@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
-import { createMiddleware } from '../src/middleware.ts';
+import { createMiddleware } from '../src/server/middleware.ts';
 import { locOf } from './helpers.ts';
 
 /**
@@ -142,8 +142,15 @@ describe('routing & guards', () => {
     expect(r.body).toMatchObject({ ok: true, name: 'astro-text-edit' });
   });
 
-  it('GET /healthX currently matches /health by prefix — flips to 404 in Phase 3 (intentional tightening)', async () => {
+  it('GET /healthX no longer matches /health — routes are exact-path (intentional tightening)', async () => {
+    // Pre-refactor this returned 200 via prefix matching; the route table
+    // matches exact pathnames. The client only ever calls exact paths.
     const r = await request({ method: 'GET', url: '/__text-edit/healthX' });
+    expect(r.status).toBe(404);
+  });
+
+  it('matches routes with a query string appended', async () => {
+    const r = await request({ method: 'GET', url: '/__text-edit/health?x=1' });
     expect(r.status).toBe(200);
   });
 

@@ -1,0 +1,46 @@
+---
+// Playground page for astro-text-edit.
+// Everything below is literal text and a static <img> — the two things the
+// integration currently supports editing. Click them in the browser with edit
+// mode on; commits should write straight back into THIS file / public/.
+const year = new Date().getFullYear();
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>astro-text-edit playground</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.6; }
+      img { max-width: 100%; border-radius: 8px; }
+      .expr { color: #888; }
+    </style>
+  </head>
+  <body>
+    <h1>Editable heading — click me with edit mode on</h1>
+
+    <p>
+      This is a plain literal paragraph. Every word here lives directly in
+      index.astro as static text, so the patcher should be able to rewrite it
+      in place without following any expression.
+    </p>
+
+    <p>
+      A second paragraph, so you can confirm the classifier picks the right
+      source location when there is more than one editable target on the page.
+    </p>
+
+    <img src="/sample.svg" alt="A sample placeholder image" />
+
+    <p>
+      Below is an expression, <span class="expr">not</span> a literal:
+      the year is {year}. The integration should classify this as
+      non-editable (or offer open-in-editor) rather than clobber the source.
+    </p>
+
+    <footer>
+      <p>Static footer text &mdash; another literal editing target.</p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "astro-text-edit-playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local test site for astro-text-edit. Not published. Consumes the integration from ../.. via a file: link so every edit to the integration source is picked up live by `npm run dev`.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^5.0.0",
+    "astro-text-edit": "file:../.."
+  }
+}

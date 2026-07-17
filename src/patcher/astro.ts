@@ -1,5 +1,6 @@
 import { parse } from '@astrojs/compiler';
-import type { AttrState, ClassifyResult, RefusalCode } from '../shared/protocol.ts';
+import type { AttrState, ClassifyResult } from '../shared/protocol.ts';
+import type { ApplyResult, Patcher, PatchRequest } from './types.ts';
 
 /**
  * .astro source patcher — resolves a `data-astro-source-loc` back to the AST
@@ -35,18 +36,6 @@ interface AstNode {
   attributes?: AstNode[];
   children?: AstNode[];
 }
-
-export interface ApplyRequest {
-  loc: string; // "line:col" from data-astro-source-loc
-  tag: string; // lowercased tag name of the clicked element
-  targetType: 'text' | 'src' | 'alt';
-  original: string; // rendered text / attr value the client saw
-  newText: string;
-}
-
-export type ApplyResult =
-  | { ok: true; newSource: string }
-  | { ok: false; code: RefusalCode; error: string };
 
 // ---------------------------------------------------------------------------
 // Position helpers (JS string space)
@@ -388,7 +377,7 @@ function patchAttribute(
   return { ok: true, newSource: source.slice(0, span.from) + replacement + source.slice(span.to) };
 }
 
-export async function applyAstro(source: string, req: ApplyRequest): Promise<ApplyResult> {
+export async function applyAstro(source: string, req: PatchRequest): Promise<ApplyResult> {
   const res = await resolveElement(source, req.loc, req.tag);
   if (res.status === 'ambiguous') {
     return { ok: false, code: 'ambiguous', error: 'Two elements share this source location; refusing to guess.' };
@@ -408,3 +397,10 @@ export async function applyAstro(source: string, req: ApplyRequest): Promise<App
   }
   return patchAttribute(source, starts, el, req.targetType, req.original, req.newText);
 }
+
+/** This file's classify/apply pair, packaged for the extension registry. */
+export const astroPatcher: Patcher = {
+  extensions: ['.astro'],
+  classify: (source, { loc, tag }) => classifyAstro(source, loc, tag),
+  apply: applyAstro,
+};

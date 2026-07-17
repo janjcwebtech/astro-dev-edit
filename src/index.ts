@@ -1,6 +1,6 @@
 import type { AstroIntegration } from 'astro';
 import { fileURLToPath } from 'node:url';
-import { createMiddleware } from './middleware.ts';
+import { createMiddleware } from './server/middleware.ts';
 
 /**
  * astro-text-edit — in-browser visual content editing for the local dev server.
