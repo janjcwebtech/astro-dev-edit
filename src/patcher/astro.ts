@@ -1,4 +1,5 @@
 import { parse } from '@astrojs/compiler';
+import type { AttrState, ClassifyResult, RefusalCode } from '../shared/protocol.ts';
 
 /**
  * .astro source patcher — resolves a `data-astro-source-loc` back to the AST
@@ -35,23 +36,6 @@ interface AstNode {
   children?: AstNode[];
 }
 
-export type ClassifyKind =
-  | 'text' // children are exclusively literal text → editable
-  | 'image' // an element whose src/alt attrs may be editable (see attrs)
-  | 'empty' // no children; nothing to text-edit
-  | 'dynamic' // expression / child elements / component content
-  | 'ambiguous' // ≥2 elements share this annotation loc — cannot patch safely
-  | 'unresolved'; // no element matches this loc (stale DOM, edited file)
-
-export type AttrState = 'static' | 'dynamic' | 'missing';
-
-export interface ClassifyResult {
-  kind: ClassifyKind;
-  reason: string;
-  /** For `img` targets: whether src/alt are patchable. */
-  attrs?: { src: AttrState; alt: AttrState };
-}
-
 export interface ApplyRequest {
   loc: string; // "line:col" from data-astro-source-loc
   tag: string; // lowercased tag name of the clicked element
@@ -62,7 +46,7 @@ export interface ApplyRequest {
 
 export type ApplyResult =
   | { ok: true; newSource: string }
-  | { ok: false; code: 'dynamic' | 'mismatch' | 'unresolved' | 'ambiguous' | 'unsupported'; error: string };
+  | { ok: false; code: RefusalCode; error: string };
 
 // ---------------------------------------------------------------------------
 // Position helpers (JS string space)

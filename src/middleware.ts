@@ -3,7 +3,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Connect } from 'vite';
 import { mkdir, readdir, readFile, realpath, rename, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
-import { applyAstro, classifyAstro, type ApplyRequest } from './patcher/astro.ts';
+import { applyAstro, classifyAstro } from './patcher/astro.ts';
+import type {
+  ApplyRequestWire,
+  ClassifyRequest,
+  OpenRequest,
+  UploadRequest,
+} from './shared/protocol.ts';
 
 /**
  * Dev-server middleware for astro-text-edit.
@@ -120,7 +126,7 @@ function safeFileName(name: string, fallbackExt: string): string {
 async function saveUpload(
   root: string,
   assetDirs: string[],
-  payload: { dataUrl: string; filename: string },
+  payload: UploadRequest,
 ): Promise<{ webPath: string }> {
   const m = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(payload.dataUrl ?? '');
   if (!m) throw new Error('expected a data: URL');
@@ -269,7 +275,7 @@ export function createMiddleware({
     // write (never a source-file patch), so it's safe to enable now. (spec §11)
     if (req.method === 'POST' && url.startsWith(`${BASE}/upload`)) {
       readBody(req, 25 * 1024 * 1024) // 25 MB cap
-        .then((buf) => JSON.parse(buf.toString('utf8')) as { dataUrl: string; filename: string })
+        .then((buf) => JSON.parse(buf.toString('utf8')) as UploadRequest)
         .then((payload) => saveUpload(root, assetDirs, payload))
         .then(({ webPath }) => {
           logger.info(`uploaded image -> ${webPath}`);
@@ -291,7 +297,7 @@ export function createMiddleware({
         return;
       }
       readBody(req, 64 * 1024)
-        .then((buf) => JSON.parse(buf.toString('utf8')) as { file: string; loc?: string })
+        .then((buf) => JSON.parse(buf.toString('utf8')) as OpenRequest)
         .then(async ({ file, loc }) => {
           // Confine to the project root before handing a path to the editor.
           const abs = resolve(root, file);
@@ -320,7 +326,7 @@ export function createMiddleware({
     // resolved {expression} from literal text. (spec §7.3, §16.1)
     if (req.method === 'POST' && url.startsWith(`${BASE}/classify`)) {
       readBody(req, 64 * 1024)
-        .then((buf) => JSON.parse(buf.toString('utf8')) as { file: string; loc: string; tag: string })
+        .then((buf) => JSON.parse(buf.toString('utf8')) as ClassifyRequest)
         .then(async ({ file, loc, tag }) => {
           if (!file || !loc || !tag) throw new Error('file, loc and tag are required');
           const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
@@ -348,7 +354,7 @@ export function createMiddleware({
     // visual refresh. (spec §5, §6.1, §7.5, §10)
     if (req.method === 'POST' && url.startsWith(`${BASE}/apply`)) {
       readBody(req, 256 * 1024)
-        .then((buf) => JSON.parse(buf.toString('utf8')) as ApplyRequest & { file: string })
+        .then((buf) => JSON.parse(buf.toString('utf8')) as ApplyRequestWire)
         .then(async (payload) => {
           const { file, loc, tag, targetType, original, newText } = payload;
           if (!file || !loc || !tag) throw new Error('file, loc and tag are required');

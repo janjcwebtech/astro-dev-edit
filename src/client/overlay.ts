@@ -15,15 +15,18 @@
  * Vanilla TS, no framework, no dependencies. (spec §4.2)
  */
 
+import type {
+  ApplyRequestWire,
+  AttrState,
+  ClassifyResult,
+  SourceLoc,
+} from '../shared/protocol.ts';
+
 const API = '/__text-edit';
 const Z = 2147483000; // above Astro's dev toolbar, below nothing that matters
 
+/** DOM-side hover hint only — the server's ClassifyResult is authoritative. */
 type Classification = 'editable' | 'image' | 'dynamic' | 'unknown';
-
-interface SourceLoc {
-  file: string;
-  loc: string;
-}
 
 let editMode = false;
 let highlighted: HTMLElement | null = null;
@@ -449,14 +452,7 @@ function releaseEditingActive(): void {
 /** The real save: POST /apply. The server re-resolves the element in the AST,
  *  verifies the source still matches `original`, and writes atomically. Throws
  *  with the server's reason on refusal. (spec §5, §7.5) */
-async function applyEdit(payload: {
-  file: string;
-  loc: string;
-  tag: string;
-  targetType: 'text' | 'src' | 'alt';
-  original: string;
-  newText: string;
-}): Promise<void> {
+async function applyEdit(payload: ApplyRequestWire): Promise<void> {
   const res = await fetch(`${API}/apply`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -470,21 +466,13 @@ async function applyEdit(payload: {
 
 // --- Server-side classification (AST truth) ---------------------------------
 
-type AttrState = 'static' | 'dynamic' | 'missing';
-
-interface ServerClassification {
-  kind: 'text' | 'image' | 'empty' | 'dynamic' | 'ambiguous' | 'unresolved';
-  reason?: string;
-  attrs?: { src: AttrState; alt: AttrState };
-}
-
-async function serverClassify(src: SourceLoc, tag: string): Promise<ServerClassification> {
+async function serverClassify(src: SourceLoc, tag: string): Promise<ClassifyResult> {
   const res = await fetch(`${API}/classify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ file: src.file, loc: src.loc, tag }),
   });
-  const body = (await res.json().catch(() => ({}))) as ServerClassification & { error?: string };
+  const body = (await res.json().catch(() => ({}))) as ClassifyResult & { error?: string };
   if (!res.ok) throw new Error(body.error ?? `classify failed (${res.status})`);
   return body;
 }
@@ -942,7 +930,7 @@ async function openElement(el: HTMLElement, src: SourceLoc): Promise<void> {
   // Claim the busy flag synchronously: /classify is async, and without this a
   // rapid second click during the round-trip could open a second editor.
   editingActive = true;
-  let server: ServerClassification;
+  let server: ClassifyResult;
   try {
     server = await serverClassify(src, el.tagName.toLowerCase());
   } catch (err) {
