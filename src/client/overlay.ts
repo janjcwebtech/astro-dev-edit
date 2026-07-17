@@ -18,6 +18,7 @@
 import type { AttrState, ClassifyResult, SourceLoc } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { cacheSourceMappings, nearestSource, sourceFor, startCapture } from './source-map.ts';
+import * as state from './state.ts';
 import {
   COLOR,
   FONT,
@@ -271,8 +272,7 @@ function setEditMode(on: boolean): void {
   }
   if (!on) {
     clearHighlight();
-    activeTextFinish?.(false); // cancel any open inline edit (restores text)
-    dismissActive(); // leaving edit mode always tears down any open interaction
+    state.dismiss(); // cancel any open inline edit (restores text) / close any panel
   }
 }
 
@@ -284,49 +284,19 @@ window.addEventListener('scroll', clearHighlight, { passive: true });
 // guarantees state resets. Inline text edits handle their own Escape (to
 // restore original text) before this ever sees it.
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && activeCloser) {
+  if (e.key === 'Escape' && state.get()?.kind === 'panel') {
     e.preventDefault();
-    dismissActive();
+    state.dismiss();
   }
 });
 
 // ---------------------------------------------------------------------------
-// Editing interactions
+// Editing interactions — each claims the state.ts interaction slot
 // ---------------------------------------------------------------------------
-
-let editingActive = false; // an inline edit or panel is currently open
-
-// Closer for whatever modal interaction is currently open, so a single global
-// Escape (or leaving edit mode) can always dismiss it and reset state — no path
-// can leave `editingActive` stuck true.
-let activeCloser: (() => void) | null = null;
-
-function setActiveCloser(fn: (() => void) | null): void {
-  activeCloser = fn;
-}
-
-function dismissActive(): void {
-  const fn = activeCloser;
-  activeCloser = null;
-  if (fn) fn();
-  editingActive = false;
-}
-
-/** A commit (or a click-to-re-target) may have started a NEW interaction by the
- *  time the previous async save settles — only clear the busy flag when nothing
- *  else took over in the meantime. */
-function releaseEditingActive(): void {
-  if (!activeTextFinish && !activeCloser) editingActive = false;
-}
 
 // --- Inline text editing ---------------------------------------------------
 
-// Handle to the in-progress inline edit's finish(), so a click elsewhere can
-// commit it synchronously and then act on the new target in one gesture.
-let activeTextFinish: ((commit: boolean) => void) | null = null;
-
 function beginTextEdit(el: HTMLElement, src: SourceLoc): void {
-  editingActive = true;
   clearHighlight();
   const original = el.textContent ?? '';
 
@@ -345,7 +315,7 @@ function beginTextEdit(el: HTMLElement, src: SourceLoc): void {
   sel?.addRange(range);
 
   const finish = (commit: boolean): void => {
-    if (activeTextFinish === finish) activeTextFinish = null;
+    state.releaseIf(token);
     el.removeEventListener('keydown', onKey);
     el.removeEventListener('blur', onBlur);
     el.removeAttribute('contenteditable');
@@ -356,12 +326,11 @@ function beginTextEdit(el: HTMLElement, src: SourceLoc): void {
     const next = el.textContent ?? '';
     if (!commit || next === original) {
       el.textContent = original; // cancel / no-op restores exactly
-      editingActive = false;
       return;
     }
     void commitTextEdit(el, src, original, next);
   };
-  activeTextFinish = finish;
+  const token = state.begin({ kind: 'text', finish });
 
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -384,6 +353,9 @@ async function commitTextEdit(
   original: string,
   newText: string,
 ): Promise<void> {
+  // Hold the slot as busy while the save is in flight; releaseIf() means a
+  // click that already re-targeted (and began a new interaction) wins.
+  const busy = state.begin({ kind: 'busy' });
   const release = lockElement(el);
   try {
     await api.apply({
@@ -401,7 +373,7 @@ async function commitTextEdit(
     toast(`Save failed — ${err instanceof Error ? err.message : 'unknown error'}`, 'err');
   } finally {
     release();
-    releaseEditingActive();
+    state.releaseIf(busy);
   }
 }
 
@@ -412,7 +384,6 @@ async function beginImageEdit(
   src: SourceLoc,
   attrs: { src: AttrState; alt: AttrState },
 ): Promise<void> {
-  editingActive = true;
   clearHighlight();
   const originalSrc = img.getAttribute('src') ?? '';
   const originalAlt = img.getAttribute('alt') ?? '';
@@ -516,27 +487,23 @@ async function beginImageEdit(
   });
 
   const close = (commit: boolean, chosenSrc?: string): void => {
-    activeCloser = null;
+    state.releaseIf(token);
     panel.remove();
     backdrop.remove();
     if (!commit) {
       img.setAttribute('src', originalSrc);
       img.setAttribute('alt', originalAlt);
-      editingActive = false;
       return;
     }
     const nextSrc = chosenSrc ?? originalSrc;
     const nextAlt = altInput.value;
-    if (nextSrc === originalSrc && nextAlt === originalAlt) {
-      editingActive = false;
-      return;
-    }
+    if (nextSrc === originalSrc && nextAlt === originalAlt) return;
     void commitImageEdit(img, src, { originalSrc, originalAlt, nextSrc, nextAlt });
   };
 
   const backdrop = buildBackdrop(() => close(false));
   wirePanelButtons(panel, () => close(false), () => close(true));
-  setActiveCloser(() => close(false));
+  const token = state.begin({ kind: 'panel', close: () => close(false) });
   document.body.append(backdrop, panel);
   altInput.focus();
 
@@ -636,6 +603,7 @@ async function commitImageEdit(
   src: SourceLoc,
   v: { originalSrc: string; originalAlt: string; nextSrc: string; nextAlt: string },
 ): Promise<void> {
+  const busy = state.begin({ kind: 'busy' });
   const release = lockElement(img);
   try {
     img.setAttribute('src', v.nextSrc);
@@ -654,14 +622,13 @@ async function commitImageEdit(
     toast(`Save failed — ${err instanceof Error ? err.message : 'unknown error'}`, 'err');
   } finally {
     release();
-    releaseEditingActive();
+    state.releaseIf(busy);
   }
 }
 
 // --- Dynamic refusal notice ------------------------------------------------
 
 function showDynamicNotice(el: HTMLElement, src: SourceLoc, reason: string): void {
-  editingActive = true;
   clearHighlight();
   const panel = buildPanel('Can’t edit this here');
   const body = panel.querySelector('[data-body]') as HTMLElement;
@@ -687,9 +654,9 @@ function showDynamicNotice(el: HTMLElement, src: SourceLoc, reason: string): voi
     body.append(hint);
   }
 
-  const close = (): void => { activeCloser = null; panel.remove(); backdrop.remove(); editingActive = false; };
+  const close = (): void => { state.releaseIf(token); panel.remove(); backdrop.remove(); };
   const backdrop = buildBackdrop(close);
-  setActiveCloser(close);
+  const token = state.begin({ kind: 'panel', close });
 
   // cancel = close, "Open template" = jump to the .astro loc, and (when the
   // page declares a content file) a primary "Edit page content" that opens it.
@@ -743,14 +710,14 @@ function isOwnUi(e: Event): boolean {
  * resolved {expression} from literal text; the AST can. (spec §16.1)
  */
 async function openElement(el: HTMLElement, src: SourceLoc): Promise<void> {
-  // Claim the busy flag synchronously: /classify is async, and without this a
-  // rapid second click during the round-trip could open a second editor.
-  editingActive = true;
+  // Claim the interaction slot synchronously: /classify is async, and without
+  // this a rapid second click during the round-trip could open a second editor.
+  const busy = state.begin({ kind: 'busy' });
   let server: ClassifyResult;
   try {
     server = await api.classify({ file: src.file, loc: src.loc, tag: el.tagName.toLowerCase() });
   } catch (err) {
-    editingActive = false;
+    state.releaseIf(busy);
     toast(`Could not check editability — ${err instanceof Error ? err.message : 'unknown error'}`, 'err');
     return;
   }
@@ -788,20 +755,22 @@ function onClick(e: MouseEvent): void {
   // Case A: an inline text edit is open. A click elsewhere should commit it and
   // — if it landed on another editable target — open that one in the SAME
   // gesture, rather than only dismissing and forcing a second click. (#1)
-  if (activeTextFinish) {
+  const interaction = state.get();
+  if (interaction?.kind === 'text') {
     const active = document.querySelector('[data-astro-text-edit-active="1"]');
     if (el && el === active) return; // clicking within the edit: leave it be
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-    activeTextFinish(true); // commit the current edit now
+    interaction.finish(true); // commit the current edit now
     if (el && src) void openElement(el, src); // and open the new target immediately
     return;
   }
 
   // Case B: a modal interaction (image/dynamic panel) is open — its own
-  // backdrop/buttons handle dismissal. Don't route background clicks.
-  if (editingActive) return;
+  // backdrop/buttons handle dismissal — or a classify/save is in flight.
+  // Don't route background clicks.
+  if (interaction) return;
 
   if (!el || !src) return;
 
