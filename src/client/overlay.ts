@@ -15,15 +15,22 @@
  * Vanilla TS, no framework, no dependencies. (spec §4.2)
  */
 
-import type {
-  ApplyRequestWire,
-  AttrState,
-  ClassifyResult,
-  SourceLoc,
-} from '../shared/protocol.ts';
-
-const API = '/__text-edit';
-const Z = 2147483000; // above Astro's dev toolbar, below nothing that matters
+import type { AttrState, ClassifyResult, SourceLoc } from '../shared/protocol.ts';
+import * as api from './api.ts';
+import { cacheSourceMappings, nearestSource, sourceFor, startCapture } from './source-map.ts';
+import {
+  COLOR,
+  FONT,
+  Z,
+  basename,
+  buildBackdrop,
+  buildPanel,
+  hexToRgba,
+  lockElement,
+  styled,
+  toast,
+  wirePanelButtons,
+} from './ui.ts';
 
 /** DOM-side hover hint only — the server's ClassifyResult is authoritative. */
 type Classification = 'editable' | 'image' | 'dynamic' | 'unknown';
@@ -31,113 +38,10 @@ type Classification = 'editable' | 'image' | 'dynamic' | 'unknown';
 let editMode = false;
 let highlighted: HTMLElement | null = null;
 
-// ---------------------------------------------------------------------------
-// Source-location cache
-// ---------------------------------------------------------------------------
-//
-// Astro emits `data-astro-source-file` / `-loc` in the served HTML, but its
-// dev-toolbar runtime STRIPS those attributes out of the DOM shortly after
-// hydration. By hover time they are gone — querying them live finds nothing.
-// (Verified against Astro 5.18: 254 attrs in served HTML, 0 in the live DOM.)
-//
-// So we snapshot every annotated element into a WeakMap the instant this script
-// runs, before the toolbar clears them, and read hover/edit locations from the
-// cache instead of from live attributes. This is the same approach the site's
-// existing astro-click-to-source integration uses. It also supersedes spec
-// §4.2's "re-read attributes lazily on next hover", which is not viable here.
-
-// Two-layer cache. The primary key is the element itself: when we see an
-// annotated element we copy its {file, loc} onto a private JS property. A JS
-// property survives the attribute-strip (Astro removes the HTML attribute, not
-// our property) AND survives across hover with no path matching. The secondary
-// path-keyed map is the fallback for the case where Astro REPLACES a node
-// wholesale (new object, our property gone): we re-resolve by structural path.
-//
-// The critical timing fix: we don't snapshot once and hope. A MutationObserver
-// watches for the attributes being added (initial render / HMR) and stamps them
-// onto the element the moment they appear — so we always capture the value
-// before the toolbar's own observer strips it, regardless of ordering.
-
-const PROP = '__astroTextEditSrc' as const;
-
-interface Stamped extends HTMLElement {
-  [PROP]?: SourceLoc;
-}
-
-const sourceByPath = new Map<string, SourceLoc>();
-
-/** Structural path: `tag:nth-of-type` chain to the document root. Computed from
- *  the live DOM at both stamp and lookup time, so the two always agree. */
-function elementPath(el: HTMLElement): string {
-  const parts: string[] = [];
-  let cur: HTMLElement | null = el;
-  while (cur && cur.parentElement) {
-    const parent: HTMLElement = cur.parentElement;
-    const tag = cur.tagName;
-    let idx = 1;
-    for (const sib of parent.children) {
-      if (sib === cur) break;
-      if (sib.tagName === tag) idx++;
-    }
-    parts.unshift(`${tag.toLowerCase()}:nth-of-type(${idx})`);
-    cur = parent;
-  }
-  return parts.join('>');
-}
-
-/** Record an annotated element's source loc into both cache layers. */
-function stamp(el: Stamped): void {
-  if (el[PROP]) return;
-  const file = el.getAttribute('data-astro-source-file');
-  if (!file) return;
-  const loc = el.getAttribute('data-astro-source-loc') ?? '';
-  const src: SourceLoc = { file, loc };
-  el[PROP] = src;
-  sourceByPath.set(elementPath(el), src);
-}
-
-/** Snapshot everything currently annotated in the DOM. */
-function cacheSourceMappings(): void {
-  for (const el of document.querySelectorAll<Stamped>('[data-astro-source-file]')) {
-    stamp(el);
-  }
-}
-
-/** Resolve a live element's source loc: property first, path fallback. */
-function sourceFor(el: HTMLElement): SourceLoc | undefined {
-  return (el as Stamped)[PROP] ?? sourceByPath.get(elementPath(el));
-}
-
-// Stamp attributes the instant they appear, before the dev toolbar strips them.
-// This wins the race regardless of script ordering. (verified fix)
-const stampObserver = new MutationObserver((records) => {
-  for (const rec of records) {
-    if (rec.type === 'attributes' && rec.target instanceof HTMLElement) {
-      stamp(rec.target);
-    }
-    for (const node of rec.addedNodes) {
-      if (node instanceof HTMLElement) {
-        if (node.hasAttribute('data-astro-source-file')) stamp(node);
-        for (const el of node.querySelectorAll<Stamped>('[data-astro-source-file]')) {
-          stamp(el);
-        }
-      }
-    }
-  }
-});
-
-function startCapture(): void {
-  cacheSourceMappings(); // grab whatever is already present
-  stampObserver.observe(document.documentElement, {
-    subtree: true,
-    childList: true,
-    attributes: true,
-    attributeFilter: ['data-astro-source-file', 'data-astro-source-loc'],
-  });
-}
-
 // Begin capturing as early as possible. If the body isn't parsed yet, wait for
-// it; the observer then catches every annotated node as it arrives.
+// it; the observer then catches every annotated node as it arrives. This must
+// run synchronously at module evaluation to win the attribute-strip race —
+// see source-map.ts.
 if (document.body) {
   startCapture();
 } else {
@@ -148,29 +52,25 @@ if (document.body) {
 // UI elements
 // ---------------------------------------------------------------------------
 
-const outline = document.createElement('div');
-outline.dataset.astroTextEditUi = '1';
-Object.assign(outline.style, {
+const outline = styled('div', 'atx-outline', {
   position: 'fixed',
   pointerEvents: 'none',
   zIndex: String(Z),
-  border: '2px solid #7c5cff',
+  border: `2px solid ${COLOR.accent}`,
   borderRadius: '3px',
   background: 'rgba(124, 92, 255, 0.08)',
   display: 'none',
   transition: 'all 60ms ease-out',
-} as CSSStyleDeclaration);
+}, 'atx-outline');
 
 // The pill is interactive: hovering it keeps it open, and its "open source"
 // button jumps to the element's source in the editor. (#3)
-const tooltip = document.createElement('div');
-tooltip.dataset.astroTextEditUi = '1';
-Object.assign(tooltip.style, {
+const tooltip = styled('div', 'atx-tooltip', {
   position: 'fixed',
   pointerEvents: 'auto',
   zIndex: String(Z + 1),
   padding: '4px 4px 4px 8px',
-  font: '500 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace',
+  font: `500 12px/1.4 ${FONT.mono}`,
   color: '#fff',
   background: '#1a1a2e',
   borderRadius: '5px',
@@ -178,48 +78,44 @@ Object.assign(tooltip.style, {
   display: 'none',
   whiteSpace: 'nowrap',
   cursor: 'default',
-} as CSSStyleDeclaration);
+}, 'atx-tooltip');
 
-const tooltipLabel = document.createElement('span');
-const tooltipOpen = document.createElement('button');
-tooltipOpen.dataset.astroTextEditUi = '1';
-tooltipOpen.type = 'button';
-tooltipOpen.textContent = 'open ↗';
-tooltipOpen.title = 'Open this location in your editor';
-Object.assign(tooltipOpen.style, {
+const tooltipLabel = styled('span', 'atx-tooltip-label', {});
+const tooltipOpen = styled('button', 'atx-tooltip-open', {
   marginLeft: '8px',
   padding: '2px 7px',
-  font: '600 11px ui-sans-serif, system-ui, sans-serif',
+  font: `600 11px ${FONT.ui}`,
   color: '#fff',
   background: 'rgba(255,255,255,0.14)',
   border: 'none',
   borderRadius: '4px',
   cursor: 'pointer',
-} as CSSStyleDeclaration);
+});
+tooltipOpen.type = 'button';
+tooltipOpen.textContent = 'open ↗';
+tooltipOpen.title = 'Open this location in your editor';
 tooltipOpen.addEventListener('mouseenter', () => (tooltipOpen.style.background = 'rgba(255,255,255,0.28)'));
 tooltipOpen.addEventListener('mouseleave', () => (tooltipOpen.style.background = 'rgba(255,255,255,0.14)'));
 tooltip.append(tooltipLabel, tooltipOpen);
 
-const toggle = document.createElement('button');
-toggle.dataset.astroTextEditUi = '1';
-toggle.type = 'button';
-toggle.textContent = 'Edit';
-toggle.title = 'Toggle text-edit mode';
-Object.assign(toggle.style, {
+const toggle = styled('button', 'atx-toggle', {
   position: 'fixed',
   // Offset up from the bottom so it clears Astro's dev toolbar bar. (spec §4.2)
   right: '16px',
   bottom: '64px',
   zIndex: String(Z + 2),
   padding: '8px 14px',
-  font: '600 13px/1 ui-sans-serif, system-ui, sans-serif',
+  font: `600 13px/1 ${FONT.ui}`,
   color: '#fff',
-  background: '#4a4a6a',
+  background: COLOR.idle,
   border: 'none',
   borderRadius: '999px',
   boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
   cursor: 'pointer',
-} as CSSStyleDeclaration);
+}, 'atx-toggle');
+toggle.type = 'button';
+toggle.textContent = 'Edit';
+toggle.title = 'Toggle text-edit mode';
 
 // ---------------------------------------------------------------------------
 // Classification (client-side hint only — the server is authoritative later)
@@ -247,29 +143,11 @@ function classify(el: HTMLElement): Classification {
 }
 
 const CLASS_COLOR: Record<Classification, string> = {
-  editable: '#7c5cff',
-  image: '#2bb673',
-  dynamic: '#e0a800',
-  unknown: '#888',
+  editable: COLOR.accent,
+  image: COLOR.image,
+  dynamic: COLOR.warn,
+  unknown: COLOR.muted,
 };
-
-/**
- * Nearest ancestor (or self) with a cached source location, resolved by
- * structural path. Reads the snapshot cache, not live attributes — the
- * attributes are gone by now.
- */
-function nearestSource(node: EventTarget | null): HTMLElement | null {
-  let el = node as HTMLElement | null;
-  while (el && el !== document.body) {
-    if (sourceFor(el)) return el;
-    el = el.parentElement;
-  }
-  return null;
-}
-
-function basename(path: string): string {
-  return path.split(/[\\/]/).pop() ?? path;
-}
 
 /**
  * The content file backing a detail page, if the page declares one.
@@ -376,21 +254,13 @@ tooltipOpen.addEventListener('click', (e) => {
   if (highlightedSrc) void openSource(highlightedSrc);
 });
 
-function hexToRgba(hex: string, alpha: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 // ---------------------------------------------------------------------------
 // Toggle
 // ---------------------------------------------------------------------------
 
 function setEditMode(on: boolean): void {
   editMode = on;
-  toggle.style.background = on ? '#7c5cff' : '#4a4a6a';
+  toggle.style.background = on ? COLOR.accent : COLOR.idle;
   toggle.textContent = on ? 'Editing' : 'Edit';
   document.body.style.cursor = on ? 'crosshair' : '';
   // Survive the full-page reload that follows every successful save.
@@ -447,34 +317,6 @@ function dismissActive(): void {
  *  else took over in the meantime. */
 function releaseEditingActive(): void {
   if (!activeTextFinish && !activeCloser) editingActive = false;
-}
-
-/** The real save: POST /apply. The server re-resolves the element in the AST,
- *  verifies the source still matches `original`, and writes atomically. Throws
- *  with the server's reason on refusal. (spec §5, §7.5) */
-async function applyEdit(payload: ApplyRequestWire): Promise<void> {
-  const res = await fetch(`${API}/apply`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `save failed (${res.status})`);
-  }
-}
-
-// --- Server-side classification (AST truth) ---------------------------------
-
-async function serverClassify(src: SourceLoc, tag: string): Promise<ClassifyResult> {
-  const res = await fetch(`${API}/classify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ file: src.file, loc: src.loc, tag }),
-  });
-  const body = (await res.json().catch(() => ({}))) as ClassifyResult & { error?: string };
-  if (!res.ok) throw new Error(body.error ?? `classify failed (${res.status})`);
-  return body;
 }
 
 // --- Inline text editing ---------------------------------------------------
@@ -544,7 +386,7 @@ async function commitTextEdit(
 ): Promise<void> {
   const release = lockElement(el);
   try {
-    await applyEdit({
+    await api.apply({
       file: src.file,
       loc: src.loc,
       tag: el.tagName.toLowerCase(),
@@ -645,16 +487,7 @@ async function beginImageEdit(
         fr.onerror = () => reject(fr.error);
         fr.readAsDataURL(file);
       });
-      const res = await fetch(`${API}/upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUrl, filename: file.name }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `upload failed (${res.status})`);
-      }
-      const { webPath } = (await res.json()) as { webPath: string };
+      const { webPath } = await api.upload({ dataUrl, filename: file.name });
       img.setAttribute('src', webPath); // live preview
       close(true, webPath);
     } catch (err) {
@@ -712,19 +545,10 @@ async function beginImageEdit(
     list.textContent = 'Loading…';
     let files: string[];
     try {
-      const res = await fetch(`${API}/assets`);
-      if (!res.ok) throw new Error(`server returned ${res.status}`);
-      const ct = res.headers.get('content-type') ?? '';
-      if (!ct.includes('application/json')) {
-        // Most likely our middleware didn't handle the route and Vite served
-        // HTML — tells us exactly what went wrong instead of a vague message.
-        throw new Error('endpoint returned non-JSON (middleware not reached?)');
-      }
-      files = ((await res.json()) as { files: string[] }).files;
       // A plain <img src> must reference a path that exists in the built site.
       // Files under /src/ are only served by the dev server — offering them
       // here would produce edits that break in production.
-      files = files.filter((f) => !f.startsWith('/src/'));
+      files = (await api.getAssets()).filter((f) => !f.startsWith('/src/'));
     } catch (err) {
       list.textContent = '';
       const msg = document.createElement('div');
@@ -818,10 +642,10 @@ async function commitImageEdit(
     img.setAttribute('alt', v.nextAlt);
     const common = { file: src.file, loc: src.loc, tag: 'img' };
     if (v.nextSrc !== v.originalSrc) {
-      await applyEdit({ ...common, targetType: 'src', original: v.originalSrc, newText: v.nextSrc });
+      await api.apply({ ...common, targetType: 'src', original: v.originalSrc, newText: v.nextSrc });
     }
     if (v.nextAlt !== v.originalAlt) {
-      await applyEdit({ ...common, targetType: 'alt', original: v.originalAlt, newText: v.nextAlt });
+      await api.apply({ ...common, targetType: 'alt', original: v.originalAlt, newText: v.nextAlt });
     }
     toast(`Saved — ${basename(src.file)}:${src.loc}`, 'ok');
   } catch (err) {
@@ -897,15 +721,7 @@ function showDynamicNotice(el: HTMLElement, src: SourceLoc, reason: string): voi
 /** Open a source location in the user's editor via the /open endpoint. */
 async function openSource(src: SourceLoc): Promise<void> {
   try {
-    const res = await fetch(`${API}/open`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file: src.file, loc: src.loc }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error ?? `open failed (${res.status})`);
-    }
+    await api.open({ file: src.file, loc: src.loc });
     toast(`Opened ${basename(src.file)}:${src.loc} in your editor`, 'ok');
   } catch (err) {
     toast(`Could not open source — ${err instanceof Error ? err.message : 'unknown'}`, 'err');
@@ -932,7 +748,7 @@ async function openElement(el: HTMLElement, src: SourceLoc): Promise<void> {
   editingActive = true;
   let server: ClassifyResult;
   try {
-    server = await serverClassify(src, el.tagName.toLowerCase());
+    server = await api.classify({ file: src.file, loc: src.loc, tag: el.tagName.toLowerCase() });
   } catch (err) {
     editingActive = false;
     toast(`Could not check editability — ${err instanceof Error ? err.message : 'unknown error'}`, 'err');
@@ -1026,152 +842,13 @@ if (import.meta.hot) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared UI helpers
-// ---------------------------------------------------------------------------
-
-/** Lock an element during a save: dim + spinner overlay. Returns a release fn. */
-function lockElement(el: HTMLElement): () => void {
-  const rect = el.getBoundingClientRect();
-  const veil = document.createElement('div');
-  veil.dataset.astroTextEditUi = '1';
-  Object.assign(veil.style, {
-    position: 'fixed', zIndex: String(Z + 3), pointerEvents: 'all',
-    left: `${rect.left - 2}px`, top: `${rect.top - 2}px`,
-    width: `${rect.width + 4}px`, height: `${rect.height + 4}px`,
-    background: 'rgba(124, 92, 255, 0.12)', borderRadius: '3px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  } as CSSStyleDeclaration);
-  const chip = document.createElement('div');
-  chip.textContent = 'saving…';
-  Object.assign(chip.style, {
-    font: '600 11px system-ui', color: '#fff', background: '#7c5cff',
-    padding: '2px 8px', borderRadius: '999px', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-  } as CSSStyleDeclaration);
-  veil.append(chip);
-  document.body.append(veil);
-  return () => veil.remove();
-}
-
-/** Bottom-center toast. `kind` sets the accent. Auto-dismisses. */
-function toast(message: string, kind: 'ok' | 'err'): void {
-  const t = document.createElement('div');
-  t.dataset.astroTextEditUi = '1';
-  t.textContent = message;
-  Object.assign(t.style, {
-    position: 'fixed', zIndex: String(Z + 5), left: '50%', bottom: '24px',
-    transform: 'translateX(-50%)', padding: '10px 16px', borderRadius: '8px',
-    font: '500 13px system-ui', color: '#fff',
-    background: kind === 'ok' ? '#2b8a4a' : '#c0392b',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.3)', opacity: '0', transition: 'opacity 120ms',
-  } as CSSStyleDeclaration);
-  document.body.append(t);
-  requestAnimationFrame(() => (t.style.opacity = '1'));
-  setTimeout(() => {
-    t.style.opacity = '0';
-    setTimeout(() => t.remove(), 200);
-  }, 2400);
-}
-
-/** A centered modal panel shell with a title bar, body slot, and two buttons. */
-function buildPanel(title: string): HTMLElement {
-  const panel = document.createElement('div');
-  panel.dataset.astroTextEditUi = '1';
-  Object.assign(panel.style, {
-    position: 'fixed', zIndex: String(Z + 6), left: '50%', top: '50%',
-    transform: 'translate(-50%, -50%)', width: 'min(420px, 92vw)',
-    background: '#1c1c2b', color: '#eee', borderRadius: '12px',
-    boxShadow: '0 12px 48px rgba(0,0,0,0.5)', border: '1px solid #333',
-    overflow: 'hidden', font: '13px system-ui',
-  } as CSSStyleDeclaration);
-
-  const bar = document.createElement('div');
-  bar.textContent = title;
-  Object.assign(bar.style, {
-    padding: '12px 16px', font: '600 13px system-ui', borderBottom: '1px solid #2c2c3d',
-  } as CSSStyleDeclaration);
-
-  const body = document.createElement('div');
-  body.dataset.body = '';
-  Object.assign(body.style, { padding: '16px' } as CSSStyleDeclaration);
-
-  const foot = document.createElement('div');
-  foot.dataset.foot = '';
-  Object.assign(foot.style, {
-    padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
-    borderTop: '1px solid #2c2c3d',
-  } as CSSStyleDeclaration);
-
-  panel.append(bar, body, foot);
-  return panel;
-}
-
-/** Dim backdrop that closes the panel when clicked. */
-function buildBackdrop(onClose: () => void): HTMLElement {
-  const b = document.createElement('div');
-  b.dataset.astroTextEditUi = '1';
-  Object.assign(b.style, {
-    position: 'fixed', inset: '0', zIndex: String(Z + 5),
-    background: 'rgba(0,0,0,0.4)',
-  } as CSSStyleDeclaration);
-  b.addEventListener('click', onClose);
-  return b;
-}
-
-/** Populate a panel's footer with cancel + confirm buttons, and optionally a
- *  secondary (outline) button between them for a second action. */
-function wirePanelButtons(
-  panel: HTMLElement,
-  onCancel: () => void,
-  onConfirm: () => void,
-  opts: { confirmLabel?: string; secondaryLabel?: string; onSecondary?: () => void } = {},
-): void {
-  const foot = panel.querySelector('[data-foot]') as HTMLElement;
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.textContent = 'Cancel';
-  Object.assign(cancel.style, {
-    padding: '7px 14px', borderRadius: '7px', border: '1px solid #3a3a4d',
-    background: 'transparent', color: '#ccc', cursor: 'pointer', font: '600 13px system-ui',
-  } as CSSStyleDeclaration);
-  cancel.addEventListener('click', onCancel);
-  foot.append(cancel);
-
-  if (opts.secondaryLabel && opts.onSecondary) {
-    const secondary = document.createElement('button');
-    secondary.type = 'button';
-    secondary.textContent = opts.secondaryLabel;
-    Object.assign(secondary.style, {
-      padding: '7px 14px', borderRadius: '7px', border: '1px solid #5a5a7a',
-      background: 'transparent', color: '#cdd', cursor: 'pointer', font: '600 13px system-ui',
-    } as CSSStyleDeclaration);
-    secondary.addEventListener('click', opts.onSecondary);
-    foot.append(secondary);
-  }
-
-  const confirm = document.createElement('button');
-  confirm.type = 'button';
-  confirm.textContent = opts.confirmLabel ?? 'Save';
-  Object.assign(confirm.style, {
-    padding: '7px 14px', borderRadius: '7px', border: 'none',
-    background: '#7c5cff', color: '#fff', cursor: 'pointer', font: '600 13px system-ui',
-  } as CSSStyleDeclaration);
-  confirm.addEventListener('click', onConfirm);
-  foot.append(confirm);
-}
-
-// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
 async function boot(): Promise<void> {
   // Confirm the server side is alive before showing the button. If the health
   // check fails the overlay stays out of the way entirely.
-  try {
-    const res = await fetch(`${API}/health`);
-    if (!res.ok) return;
-  } catch {
-    return;
-  }
+  if (!(await api.health())) return;
   document.body.append(outline, tooltip, toggle);
 
   // Restore edit mode across the full-page reload that follows every save.
