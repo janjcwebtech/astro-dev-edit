@@ -1,0 +1,38 @@
+{
+  "name": "astro-text-edit",
+  "version": "0.1.0",
+  "description": "In-browser visual content editing for the Astro dev server — click text or images in the rendered page, writes straight to source. Dev-only.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "astro-component",
+    "cms",
+    "visual-editing",
+    "dev-tools",
+    "withastro"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "astro": ">=5.0.0"
+  },
+  "dependencies": {
+    "@astrojs/compiler": "^2.13.1",
+    "launch-editor": "^2.14.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.6.0"
+  }
+}
