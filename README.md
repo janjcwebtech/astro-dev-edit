@@ -133,6 +133,24 @@ Rules of the contract:
 The button opens the file at its top (no line number); it does not yet resolve
 which line a specific field lives on.
 
+## Styling the overlay
+
+Every overlay element carries a stable class, and the singletons carry IDs:
+`#atx-toggle` (the Edit button), `#atx-outline` (hover highlight),
+`#atx-tooltip` (the file:loc pill), plus classes like `atx-panel`,
+`atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
+`atx-backdrop`, `atx-drop`, `atx-asset-row`.
+
+Use them to reference elements from devtools or to override styling. The
+baseline styles are **inline** on purpose — they win specificity against any
+host-page CSS so the overlay renders correctly on every site — which means
+your overrides need `!important`:
+
+```css
+/* e.g. move the Edit button above a cookie banner */
+#atx-toggle { bottom: 120px !important; }
+```
+
 ## Scope and limitations
 
 - **Dev only.** Nothing runs in build/preview/production.
