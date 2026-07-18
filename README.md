@@ -214,7 +214,8 @@ Every overlay element carries a stable class, and the singletons carry IDs:
 `#atx-hide` (the ✕ shown on hover that hides the group until reload),
 `#atx-toggle-hint` (the "hold … to navigate" note under the buttons),
 `#atx-outline` (hover highlight),
-`#atx-tooltip` (the file:loc pill), plus classes like `atx-panel`,
+`#atx-tooltip` (the file:loc pill — both its label and the "open ↗" button
+jump to the source in your editor), plus classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
 `atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, and the rich body
 editor's `atx-rte`, `atx-rte-head` (sticky toolbar + image panel),

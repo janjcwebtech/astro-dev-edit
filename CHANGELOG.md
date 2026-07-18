@@ -18,6 +18,7 @@ Work landed on `main` since the 0.1.0 baseline, awaiting a version stamp.
 -   `uploadDir` option (default `public`) controls where image uploads are written; a preflight warning fires when it points outside `public/`, where a plain `<img src>` would 404 in a production build
 -   WYSIWYG body editor in the entry drawer: formatting toolbar (bold, italic, strikethrough, heading levels, lists, quote, code block, inline code, link, insert image) over a contenteditable surface, with an MD/Rich toggle; bodies using markdown outside the supported subset (tables, raw HTML/MDX, footnotes, nested lists) open in raw-markdown mode and refuse a lossy switch to rich
 -   A small ✕ button, revealed while hovering the corner buttons, hides them (and turns edit mode off) until the next page reload
+-   The hover pill's `file:loc` label is clickable and jumps to the source location, same as the "open ↗" button next to it
 
 ### Changed
 
@@ -33,6 +34,7 @@ Work landed on `main` since the 0.1.0 baseline, awaiting a version stamp.
 
 ### Fixed
 
+-   Moving the mouse from an element up to its hover pill often crossed a different annotated element (typically the parent) and instantly retargeted the highlight, yanking the pill away before it could be clicked; switching the highlight to a different element now waits out a short dwell (~150ms), cancelled by reaching the pill or returning to the element — the first highlight is still instant
 -   Image uploads wrote into the first `assetDirs` entry (`src/assets` by default), producing an `<img src="/src/assets/…">` that works in the dev server but 404s in a production build; uploads now go to the configurable `uploadDir` under `public/`, and the uploaded file is offered by the swap panel afterwards
 -   Clicking an existing image in the rich body editor pre-filled its alt text from the filename the moment the panel opened, so a plain Replace could silently rewrite the alt; existing images' alt is now left untouched (filename auto-suggest applies only to newly inserted images)
 -   Bare block-level images (not wrapped in a paragraph) were dropped by the rich editor's markdown serialization; they now serialize as `![alt](src)`

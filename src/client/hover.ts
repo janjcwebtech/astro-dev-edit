@@ -70,7 +70,14 @@ const tooltip = styled('div', 'atx-tooltip', {
   cursor: 'default',
 }, 'atx-tooltip');
 
-const tooltipLabel = styled('span', 'atx-tooltip-label', {});
+// The label is clickable like the button — the whole file:loc line jumps to
+// the source. (#3)
+const tooltipLabel = styled('span', 'atx-tooltip-label', {
+  cursor: 'pointer',
+});
+tooltipLabel.title = 'Open this location in your editor';
+tooltipLabel.addEventListener('mouseenter', () => (tooltipLabel.style.textDecoration = 'underline'));
+tooltipLabel.addEventListener('mouseleave', () => (tooltipLabel.style.textDecoration = 'none'));
 const tooltipOpen = styled('button', 'atx-tooltip-open', {
   marginLeft: '8px',
   padding: '2px 7px',
@@ -97,6 +104,14 @@ let highlightedSrc: SourceLoc | null = null;
 // Grace timer: when the mouse leaves an element we wait briefly before hiding,
 // so the user can travel up to the pill and click it without it vanishing. (#3)
 let hideTimer: number | null = null;
+// Switch timer: travelling from an element up to its pill often crosses a
+// *different* annotated element (the parent, or a sibling the pill overlaps).
+// Retargeting instantly would yank the pill away mid-travel, so a switch to a
+// new element only lands after a short dwell; reaching the pill (or wandering
+// back) cancels it. The first highlight is never delayed.
+const SWITCH_DELAY = 150;
+let switchTimer: number | null = null;
+let switchTarget: HTMLElement | null = null;
 
 function cancelHide(): void {
   if (hideTimer !== null) {
@@ -110,8 +125,17 @@ function scheduleHide(): void {
   hideTimer = window.setTimeout(clearHighlight, 220);
 }
 
+function cancelSwitch(): void {
+  if (switchTimer !== null) {
+    clearTimeout(switchTimer);
+    switchTimer = null;
+  }
+  switchTarget = null;
+}
+
 export function clearHighlight(): void {
   cancelHide();
+  cancelSwitch();
   highlighted = null;
   highlightedSrc = null;
   outline.style.display = 'none';
@@ -130,26 +154,17 @@ export interface HoverDeps {
 /** Wire the hover listeners; returns the elements for the boot code to append
  *  once the server health check passes. */
 export function initHover(deps: HoverDeps): HTMLElement[] {
-  tooltipOpen.addEventListener('click', (e) => {
+  const openHighlighted = (e: MouseEvent): void => {
     e.preventDefault();
     e.stopPropagation();
     if (highlightedSrc) deps.openSource(highlightedSrc);
-  });
+  };
+  tooltipOpen.addEventListener('click', openHighlighted);
+  tooltipLabel.addEventListener('click', openHighlighted);
 
-  function onMouseMove(e: MouseEvent): void {
-    if (!deps.isEditMode()) return;
-    // Moving onto our own pill must NOT count as leaving the element.
-    if (e.target instanceof Node && tooltip.contains(e.target)) {
-      cancelHide();
-      return;
-    }
-    const el = nearestSource(e.target);
-    if (!el) {
-      scheduleHide(); // grace period instead of instant hide
-      return;
-    }
-    cancelHide();
-    if (el === highlighted) return;
+  function highlight(el: HTMLElement): void {
+    cancelSwitch();
+    if (!el.isConnected) return; // HMR may have replaced it during the dwell
     highlighted = el;
 
     const kind = classify(el);
@@ -179,6 +194,38 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
     const top = rect.top - 28 < 4 ? rect.bottom + 4 : rect.top - 28;
     tooltip.style.left = `${Math.max(4, rect.left)}px`;
     tooltip.style.top = `${top}px`;
+  }
+
+  function onMouseMove(e: MouseEvent): void {
+    if (!deps.isEditMode()) return;
+    // Moving onto our own pill must NOT count as leaving the element — and it
+    // wins over any pending retarget.
+    if (e.target instanceof Node && tooltip.contains(e.target)) {
+      cancelHide();
+      cancelSwitch();
+      return;
+    }
+    const el = nearestSource(e.target);
+    if (!el) {
+      cancelSwitch();
+      scheduleHide(); // grace period instead of instant hide
+      return;
+    }
+    cancelHide();
+    if (el === highlighted) {
+      cancelSwitch(); // wandered back onto the current element
+      return;
+    }
+    // First highlight lands instantly; a *switch* waits out the dwell so the
+    // pill doesn't jump to the parent while the mouse travels up to it.
+    if (highlighted === null) {
+      highlight(el);
+      return;
+    }
+    if (el === switchTarget) return; // countdown to this element already runs
+    cancelSwitch();
+    switchTarget = el;
+    switchTimer = window.setTimeout(() => highlight(el), SWITCH_DELAY);
   }
 
   document.addEventListener('mousemove', onMouseMove, { passive: true });

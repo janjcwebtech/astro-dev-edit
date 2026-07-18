@@ -96,6 +96,9 @@ whichever sections your change touches; run the whole list before a release.
 
 - [ ] Edit mode on → hovering literal text highlights it; click opens the
       inline contenteditable; save writes the file and HMR refreshes.
+- [ ] Mousing from an element up to its pill (crossing the parent en route)
+      keeps the pill in place — no instant retarget; both the pill's file:loc
+      label and its "open ↗" button jump to the source in the editor.
 - [ ] Clicking dynamic content (a resolved `{expression}`) opens the refusal
       notice with a working "Open source" button — never a false edit.
 - [ ] Escape / click-away discards; a stale edit (file changed underneath)
