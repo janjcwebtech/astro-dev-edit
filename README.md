@@ -111,8 +111,8 @@ like a CMS would:
   sticky formatting toolbar: bold / italic / strikethrough, heading levels
   (H1–H6 dropdown), bulleted and numbered lists, quote, code block, inline
   code, links, and image insert (upload, browse existing assets, or type a
-  path). Clicking an image inside the body reopens the same panel to replace
-  it. The **MD** button flips to raw-markdown source; bodies using markdown
+  path) with an alt-text field auto-suggested from the file name. Clicking an
+  image inside the body reopens the same panel to replace it. The **MD** button flips to raw-markdown source; bodies using markdown
   the rich view can't represent losslessly (tables, raw HTML/MDX, footnotes,
   nested lists, indented code) open in source mode, and the switch back to
   rich is refused rather than performed lossily. The body is only rewritten

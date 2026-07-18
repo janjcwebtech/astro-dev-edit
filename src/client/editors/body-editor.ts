@@ -1,5 +1,5 @@
 import { canRichEdit, escapeHtml, htmlToMarkdown, markdownToHtml } from '../markdown.ts';
-import { COLOR, FONT, INPUT_STYLE, styled, toast } from '../ui.ts';
+import { COLOR, FONT, INPUT_STYLE, basename, styled, toast } from '../ui.ts';
 import { buildImageField } from './asset-picker.ts';
 
 /**
@@ -220,6 +220,20 @@ export function buildBodyEditor(initial: string): BodyEditor {
   let imageValue = '';
   let replaceTarget: HTMLImageElement | null = null;
   const imageFieldSlot = styled('div', 'atx-rte-image-slot', {});
+
+  // Alt text, auto-suggested from the picked file's name until edited by hand.
+  const altFromPath = (path: string): string =>
+    (basename(path).replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ')).trim();
+  let altTouched = false;
+  const altLabel = styled('label', 'atx-rte-image-alt-label', {
+    display: 'block', font: `600 11px ${FONT.ui}`, margin: '8px 0 4px', opacity: '0.85',
+  });
+  altLabel.textContent = 'Alt text';
+  const altInput = styled('input', 'atx-rte-image-alt', { ...INPUT_STYLE });
+  altInput.type = 'text';
+  altInput.placeholder = 'Describe the image';
+  altInput.addEventListener('input', () => (altTouched = true));
+
   const imageActions = styled('div', 'atx-rte-image-actions', {
     display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px',
   });
@@ -240,26 +254,35 @@ export function buildBodyEditor(initial: string): BodyEditor {
       return;
     }
     imagePanel.style.display = 'none';
+    const alt = altInput.value.trim();
     if (replaceTarget && replaceTarget.isConnected) {
       replaceTarget.src = imageValue;
+      replaceTarget.alt = alt;
     } else {
       content.focus();
       restoreSelection();
-      exec('insertImage', imageValue);
+      exec('insertHTML', `<img src="${escapeHtml(imageValue)}" alt="${escapeHtml(alt)}">`);
     }
   });
   imageActions.append(
     smallBtn('Cancel', false, () => (imagePanel.style.display = 'none')),
     confirmBtn,
   );
-  imagePanel.append(imageFieldSlot, imageActions);
+  imagePanel.append(imageFieldSlot, altLabel, altInput, imageActions);
 
   /** (Re)builds the field so the path/preview reflect this open, not the last. */
   const openImagePanel = (prefill: string, target: HTMLImageElement | null): void => {
     replaceTarget = target;
     imageValue = prefill;
+    // An existing alt counts as hand-written — picking a new file won't
+    // clobber it; a blank one follows the file name until edited.
+    altInput.value = target?.getAttribute('alt') ?? '';
+    altTouched = altInput.value !== '';
     imageFieldSlot.textContent = '';
-    imageFieldSlot.append(buildImageField(prefill, (v) => (imageValue = v)));
+    imageFieldSlot.append(buildImageField(prefill, (v) => {
+      imageValue = v;
+      if (!altTouched) altInput.value = altFromPath(v);
+    }));
     confirmBtn.textContent = target ? 'Replace' : 'Insert';
     imagePanel.style.display = 'block';
   };

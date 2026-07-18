@@ -23,6 +23,7 @@ Work in progress on the `cms` branch, not yet merged to `main`.
 -   Entry drawer widened to 50% of the viewport (still ≥440px, capped at 94vw on small screens)
 -   Image field redesigned: large 240×160 preview above the path input, click-to-browse on the preview, and a placeholder (never a broken image) when the path is empty or fails to load
 -   Clicking an image inside the rich body editor opens the picker to replace it
+-   Alt-text field in the image insert/replace panel, auto-suggested from the picked file's name until edited by hand; an existing alt is preserved when swapping the file
 -   Rich editor toolbar and image insert/replace panel share a sticky header, so the image UI stays in the viewport when editing far down a long body
 -   Rich editor surface is white with dark text (like the rendered page); drawer and panels restore normal per-element cursors instead of inheriting edit mode's crosshair
 
