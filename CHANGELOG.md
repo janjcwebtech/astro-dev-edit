@@ -8,7 +8,7 @@ No versions have been tagged/published yet — sections below track work as it l
 
 ## \[Unreleased\]
 
-Work in progress on the `cms` branch, not yet merged to `main`.
+Work landed on `main` since the 0.1.0 baseline, awaiting a version stamp.
 
 ### Added
 
@@ -37,6 +37,10 @@ Work in progress on the `cms` branch, not yet merged to `main`.
 -   Clicking an existing image in the rich body editor pre-filled its alt text from the filename the moment the panel opened, so a plain Replace could silently rewrite the alt; existing images' alt is now left untouched (filename auto-suggest applies only to newly inserted images)
 -   Bare block-level images (not wrapped in a paragraph) were dropped by the rich editor's markdown serialization; they now serialize as `![alt](src)`
 -   Date fields already rendered as a native date picker, but its calendar icon was a near-invisible dark glyph on the dark input; `color-scheme: dark` on form controls makes the picker icon and popup (and number spinners) render light and discoverable
+
+### Security
+
+-   The open-in-editor endpoint (`/open`) confined client-supplied paths with a weaker string-space check than the edit endpoints (no symlink resolution, no content-roots or extension check); it now goes through the same `validateEditablePath` gate as `/classify` and `/apply`, so nonexistent paths, symlinks resolving outside the content roots, and non-editable file types are rejected before anything reaches `launch-editor`
 
 ## \[0.1.0\] - Unreleased
 
