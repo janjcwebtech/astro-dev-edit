@@ -113,7 +113,7 @@ const hideButton = styled('button', 'atx-hide', {
   borderRadius: '999px',
   boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
   cursor: 'pointer',
-  alignSelf: 'center',
+  alignSelf: 'flex-end',
   display: 'none',
 }, 'atx-hide');
 hideButton.type = 'button';
