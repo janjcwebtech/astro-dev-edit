@@ -36,11 +36,14 @@ export const FONT = {
   ui: 'ui-sans-serif, system-ui, sans-serif',
 } as const;
 
-/** Baseline for text-ish form controls (inputs, textareas, selects). */
+/** Baseline for text-ish form controls (inputs, textareas, selects).
+ *  `colorScheme: dark` makes the browser render native chrome — the date
+ *  input's calendar-picker icon and popup, number spinners — light against the
+ *  dark background instead of as a near-invisible dark glyph. */
 export const INPUT_STYLE: Partial<CSSStyleDeclaration> = {
   width: '100%', padding: '6px 8px', boxSizing: 'border-box',
   border: '1px solid #444', borderRadius: '5px', background: '#111', color: '#fff',
-  font: '13px system-ui',
+  font: '13px system-ui', colorScheme: 'dark',
 };
 
 /**

@@ -102,9 +102,11 @@ export function buildBodyEditor(initial: string): BodyEditor {
   // --- the two surfaces ----------------------------------------------------
 
   // White writing surface, like the rendered page rather than a form field.
+  // colorScheme:light keeps native chrome (scrollbar) matched to the light bg,
+  // overriding the dark default INPUT_STYLE carries.
   const content = styled('div', 'atx-rte-content', {
     ...INPUT_STYLE, minHeight: '40vh', padding: '10px 14px',
-    background: '#fff', color: '#1a1a1a', border: '1px solid #444',
+    background: '#fff', color: '#1a1a1a', border: '1px solid #444', colorScheme: 'light',
     font: `13px/1.6 ${FONT.ui}`, outline: 'none', overflowY: 'auto', cursor: 'text',
   });
   content.contentEditable = 'true';

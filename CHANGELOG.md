@@ -30,6 +30,7 @@ Work in progress on the `cms` branch, not yet merged to `main`.
 ### Fixed
 
 -   Bare block-level images (not wrapped in a paragraph) were dropped by the rich editor's markdown serialization; they now serialize as `![alt](src)`
+-   Date fields already rendered as a native date picker, but its calendar icon was a near-invisible dark glyph on the dark input; `color-scheme: dark` on form controls makes the picker icon and popup (and number spinners) render light and discoverable
 
 ## \[0.1.0\] - Unreleased
 

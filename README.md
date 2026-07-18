@@ -103,10 +103,11 @@ like a CMS would:
 - **Frontmatter as typed form fields** — the field list, types, requiredness,
   defaults, and enum options are **introspected from your own
   `content.config.ts` zod schema** (loaded through the dev server, always
-  fresh). `z.string()` → text, `z.coerce.date()` → date picker,
-  `z.boolean()` → checkbox, `z.enum` → select, `z.array(z.string())` → tags,
-  and so on. No schema resolvable? Field types are inferred from the entry's
-  own values instead — the panel always works.
+  fresh). `z.string()` → text, `z.coerce.date()`/`z.date()` → native date
+  picker, `z.number()` → number, `z.boolean()` → checkbox, `z.enum` → select,
+  `z.array(z.string())` → tags, and so on. No schema resolvable? Field types
+  are inferred from the entry's own values instead (a `YYYY-MM-DD` value infers
+  as a date) — the panel always works.
 - **Markdown body in a WYSIWYG editor** — a white writing surface with a
   sticky formatting toolbar: bold / italic / strikethrough, heading levels
   (H1–H6 dropdown), bulleted and numbered lists, quote, code block, inline
@@ -216,6 +217,12 @@ One exception to the inline-styles rule: the rich editor's *content* elements
 injected stylesheet, `#atx-rte-style`, scoped under `.atx-rte-content`. Those
 rules are ordinary CSS, so overriding them needs specificity, not
 `!important`.
+
+Form controls declare `color-scheme: dark`, so the browser renders native
+chrome — the date field's calendar-picker icon and popup, number-input
+spinners — in light colours that stay visible against the dark inputs. If you
+re-theme the inputs to a light background, override this to `light !important`
+so those native controls flip back.
 
 Use them to reference elements from devtools or to override styling. The
 baseline styles are **inline** on purpose — they win specificity against any
