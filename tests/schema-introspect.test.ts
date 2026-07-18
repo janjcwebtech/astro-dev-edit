@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   IMAGE_STUB_DESCRIPTION,
   inferFields,
+  validateChanges,
   zodToFields,
 } from '../src/server/schema-introspect.ts';
 
@@ -91,6 +92,26 @@ describe('zodToFields', () => {
     expect(zodToFields(undefined)).toBeNull();
     expect(zodToFields({ not: 'zod' })).toBeNull();
     expect(zodToFields(() => z.object({}))).toBeNull();
+  });
+});
+
+describe('validateChanges', () => {
+  const schema = z.object({
+    title: z.string(),
+    draft: z.boolean().optional(),
+    author: z.string().default('Jan Cerny'),
+  });
+
+  it('allows null-deletion of optional and defaulted keys', () => {
+    expect(validateChanges(schema, { draft: null, author: null })).toEqual({});
+  });
+
+  it('refuses null-deletion of a required key', () => {
+    expect(validateChanges(schema, { title: null })).toEqual({ title: 'required' });
+  });
+
+  it('allows null for keys the schema does not know', () => {
+    expect(validateChanges(schema, { extra: null })).toEqual({});
   });
 });
 

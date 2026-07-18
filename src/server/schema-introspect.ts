@@ -177,8 +177,13 @@ export function validateChanges(
   const errors: Record<string, string> = {};
   if (!shape) return errors;
   for (const [key, value] of Object.entries(changes)) {
-    if (value === null) continue; // deletion; required-ness is caught by full parses elsewhere
     const field = shape[key] as ZodLike | undefined;
+    if (value === null) {
+      // Deletion: the well-behaved client only sends null for optional fields,
+      // but don't trust it — a required key must not be strippable.
+      if (field && unwrap(field).required) errors[key] = 'required';
+      continue;
+    }
     if (!field?.safeParse) continue;
     const result = field.safeParse(coerceForField(field, value));
     if (!result.success) {

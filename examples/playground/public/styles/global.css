@@ -143,6 +143,7 @@ a { color: inherit; }
 }
 .nav-links a:hover { color: var(--terracotta); }
 .nav-cta { margin-left: 0.25rem; }
+.nav-cta .btn { color: #fff; }
 
 /* Hero */
 .hero {

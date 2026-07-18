@@ -107,7 +107,16 @@ like a CMS would:
   `z.boolean()` → checkbox, `z.enum` → select, `z.array(z.string())` → tags,
   and so on. No schema resolvable? Field types are inferred from the entry's
   own values instead — the panel always works.
-- **Markdown body** in a plain textarea (no WYSIWYG yet).
+- **Markdown body in a WYSIWYG editor** — a white writing surface with a
+  sticky formatting toolbar: bold / italic / strikethrough, heading levels
+  (H1–H6 dropdown), bulleted and numbered lists, quote, code block, inline
+  code, links, and image insert (upload, browse existing assets, or type a
+  path). Clicking an image inside the body reopens the same panel to replace
+  it. The **MD** button flips to raw-markdown source; bodies using markdown
+  the rich view can't represent losslessly (tables, raw HTML/MDX, footnotes,
+  nested lists, indented code) open in source mode, and the switch back to
+  rich is refused rather than performed lossily. The body is only rewritten
+  when you actually change it — opening the drawer never reformats the file.
 - **Atomic, surgical saves** — one request writes everything at once. The YAML
   is patched in place: comments, key order, quoting, and keys you didn't touch
   survive byte-for-byte. Changed values are validated against your zod schema
@@ -197,7 +206,16 @@ Every overlay element carries a stable class, and the singletons carry IDs:
 `#atx-toggle` (the Edit button), `#atx-outline` (hover highlight),
 `#atx-tooltip` (the file:loc pill), plus classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
-`atx-backdrop`, `atx-drop`, `atx-asset-row`.
+`atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, and the rich body
+editor's `atx-rte`, `atx-rte-head` (sticky toolbar + image panel),
+`atx-rte-toolbar`, `atx-rte-btn`, `atx-rte-content`, `atx-rte-image-panel`,
+and the image field's `atx-image-field-preview|thumb|empty|path`.
+
+One exception to the inline-styles rule: the rich editor's *content* elements
+(headings, lists, quotes… that you create while typing) are styled by a small
+injected stylesheet, `#atx-rte-style`, scoped under `.atx-rte-content`. Those
+rules are ordinary CSS, so overriding them needs specificity, not
+`!important`.
 
 Use them to reference elements from devtools or to override styling. The
 baseline styles are **inline** on purpose — they win specificity against any
@@ -218,8 +236,10 @@ your overrides need `!important`:
 - **No in-place (click-on-the-page) editing of expression-driven text.** On
   detail pages those clicks route to the entry drawer; elsewhere they refuse
   with "Open source" as the escape hatch.
-- **Entry drawer edits markdown as plain text** — no rich-text/WYSIWYG yet, and
-  no `astro:assets` `image()` metadata (path strings only).
+- **The rich body editor covers a markdown subset** — headings, emphasis,
+  lists, quotes, code, links, images, hr. Anything beyond it (tables, raw
+  HTML/MDX, footnotes, nested lists) is still editable, but as markdown
+  source. No `astro:assets` `image()` metadata (path strings only).
 - Verified against Astro 5.x. Requires the dev toolbar (above).
 
 ## How it works (short version)

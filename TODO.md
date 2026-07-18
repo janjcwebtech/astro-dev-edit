@@ -48,6 +48,14 @@ its own copy of the drop-zone + asset-list wiring. Fold image.ts onto
 buildImageField (keeping its live-<img> preview behaviour) so the upload/list
 UI exists once.
 
+## Entry create writes `.md` only
+
+`/entry/create` (src/server/entry-routes.ts) always writes `<slug>.md`, even
+though the entry editor reads/edits `.mdx` too. Creating an entry in an
+all-MDX collection therefore produces a plain markdown file. Fix: let config
+(or the collection's existing entries) pick the extension, and thread it
+through `EntryCreateRequest`.
+
 ## Entry create navigates by convention
 
 After /entry/create the client waits ~800ms for the content layer to sync,

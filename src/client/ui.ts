@@ -36,6 +36,13 @@ export const FONT = {
   ui: 'ui-sans-serif, system-ui, sans-serif',
 } as const;
 
+/** Baseline for text-ish form controls (inputs, textareas, selects). */
+export const INPUT_STYLE: Partial<CSSStyleDeclaration> = {
+  width: '100%', padding: '6px 8px', boxSizing: 'border-box',
+  border: '1px solid #444', borderRadius: '5px', background: '#111', color: '#fff',
+  font: '13px system-ui',
+};
+
 /**
  * Create an overlay element: marks it as our own UI (so the click router
  * ignores it), stamps the atx-* class hook (and optional id for singletons),
@@ -113,6 +120,9 @@ export function buildPanel(title: string): HTMLElement {
     background: COLOR.panelBg, color: '#eee', borderRadius: '12px',
     boxShadow: '0 12px 48px rgba(0,0,0,0.5)', border: `1px solid ${COLOR.panelBorder}`,
     overflow: 'hidden', font: '13px system-ui',
+    // Edit mode sets a crosshair cursor on the whole page; our UI is not a
+    // click-to-edit surface, so restore normal per-element cursors.
+    cursor: 'auto',
   });
 
   const bar = styled('div', 'atx-panel-title', {
@@ -139,10 +149,15 @@ export function buildPanel(title: string): HTMLElement {
 export function buildDrawer(title: string): HTMLElement {
   const drawer = styled('div', 'atx-drawer', {
     position: 'fixed', zIndex: String(Z + 6), right: '0', top: '0',
-    height: '100vh', width: 'min(440px, 94vw)', display: 'flex', flexDirection: 'column',
+    // Half the screen, but never narrower than the classic 440px drawer and
+    // never wider than the viewport allows on small screens.
+    height: '100vh', width: 'min(max(440px, 50vw), 94vw)', display: 'flex', flexDirection: 'column',
     background: COLOR.panelBg, color: '#eee',
     boxShadow: '-8px 0 40px rgba(0,0,0,0.45)', borderLeft: `1px solid ${COLOR.panelBorder}`,
     font: '13px system-ui', boxSizing: 'border-box',
+    // Edit mode sets a crosshair cursor on the whole page; our UI is not a
+    // click-to-edit surface, so restore normal per-element cursors.
+    cursor: 'auto',
   });
 
   const bar = styled('div', 'atx-drawer-title', {
@@ -185,6 +200,32 @@ export function buildBackdrop(onClose: () => void): HTMLElement {
   return b;
 }
 
+/** Footer-button variants. `cancel` and `ghost` render identically; the class
+ *  names differ because the README documents them as separate theming hooks. */
+export type ButtonKind = 'primary' | 'secondary' | 'cancel' | 'ghost' | 'danger';
+
+const BUTTON_STYLES: Record<ButtonKind, Partial<CSSStyleDeclaration>> = {
+  primary: { border: 'none', background: COLOR.accent, color: '#fff' },
+  secondary: { border: '1px solid #5a5a7a', background: 'transparent', color: '#cdd' },
+  cancel: { border: '1px solid #3a3a4d', background: 'transparent', color: '#ccc' },
+  ghost: { border: '1px solid #3a3a4d', background: 'transparent', color: '#ccc' },
+  // marginRight:auto pushes a danger button to the far left of a flex footer,
+  // away from the safe actions.
+  danger: { border: '1px solid #7a3a3a', background: 'transparent', color: '#ff8a80', marginRight: 'auto' },
+};
+
+/** A panel/drawer footer button. The single source of button styling. */
+export function footButton(label: string, kind: ButtonKind, onClick: () => void): HTMLButtonElement {
+  const btn = styled('button', `atx-btn atx-btn-${kind}`, {
+    padding: '7px 14px', borderRadius: '7px', cursor: 'pointer', font: '600 13px system-ui',
+    ...BUTTON_STYLES[kind],
+  });
+  btn.type = 'button';
+  btn.textContent = label;
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
 /** Populate a panel's footer with cancel + confirm buttons, and optionally a
  *  secondary (outline) button between them for a second action. */
 export function wirePanelButtons(
@@ -194,32 +235,9 @@ export function wirePanelButtons(
   opts: { confirmLabel?: string; secondaryLabel?: string; onSecondary?: () => void } = {},
 ): void {
   const foot = panel.querySelector('[data-foot]') as HTMLElement;
-  const cancel = styled('button', 'atx-btn atx-btn-cancel', {
-    padding: '7px 14px', borderRadius: '7px', border: '1px solid #3a3a4d',
-    background: 'transparent', color: '#ccc', cursor: 'pointer', font: '600 13px system-ui',
-  });
-  cancel.type = 'button';
-  cancel.textContent = 'Cancel';
-  cancel.addEventListener('click', onCancel);
-  foot.append(cancel);
-
+  foot.append(footButton('Cancel', 'cancel', onCancel));
   if (opts.secondaryLabel && opts.onSecondary) {
-    const secondary = styled('button', 'atx-btn atx-btn-secondary', {
-      padding: '7px 14px', borderRadius: '7px', border: '1px solid #5a5a7a',
-      background: 'transparent', color: '#cdd', cursor: 'pointer', font: '600 13px system-ui',
-    });
-    secondary.type = 'button';
-    secondary.textContent = opts.secondaryLabel;
-    secondary.addEventListener('click', opts.onSecondary);
-    foot.append(secondary);
+    foot.append(footButton(opts.secondaryLabel, 'secondary', opts.onSecondary));
   }
-
-  const confirm = styled('button', 'atx-btn atx-btn-primary', {
-    padding: '7px 14px', borderRadius: '7px', border: 'none',
-    background: COLOR.accent, color: '#fff', cursor: 'pointer', font: '600 13px system-ui',
-  });
-  confirm.type = 'button';
-  confirm.textContent = opts.confirmLabel ?? 'Save';
-  confirm.addEventListener('click', onConfirm);
-  foot.append(confirm);
+  foot.append(footButton(opts.confirmLabel ?? 'Save', 'primary', onConfirm));
 }

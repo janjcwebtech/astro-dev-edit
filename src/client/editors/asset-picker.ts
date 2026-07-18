@@ -1,5 +1,5 @@
 import * as api from '../api.ts';
-import { COLOR, basename, styled, toast } from '../ui.ts';
+import { COLOR, FONT, INPUT_STYLE, basename, styled, toast } from '../ui.ts';
 
 /**
  * Compact image-field control for the entry panel: current-value preview,
@@ -14,21 +14,42 @@ export function buildImageField(
 ): HTMLElement {
   let value = initial;
 
-  const wrap = styled('div', 'atx-image-field', { display: 'grid', gap: '6px' });
+  const wrap = styled('div', 'atx-image-field', { display: 'grid', gap: '8px' });
+
+  // Preview above the path input; clicking it opens the browse list too.
+  const thumbWrap = styled('button', 'atx-image-field-preview', {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0',
+    width: '240px', height: '160px', overflow: 'hidden', cursor: 'pointer',
+    borderRadius: '8px', border: '1px solid #333',
+    background: 'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 16px 16px',
+  });
+  thumbWrap.type = 'button';
+  thumbWrap.title = 'Browse images';
+  const thumb = styled('img', 'atx-image-field-thumb', {
+    width: '100%', height: '100%', objectFit: 'cover', display: 'none',
+  });
+  thumb.alt = '';
+  const thumbEmpty = styled('span', 'atx-image-field-empty', {
+    font: '12px system-ui', color: '#888', pointerEvents: 'none',
+  });
+  thumbEmpty.textContent = 'No image — click to browse';
+  // A path that fails to load falls back to the placeholder, never a broken icon.
+  thumb.addEventListener('error', () => {
+    thumb.style.display = 'none';
+    thumbEmpty.style.display = '';
+  });
+  thumb.addEventListener('load', () => {
+    thumb.style.display = '';
+    thumbEmpty.style.display = 'none';
+  });
+  thumbWrap.append(thumb, thumbEmpty);
+  wrap.append(thumbWrap);
 
   const row = styled('div', 'atx-image-field-row', {
     display: 'flex', alignItems: 'center', gap: '8px',
   });
-  const thumb = styled('img', 'atx-image-field-thumb', {
-    flex: '0 0 auto', width: '56px', height: '40px', objectFit: 'cover',
-    borderRadius: '4px', border: '1px solid #333',
-    background: 'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 12px 12px',
-  });
-  thumb.alt = '';
   const pathInput = styled('input', 'atx-image-field-path', {
-    flex: '1 1 auto', minWidth: '0', padding: '6px 8px', boxSizing: 'border-box',
-    border: '1px solid #444', borderRadius: '5px', background: '#111', color: '#fff',
-    font: '12px ui-monospace, monospace',
+    ...INPUT_STYLE, flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
   });
   const browse = styled('button', 'atx-btn atx-image-field-browse', {
     flex: '0 0 auto', padding: '6px 10px', borderRadius: '6px', border: '1px solid #555',
@@ -36,7 +57,7 @@ export function buildImageField(
   });
   browse.type = 'button';
   browse.textContent = 'Browse…';
-  row.append(thumb, pathInput, browse);
+  row.append(pathInput, browse);
   wrap.append(row);
 
   const picker = styled('div', 'atx-image-field-picker', { display: 'none' });
@@ -58,17 +79,26 @@ export function buildImageField(
   picker.append(drop, list);
   wrap.append(picker);
 
+  const showImage = (src: string): void => {
+    if (src) {
+      thumb.src = src;
+    } else {
+      thumb.removeAttribute('src');
+      thumb.style.display = 'none';
+      thumbEmpty.style.display = '';
+    }
+  };
   const set = (next: string): void => {
     value = next;
     pathInput.value = next;
-    thumb.src = next;
+    showImage(next);
     onChange(next);
   };
   set(initial);
 
   pathInput.addEventListener('input', () => {
     value = pathInput.value;
-    thumb.src = value;
+    showImage(value);
     onChange(value);
   });
 
@@ -156,14 +186,16 @@ export function buildImageField(
     }
   };
 
-  browse.addEventListener('click', () => {
+  const togglePicker = (): void => {
     const open = picker.style.display !== 'none';
     picker.style.display = open ? 'none' : 'block';
     if (!open && !listLoaded) {
       listLoaded = true;
       void loadList();
     }
-  });
+  };
+  browse.addEventListener('click', togglePicker);
+  thumbWrap.addEventListener('click', togglePicker);
 
   return wrap;
 }
