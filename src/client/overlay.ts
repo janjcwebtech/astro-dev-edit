@@ -43,40 +43,38 @@ if (document.body) {
 
 let editMode = false;
 
-const toggle = styled('button', 'atx-toggle', {
+// The toggle and entry pills share a fixed width so the stacked buttons read
+// as one aligned control group.
+const PILL_WIDTH = '120px';
+const pillStyle = (bottom: string, background: string): Partial<CSSStyleDeclaration> => ({
   position: 'fixed',
-  // Offset up from the bottom so it clears Astro's dev toolbar bar. (spec §4.2)
   right: '16px',
-  bottom: '64px',
+  bottom,
   zIndex: String(Z + 2),
-  padding: '8px 14px',
+  width: PILL_WIDTH,
+  boxSizing: 'border-box',
+  textAlign: 'center',
+  padding: '8px 10px',
   font: `600 13px/1 ${FONT.ui}`,
   color: '#fff',
-  background: COLOR.idle,
+  background,
   border: 'none',
   borderRadius: '999px',
   boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
   cursor: 'pointer',
-}, 'atx-toggle');
+});
+
+// Offset up from the bottom so it clears Astro's dev toolbar bar. (spec §4.2)
+const toggle = styled('button', 'atx-toggle', pillStyle('64px', COLOR.idle), 'atx-toggle');
 toggle.type = 'button';
-toggle.textContent = 'Edit';
+toggle.textContent = '✎ Edit';
 toggle.title = 'Toggle text-edit mode';
 
 // On detail pages that declare a backing content file (the page-source meta
-// tag), edit mode grows a second pill that opens the CMS entry drawer.
+// tag), a second pill opens the CMS entry drawer. It shows whenever the page
+// declares one — a one-click action, independent of edit mode.
 const entryButton = styled('button', 'atx-entry', {
-  position: 'fixed',
-  right: '16px',
-  bottom: '104px',
-  zIndex: String(Z + 2),
-  padding: '8px 14px',
-  font: `600 13px/1 ${FONT.ui}`,
-  color: '#fff',
-  background: COLOR.image,
-  border: 'none',
-  borderRadius: '999px',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-  cursor: 'pointer',
+  ...pillStyle('104px', COLOR.image),
   display: 'none',
 }, 'atx-entry');
 entryButton.type = 'button';
@@ -87,12 +85,76 @@ entryButton.addEventListener('click', () => {
   if (file) void openEntryPanel(file);
 });
 
+// ---------------------------------------------------------------------------
+// Navigate-while-held: holding Ctrl or Alt/Option suspends editing so clicks
+// travel the site normally, without toggling edit mode off and back on.
+// ---------------------------------------------------------------------------
+
+const IS_MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform);
+const NAV_HINT = IS_MAC ? 'hold ⌃ or ⌥ to navigate' : 'hold Ctrl to navigate';
+
+let navigating = false;
+
+// Small annotation under the toggle so hold-to-navigate isn't completely
+// hidden. Visible only while edit mode is on.
+const hint = styled('div', 'atx-toggle-hint', {
+  position: 'fixed',
+  right: '16px',
+  bottom: '44px',
+  zIndex: String(Z + 2),
+  padding: '3px 8px',
+  font: `500 10px/1.3 ${FONT.ui}`,
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
+  color: '#ddd',
+  background: 'rgba(28, 28, 43, 0.85)',
+  borderRadius: '999px',
+  pointerEvents: 'none',
+  display: 'none',
+}, 'atx-toggle-hint');
+hint.textContent = NAV_HINT;
+
+function refreshCursor(): void {
+  document.body.style.cursor = editMode && !navigating ? 'crosshair' : '';
+}
+
+function setNavigating(on: boolean): void {
+  const next = on && editMode;
+  if (navigating === next) return;
+  navigating = next;
+  refreshCursor();
+  hint.textContent = navigating ? 'release to edit' : NAV_HINT;
+  if (navigating) clearHighlight();
+}
+
+// Track the modifier via keydown/keyup, with two fallbacks: window blur
+// (app switch mid-hold) releases the mode, and mousemove re-syncs from the
+// event's own modifier flags in case the keydown fired while focus was
+// elsewhere. Capture phase, so the sync runs before hover's own listener.
+const NAV_KEYS = new Set(['Control', 'Alt']);
+document.addEventListener('keydown', (e) => {
+  if (!editMode || !NAV_KEYS.has(e.key)) return;
+  // A bare Alt keydown would otherwise focus the browser menu bar on keyup
+  // (Firefox/Windows).
+  if (e.key === 'Alt') e.preventDefault();
+  setNavigating(true);
+}, true);
+document.addEventListener('keyup', (e) => {
+  // If both modifiers were held, the flags of the still-held one keep it on.
+  if (NAV_KEYS.has(e.key)) setNavigating(e.ctrlKey || e.altKey);
+}, true);
+window.addEventListener('blur', () => setNavigating(false));
+document.addEventListener('mousemove', (e) => {
+  if (editMode) setNavigating(e.ctrlKey || e.altKey);
+}, true);
+
 function setEditMode(on: boolean): void {
   editMode = on;
+  if (!on) setNavigating(false);
   toggle.style.background = on ? COLOR.accent : COLOR.idle;
-  toggle.textContent = on ? 'Editing' : 'Edit';
-  entryButton.style.display = on && pageSource() ? 'block' : 'none';
-  document.body.style.cursor = on ? 'crosshair' : '';
+  toggle.textContent = on ? '✎ Editing' : '✎ Edit';
+  hint.style.display = on ? 'block' : 'none';
+  refreshCursor();
   // Survive the full-page reload that follows every successful save.
   try {
     sessionStorage.setItem('astroTextEditMode', on ? '1' : '0');
@@ -132,8 +194,16 @@ async function openSource(src: SourceLoc): Promise<void> {
 }
 
 const isEditMode = (): boolean => editMode;
-const hoverElements = initHover({ isEditMode, openSource: (src) => void openSource(src) });
-initRouter({ isEditMode, openSource: (src) => void openSource(src) });
+// Hover treats navigate-mode as "edit mode off": no outline, no tooltip.
+const hoverElements = initHover({
+  isEditMode: () => editMode && !navigating,
+  openSource: (src) => void openSource(src),
+});
+initRouter({
+  isEditMode,
+  isNavigating: () => navigating,
+  openSource: (src) => void openSource(src),
+});
 
 // After an HMR update: drop stale hover state, and re-snapshot source
 // mappings from the freshly-rendered (re-annotated) DOM before the toolbar
@@ -153,7 +223,11 @@ async function boot(): Promise<void> {
   // Confirm the server side is alive before showing the button. If the health
   // check fails the overlay stays out of the way entirely.
   if (!(await api.health())) return;
-  document.body.append(...hoverElements, toggle, entryButton);
+  document.body.append(...hoverElements, toggle, hint, entryButton);
+
+  // The entry pill is a one-click CMS action, useful outside edit mode too —
+  // show it whenever the page declares a backing content file.
+  entryButton.style.display = pageSource() ? 'block' : 'none';
 
   // Restore edit mode across the full-page reload that follows every save.
   try {

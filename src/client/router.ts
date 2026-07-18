@@ -22,7 +22,26 @@ export function isOwnUi(e: Event): boolean {
 
 export interface RouterDeps {
   isEditMode(): boolean;
+  /** True while the navigate modifier (Ctrl / Alt) is held in edit mode. */
+  isNavigating(): boolean;
   openSource(src: SourceLoc): void;
+}
+
+const IS_MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform);
+
+/**
+ * In navigate mode, give links plain-click behavior despite the held
+ * modifier: natively Alt+click downloads the target and Ctrl+click opens a
+ * new tab, so we swallow the event and navigate ourselves. Non-link targets
+ * (buttons, form controls) pass through untouched.
+ */
+function navigateThrough(e: MouseEvent): void {
+  const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
+  if (!(a instanceof HTMLAnchorElement)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation();
+  window.location.assign(a.href);
 }
 
 /** Register the capture-phase click/mousedown listeners. */
@@ -72,6 +91,13 @@ export function initRouter(deps: RouterDeps): void {
     if (!deps.isEditMode()) return;
     if (isOwnUi(e)) return;
 
+    // Navigate mode: don't intercept anything, but fix up link clicks whose
+    // native modifier behavior isn't "navigate here".
+    if (deps.isNavigating()) {
+      navigateThrough(e);
+      return;
+    }
+
     const el = nearestSource(e.target);
     const src = el ? sourceFor(el) : undefined;
 
@@ -108,7 +134,7 @@ export function initRouter(deps: RouterDeps): void {
   // phase — some browsers begin navigation/focus on mousedown before click
   // fires. This stops a wrapping link from acting; our own UI is exempt.
   function onMouseDown(e: MouseEvent): void {
-    if (!deps.isEditMode() || isOwnUi(e)) return;
+    if (!deps.isEditMode() || deps.isNavigating() || isOwnUi(e)) return;
     const el = nearestSource(e.target);
     if (el && sourceFor(el)) {
       // Don't preventDefault when the mousedown is inside the active edit, or
@@ -119,7 +145,17 @@ export function initRouter(deps: RouterDeps): void {
     }
   }
 
+  // macOS turns Ctrl+click into a right-click — no click event ever fires,
+  // only contextmenu. In navigate mode, catch it on links and navigate
+  // instead of showing the menu; anywhere else the menu opens as usual.
+  function onContextMenu(e: MouseEvent): void {
+    if (!IS_MAC || !e.ctrlKey) return;
+    if (!deps.isEditMode() || !deps.isNavigating() || isOwnUi(e)) return;
+    navigateThrough(e);
+  }
+
   // Capture phase so we intercept before links/buttons act on their default.
   document.addEventListener('click', onClick, true);
   document.addEventListener('mousedown', onMouseDown, true);
+  document.addEventListener('contextmenu', onContextMenu, true);
 }

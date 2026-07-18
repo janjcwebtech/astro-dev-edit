@@ -2,7 +2,9 @@
 
 In-browser visual content editing for the Astro **dev server**. Turn on edit
 mode, click text or an image in the rendered page, and the change is written
-straight to the source file. Astro's HMR refreshes the preview.
+straight to the source file. Astro's HMR refreshes the preview. Need to move
+to another page while editing? Hold **Ctrl** (or **⌥ Option** on macOS) and
+clicks navigate normally — release to keep editing, no mode toggling.
 
 **Dev-only by design.** The integration registers nothing for `astro build` /
 `astro preview`, so it can never reach a production bundle. It ships TypeScript
@@ -96,7 +98,8 @@ Treat it like editing the files directly, because that is what it does.
 ## Entry editor — CMS panel for content collections
 
 On a detail page that declares its backing content file (the meta tag below),
-edit mode shows an **✎ Edit entry** button, and clicking any collection-driven
+an **✎ Edit entry** button is always visible (no need to enter edit mode —
+it's a one-click CMS action), and in edit mode clicking any collection-driven
 text offers **"Edit page content"**. Both open a drawer that edits the entry
 like a CMS would:
 
@@ -204,7 +207,9 @@ navigation guess differs.
 ## Styling the overlay
 
 Every overlay element carries a stable class, and the singletons carry IDs:
-`#atx-toggle` (the Edit button), `#atx-outline` (hover highlight),
+`#atx-toggle` (the Edit button), `#atx-entry` (the Edit entry button),
+`#atx-toggle-hint` (the "hold … to navigate" note under the toggle),
+`#atx-outline` (hover highlight),
 `#atx-tooltip` (the file:loc pill), plus classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
 `atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, and the rich body
