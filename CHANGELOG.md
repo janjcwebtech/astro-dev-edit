@@ -4,11 +4,9 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/): fix-only releases bump the patch (`0.0.x`), releases with feature work bump the minor (`0.x.0`), and the major (`X.0.0`) moves only on an explicitly confirmed bigger release. While the project is in alpha (`0.x.x`), breaking changes may land in minor releases.
 
-No versions have been tagged/published yet — sections below track work as it lands on `main`, and will be stamped with a release date once tagged.
-
 ## \[Unreleased\]
 
-Work landed on `main` since the 0.1.0 baseline, awaiting a version stamp.
+## \[0.1.1\] - 2026-07-18
 
 ### Added
 
@@ -44,9 +42,9 @@ Work landed on `main` since the 0.1.0 baseline, awaiting a version stamp.
 
 -   The open-in-editor endpoint (`/open`) confined client-supplied paths with a weaker string-space check than the edit endpoints (no symlink resolution, no content-roots or extension check); it now goes through the same `validateEditablePath` gate as `/classify` and `/apply`, so nonexistent paths, symlinks resolving outside the content roots, and non-editable file types are rejected before anything reaches `launch-editor`
 
-## \[0.1.0\] - Unreleased
+## \[0.1.0\] - 2026-07-18
 
-Initial alpha baseline, currently on `main`.
+Initial alpha baseline. Never tagged on its own — first shipped as part of the v0.1.1 tag.
 
 ### Added
 
