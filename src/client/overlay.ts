@@ -44,17 +44,16 @@ if (document.body) {
 let editMode = false;
 
 // The toggle and entry pills share a fixed width so the stacked buttons read
-// as one aligned control group.
+// as one aligned control group. They stay dimmed until the group is hovered.
 const PILL_WIDTH = '120px';
-const pillStyle = (bottom: string, background: string): Partial<CSSStyleDeclaration> => ({
-  position: 'fixed',
-  right: '16px',
-  bottom,
-  zIndex: String(Z + 2),
+const PILL_OPACITY = '0.6';
+const pillStyle = (background: string): Partial<CSSStyleDeclaration> => ({
   width: PILL_WIDTH,
   boxSizing: 'border-box',
-  textAlign: 'center',
-  padding: '8px 10px',
+  // Left-aligned so the ✎ icon lands in the same spot on every pill,
+  // regardless of label length.
+  textAlign: 'left',
+  padding: '8px 12px',
   font: `600 13px/1 ${FONT.ui}`,
   color: '#fff',
   background,
@@ -62,10 +61,25 @@ const pillStyle = (bottom: string, background: string): Partial<CSSStyleDeclarat
   borderRadius: '999px',
   boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
   cursor: 'pointer',
+  opacity: PILL_OPACITY,
+  transition: 'opacity 120ms',
 });
 
-// Offset up from the bottom so it clears Astro's dev toolbar bar. (spec §4.2)
-const toggle = styled('button', 'atx-toggle', pillStyle('64px', COLOR.idle), 'atx-toggle');
+// Wrapper that stacks the pills (and, on hover, the hide button) in the
+// bottom-right corner. Offset up from the bottom so it clears Astro's dev
+// toolbar bar. (spec §4.2)
+const controls = styled('div', 'atx-controls', {
+  position: 'fixed',
+  right: '16px',
+  bottom: '64px',
+  zIndex: String(Z + 2),
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  gap: '10px',
+}, 'atx-controls');
+
+const toggle = styled('button', 'atx-toggle', pillStyle(COLOR.idle), 'atx-toggle');
 toggle.type = 'button';
 toggle.textContent = '✎ Edit';
 toggle.title = 'Toggle text-edit mode';
@@ -74,7 +88,7 @@ toggle.title = 'Toggle text-edit mode';
 // tag), a second pill opens the CMS entry drawer. It shows whenever the page
 // declares one — a one-click action, independent of edit mode.
 const entryButton = styled('button', 'atx-entry', {
-  ...pillStyle('104px', COLOR.image),
+  ...pillStyle(COLOR.image),
   display: 'none',
 }, 'atx-entry');
 entryButton.type = 'button';
@@ -83,6 +97,42 @@ entryButton.title = 'Edit this page’s content entry';
 entryButton.addEventListener('click', () => {
   const file = pageSource();
   if (file) void openEntryPanel(file);
+});
+
+// Small ✕ above the pills, revealed while the group is hovered: hides the
+// whole control group (buttons + hint) until the next page reload.
+const hideButton = styled('button', 'atx-hide', {
+  width: '20px',
+  height: '20px',
+  padding: '0',
+  font: `600 11px/1 ${FONT.ui}`,
+  textAlign: 'center',
+  color: '#ddd',
+  background: 'rgba(28, 28, 43, 0.85)',
+  border: 'none',
+  borderRadius: '999px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+  cursor: 'pointer',
+  alignSelf: 'center',
+  display: 'none',
+}, 'atx-hide');
+hideButton.type = 'button';
+hideButton.textContent = '✕';
+hideButton.title = 'Hide editing buttons until reload';
+hideButton.addEventListener('click', () => {
+  setEditMode(false);
+  controls.style.display = 'none';
+});
+
+controls.addEventListener('mouseenter', () => {
+  hideButton.style.display = '';
+  toggle.style.opacity = '1';
+  entryButton.style.opacity = '1';
+});
+controls.addEventListener('mouseleave', () => {
+  hideButton.style.display = 'none';
+  toggle.style.opacity = PILL_OPACITY;
+  entryButton.style.opacity = PILL_OPACITY;
 });
 
 // ---------------------------------------------------------------------------
@@ -96,12 +146,12 @@ const NAV_HINT = IS_MAC ? 'hold ⌃ or ⌥ to navigate' : 'hold Ctrl to navigate
 let navigating = false;
 
 // Small annotation under the toggle so hold-to-navigate isn't completely
-// hidden. Visible only while edit mode is on.
+// hidden. Visible only while edit mode is on. Anchored 10px below the button
+// stack (absolute, so showing it never shifts the pills).
 const hint = styled('div', 'atx-toggle-hint', {
-  position: 'fixed',
-  right: '16px',
-  bottom: '44px',
-  zIndex: String(Z + 2),
+  position: 'absolute',
+  top: 'calc(100% + 10px)',
+  right: '0',
   padding: '3px 8px',
   font: `500 10px/1.3 ${FONT.ui}`,
   textAlign: 'center',
@@ -223,7 +273,8 @@ async function boot(): Promise<void> {
   // Confirm the server side is alive before showing the button. If the health
   // check fails the overlay stays out of the way entirely.
   if (!(await api.health())) return;
-  document.body.append(...hoverElements, toggle, hint, entryButton);
+  controls.append(hideButton, entryButton, toggle, hint);
+  document.body.append(...hoverElements, controls);
 
   // The entry pill is a one-click CMS action, useful outside edit mode too —
   // show it whenever the page declares a backing content file.

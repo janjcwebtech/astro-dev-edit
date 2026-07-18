@@ -207,8 +207,10 @@ navigation guess differs.
 ## Styling the overlay
 
 Every overlay element carries a stable class, and the singletons carry IDs:
+`#atx-controls` (the fixed bottom-right group holding the buttons),
 `#atx-toggle` (the Edit button), `#atx-entry` (the Edit entry button),
-`#atx-toggle-hint` (the "hold … to navigate" note under the toggle),
+`#atx-hide` (the ✕ shown on hover that hides the group until reload),
+`#atx-toggle-hint` (the "hold … to navigate" note under the buttons),
 `#atx-outline` (hover highlight),
 `#atx-tooltip` (the file:loc pill), plus classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
@@ -235,8 +237,8 @@ host-page CSS so the overlay renders correctly on every site — which means
 your overrides need `!important`:
 
 ```css
-/* e.g. move the Edit button above a cookie banner */
-#atx-toggle { bottom: 120px !important; }
+/* e.g. move the edit buttons above a cookie banner */
+#atx-controls { bottom: 120px !important; }
 ```
 
 ## Scope and limitations

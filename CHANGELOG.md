@@ -1,6 +1,4 @@
-> # Changelog
-
-`inline code`
+# Changelog
 
 All notable changes to this project are documented in this file.
 
@@ -18,11 +16,13 @@ Work in progress on the `cms` branch, not yet merged to `main`.
 -   Navigate-while-held: holding Ctrl or Alt/Option in edit mode suspends editing so clicks travel the site normally (link clicks are re-dispatched as plain navigation, since natively Alt+click downloads, Ctrl+click opens a new tab, and macOS treats Ctrl+click as a right-click); a small "hold … to navigate" annotation under the toggle surfaces the feature
 -   Playground blog content, layouts, and nav/footer components to exercise entry editing end-to-end
 -   WYSIWYG body editor in the entry drawer: formatting toolbar (bold, italic, strikethrough, heading levels, lists, quote, code block, inline code, link, insert image) over a contenteditable surface, with an MD/Rich toggle; bodies using markdown outside the supported subset (tables, raw HTML/MDX, footnotes, nested lists) open in raw-markdown mode and refuse a lossy switch to rich
+-   A small ✕ button, revealed while hovering the corner buttons, hides them (and turns edit mode off) until the next page reload
 
 ### Changed
 
 -   The ✎ Edit entry button is now always visible on pages that declare a backing content file — a one-click CMS action, no longer gated behind edit mode
 -   The edit toggle gained the ✎ icon and both floating pills share a fixed width so they render as an aligned stack
+-   The corner buttons and the navigate hint now live in one wrapper (`#atx-controls`) — CSS overrides that repositioned `#atx-toggle` should target the wrapper instead; the pills are dimmed to 60% opacity until hovered, their labels are left-aligned so the ✎ icon sits in the same spot on both, and the "hold … to navigate" hint is anchored 10px below the buttons
 -   Entry drawer widened to 50% of the viewport (still ≥440px, capped at 94vw on small screens)
 -   Image field redesigned: large 240×160 preview above the path input, click-to-browse on the preview, and a placeholder (never a broken image) when the path is empty or fails to load
 -   Clicking an image inside the rich body editor opens the picker to replace it
