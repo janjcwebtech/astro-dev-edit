@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -37,6 +37,9 @@ const title = 'Dynamic';
 
 let root: string;
 let handler: Connect.NextHandleFunction;
+// Same tree, but with open-in-editor enabled — used to pin /open's path
+// validation (only its rejection paths, so launch-editor is never reached).
+let openHandler: Connect.NextHandleFunction;
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'atx-test-'));
@@ -51,8 +54,11 @@ beforeAll(async () => {
   await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
   await writeFile(join(root, 'src/content/note.md'), '# Note\n\nBody.\n');
   await writeFile(join(root, 'outside.astro'), '<p>Outside content roots</p>\n');
+  // Symlink inside the content roots pointing outside them — string-space
+  // confinement passes it, realpath confinement must reject it.
+  await symlink(join(root, 'outside.astro'), join(root, 'src/pages/link.astro'));
 
-  handler = createMiddleware({
+  const deps = {
     logger,
     root,
     assetDirs: ['src/assets', 'public'],
@@ -62,7 +68,9 @@ beforeAll(async () => {
     openInEditor: false,
     entryEditorEnabled: true,
     schemaProvider: null,
-  });
+  };
+  handler = createMiddleware(deps);
+  openHandler = createMiddleware({ ...deps, openInEditor: true });
 });
 
 afterAll(async () => {
@@ -82,6 +90,8 @@ function request(opts: {
   rawBody?: string | Buffer;
   remoteAddress?: string;
   origin?: string;
+  /** Middleware instance to hit; defaults to the shared `handler`. */
+  via?: Connect.NextHandleFunction;
 }): Promise<MockResult> {
   const payload =
     opts.rawBody !== undefined
@@ -111,7 +121,7 @@ function request(opts: {
     };
     const next = () => resolve({ status: -1, body: null, nextCalled: true });
     try {
-      handler(req, res, next);
+      (opts.via ?? handler)(req, res, next);
     } catch (err) {
       reject(err);
     }
@@ -235,6 +245,62 @@ describe('POST /open', () => {
       body: { file: 'src/pages/index.astro' },
     });
     expect(r.status).toBe(403);
+  });
+
+  // Path validation matches /classify and /apply (validateEditablePath):
+  // realpath inside the project root and a content root, allowed extension.
+  it('rejects files outside the content roots with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/open',
+      body: { file: 'outside.astro' },
+      via: openHandler,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('content roots');
+  });
+
+  it('rejects a symlink that resolves outside the content roots with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/open',
+      body: { file: 'src/pages/link.astro' },
+      via: openHandler,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('content roots');
+  });
+
+  it('rejects disallowed extensions with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/open',
+      body: { file: 'public/readme.txt' },
+      via: openHandler,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('not editable');
+  });
+
+  it('rejects nonexistent files with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/open',
+      body: { file: 'src/pages/missing.astro' },
+      via: openHandler,
+    });
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects a missing file field with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/open',
+      body: {},
+      via: openHandler,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('required');
   });
 });
 

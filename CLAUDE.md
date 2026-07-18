@@ -72,9 +72,9 @@ re-runs as authority); keep `protocol.ts` itself types-only.
 - **Security is centralized.** `isLocalRequest` rejects non-localhost / bad
   Origin at the middleware door. `paths.ts::validateEditablePath` is the one
   gate every edit path passes: realpath (symlinks resolved) ∈ project root ∈
-  configured `contentRoots`, with an allowed extension. Writes go through
-  `atomicWrite` (temp file + rename). Note the known asymmetry: `/open` confines
-  with `insideRoot` only — see `TODO.md`.
+  configured `contentRoots`, with an allowed extension. Every path-taking route — `/classify`, `/apply`,
+  and `/open` alike — goes through it. Writes go through `atomicWrite`
+  (temp file + rename).
 - `content-config.ts` loads the project's own `content.config.ts` through the
   dev server (`ssrLoadModule`, always fresh) to answer "which collection backs
   this file, and what's its zod schema?" It's impure and injected into the
