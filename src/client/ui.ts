@@ -133,6 +133,48 @@ export function buildPanel(title: string): HTMLElement {
   return panel;
 }
 
+/** A right-side drawer shell (entry editor): title bar with an action slot,
+ *  scrollable body, sticky footer. Same [data-body]/[data-foot] contract as
+ *  buildPanel, so wirePanelButtons works unchanged. */
+export function buildDrawer(title: string): HTMLElement {
+  const drawer = styled('div', 'atx-drawer', {
+    position: 'fixed', zIndex: String(Z + 6), right: '0', top: '0',
+    height: '100vh', width: 'min(440px, 94vw)', display: 'flex', flexDirection: 'column',
+    background: COLOR.panelBg, color: '#eee',
+    boxShadow: '-8px 0 40px rgba(0,0,0,0.45)', borderLeft: `1px solid ${COLOR.panelBorder}`,
+    font: '13px system-ui', boxSizing: 'border-box',
+  });
+
+  const bar = styled('div', 'atx-drawer-title', {
+    padding: '14px 16px', font: '600 13px system-ui', flex: '0 0 auto',
+    borderBottom: `1px solid ${COLOR.panelDivider}`,
+    display: 'flex', alignItems: 'center', gap: '8px',
+  });
+  const barText = styled('span', 'atx-drawer-title-text', {
+    flex: '1 1 auto', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+  });
+  barText.textContent = title;
+  const barActions = styled('span', 'atx-drawer-actions', {
+    flex: '0 0 auto', display: 'flex', gap: '6px',
+  });
+  barActions.dataset.actions = '';
+  bar.append(barText, barActions);
+
+  const body = styled('div', 'atx-drawer-body', {
+    padding: '16px', flex: '1 1 auto', overflowY: 'auto',
+  });
+  body.dataset.body = '';
+
+  const foot = styled('div', 'atx-drawer-foot', {
+    padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
+    borderTop: `1px solid ${COLOR.panelDivider}`, flex: '0 0 auto',
+  });
+  foot.dataset.foot = '';
+
+  drawer.append(bar, body, foot);
+  return drawer;
+}
+
 /** Dim backdrop that closes the panel when clicked. */
 export function buildBackdrop(onClose: () => void): HTMLElement {
   const b = styled('div', 'atx-backdrop', {

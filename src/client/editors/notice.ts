@@ -2,11 +2,13 @@ import type { SourceLoc } from '../../shared/protocol.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
 import { FONT, basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
+import { openEntryPanel } from './entry.ts';
 
 /**
  * Refusal notice for content that can't be edited in place (expressions,
  * nested markup, components). Offers "Open source" — and, when the page
- * declares a backing content file, a primary "Edit page content" jump.
+ * declares a backing content file, a primary "Edit page content" action that
+ * opens the CMS entry drawer for it.
  */
 
 /**
@@ -71,17 +73,19 @@ export function showDynamicNotice(
   const token = state.begin({ kind: 'panel', close });
 
   // cancel = close, "Open template" = jump to the .astro loc, and (when the
-  // page declares a content file) a primary "Edit page content" that opens it.
+  // page declares a content file) a primary "Edit page content" that opens
+  // the entry drawer for it. The drawer claims the state slot itself, so the
+  // notice just closes first.
   wirePanelButtons(
     panel,
     close,
     () => {
+      close();
       if (contentFile) {
-        openSource({ file: contentFile, loc: '' });
+        void openEntryPanel(contentFile);
       } else {
         openSource(src);
       }
-      close();
     },
     contentFile
       ? {

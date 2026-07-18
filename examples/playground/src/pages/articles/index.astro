@@ -1,0 +1,37 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+
+const posts = (await getCollection('blog')).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+---
+<Base title="Articles — J&C web">
+  <section class="section">
+    <div class="container">
+      <!-- Literal intro copy (editable) -->
+      <p class="eyebrow">The journal</p>
+      <h1>Articles &amp; insights</h1>
+      <p class="lead" style="max-width:55ch;">
+        Practical notes on security, accessibility, performance, and getting
+        more from your website.
+      </p>
+
+      <!-- Collection cards: mapped over real markdown (non-editable path) -->
+      <div class="grid grid-3" style="margin-top:2.5rem;">
+        {posts.map((post) => (
+          <a class="article-card" href={`/articles/${post.id}`}>
+            <img src={post.data.image} alt={post.data.title} />
+            <div class="body">
+              <p class="meta">{post.data.category} · {fmt(post.data.date)} · {post.data.readTime}</p>
+              <h3>{post.data.title}</h3>
+              <p>{post.data.excerpt}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Base>

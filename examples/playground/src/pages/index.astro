@@ -1,46 +1,88 @@
 ---
-// Playground page for astro-text-edit.
-// Everything below is literal text and a static <img> — the two things the
-// integration currently supports editing. Click them in the browser with edit
-// mode on; commits should write straight back into THIS file / public/.
-const year = new Date().getFullYear();
+import Base from '../layouts/Base.astro';
+
+// Home page. Almost everything here is LITERAL text and STATIC <img> — the two
+// things the editor supports today. The services list is a mapped array on
+// purpose: it exercises the classifier's non-editable (expression) path.
+const services = [
+  { tag: 'Design', title: 'Modernise your website', body: 'Opportunity analysis, conversion improvements, and design modernisation built around your goals.' },
+  { tag: 'Visibility', title: 'Improve online visibility', body: 'Schema markup, Core Web Vitals, content authority, and technical SEO that compounds.' },
+  { tag: 'Automation', title: 'Automate your workflow', body: 'CRM integration, publishing automation, A/B testing, and API connections.' },
+  { tag: 'Security', title: "Keep your clients' data safe", body: 'Vulnerability patching, login security, firewall setup, and Cloudflare integration.' },
+  { tag: 'Compliance', title: 'Stay compliant', body: 'GDPR compliance, WCAG accessibility standards, cookie consent, and tracking review.' },
+  { tag: 'Support', title: 'Publish quicker', body: 'Landing page templates, pre-built content blocks, and page-builder optimisation.' },
+];
 ---
+<Base title="J&C web — Strategic digital partner for your website">
+  <!-- HERO: literal heading, subhead, buttons + a static image -->
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <p class="eyebrow">Complete web operation under one roof</p>
+        <h1>Strategic digital partner for your website</h1>
+        <p class="lead">
+          We connect technology with your business goals, simply and securely,
+          from design and development to security, SEO, and automation.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/#contact">Let's talk now</a>
+          <a class="btn btn-ghost" href="/articles">Read the articles</a>
+        </div>
+      </div>
+      <div class="hero-media">
+        <img src="/images/meeting.png" alt="Two people reviewing a website together at a desk" />
+      </div>
+    </div>
+  </section>
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>astro-text-edit playground</title>
-    <style>
-      body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.6; }
-      img { max-width: 100%; border-radius: 8px; }
-      .expr { color: #888; }
-    </style>
-  </head>
-  <body>
-    <h1>Editable heading — click me with edit mode on</h1>
+  <!-- SERVICES: mapped cards (expressions — should classify as non-editable) -->
+  <section class="section" id="services">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">How we help you</p>
+        <h2>Get more from your website</h2>
+        <p>Six ways we keep sites stable, visible, compliant, and easier to manage over time.</p>
+      </div>
+      <div class="grid grid-3">
+        {services.map((s) => (
+          <article class="card">
+            <span class="tag">{s.tag}</span>
+            <h3>{s.title}</h3>
+            <p>{s.body}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
 
-    <p>
-      This is a plain literal paragraph. Every word here lives directly in
-      index.astro as static text, so the patcher should be able to rewrite it
-      in place without following any expression.
-    </p>
+  <!-- FEATURE SPLIT: literal text + static image -->
+  <section class="section">
+    <div class="container split">
+      <img src="/images/security.jpg" alt="Abstract representation of website security" />
+      <div>
+        <p class="eyebrow">Security first</p>
+        <h2>Get better results with your website</h2>
+        <p>
+          A long-term approach shaped by ten years of real-world work. We combine
+          technical expertise with a practical, understandable approach that keeps
+          sites stable, compliant, and easier to manage.
+        </p>
+        <a class="btn btn-dark" href="/about">More about how we work</a>
+      </div>
+    </div>
+  </section>
 
-    <p>
-      A second paragraph, so you can confirm the classifier picks the right
-      source location when there is more than one editable target on the page.
-    </p>
-
-    <img src="/sample.svg" alt="A sample placeholder image" />
-
-    <p>
-      Below is an expression, <span class="expr">not</span> a literal:
-      the year is {year}. The integration should classify this as
-      non-editable (or offer open-in-editor) rather than clobber the source.
-    </p>
-
-    <footer>
-      <p>Static footer text &mdash; another literal editing target.</p>
-    </footer>
-  </body>
-</html>
+  <!-- DARK CTA BAND: literal text + buttons -->
+  <section class="section" id="contact">
+    <div class="container">
+      <div class="cta-band">
+        <h2>Get better results with your website</h2>
+        <p>Tell us where your site is today and we'll show you the fastest path to a measurable improvement.</p>
+        <div class="hero-actions" style="justify-content:center;">
+          <a class="btn btn-primary" href="mailto:contact@jcweb.tech">Book a call</a>
+          <a class="btn btn-ghost" href="/about" style="color:var(--cream);border-color:rgba(255,255,255,0.3);">Learn more</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

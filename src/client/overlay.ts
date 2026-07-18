@@ -19,6 +19,8 @@
 
 import type { SourceLoc } from '../shared/protocol.ts';
 import * as api from './api.ts';
+import { openEntryPanel } from './editors/entry.ts';
+import { pageSource } from './editors/notice.ts';
 import { clearHighlight, initHover } from './hover.ts';
 import { initRouter } from './router.ts';
 import { cacheSourceMappings, startCapture } from './source-map.ts';
@@ -60,10 +62,36 @@ toggle.type = 'button';
 toggle.textContent = 'Edit';
 toggle.title = 'Toggle text-edit mode';
 
+// On detail pages that declare a backing content file (the page-source meta
+// tag), edit mode grows a second pill that opens the CMS entry drawer.
+const entryButton = styled('button', 'atx-entry', {
+  position: 'fixed',
+  right: '16px',
+  bottom: '104px',
+  zIndex: String(Z + 2),
+  padding: '8px 14px',
+  font: `600 13px/1 ${FONT.ui}`,
+  color: '#fff',
+  background: COLOR.image,
+  border: 'none',
+  borderRadius: '999px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+  cursor: 'pointer',
+  display: 'none',
+}, 'atx-entry');
+entryButton.type = 'button';
+entryButton.textContent = '✎ Edit entry';
+entryButton.title = 'Edit this page’s content entry';
+entryButton.addEventListener('click', () => {
+  const file = pageSource();
+  if (file) void openEntryPanel(file);
+});
+
 function setEditMode(on: boolean): void {
   editMode = on;
   toggle.style.background = on ? COLOR.accent : COLOR.idle;
   toggle.textContent = on ? 'Editing' : 'Edit';
+  entryButton.style.display = on && pageSource() ? 'block' : 'none';
   document.body.style.cursor = on ? 'crosshair' : '';
   // Survive the full-page reload that follows every successful save.
   try {
@@ -125,7 +153,7 @@ async function boot(): Promise<void> {
   // Confirm the server side is alive before showing the button. If the health
   // check fails the overlay stays out of the way entirely.
   if (!(await api.health())) return;
-  document.body.append(...hoverElements, toggle);
+  document.body.append(...hoverElements, toggle, entryButton);
 
   // Restore edit mode across the full-page reload that follows every save.
   try {

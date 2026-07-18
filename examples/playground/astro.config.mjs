@@ -14,6 +14,18 @@ export default defineConfig({
       // work, but being explicit documents what the integration touches.
       contentRoots: ['src', 'public'],
       assetDirs: ['src/assets', 'public'],
+      // Entry-editor field tweaks: the schema drives everything else; these
+      // just pick nicer widgets than the plain-string default.
+      entryEditor: {
+        collections: {
+          blog: {
+            fields: {
+              excerpt: { widget: 'textarea' },
+              image: { widget: 'image' },
+            },
+          },
+        },
+      },
     }),
   ],
 });

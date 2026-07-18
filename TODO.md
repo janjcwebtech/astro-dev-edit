@@ -39,3 +39,19 @@ edit of it refuses with `mismatch` (fails safe, verified live in the
 playground). Fix: decode the full HTML named-entity set — or at least the
 common typographic ones (mdash, ndash, hellip, rsquo, lsquo, rdquo, ldquo,
 copy, trade) — in both the compare and (escaped) write paths.
+
+## Finish the asset-picker extraction
+
+The entry drawer's image field (src/client/editors/asset-picker.ts) reuses
+api.upload/getAssets but the image swap panel (editors/image.ts) still carries
+its own copy of the drop-zone + asset-list wiring. Fold image.ts onto
+buildImageField (keeping its live-<img> preview behaviour) so the upload/list
+UI exists once.
+
+## Entry create navigates by convention
+
+After /entry/create the client waits ~800ms for the content layer to sync,
+then navigates to the sibling URL (swap the last path segment for the new
+slug). A non-conventional detail route or a slow sync still 404s until reload.
+Options: poll the new URL until it stops 404ing, or let config declare a
+detail-route template per collection.

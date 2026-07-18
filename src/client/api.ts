@@ -3,6 +3,13 @@ import type {
   AssetsResponse,
   ClassifyRequest,
   ClassifyResult,
+  EntryApplyRequest,
+  EntryCreateRequest,
+  EntryCreateResponse,
+  EntryDeleteRequest,
+  EntryErrorResponse,
+  EntryRequest,
+  EntryResponse,
   OpenRequest,
   UploadRequest,
   UploadResponse,
@@ -79,4 +86,49 @@ export async function classify(req: ClassifyRequest): Promise<ClassifyResult> {
 export async function apply(req: ApplyRequestWire): Promise<void> {
   const res = await post('/apply', req);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `save failed (${res.status})`);
+}
+
+// --- Entry editor ------------------------------------------------------------
+
+/** Entry-endpoint failure carrying the code and per-field validation messages
+ *  the panel needs for inline rendering — richer than the string-only errors
+ *  the loc-based endpoints get away with. */
+export class EntryApplyError extends Error {
+  code?: EntryErrorResponse['code'];
+  fieldErrors?: Record<string, string>;
+  constructor(body: EntryErrorResponse, status: number) {
+    super(body.error || `request failed (${status})`);
+    this.name = 'EntryApplyError';
+    this.code = body.code;
+    this.fieldErrors = body.fieldErrors;
+  }
+}
+
+async function entryPost<T>(path: string, payload: unknown, what: string): Promise<T> {
+  const res = await post(path, payload);
+  const body = (await res.json().catch(() => ({ error: `${what} failed (${res.status})` }))) as
+    | T
+    | EntryErrorResponse;
+  if (!res.ok) throw new EntryApplyError(body as EntryErrorResponse, res.status);
+  return body as T;
+}
+
+/** Read a collection entry as typed fields + markdown body. */
+export async function getEntry(req: EntryRequest): Promise<EntryResponse> {
+  return entryPost<EntryResponse>('/entry', req, 'entry read');
+}
+
+/** Atomic multi-field save; throws EntryApplyError on conflict/validation. */
+export async function applyEntry(req: EntryApplyRequest): Promise<void> {
+  await entryPost<{ ok: true }>('/entry/apply', req, 'save');
+}
+
+/** Create a new entry in a collection; resolves to its repo-relative path. */
+export async function createEntry(req: EntryCreateRequest): Promise<EntryCreateResponse> {
+  return entryPost<EntryCreateResponse>('/entry/create', req, 'create');
+}
+
+/** Delete an entry (etag-guarded; undo is git). */
+export async function deleteEntry(req: EntryDeleteRequest): Promise<void> {
+  await entryPost<{ ok: true }>('/entry/delete', req, 'delete');
 }

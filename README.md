@@ -15,13 +15,14 @@ source; your Astro project compiles it like any other `.ts`.
 - **Images in `.astro`** — swap a static `src` from the project's images (with
   thumbnails) or upload a new file, and edit `alt`. Only statically-quoted
   attributes are editable; `src={…}` / `<Image>` are treated as dynamic.
+- **Content-collection entries** — on a detail page that declares its backing
+  `.md`/`.mdx` file, an **Edit entry** drawer edits the frontmatter as typed
+  form fields (generated from your own zod schema) plus the markdown body, and
+  can create or delete entries. See [Entry editor](#entry-editor-cms-panel-for-content-collections).
 - Everything else **refuses safely** with a reason and an "Open source" jump to
   the editor. Expression-driven text (`{title}`), loop-generated content,
-  components, `set:html`, nested markup, and markdown/MDX bodies all fall here.
-
-On a **detail page** (a route rendering one content entry through a template),
-the refusal notice can offer a one-click jump to the backing `.md`/`.mdx` file —
-see [Detail-page content jump](#detail-page-content-jump).
+  components, `set:html`, and nested markup all fall here — on detail pages the
+  refusal notice offers "Edit page content", which opens the entry drawer.
 
 ## Install
 
@@ -63,6 +64,7 @@ textEdit({
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],        // writes confined to these
   openInEditor: true,                     // expose "Open source" / jump-to-file
+  entryEditor: {},                        // CMS entry drawer; false disables it
 })
 ```
 
@@ -73,6 +75,7 @@ textEdit({
 | `editableExtensions` | `['.astro', '.md', '.mdx']` | Extensions the patcher is allowed to write. |
 | `contentRoots` | `['src', 'public']` | Writes are confined to these (resolved, symlinks included). |
 | `openInEditor` | `true` | Expose the "Open source" / jump-to-file behaviour. |
+| `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
 
 ## Undo is git — there is no in-app undo
 
@@ -90,12 +93,64 @@ working tree**:
 
 Treat it like editing the files directly, because that is what it does.
 
-## Detail-page content jump
+## Entry editor — CMS panel for content collections
 
-A detail-page layout can opt in so that clicking dynamic content (e.g. the post
-title) offers **"Edit page content"**, opening the entry's markdown/MDX file in
-your editor. This is the interim answer for content that renders through an
-expression (`{title}`) — in-place editing of those fields is not built yet.
+On a detail page that declares its backing content file (the meta tag below),
+edit mode shows an **✎ Edit entry** button, and clicking any collection-driven
+text offers **"Edit page content"**. Both open a drawer that edits the entry
+like a CMS would:
+
+- **Frontmatter as typed form fields** — the field list, types, requiredness,
+  defaults, and enum options are **introspected from your own
+  `content.config.ts` zod schema** (loaded through the dev server, always
+  fresh). `z.string()` → text, `z.coerce.date()` → date picker,
+  `z.boolean()` → checkbox, `z.enum` → select, `z.array(z.string())` → tags,
+  and so on. No schema resolvable? Field types are inferred from the entry's
+  own values instead — the panel always works.
+- **Markdown body** in a plain textarea (no WYSIWYG yet).
+- **Atomic, surgical saves** — one request writes everything at once. The YAML
+  is patched in place: comments, key order, quoting, and keys you didn't touch
+  survive byte-for-byte. Changed values are validated against your zod schema
+  *before* the write (inline per-field errors), and every write is etag-guarded
+  — if the file changed on disk since the panel opened, you get a conflict and
+  a fresh reload instead of a lost update.
+- **Create** (the `+ New` button — slug auto-suggested from the title, schema
+  defaults honoured, never overwrites) and **Delete** (confirmed; undo is git).
+
+### Setup per project
+
+1. Add the integration (above).
+2. Emit the meta tag from your detail-page layout (below).
+3. Optional: tune fields via `entryEditor` config.
+
+The file→collection mapping follows the `src/content/<name>/` convention.
+Unconventional layouts and field tweaks go in the options:
+
+```js
+textEdit({
+  entryEditor: {
+    // configPath: 'src/content.config.ts',      // auto-detected normally
+    collections: {
+      blog: {
+        // dir: 'content/posts',                 // if not src/content/blog
+        fields: {
+          excerpt: { widget: 'textarea' },
+          image: { widget: 'image' },            // asset picker + upload
+          internalId: { hidden: true },
+        },
+      },
+    },
+  },
+})
+```
+
+Widgets: `text`, `textarea`, `date`, `number`, `boolean`, `select`, `tags`,
+`image`, `json` (read-only). Fields whose zod shape the panel can't edit
+(nested objects, unions) render read-only as `json`. Schema functions using
+`image()` helpers are handled best-effort: the image field edits the path
+string; full `astro:assets` metadata is out of scope.
+
+### The page-source meta tag
 
 **Opt in per detail-page layout** by emitting one **dev-only** meta tag into
 `<head>`:
@@ -126,12 +181,15 @@ Rules of the contract:
   listing routes render a *set* of entries with no single backing file; leave
   the meta off and they correctly fall back to plain "Open source".
 - Nothing auto-detects detail pages. The meta tag **is** the opt-in — if it's
-  absent, the jump button simply doesn't appear. If your layout renders inside a
-  wrapper layout, make sure the meta ends up in the document `<head>` (e.g. via a
-  named `head` slot).
+  absent, the entry button simply doesn't appear. If your layout renders inside
+  a wrapper layout, make sure the meta ends up in the document `<head>` (e.g.
+  via a named `head` slot).
+- Entries must live under a configured `contentRoots` dir (default `src`).
 
-The button opens the file at its top (no line number); it does not yet resolve
-which line a specific field lives on.
+After a create the browser navigates to the sibling URL (`/articles/<new-slug>`
+by convention); after a delete, to the parent listing. Projects with
+non-conventional detail routes still get the file written/removed — only the
+navigation guess differs.
 
 ## Styling the overlay
 
@@ -157,8 +215,11 @@ your overrides need `!important`:
 - **Localhost only.** All endpoints reject non-localhost requests.
 - **Content, never structure.** Inserted text is escaped so it can't introduce a
   tag, an expression, or an entity — edits change words, never behaviour.
-- **No in-place editing of markdown/MDX bodies or expression-driven fields yet.**
-  Those refuse, with "Open source" / "Edit page content" as the escape hatch.
+- **No in-place (click-on-the-page) editing of expression-driven text.** On
+  detail pages those clicks route to the entry drawer; elsewhere they refuse
+  with "Open source" as the escape hatch.
+- **Entry drawer edits markdown as plain text** — no rich-text/WYSIWYG yet, and
+  no `astro:assets` `image()` metadata (path strings only).
 - Verified against Astro 5.x. Requires the dev toolbar (above).
 
 ## How it works (short version)

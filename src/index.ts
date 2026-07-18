@@ -1,5 +1,6 @@
 import type { AstroIntegration } from 'astro';
 import { fileURLToPath } from 'node:url';
+import { createSchemaProvider, type EntryEditorOptions } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
 
 /**
@@ -25,7 +26,15 @@ export interface TextEditOptions {
   contentRoots?: string[];
   /** Expose the click-to-source fallback. */
   openInEditor?: boolean;
+  /**
+   * The CMS-style entry panel for content-collection pages that emit the
+   * `astro-text-edit:page-source` meta tag. Zero-config for conventional
+   * `src/content/<name>/` layouts; `false` disables the whole surface.
+   */
+  entryEditor?: false | EntryEditorOptions;
 }
+
+export type { EntryEditorOptions, EntryFieldOverride } from './server/content-config.ts';
 
 const DEFAULTS: Required<TextEditOptions> = {
   enabled: true,
@@ -33,6 +42,7 @@ const DEFAULTS: Required<TextEditOptions> = {
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],
   openInEditor: true,
+  entryEditor: {},
 };
 
 export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegration {
@@ -84,6 +94,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
 
       'astro:server:setup': ({ server, logger }) => {
         if (!active) return;
+        const entryEditorEnabled = options.entryEditor !== false;
         // Vite dev middleware exposes the edit API under /__text-edit/. (spec §4.3)
         server.middlewares.use(
           createMiddleware({
@@ -93,6 +104,10 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
             contentRoots: options.contentRoots,
             editableExtensions: options.editableExtensions,
             openInEditor: options.openInEditor,
+            entryEditorEnabled,
+            schemaProvider: entryEditorEnabled
+              ? createSchemaProvider(server, projectRoot, options.entryEditor || {})
+              : null,
           }),
         );
       },

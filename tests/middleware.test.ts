@@ -59,6 +59,8 @@ beforeAll(async () => {
     contentRoots: ['src', 'public'],
     editableExtensions: ['.astro', '.md', '.mdx'],
     openInEditor: false,
+    entryEditorEnabled: true,
+    schemaProvider: null,
   });
 });
 

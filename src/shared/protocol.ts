@@ -93,3 +93,93 @@ export interface ErrorResponse {
   error: string;
   code?: RefusalCode;
 }
+
+// --- Entry editor (spec: CMS panel for content-collection entries) -----------
+
+/** Widget/type a frontmatter field renders as in the entry panel. */
+export type FieldType =
+  | 'text'
+  | 'textarea'
+  | 'date'
+  | 'number'
+  | 'boolean'
+  | 'select'
+  | 'tags'
+  | 'image'
+  | 'json'; // unrecognized shape → shown read-only
+
+/** One frontmatter field, derived from the collection's zod schema (or, when
+ *  no schema is resolvable, inferred from the entry's own values). */
+export interface FieldDescriptor {
+  name: string;
+  /** Humanized name; overridable via entryEditor config. */
+  label: string;
+  type: FieldType;
+  /** No default and not optional/nullable. */
+  required: boolean;
+  /** Enum values, for `select`. */
+  options?: string[];
+  /** Schema default — shown as placeholder when the key is absent. */
+  defaultValue?: unknown;
+  /** Whether the key exists in the file's frontmatter. */
+  present: boolean;
+  source: 'schema' | 'inferred';
+}
+
+// --- POST /entry -------------------------------------------------------------
+export interface EntryRequest {
+  /** Repo-relative path from the page-source meta tag. */
+  file: string;
+}
+export interface EntryResponse {
+  file: string;
+  /** sha256 of the full file content; sent back on every write. */
+  etag: string;
+  /** Matched collection name, when the file maps to one. */
+  collection: string | null;
+  fields: FieldDescriptor[];
+  /** Parsed frontmatter values (JSON-safe). */
+  values: Record<string, unknown>;
+  /** Markdown body, \n-normalized. */
+  body: string;
+  bodyEditable: boolean;
+}
+
+// --- POST /entry/apply -------------------------------------------------------
+export interface EntryApplyRequest {
+  file: string;
+  etag: string;
+  changes: {
+    /** ONLY changed keys. `null` clears an optional key from the file. */
+    frontmatter?: Record<string, unknown>;
+    body?: string;
+  };
+}
+
+// --- POST /entry/create ------------------------------------------------------
+export interface EntryCreateRequest {
+  collection: string;
+  /** Filename without extension; sanitized server-side. */
+  slug: string;
+  frontmatter: Record<string, unknown>;
+  body: string;
+}
+export interface EntryCreateResponse {
+  /** Repo-relative path of the new file. */
+  file: string;
+}
+
+// --- POST /entry/delete ------------------------------------------------------
+export interface EntryDeleteRequest {
+  file: string;
+  etag: string;
+}
+
+/** Entry endpoints extend the shared error shape with two more codes and
+ *  optional per-field validation messages. */
+export interface EntryErrorResponse {
+  error: string;
+  code?: RefusalCode | 'conflict' | 'validation' | 'exists';
+  /** Field name → message, for 422 validation failures. */
+  fieldErrors?: Record<string, string>;
+}

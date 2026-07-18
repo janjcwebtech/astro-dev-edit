@@ -1,0 +1,62 @@
+---
+import Base from '../layouts/Base.astro';
+
+const testimonials = [
+  { quote: 'A professional, honest and collaborative approach to agency partnerships.', who: 'Oliver Martin', role: 'Owner, NO LABEL Studios' },
+  { quote: 'A business-oriented attitude and a real focus on understanding market needs to develop the right solution.', who: 'Martí Torra', role: 'Founder, PlantScraper' },
+  { quote: 'One of the best collaborators — proactive, meets deadlines, with strong UX and UI overlap.', who: 'Vojtech Bruk', role: 'Web Designer & SEO Consultant' },
+];
+---
+<Base title="About — J&C web">
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">About us</p>
+      <h1>A long-term approach shaped by ten years of real-world work</h1>
+      <p class="lead" style="max-width:60ch;">
+        We help marketing teams get more from their websites through continuous
+        involvement — combining technical expertise with a practical,
+        understandable approach that keeps sites stable, compliant, and easier
+        to manage over time.
+      </p>
+    </div>
+  </section>
+
+  <!-- Team: static image + literal name/role -->
+  <section class="section" style="padding-top:0;">
+    <div class="container split">
+      <div class="team-member" style="gap:1.25rem;">
+        <img src="/images/jan.webp" alt="Portrait of Jan Cerny" style="width:96px;height:96px;" />
+        <div>
+          <h3 style="margin:0;">Jan Cerny</h3>
+          <p style="margin:0;">Software &amp; Security Engineer · Co-founder of J&amp;C web</p>
+        </div>
+      </div>
+      <div>
+        <h2>Why clients trust us</h2>
+        <p>
+          Every engagement is grounded in the same principles: be honest about
+          trade-offs, keep the work understandable, and treat a client's site as
+          if its stability were our own reputation — because it is.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials: mapped (non-editable expressions) -->
+  <section class="section" style="padding-top:0;">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">In their words</p>
+        <h2>What partners say</h2>
+      </div>
+      <div class="grid grid-3">
+        {testimonials.map((t) => (
+          <blockquote class="quote">
+            <p>&ldquo;{t.quote}&rdquo;</p>
+            <p class="who">{t.who}<br /><span style="font-weight:400;color:var(--grey);">{t.role}</span></p>
+          </blockquote>
+        ))}
+      </div>
+    </div>
+  </section>
+</Base>

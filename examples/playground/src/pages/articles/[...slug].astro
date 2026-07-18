@@ -1,0 +1,33 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+// Repo-relative path to the markdown source, so the editor can offer a jump to
+// where this page's title/body actually live. `filePath` comes from the glob
+// loader; fall back to reconstructing it from the entry id if ever absent.
+const pageSource = post.filePath ?? `src/content/blog/${post.id}.md`;
+---
+<Base title={`${post.data.title} — J&C web`} description={post.data.excerpt} pageSource={pageSource}>
+  <article class="section">
+    <div class="container prose">
+      <a href="/articles" style="color:var(--terracotta);text-decoration:none;font-size:0.9rem;">&larr; All articles</a>
+      <p class="eyebrow" style="margin-top:1rem;">{post.data.category}</p>
+      <h1>{post.data.title}</h1>
+      <p class="meta" style="color:var(--grey);">By {post.data.author} · {fmt(post.data.date)} · {post.data.readTime}</p>
+      <img src={post.data.image} alt={post.data.title} />
+      <!-- Markdown body renders via <Content /> (an expression) — the editor
+           should treat this as non-editable for now (spec §16.4). -->
+      <Content />
+    </div>
+  </article>
+</Base>

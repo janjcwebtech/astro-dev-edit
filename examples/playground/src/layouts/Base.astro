@@ -1,0 +1,36 @@
+---
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  /**
+   * Repo-relative path to the markdown/MDX file backing this page, e.g.
+   * `src/content/blog/post.md`. When set, we emit the
+   * `astro-text-edit:page-source` meta tag the integration reads to offer an
+   * "Edit page content" jump on detail pages whose text lives in markdown
+   * rather than the .astro template. (integration spec §16.2)
+   */
+  pageSource?: string;
+}
+const { title, description = 'Strategic digital partner for your website.', pageSource } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/styles/global.css" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {pageSource && <meta name="astro-text-edit:page-source" content={pageSource} />}
+  </head>
+  <body>
+    <Nav />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>
