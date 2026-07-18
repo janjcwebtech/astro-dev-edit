@@ -201,3 +201,29 @@ as the spec of current behavior. `tests/helpers.ts::locOf` computes the
 `astro.ts`); use it to build classify/apply requests. Deliberate behavior quirks
 (entity decoding, verify strictness, partial-failure windows) are documented in
 `TODO.md` as known deferrals rather than bugs — check there before "fixing" one.
+
+## Changelog, README, and versioning
+
+Two docs are easy to forget and must not be — check both before any change
+lands:
+
+- **`CHANGELOG.md`** — every user-visible change (feature, fix, behavior or
+  option change, security tightening) gets an entry under `[Unreleased]` in
+  the appropriate Keep-a-Changelog section (Added / Changed / Fixed /
+  Security), in the same commit as the change.
+- **`README.md`** — the user-facing doc. Any change to options, endpoints,
+  editors/panels, refusal behavior, or the `atx-*` styling surface updates
+  the matching README section in the same commit.
+
+Versioning is semver, applied at release time (when work is stamped out of
+`[Unreleased]`), not per commit:
+
+- **Patch (`0.0.x`)** — a release containing only fixes.
+- **Minor (`0.x.0`)** — a release containing feature work. While in `0.x`,
+  breaking changes may ride along in minors.
+- **Major (`X.0.0`)** — only when the user explicitly confirms a bigger
+  release; never bump major on your own.
+
+Stamping a release means: rename `[Unreleased]` to the new version with the
+date, bump `version` in `package.json` to match, and tag `vX.Y.Z` — all in
+one commit on `main`.
