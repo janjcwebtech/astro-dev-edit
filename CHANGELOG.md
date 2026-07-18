@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+## \[0.2.0\] - 2026-07-19
+
 ### Changed
 
 -   The hover pill no longer guesses editability from the DOM (which false-flagged resolved `{expressions}` as editable): it now appears instantly in a neutral "checking" state (muted outline, `file:loc · loading…`), and once the pointer rests on one element for ~500ms it is confirmed against the server's AST classification and upgrades to the verdict a click would get — `editable`, `image`, or `dynamic`. The verdict occupies a fixed-width slot in the pill, so the pill doesn't resize when the verdict lands. Verdicts are cached per element until the next HMR update, so a re-hover shows its verdict immediately and each element costs at most one `/classify` per file version; sweeping the mouse across the page fires no requests at all
