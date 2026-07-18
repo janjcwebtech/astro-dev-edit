@@ -13,16 +13,6 @@ the source disagree until reload. Fix: extend the wire protocol so one
 `/apply` accepts an ops array and the server does a single
 verify-all-then-write-once pass.
 
-## `/open` path validation is weaker than the edit endpoints
-
-The open-in-editor route (src/server/middleware.ts) confines the path with
-`insideRoot()` only — no `realpath` (symlinks unresolved), no contentRoots
-check, no extension check — while `/classify`/`/apply` go through
-`validateEditablePath`. Harmless today (it only opens an editor), but the
-asymmetry is unearned. Fix: route it through `validateEditablePath` with a
-relaxed extension list, or a shared `confine(level)` helper in
-src/server/paths.ts.
-
 ## Verify strictness differs between text and attributes
 
 Text content verification is whitespace-normalized

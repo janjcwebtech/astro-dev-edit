@@ -1,6 +1,6 @@
 import type { AstroIntegrationLogger } from 'astro';
 import { readFile } from 'node:fs/promises';
-import { basename, extname, resolve } from 'node:path';
+import { basename, extname } from 'node:path';
 import type { Connect } from 'vite';
 import { patcherFor } from '../patcher/registry.ts';
 import type {
@@ -12,7 +12,7 @@ import type {
 import { listAssets, saveUpload } from './assets.ts';
 import type { EntrySchemaProvider } from './content-config.ts';
 import { createEntryRoutes } from './entry-routes.ts';
-import { atomicWrite, insideRoot, validateEditablePath } from './paths.ts';
+import { atomicWrite, validateEditablePath } from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
 
 /**
@@ -132,9 +132,12 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
           return { status: 403, body: { error: 'open-in-editor is disabled by configuration' } };
         }
         const { file, loc } = body as OpenRequest;
-        // Confine to the project root before handing a path to the editor.
-        const abs = resolve(root, file);
-        if (!insideRoot(root, abs)) throw new Error('path escapes root');
+        if (!file) throw new Error('file is required');
+        // Same gate as /classify and /apply: realpath ∈ root ∈ contentRoots,
+        // allowed extension. /open only spawns an editor, but it takes the
+        // same client-supplied paths, and every legitimate caller targets a
+        // file that already passed this gate. (spec §8)
+        const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
         const [line, col] = (loc ?? '').split(':');
         const spec = line ? `${abs}:${line}${col ? ':' + col : ''}` : abs;
         // launch-editor is CommonJS: the module IS the function. Interop may

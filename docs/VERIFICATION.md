@@ -37,7 +37,7 @@ Run in this order; each is cheaper than the next.
 | `GET /health` | `tests/middleware.test.ts` |
 | `GET /assets` — asset dirs listed as sorted web paths, `public/` mapped to `/` | `tests/middleware.test.ts` |
 | `POST /upload` — data-URL write into the configured `uploadDir`, clash suffixing, traversal sanitising, mime/payload rejection | `tests/middleware.test.ts` |
-| `POST /open` — disabled-by-config 403 | `tests/middleware.test.ts` |
+| `POST /open` — disabled-by-config 403; path gate matches `/classify`/`/apply` (out-of-content-roots, out-resolving symlink, bad extension, nonexistent, missing field → 400) | `tests/middleware.test.ts` |
 | `POST /classify` — literal text, dynamic for non-`.astro`, out-of-root and nonexistent rejection | `tests/middleware.test.ts` |
 | `POST /apply` — atomic on-disk patch, unsupported/refusal 422s, validation 400s | `tests/middleware.test.ts` |
 | `POST /entry` — schema fields + values + body + etag; inference fallback; path rejection | `tests/middleware-entry.test.ts` |
@@ -51,9 +51,9 @@ Run in this order; each is cheaper than the next.
 
 Not automated: `content-config.ts` (loads the project's real
 `content.config.ts` via `ssrLoadModule`) is injected and **stubbed** in every
-test — its real code path only runs in the playground. Same for
-`paths.ts::validateEditablePath`'s realpath/symlink behavior beyond what the
-middleware tests exercise, and `/open` actually launching an editor.
+test — its real code path only runs in the playground. Same for `/open`
+actually launching an editor (tests only pin its rejection paths, which fail
+before launch-editor is reached).
 
 ### Patchers (`src/patcher/`)
 
@@ -141,6 +141,6 @@ whichever sections your change touches; run the whole list before a release.
 ## Known deferrals
 
 Deliberate quirks (entity decoding, verify strictness, partial-failure
-windows, the `/open` confinement asymmetry) are documented in
+windows) are documented in
 [TODO.md](../TODO.md) — check there before treating a checklist failure as a
 regression.
