@@ -1,4 +1,5 @@
 import type { AstroIntegration } from 'astro';
+import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSchemaProvider, type EntryEditorOptions } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
@@ -18,8 +19,15 @@ import { createMiddleware } from './server/middleware.ts';
 export interface TextEditOptions {
   /** Kill switch. When false the integration does nothing at all. */
   enabled?: boolean;
-  /** Directories scanned for replacement images; uploads go to the first. */
+  /** Directories scanned for replacement images offered in the swap panel. */
   assetDirs?: string[];
+  /**
+   * Directory new image uploads are written to, relative to the project root.
+   * Must be a web-servable location — files here become a plain `<img src>` in
+   * the source, so anything outside `public/` works in dev but 404s in a
+   * production build. Defaults to `public`.
+   */
+  uploadDir?: string;
   /** Extensions the patcher is allowed to write. */
   editableExtensions?: string[];
   /** Directories that writes are confined to. */
@@ -39,6 +47,7 @@ export type { EntryEditorOptions, EntryFieldOverride } from './server/content-co
 const DEFAULTS: Required<TextEditOptions> = {
   enabled: true,
   assetDirs: ['src/assets', 'public'],
+  uploadDir: 'public',
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],
   openInEditor: true,
@@ -66,6 +75,22 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
         }
         active = true;
         projectRoot = fileURLToPath(config.root);
+
+        // Uploads become a literal `<img src>` in the source. Anything outside
+        // `public/` is served by Vite in dev but absent from a production
+        // build, so the reference would 404 once deployed. Warn rather than
+        // silently produce dev-only paths. (matches the swap panel, which
+        // never offers `/src/` assets for the same reason)
+        const uploadRel = relative(projectRoot, resolve(projectRoot, options.uploadDir));
+        const uploadServable =
+          uploadRel === 'public' || uploadRel.startsWith('public' + sep);
+        if (!uploadServable) {
+          logger.warn(
+            `uploadDir "${options.uploadDir}" is not under public/ — uploaded ` +
+              'images are served in dev but will 404 in a production build. ' +
+              'Point uploadDir at a folder under public/.',
+          );
+        }
 
         // The whole feature rides on `data-astro-source-file` / `-loc`
         // attributes, which Astro only emits when the dev toolbar is enabled.
@@ -101,6 +126,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
             logger,
             root: projectRoot,
             assetDirs: options.assetDirs,
+            uploadDir: options.uploadDir,
             contentRoots: options.contentRoots,
             editableExtensions: options.editableExtensions,
             openInEditor: options.openInEditor,

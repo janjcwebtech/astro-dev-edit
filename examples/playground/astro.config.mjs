@@ -14,6 +14,9 @@ export default defineConfig({
       // work, but being explicit documents what the integration touches.
       contentRoots: ['src', 'public'],
       assetDirs: ['src/assets', 'public'],
+      // Uploads land beside the existing images (web-servable in prod) rather
+      // than in src/assets, so a swapped-in <img src> survives a real build.
+      uploadDir: 'public/images',
       // Entry-editor field tweaks: the schema drives everything else; these
       // just pick nicer widgets than the plain-string default.
       entryEditor: {

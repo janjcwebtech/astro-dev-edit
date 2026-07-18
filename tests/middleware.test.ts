@@ -56,6 +56,7 @@ beforeAll(async () => {
     logger,
     root,
     assetDirs: ['src/assets', 'public'],
+    uploadDir: 'public',
     contentRoots: ['src', 'public'],
     editableExtensions: ['.astro', '.md', '.mdx'],
     openInEditor: false,
@@ -174,15 +175,15 @@ describe('GET /assets', () => {
 describe('POST /upload', () => {
   const PNG_B64 = Buffer.from('fake-png-bytes').toString('base64');
 
-  it('writes a base64 data-URL into the first asset dir and returns its web path', async () => {
+  it('writes a base64 data-URL into the upload dir and returns its web path', async () => {
     const r = await request({
       method: 'POST',
       url: '/__text-edit/upload',
       body: { dataUrl: `data:image/png;base64,${PNG_B64}`, filename: 'shot.png' },
     });
     expect(r.status).toBe(200);
-    expect(r.body.webPath).toBe('/src/assets/shot.png');
-    expect(String(await readFile(join(root, 'src/assets/shot.png')))).toBe('fake-png-bytes');
+    expect(r.body.webPath).toBe('/shot.png');
+    expect(String(await readFile(join(root, 'public/shot.png')))).toBe('fake-png-bytes');
   });
 
   it('suffixes on a name clash instead of overwriting', async () => {
@@ -192,7 +193,7 @@ describe('POST /upload', () => {
       body: { dataUrl: `data:image/png;base64,${PNG_B64}`, filename: 'shot.png' },
     });
     expect(r.status).toBe(200);
-    expect(r.body.webPath).toBe('/src/assets/shot-1.png');
+    expect(r.body.webPath).toBe('/shot-1.png');
   });
 
   it('sanitises path-traversal filenames to a safe basename', async () => {
@@ -202,7 +203,7 @@ describe('POST /upload', () => {
       body: { dataUrl: `data:image/png;base64,${PNG_B64}`, filename: '../../etc/passwd' },
     });
     expect(r.status).toBe(200);
-    expect(r.body.webPath).toBe('/src/assets/passwd.png');
+    expect(r.body.webPath).toBe('/passwd.png');
   });
 
   it('rejects unsupported mime types with 400', async () => {

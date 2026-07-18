@@ -15,6 +15,7 @@ Work in progress on the `cms` branch, not yet merged to `main`.
 -   Content collection entry editing: frontmatter patching, content collection schema introspection, and an asset picker
 -   Navigate-while-held: holding Ctrl or Alt/Option in edit mode suspends editing so clicks travel the site normally (link clicks are re-dispatched as plain navigation, since natively Alt+click downloads, Ctrl+click opens a new tab, and macOS treats Ctrl+click as a right-click); a small "hold … to navigate" annotation under the toggle surfaces the feature
 -   Playground blog content, layouts, and nav/footer components to exercise entry editing end-to-end
+-   `uploadDir` option (default `public`) controls where image uploads are written; a preflight warning fires when it points outside `public/`, where a plain `<img src>` would 404 in a production build
 -   WYSIWYG body editor in the entry drawer: formatting toolbar (bold, italic, strikethrough, heading levels, lists, quote, code block, inline code, link, insert image) over a contenteditable surface, with an MD/Rich toggle; bodies using markdown outside the supported subset (tables, raw HTML/MDX, footnotes, nested lists) open in raw-markdown mode and refuse a lossy switch to rich
 -   A small ✕ button, revealed while hovering the corner buttons, hides them (and turns edit mode off) until the next page reload
 
@@ -26,12 +27,14 @@ Work in progress on the `cms` branch, not yet merged to `main`.
 -   Entry drawer widened to 50% of the viewport (still ≥440px, capped at 94vw on small screens)
 -   Image field redesigned: large 240×160 preview above the path input, click-to-browse on the preview, and a placeholder (never a broken image) when the path is empty or fails to load
 -   Clicking an image inside the rich body editor opens the picker to replace it
--   Alt-text field in the image insert/replace panel, auto-suggested from the picked file's name until edited by hand; an existing alt is preserved when swapping the file
+-   Alt-text field in the image insert/replace panel; a newly inserted image auto-suggests alt from the picked file's name (until edited by hand), while editing an existing image never changes its alt on its own
 -   Rich editor toolbar and image insert/replace panel share a sticky header, so the image UI stays in the viewport when editing far down a long body
 -   Rich editor surface is white with dark text (like the rendered page); drawer and panels restore normal per-element cursors instead of inheriting edit mode's crosshair
 
 ### Fixed
 
+-   Image uploads wrote into the first `assetDirs` entry (`src/assets` by default), producing an `<img src="/src/assets/…">` that works in the dev server but 404s in a production build; uploads now go to the configurable `uploadDir` under `public/`, and the uploaded file is offered by the swap panel afterwards
+-   Clicking an existing image in the rich body editor pre-filled its alt text from the filename the moment the panel opened, so a plain Replace could silently rewrite the alt; existing images' alt is now left untouched (filename auto-suggest applies only to newly inserted images)
 -   Bare block-level images (not wrapped in a paragraph) were dropped by the rich editor's markdown serialization; they now serialize as `![alt](src)`
 -   Date fields already rendered as a native date picker, but its calendar icon was a near-invisible dark glyph on the dark input; `color-scheme: dark` on form controls makes the picker icon and popup (and number spinners) render light and discoverable
 

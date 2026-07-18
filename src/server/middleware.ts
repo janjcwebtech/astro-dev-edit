@@ -31,6 +31,8 @@ interface MiddlewareDeps {
   root: string;
   /** Directories the asset listing may read from, relative to root. */
   assetDirs: string[];
+  /** Directory new uploads are written to, relative to root. */
+  uploadDir: string;
   /** Directories writes are confined to, relative to root. (spec §8) */
   contentRoots: string[];
   /** Extensions the patcher may write. (spec §8) */
@@ -72,6 +74,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     logger,
     root,
     assetDirs,
+    uploadDir,
     contentRoots,
     editableExtensions,
     openInEditor,
@@ -102,15 +105,15 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       onError: () => ({ status: 500, body: { error: 'could not list assets' } }),
     },
 
-    // Writes a NEW image file into an asset dir — a self-contained asset
-    // write, never a source-file patch. (spec §11)
+    // Writes a NEW image file into the configured upload dir — a self-contained
+    // asset write, never a source-file patch. (spec §11)
     {
       method: 'POST',
       path: '/upload',
       maxBytes: 25 * 1024 * 1024, // 25 MB cap
       label: 'upload',
       handler: async (body) => {
-        const { webPath } = await saveUpload(root, assetDirs, body as UploadRequest);
+        const { webPath } = await saveUpload(root, uploadDir, body as UploadRequest);
         logger.info(`uploaded image -> ${webPath}`);
         return { status: 200, body: { webPath } };
       },

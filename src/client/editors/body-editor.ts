@@ -276,10 +276,11 @@ export function buildBodyEditor(initial: string): BodyEditor {
   const openImagePanel = (prefill: string, target: HTMLImageElement | null): void => {
     replaceTarget = target;
     imageValue = prefill;
-    // An existing alt counts as hand-written — picking a new file won't
-    // clobber it; a blank one follows the file name until edited.
+    // Editing an existing image never rewrites its alt on its own — the source
+    // value is authoritative, even when blank. Filename auto-suggest applies
+    // only to a brand-new insert, and only until the field is edited by hand.
     altInput.value = target?.getAttribute('alt') ?? '';
-    altTouched = altInput.value !== '';
+    altTouched = target !== null || altInput.value !== '';
     imageFieldSlot.textContent = '';
     imageFieldSlot.append(buildImageField(prefill, (v) => {
       imageValue = v;

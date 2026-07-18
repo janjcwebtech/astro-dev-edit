@@ -75,24 +75,24 @@ export function safeFileName(name: string, fallbackExt: string): string {
 }
 
 /**
- * Write an uploaded image into an asset directory. Accepts a data-URL. The
- * destination is confined to a configured asset dir inside the project root,
- * the extension must be an allowed image type, and the name is sanitised. On a
- * name clash a numeric suffix is added rather than overwriting. Returns the
+ * Write an uploaded image into the configured upload directory. Accepts a
+ * data-URL. The destination is confined to the upload dir inside the project
+ * root, the extension must be an allowed image type, and the name is sanitised.
+ * On a name clash a numeric suffix is added rather than overwriting. Returns the
  * web-servable path. (safe: writes a NEW asset file, never patches source)
  */
 export async function saveUpload(
   root: string,
-  assetDirs: string[],
+  uploadDir: string,
   payload: UploadRequest,
 ): Promise<{ webPath: string }> {
   const { mime, data } = parseDataUrl(payload.dataUrl);
   const fallbackExt = EXT_BY_MIME[mime];
   if (!fallbackExt) throw new Error(`unsupported image type: ${mime}`);
 
-  // Target the first configured asset dir that lives inside the root.
-  const dir = assetDirs.map((d) => resolve(root, d)).find((abs) => insideRoot(root, abs));
-  if (!dir) throw new Error('no writable asset directory configured');
+  // Uploads land in the configured upload dir, confined to the project root.
+  const dir = resolve(root, uploadDir);
+  if (!insideRoot(root, dir)) throw new Error('upload directory escapes the project root');
 
   const fileName = safeFileName(payload.filename || 'upload', fallbackExt);
   let target = join(dir, fileName);

@@ -62,7 +62,8 @@ to edit and logs a preflight warning. Keep `devToolbar.enabled` on in dev.
 ```js
 textEdit({
   enabled: true,                          // kill switch
-  assetDirs: ['public', 'src/assets'],    // scanned for images; uploads → first
+  assetDirs: ['src/assets', 'public'],    // scanned for swappable images
+  uploadDir: 'public',                    // where new uploads are written
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],        // writes confined to these
   openInEditor: true,                     // expose "Open source" / jump-to-file
@@ -73,7 +74,8 @@ textEdit({
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | `true` | `false` disables the integration entirely. |
-| `assetDirs` | `['src/assets', 'public']` | Dirs scanned for replacement images; **uploads go to the first**. |
+| `assetDirs` | `['src/assets', 'public']` | Dirs scanned for the swap panel's replacement-image list. |
+| `uploadDir` | `'public'` | Where new uploads are written. Must be under `public/` — files here become a plain `<img src>`, so a `src/`-relative dir works in dev but 404s in a production build (a preflight warning fires if it isn't web-servable). |
 | `editableExtensions` | `['.astro', '.md', '.mdx']` | Extensions the patcher is allowed to write. |
 | `contentRoots` | `['src', 'public']` | Writes are confined to these (resolved, symlinks included). |
 | `openInEditor` | `true` | Expose the "Open source" / jump-to-file behaviour. |
