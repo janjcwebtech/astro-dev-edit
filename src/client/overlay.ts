@@ -19,6 +19,7 @@
 
 import type { SourceLoc } from '../shared/protocol.ts';
 import * as api from './api.ts';
+import { invalidateClassifications } from './classify-cache.ts';
 import { openEntryPanel } from './editors/entry.ts';
 import { pageSource } from './editors/notice.ts';
 import { clearHighlight, initHover } from './hover.ts';
@@ -261,6 +262,7 @@ initRouter({
 if (import.meta.hot) {
   import.meta.hot.on('vite:afterUpdate', () => {
     clearHighlight();
+    invalidateClassifications(); // the source changed — cached verdicts are stale
     cacheSourceMappings();
   });
 }

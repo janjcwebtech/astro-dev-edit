@@ -72,6 +72,7 @@ the loc rules in `astro.ts`.
 | Functionality | Test file |
 | --- | --- |
 | `markdown.ts` — `markdownToHtml` rendering subset, `canRichEdit` accept/refuse | `tests/markdown.test.ts` |
+| `classify-cache.ts` — verdict caching per file\|loc\|tag, in-flight dedupe, failure retry, HMR invalidation (incl. mid-flight) | `tests/classify-cache.test.ts` |
 
 **Everything else in `src/client/` has no unit tests** — it is DOM- and
 dev-server-bound and is verified only by the manual checklist below. When
@@ -94,8 +95,16 @@ whichever sections your change touches; run the whole list before a release.
 
 **Inline text editing** (e.g. `/articles/` listing)
 
-- [ ] Edit mode on → hovering literal text highlights it; click opens the
-      inline contenteditable; save writes the file and HMR refreshes.
+- [ ] Edit mode on → hovering highlights the element with a neutral grey pill
+      (`file:loc · loading…`); after resting ~500ms on it the pill upgrades to
+      the server verdict — purple `editable` on literal text, amber `dynamic`
+      on expression-driven content, green `image` on a static `<img>` — with
+      no change in pill width (the verdict slot is fixed-width). Sweeping
+      the mouse across elements without resting fires no `/classify` requests,
+      a re-hover of a verified element shows its verdict instantly with no new
+      request (network tab), and after an HMR update verdicts re-verify.
+- [ ] Click on literal text opens the inline contenteditable (works before the
+      verdict lands, too); save writes the file and HMR refreshes.
 - [ ] Mousing from an element up to its pill (crossing the parent en route)
       keeps the pill in place — no instant retarget; both the pill's file:loc
       label and its "open ↗" button jump to the source in the editor.

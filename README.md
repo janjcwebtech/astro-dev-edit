@@ -26,6 +26,13 @@ source; your Astro project compiles it like any other `.ts`.
   components, `set:html`, and nested markup all fall here — on detail pages the
   refusal notice offers "Edit page content", which opens the entry drawer.
 
+In edit mode, hovering an element outlines it and shows a `file:line:col`
+pill. The pill starts neutral (grey `loading…`, no editability claim); once
+the pointer rests on one element for a moment, the source AST is consulted
+and the pill colors up to the verdict a click would get — **editable**,
+**image**, or **dynamic**. Verdicts are remembered until the file next
+changes, so known elements show theirs instantly.
+
 ## Install
 
 Install from git (shipping TypeScript source — no build step):
@@ -215,7 +222,9 @@ Every overlay element carries a stable class, and the singletons carry IDs:
 `#atx-toggle-hint` (the "hold … to navigate" note under the buttons),
 `#atx-outline` (hover highlight),
 `#atx-tooltip` (the file:loc pill — both its label and the "open ↗" button
-jump to the source in your editor), plus classes like `atx-panel`,
+jump to the source in your editor; inside the label, `atx-tooltip-loc` holds
+the location and `atx-tooltip-verdict` is the fixed-width verdict slot), plus
+classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
 `atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, and the rich body
 editor's `atx-rte`, `atx-rte-head` (sticky toolbar + image panel),
