@@ -187,6 +187,14 @@ stub the interface in tests.
 
 ## Tests
 
+**`docs/VERIFICATION.md` is the verification map** — every feature area with
+the test file that pins it, plus the manual playground checklist for the
+client layer (which has no unit tests beyond `markdown.ts`). It must stay
+current: any change that adds, removes, or reshapes functionality updates its
+matrix in the same commit, and a manual-only behavior that gains a test moves
+into the automated table. The `.claude/skills/verify` skill is the runbook
+(typecheck → vitest → playground drive) that leans on it.
+
 Vitest characterization tests pin patcher and middleware behavior — treat them
 as the spec of current behavior. `tests/helpers.ts::locOf` computes the
 `line:col` an element would be annotated with (mirrors the loc rules in
