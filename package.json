@@ -1,6 +1,6 @@
 {
   "name": "astro-text-edit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "In-browser visual content editing for the Astro dev server — click text or images in the rendered page, writes straight to source. Dev-only.",
   "type": "module",
   "exports": {
