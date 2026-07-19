@@ -27,7 +27,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "astro": ">=5.0.0 <7"
+    "astro": ">=5.0.0 <8"
   },
   "dependencies": {
     "@astrojs/compiler": "^2.13.1",

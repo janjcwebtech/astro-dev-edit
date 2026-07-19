@@ -1,6 +1,8 @@
 import type { AstroIntegration } from 'astro';
-import { relative, resolve, sep } from 'node:path';
+import { createRequire } from 'node:module';
+import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createAnnotatePlugin } from './server/annotate.ts';
 import { createSchemaProvider, type EntryEditorOptions } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
 
@@ -35,6 +37,14 @@ export interface TextEditOptions {
   /** Expose the click-to-source fallback. */
   openInEditor?: boolean;
   /**
+   * Who emits the `data-astro-source-*` attributes the feature rides on.
+   * `'auto'` (default): Astro's own compiler on Astro 5/6; injected by this
+   * integration on Astro ≥7, whose Rust compiler doesn't emit them
+   * (docs/ASTRO-COMPAT.md). `'force'` always injects (also lifts the
+   * dev-toolbar requirement on 5/6); `'off'` never injects.
+   */
+  sourceAnnotations?: 'auto' | 'force' | 'off';
+  /**
    * The CMS-style entry panel for content-collection pages that emit the
    * `astro-text-edit:page-source` meta tag. Zero-config for conventional
    * `src/content/<name>/` layouts; `false` disables the whole surface.
@@ -51,8 +61,22 @@ const DEFAULTS: Required<TextEditOptions> = {
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],
   openInEditor: true,
+  sourceAnnotations: 'auto',
   entryEditor: {},
 };
+
+/** The project's installed Astro major, resolved from the project root (the
+ *  integration's own tree has no astro). null when resolution fails. */
+function detectAstroMajor(projectRoot: string): number | null {
+  try {
+    const req = createRequire(join(projectRoot, 'package.json'));
+    const version = (req('astro/package.json') as { version: string }).version;
+    const major = Number.parseInt(version.split('.')[0]!, 10);
+    return Number.isNaN(major) ? null : major;
+  } catch {
+    return null;
+  }
+}
 
 export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegration {
   const options = { ...DEFAULTS, ...userOptions };
@@ -65,7 +89,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
   return {
     name: 'astro-text-edit',
     hooks: {
-      'astro:config:setup': ({ command, config, injectScript, logger }) => {
+      'astro:config:setup': ({ command, config, injectScript, logger, updateConfig }) => {
         // Dev server only. Bail for `astro build` / `astro preview` so nothing
         // ships to production. (spec §4.1, §8)
         if (command !== 'dev') return;
@@ -93,16 +117,37 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
         }
 
         // The whole feature rides on `data-astro-source-file` / `-loc`
-        // attributes, which Astro only emits when the dev toolbar is enabled.
-        // If it's off, hover highlight and (later) click-to-edit silently find
-        // nothing. Fail loud rather than mysteriously do nothing. (preflight)
+        // attributes. On Astro 5/6 the compiler emits them (dev toolbar on);
+        // on Astro ≥7 the Rust compiler doesn't (docs/ASTRO-COMPAT.md,
+        // withastro/compiler-rs#96), so we inject them ourselves with a
+        // pre-compiler Vite transform. Unresolvable version → inject too:
+        // double annotation is harmless (identical values, browsers keep the
+        // first), while missing annotation kills the feature.
+        const astroMajor = detectAstroMajor(projectRoot);
+        const selfAnnotate =
+          options.sourceAnnotations === 'force' ||
+          (options.sourceAnnotations === 'auto' && (astroMajor === null || astroMajor >= 7));
+        if (selfAnnotate) {
+          updateConfig({ vite: { plugins: [createAnnotatePlugin()] } });
+          logger.info(
+            `injecting data-astro-source-* annotations (` +
+              (options.sourceAnnotations === 'force'
+                ? 'sourceAnnotations: "force"'
+                : `Astro ${astroMajor ?? 'unknown'} — its compiler does not emit them`) +
+              ')',
+          );
+        }
+
+        // Without self-annotation, only the dev toolbar makes Astro emit the
+        // attributes. If it's off, hover highlight and click-to-edit silently
+        // find nothing. Fail loud rather than mysteriously do nothing.
         const toolbarEnabled = config.devToolbar?.enabled ?? true;
-        if (!toolbarEnabled) {
+        if (!toolbarEnabled && !selfAnnotate) {
           logger.warn(
             'the Astro dev toolbar is DISABLED, so no data-astro-source-* ' +
               'attributes are emitted. astro-text-edit needs them to locate ' +
               'editable elements and will find nothing. Re-enable the dev ' +
-              'toolbar (devToolbar.enabled) to use text-edit.',
+              'toolbar (devToolbar.enabled) or set sourceAnnotations: "force".',
           );
         }
 

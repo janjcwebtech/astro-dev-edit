@@ -66,11 +66,18 @@ export default defineConfig({
 
 Then `npm run dev` and click **Edit** (bottom-right of the page).
 
-### Requires the dev toolbar
+### Where the source locations come from
 
-The feature depends on `data-astro-source-*` attributes, which Astro only emits
-when the **dev toolbar is enabled**. With it off, the integration finds nothing
-to edit and logs a preflight warning. Keep `devToolbar.enabled` on in dev.
+The feature depends on `data-astro-source-*` attributes on every element:
+
+-   **Astro 5/6** — Astro's own compiler emits them, but only when the **dev
+    toolbar is enabled**. With it off, the integration finds nothing to edit
+    and logs a preflight warning. Keep `devToolbar.enabled` on in dev (or set
+    `sourceAnnotations: 'force'`).
+-   **Astro ≥7** — the new Rust compiler doesn't emit them at all
+    ([details](docs/ASTRO-COMPAT.md)), so the integration **injects them
+    itself** via a pre-compiler transform. Automatic; the dev toolbar is no
+    longer required for locating elements on 7.
 
 ## Options
 
@@ -82,6 +89,7 @@ textEdit({
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],        // writes confined to these
   openInEditor: true,                     // expose "Open source" / jump-to-file
+  sourceAnnotations: 'auto',              // who emits data-astro-source-*
   entryEditor: {},                        // CMS entry drawer; false disables it
 })
 ```
@@ -94,6 +102,7 @@ textEdit({
 | `editableExtensions` | `['.astro', '.md', '.mdx']` | Extensions the patcher is allowed to write. |
 | `contentRoots` | `['src', 'public']` | Writes are confined to these (resolved, symlinks included). |
 | `openInEditor` | `true` | Expose the "Open source" / jump-to-file behaviour. |
+| `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. |
 | `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
 
 ## Undo is git — there is no in-app undo
@@ -282,10 +291,10 @@ your overrides need `!important`:
   lists, quotes, code, links, images, hr. Anything beyond it (tables, raw
   HTML/MDX, footnotes, nested lists) is still editable, but as markdown
   source. No `astro:assets` `image()` metadata (path strings only).
-- **Astro 5.x and 6.x only — not Astro 7.x.** Astro 7's Rust compiler
-  (`@astrojs/compiler-rs`) no longer emits the `data-astro-source-*` attributes
-  the whole feature rides on, so click-to-edit is inert there. See
-  [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md). Requires the dev toolbar (above).
+- **Astro 5.x–7.x.** On 5/6 Astro's compiler provides the source annotations
+  (dev toolbar required, above); on ≥7 the integration injects them itself,
+  since the Rust compiler no longer emits them. See
+  [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md).
 
 ## How it works (short version)
 
