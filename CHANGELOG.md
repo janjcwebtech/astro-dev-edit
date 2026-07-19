@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/): fix-only releases bump the patch (`0.0.x`), releases with feature work bump the minor (`0.x.0`), and the major (`X.0.0`) moves only on an explicitly confirmed bigger release. While the project is in alpha (`0.x.x`), breaking changes may land in minor releases.
 
+## \[Unreleased\]
+
+### Changed
+
+-   Narrowed the `astro` peer range to `>=5.0.0 <7`. Astro 7 makes the rewritten Rust compiler (`@astrojs/compiler-rs`) the default, and it no longer emits the `data-astro-source-file` / `-loc` attributes the whole feature depends on — so click-to-edit is inert on Astro 7 (the entry drawer, which uses the page-source meta + content config, still works). Verified working on Astro 5.x and 6.x (6.4.8). Filed [withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96) upstream; full write-up, including the two-phase history and other tools on the same mechanism, in [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md)
+
 ## \[0.3.0\] - 2026-07-19
 
 ### Added

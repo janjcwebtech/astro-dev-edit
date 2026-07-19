@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Dev-focused by design.** `astro:config:setup` bails unless `command === 'dev'`, so nothing registers for `astro build` / `astro preview` and the code can never reach a production bundle. Keep it that way — any new hook work must preserve the dev-only guard.
 
+**Astro 5.x and 6.x only — not Astro 7.x.** The whole feature rides on the `data-astro-source-file` / `-loc` attributes Astro emits in dev. Astro 7 defaults to the Rust compiler (`@astrojs/compiler-rs`), which accepts the `annotateSourceFile` flag but **does not emit those attributes**, so click-to-edit is inert there (the entry drawer, which uses the page-source meta + content config, still works). The peer range is pinned `>=5.0.0 <7` for this reason. Don't bump the playground or peer range to 7 until upstream restores emission — tracked in [`docs/ASTRO-COMPAT.md`](docs/ASTRO-COMPAT.md) ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)), which also records the two-phase attribute-removal history and the other tools on the same mechanism.
+
 ## Commands
 
 ```bash

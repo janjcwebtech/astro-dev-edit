@@ -282,7 +282,10 @@ your overrides need `!important`:
   lists, quotes, code, links, images, hr. Anything beyond it (tables, raw
   HTML/MDX, footnotes, nested lists) is still editable, but as markdown
   source. No `astro:assets` `image()` metadata (path strings only).
-- Verified against Astro 5.x. Requires the dev toolbar (above).
+- **Astro 5.x and 6.x only — not Astro 7.x.** Astro 7's Rust compiler
+  (`@astrojs/compiler-rs`) no longer emits the `data-astro-source-*` attributes
+  the whole feature rides on, so click-to-edit is inert there. See
+  [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md). Requires the dev toolbar (above).
 
 ## How it works (short version)
 
