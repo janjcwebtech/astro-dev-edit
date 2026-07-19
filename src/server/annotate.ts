@@ -118,13 +118,18 @@ export async function annotateAstroSource(source: string, file: string): Promise
 
   if (insertions.length === 0) return source;
   insertions.sort((a, b) => a.index - b.index);
-  let out = '';
+  // Build with a parts array + single join, not `out += …` in the loop: the
+  // latter recopies a growing string per insertion (O(k²) over the output).
+  // A `.map()` loop lives in source once, so real files have few insertions —
+  // but a large hand-written template shouldn't degrade.
+  const parts: string[] = [];
   let cursor = 0;
   for (const ins of insertions) {
-    out += source.slice(cursor, ins.index) + ins.text;
+    parts.push(source.slice(cursor, ins.index), ins.text);
     cursor = ins.index;
   }
-  return out + source.slice(cursor);
+  parts.push(source.slice(cursor));
+  return parts.join('');
 }
 
 /**
