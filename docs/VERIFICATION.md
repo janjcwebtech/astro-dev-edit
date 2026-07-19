@@ -46,6 +46,7 @@ Run in this order; each is cheaper than the next.
 | `POST /entry/create` — valid create, slug-clash 409, missing-required 422, unknown collection / empty slug rejection | `tests/middleware-entry.test.ts` |
 | `POST /entry/delete` — fresh-etag delete, stale-etag 409 keeps file | `tests/middleware-entry.test.ts` |
 | Entry editor disabled → all `/entry*` rejected | `tests/middleware-entry.test.ts` |
+| `annotateAstroSource` — self-annotation for Astro ≥7: loc parity with `locOf` (text/expression/childless rules), component skip, elements inside expressions, self-closing tags, attr escaping, no-newline invariant, classify/apply round-trip against the original source | `tests/annotate.test.ts` |
 | `zodToFields` — playground blog schema, primitive/enum/array mapping, wrapper unwrapping, image() stub, degrade-to-json | `tests/schema-introspect.test.ts` |
 | `validateChanges` — null-deletion rules for optional/defaulted/required/unknown keys | `tests/schema-introspect.test.ts` |
 | `inferFields` — type inference from frontmatter values | `tests/schema-introspect.test.ts` |
@@ -54,7 +55,10 @@ Not automated: `content-config.ts` (loads the project's real
 `content.config.ts` via `ssrLoadModule`) is injected and **stubbed** in every
 test — its real code path only runs in the playground. Same for `/open`
 actually launching an editor (tests only pin its rejection paths, which fail
-before launch-editor is reached).
+before launch-editor is reached), and for `createAnnotatePlugin`'s Vite
+hook-ordering (`transform: { order: 'pre' }` must beat Astro's own compile
+plugin — only observable against a real Astro ≥7 dev server; check that dev
+SSR contains `data-astro-source-*` on all files, not just page entries).
 
 ### Patchers (`src/patcher/`)
 

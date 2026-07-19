@@ -6,9 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Added
+
+-   **Astro 7 support via self-annotation.** Astro 7's Rust compiler doesn't emit the `data-astro-source-*` attributes the feature rides on, so the integration now injects them itself: a pre-compiler Vite transform (`src/server/annotate.ts`) parses each `.astro` file with the WASM compiler and stamps every plain element with the same file/loc annotation Astro 5/6 emitted — loc-rule-identical to the patcher, so classify/apply work unchanged against the on-disk source. Verified end-to-end on Astro 7.1.1 (annotation coverage, classify, inline edit, on-disk write, post-HMR re-capture). Details in [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md)
+-   New `sourceAnnotations` option (`'auto'` | `'force'` | `'off'`, default `'auto'`): `'auto'` injects only on Astro ≥7 (or when the Astro version can't be resolved); `'force'` always injects — which also lifts the dev-toolbar requirement on Astro 5/6; `'off'` never injects. The peer range widened back from `>=5.0.0 <7` to `>=5.0.0 <8`
+
 ### Changed
 
--   Narrowed the `astro` peer range to `>=5.0.0 <7`. Astro 7 makes the rewritten Rust compiler (`@astrojs/compiler-rs`) the default, and it no longer emits the `data-astro-source-file` / `-loc` attributes the whole feature depends on — so click-to-edit is inert on Astro 7 (the entry drawer, which uses the page-source meta + content config, still works). Verified working on Astro 5.x and 6.x (6.4.8). Filed [withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96) upstream; full write-up, including the two-phase history and other tools on the same mechanism, in [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md)
+-   Narrowed the `astro` peer range to `>=5.0.0 <7` (superseded above by self-annotation, which widened it to `<8`). Astro 7 makes the rewritten Rust compiler (`@astrojs/compiler-rs`) the default, and it no longer emits the `data-astro-source-file` / `-loc` attributes the whole feature depends on — so click-to-edit was inert on Astro 7 (the entry drawer, which uses the page-source meta + content config, still worked). Filed [withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96) upstream; full write-up, including the two-phase history and other tools on the same mechanism, in [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md)
+-   The playground now pins `astro` to `^7.0.0`, so the self-annotation regime is what the manual checklist exercises (Astro 5/6 keep their coverage through the loc-parity tests in `tests/annotate.test.ts`, which pin the same rules their compiler uses)
 
 ## \[0.3.0\] - 2026-07-19
 
