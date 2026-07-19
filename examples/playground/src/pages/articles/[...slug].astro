@@ -20,7 +20,7 @@ const pageSource = post.filePath ?? `src/content/blog/${post.id}.md`;
 <Base title={`${post.data.title} · Copydesk`} description={post.data.excerpt} pageSource={pageSource}>
   <article class="section">
     <div class="container prose">
-      <a href="/articles" style="color:var(--terracotta);text-decoration:none;font-size:0.9rem;">&larr; All articles</a>
+      <a href="/articles" style="color:var(--accent);text-decoration:none;font-size:0.9rem;">&larr; All articles</a>
       <p class="eyebrow" style="margin-top:1rem;">{post.data.category}</p>
       <h1>{post.data.title}</h1>
       <p class="meta" style="color:var(--grey);">By {post.data.author} · {fmt(post.data.date)} · {post.data.readTime}</p>

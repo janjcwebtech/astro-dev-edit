@@ -2,5 +2,5 @@
 <rect width="800" height="450" fill="#fdfcff"/>
 <circle cx="710" cy="70" r="130" fill="#ebe6f7" opacity="0.6"/>
 <circle cx="60" cy="410" r="90" fill="#cfc7e2" opacity="0.35"/>
-<rect x="0" y="0" width="800" height="450" fill="#363150"/><rect x="280" y="105" width="240" height="240" rx="24" fill="#cfc7e2"/><rect x="340" y="165" width="120" height="120" rx="12" fill="#7c5cff"/>
+<rect x="0" y="0" width="800" height="450" fill="#7c5cff"/><circle cx="400" cy="225" r="120" fill="#6446e0"/><circle cx="400" cy="225" r="60" fill="#fdfcff"/>
 </svg>
