@@ -124,7 +124,7 @@ whichever sections your change touches; run the whole list before a release.
       navigate normally (no new tab, no download, no context menu); the
       "hold … to navigate" hint shows under the toggle.
 
-**Entry drawer (CMS)** (e.g. `/articles/wordpress-auto-updates`)
+**Entry drawer (CMS)** (e.g. `/articles/editing-astro-sites`)
 
 - [ ] ✎ Edit entry pill opens the drawer; fields match the collection's zod
       schema (date → native picker, enum → select, image → picker control,
@@ -141,7 +141,8 @@ whichever sections your change touches; run the whole list before a release.
       lists, quote, code block, inline code, link, image) round-trip through
       save without mangling the markdown body.
 - [ ] A body using unsupported markdown (tables, raw HTML, footnotes, nested
-      lists) opens in raw mode and refuses a lossy switch to rich.
+      lists) opens in raw mode and refuses a lossy switch to rich (fixture:
+      `/articles/text-editors-vs-visual-editors`, which contains a table).
 - [ ] Clicking an image inside the rich editor opens the replace picker; alt
       is auto-suggested from the filename and preserved on swap.
 

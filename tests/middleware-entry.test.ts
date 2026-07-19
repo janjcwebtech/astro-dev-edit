@@ -32,7 +32,7 @@ const blogSchema = z.object({
   title: z.string(),
   excerpt: z.string(),
   date: z.coerce.date(),
-  author: z.string().default('Jan Cerny'),
+  author: z.string().default('Alex Sand'),
   category: z.string().default('Article'),
   image: z.string(),
 });
@@ -42,7 +42,7 @@ title: Hello world
 excerpt: A first post.
 date: 2026-06-11
 # keep author in sync
-author: Jan Cerny
+author: Alex Sand
 category: Security
 image: /images/hello.webp
 ---
@@ -149,7 +149,7 @@ describe('POST /entry', () => {
     // config overrides applied
     expect(byName('excerpt').type).toBe('textarea');
     expect(byName('image').type).toBe('image');
-    expect(byName('author')).toMatchObject({ required: false, defaultValue: 'Jan Cerny' });
+    expect(byName('author')).toMatchObject({ required: false, defaultValue: 'Alex Sand' });
   });
 
   it('falls back to inferred fields when no collection matches', async () => {

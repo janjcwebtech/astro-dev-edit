@@ -2,53 +2,54 @@
 import Base from '../layouts/Base.astro';
 
 // Home page. Almost everything here is LITERAL text and STATIC <img> — the two
-// things the editor supports today. The services list is a mapped array on
+// things the editor supports today. The benefits list is a mapped array on
 // purpose: it exercises the classifier's non-editable (expression) path.
-const services = [
-  { tag: 'Design', title: 'Modernise your website', body: 'Opportunity analysis, conversion improvements, and design modernisation built around your goals.' },
-  { tag: 'Visibility', title: 'Improve online visibility', body: 'Schema markup, Core Web Vitals, content authority, and technical SEO that compounds.' },
-  { tag: 'Automation', title: 'Automate your workflow', body: 'CRM integration, publishing automation, A/B testing, and API connections.' },
-  { tag: 'Security', title: "Keep your clients' data safe", body: 'Vulnerability patching, login security, firewall setup, and Cloudflare integration.' },
-  { tag: 'Compliance', title: 'Stay compliant', body: 'GDPR compliance, WCAG accessibility standards, cookie consent, and tracking review.' },
-  { tag: 'Support', title: 'Publish quicker', body: 'Landing page templates, pre-built content blocks, and page-builder optimisation.' },
+const benefits = [
+  { tag: 'Context', title: 'Edit where you read', body: 'Change the words on the rendered page, not in a file three folders away. What you see is what you are editing.' },
+  { tag: 'Accuracy', title: 'Fewer copy mistakes', body: 'When the preview is the interface, there is no guessing which heading in the source maps to the one on screen.' },
+  { tag: 'Speed', title: 'A typo takes seconds', body: 'Spot it, click it, fix it. No editor, no search, no rebuild ritual for a one-word change.' },
+  { tag: 'Safety', title: 'Your repo is the undo', body: 'Every change is a plain edit to a source file in your working tree. Review it, commit it, or throw it away with git.' },
+  { tag: 'Honesty', title: 'It refuses what it cannot do', body: 'Generated and templated content is declined with an explanation and a jump to the source, never silently mangled.' },
+  { tag: 'Ownership', title: 'No second system', body: 'Content stays in your repository. There is no external database, no sync, and nothing new to host or back up.' },
 ];
 ---
-<Base title="J&C web — Strategic digital partner for your website">
+<Base title="Copydesk · Edit your Astro site where you can see it">
   <!-- HERO: literal heading, subhead, buttons + a static image -->
   <section class="hero">
     <div class="container hero-grid">
       <div>
-        <p class="eyebrow">Complete web operation under one roof</p>
-        <h1>Strategic digital partner for your website</h1>
+        <p class="eyebrow">Visual editing for Astro</p>
+        <h1>Edit your site where you can see it</h1>
         <p class="lead">
-          We connect technology with your business goals, simply and securely,
-          from design and development to security, SEO, and automation.
+          Copydesk is a fictional site about changing your content on the page
+          itself: click the text, type, and the change lands in your source
+          files. This whole site is a playground, so try it on anything.
         </p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="/#contact">Let's talk now</a>
-          <a class="btn btn-ghost" href="/articles">Read the articles</a>
+          <a class="btn btn-primary" href="/articles">Read the articles</a>
+          <a class="btn btn-ghost" href="/about">How this playground works</a>
         </div>
       </div>
       <div class="hero-media">
-        <img src="/images/meeting.png" alt="Two people reviewing a website together at a desk" />
+        <img src="/images/hero.svg" alt="A stylised page with one line of text highlighted for editing" />
       </div>
     </div>
   </section>
 
-  <!-- SERVICES: mapped cards (expressions — should classify as non-editable) -->
-  <section class="section" id="services">
+  <!-- BENEFITS: mapped cards (expressions — should classify as non-editable) -->
+  <section class="section" id="benefits">
     <div class="container">
       <div class="section-head">
-        <p class="eyebrow">How we help you</p>
-        <h2>Get more from your website</h2>
-        <p>Six ways we keep sites stable, visible, compliant, and easier to manage over time.</p>
+        <p class="eyebrow">Why edit visually</p>
+        <h2>The page is the best editor for the page</h2>
+        <p>Six reasons to fix the words where the words actually are.</p>
       </div>
       <div class="grid grid-3">
-        {services.map((s) => (
+        {benefits.map((b) => (
           <article class="card">
-            <span class="tag">{s.tag}</span>
-            <h3>{s.title}</h3>
-            <p>{s.body}</p>
+            <span class="tag">{b.tag}</span>
+            <h3>{b.title}</h3>
+            <p>{b.body}</p>
           </article>
         ))}
       </div>
@@ -58,29 +59,29 @@ const services = [
   <!-- FEATURE SPLIT: literal text + static image -->
   <section class="section">
     <div class="container split">
-      <img src="/images/security.jpg" alt="Abstract representation of website security" />
+      <img src="/images/workflow.svg" alt="A rendered preview and its source file side by side, connected by an arrow" />
       <div>
-        <p class="eyebrow">Security first</p>
-        <h2>Get better results with your website</h2>
+        <p class="eyebrow">One source of truth</p>
+        <h2>The preview and the source stay in step</h2>
         <p>
-          A long-term approach shaped by ten years of real-world work. We combine
-          technical expertise with a practical, understandable approach that keeps
-          sites stable, compliant, and easier to manage.
+          A visual edit is not a parallel copy of your content. It is the same
+          markdown and templates your site already builds from. Change the page
+          and the file changes; change the file and the page follows.
         </p>
-        <a class="btn btn-dark" href="/about">More about how we work</a>
+        <a class="btn btn-dark" href="/about">More about how it works</a>
       </div>
     </div>
   </section>
 
   <!-- DARK CTA BAND: literal text + buttons -->
-  <section class="section" id="contact">
+  <section class="section" id="try">
     <div class="container">
       <div class="cta-band">
-        <h2>Get better results with your website</h2>
-        <p>Tell us where your site is today and we'll show you the fastest path to a measurable improvement.</p>
+        <h2>Try it on this very page</h2>
+        <p>Turn on edit mode, click this sentence, and change it. That is the whole pitch.</p>
         <div class="hero-actions" style="justify-content:center;">
-          <a class="btn btn-primary" href="mailto:contact@jcweb.tech">Book a call</a>
-          <a class="btn btn-ghost" href="/about" style="color:var(--cream);border-color:rgba(255,255,255,0.3);">Learn more</a>
+          <a class="btn btn-primary" href="/articles">Browse the articles</a>
+          <a class="btn btn-ghost" href="/about" style="color:var(--cream);border-color:rgba(255,255,255,0.3);">About the playground</a>
         </div>
       </div>
     </div>

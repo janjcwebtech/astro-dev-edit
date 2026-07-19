@@ -1,59 +1,59 @@
 ---
 import Base from '../layouts/Base.astro';
 
-const testimonials = [
-  { quote: 'A professional, honest and collaborative approach to agency partnerships.', who: 'Oliver Martin', role: 'Owner, NO LABEL Studios' },
-  { quote: 'A business-oriented attitude and a real focus on understanding market needs to develop the right solution.', who: 'Martí Torra', role: 'Founder, PlantScraper' },
-  { quote: 'One of the best collaborators — proactive, meets deadlines, with strong UX and UI overlap.', who: 'Vojtech Bruk', role: 'Web Designer & SEO Consultant' },
+const voices = [
+  { quote: 'I stopped sending screenshots with arrows pointing at typos. I just fix them now.', who: 'Maya Ortiz', role: 'Content lead (fictional)' },
+  { quote: 'The part I trust most is what it refuses to touch. Generated text stays generated.', who: 'Jonas Falk', role: 'Developer (fictional)' },
+  { quote: 'Editing in the browser and reviewing in git is the split of responsibilities we always wanted.', who: 'Priya Nair', role: 'Editor (fictional)' },
 ];
 ---
-<Base title="About — J&C web">
+<Base title="About · Copydesk">
   <section class="section">
     <div class="container">
-      <p class="eyebrow">About us</p>
-      <h1>A long-term approach shaped by ten years of real-world work</h1>
+      <p class="eyebrow">About this site</p>
+      <h1>A place made to be clicked on</h1>
       <p class="lead" style="max-width:60ch;">
-        We help marketing teams get more from their websites through continuous
-        involvement — combining technical expertise with a practical,
-        understandable approach that keeps sites stable, compliant, and easier
-        to manage over time.
+        Copydesk is the playground for a visual editing tool for Astro. Nothing
+        here is real (no company, no clients, no newsletter), but every
+        section exists for a reason: headings and paragraphs you can edit,
+        images you can swap, and generated content that should politely refuse.
       </p>
     </div>
   </section>
 
-  <!-- Team: static image + literal name/role -->
+  <!-- Persona: static image + literal name/role -->
   <section class="section" style="padding-top:0;">
     <div class="container split">
       <div class="team-member" style="gap:1.25rem;">
-        <img src="/images/jan.webp" alt="Portrait of Jan Cerny" style="width:96px;height:96px;" />
+        <img src="/images/portrait.svg" alt="Abstract placeholder portrait" style="width:96px;height:96px;" />
         <div>
-          <h3 style="margin:0;">Jan Cerny</h3>
-          <p style="margin:0;">Software &amp; Security Engineer · Co-founder of J&amp;C web</p>
+          <h3 style="margin:0;">Alex Sand</h3>
+          <p style="margin:0;">Fictional editor-in-chief of this playground</p>
         </div>
       </div>
       <div>
-        <h2>Why clients trust us</h2>
+        <h2>What this site is for</h2>
         <p>
-          Every engagement is grounded in the same principles: be honest about
-          trade-offs, keep the work understandable, and treat a client's site as
-          if its stability were our own reputation — because it is.
+          Every page doubles as a test fixture. If you are trying the editor,
+          this is the safe place to break things: edits land in the
+          playground's own files, and git puts everything back.
         </p>
       </div>
     </div>
   </section>
 
-  <!-- Testimonials: mapped (non-editable expressions) -->
+  <!-- Voices: mapped (non-editable expressions) -->
   <section class="section" style="padding-top:0;">
     <div class="container">
       <div class="section-head">
-        <p class="eyebrow">In their words</p>
-        <h2>What partners say</h2>
+        <p class="eyebrow">Imagined reviews</p>
+        <h2>What people could say</h2>
       </div>
       <div class="grid grid-3">
-        {testimonials.map((t) => (
+        {voices.map((v) => (
           <blockquote class="quote">
-            <p>&ldquo;{t.quote}&rdquo;</p>
-            <p class="who">{t.who}<br /><span style="font-weight:400;color:var(--grey);">{t.role}</span></p>
+            <p>&ldquo;{v.quote}&rdquo;</p>
+            <p class="who">{v.who}<br /><span style="font-weight:400;color:var(--grey);">{v.role}</span></p>
           </blockquote>
         ))}
       </div>

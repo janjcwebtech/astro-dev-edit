@@ -17,7 +17,7 @@ const fmt = (d: Date) =>
 // loader; fall back to reconstructing it from the entry id if ever absent.
 const pageSource = post.filePath ?? `src/content/blog/${post.id}.md`;
 ---
-<Base title={`${post.data.title} — J&C web`} description={post.data.excerpt} pageSource={pageSource}>
+<Base title={`${post.data.title} · Copydesk`} description={post.data.excerpt} pageSource={pageSource}>
   <article class="section">
     <div class="container prose">
       <a href="/articles" style="color:var(--terracotta);text-decoration:none;font-size:0.9rem;">&larr; All articles</a>

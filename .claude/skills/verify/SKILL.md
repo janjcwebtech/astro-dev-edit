@@ -54,9 +54,13 @@ Gotchas:
 
 - Home page `/` has the ✎ Edit toggle only.
 - `/articles/` is a listing (literal text, editable in edit mode).
-- `/articles/wordpress-auto-updates` (any id under `src/content/blog/`) is a
+- `/articles/editing-astro-sites` (any id under `src/content/blog/`) is a
   detail page that declares the page-source meta → the ✎ Edit entry pill and
   the CMS drawer appear there.
+- Special-purpose fixtures: `/articles/text-editors-vs-visual-editors` has a
+  markdown table → its body opens raw-only in the drawer;
+  `/articles/drafts-live-here-too` is `draft: true` (off the listing, page
+  still renders — exercises the boolean widget).
 - Overlay singletons: `#atx-controls` (button group wrapper), `#atx-toggle`,
   `#atx-entry`, `#atx-hide`, `#atx-toggle-hint`. Drawer: `.atx-drawer`.
 - Edit-mode persistence: `sessionStorage.astroTextEditMode` (`'1'`/`'0'`).

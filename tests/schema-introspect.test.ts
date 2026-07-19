@@ -21,18 +21,25 @@ describe('zodToFields', () => {
         excerpt: z.string(),
         date: z.coerce.date(),
         readTime: z.string(),
-        author: z.string().default('Jan Cerny'),
-        category: z.string().default('Article'),
+        author: z.string().default('Alex Sand'),
+        category: z.enum(['Editing', 'Workflow', 'Astro']).default('Editing'),
+        draft: z.boolean().default(false),
         image: z.string(),
       }),
     );
     if (!fields) throw new Error('expected fields');
     expect(fields.map((f) => f.name)).toEqual([
-      'title', 'excerpt', 'date', 'readTime', 'author', 'category', 'image',
+      'title', 'excerpt', 'date', 'readTime', 'author', 'category', 'draft', 'image',
     ]);
     expect(byName(fields, 'title')).toMatchObject({ type: 'text', required: true, source: 'schema' });
     expect(byName(fields, 'date').type).toBe('date');
-    expect(byName(fields, 'author')).toMatchObject({ required: false, defaultValue: 'Jan Cerny' });
+    expect(byName(fields, 'author')).toMatchObject({ required: false, defaultValue: 'Alex Sand' });
+    expect(byName(fields, 'category')).toMatchObject({
+      type: 'select',
+      options: ['Editing', 'Workflow', 'Astro'],
+      defaultValue: 'Editing',
+    });
+    expect(byName(fields, 'draft')).toMatchObject({ type: 'boolean', required: false });
     expect(byName(fields, 'readTime').label).toBe('Read Time');
   });
 
@@ -99,7 +106,7 @@ describe('validateChanges', () => {
   const schema = z.object({
     title: z.string(),
     draft: z.boolean().optional(),
-    author: z.string().default('Jan Cerny'),
+    author: z.string().default('Alex Sand'),
   });
 
   it('allows null-deletion of optional and defaulted keys', () => {

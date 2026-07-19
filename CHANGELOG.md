@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Changed
+
+-   The playground is now a neutral fictional site ("Copydesk", about visual editing for Astro) instead of a copy of a real business site — real branding, personal names, and company details are gone from the repo, and the imagery is replaced by tiny generated SVG placeholders. The blog collection schema now includes an enum `category` and a boolean `draft`, so the entry drawer's select and toggle widgets are exercised by real fixtures, and two entries are purpose-built: one with a markdown table (pins the raw-only body mode) and one draft (kept off the listing, page still renders)
+
 ## \[0.2.0\] - 2026-07-19
 
 ### Changed

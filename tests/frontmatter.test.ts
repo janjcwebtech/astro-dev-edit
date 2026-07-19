@@ -11,7 +11,7 @@ excerpt: Auto-updates trade a little control for a lot of protection.
 date: 2026-06-11
 readTime: 4 min
 # editorial note: keep the author in sync with the byline
-author: Jan Cerny
+author: Alex Sand
 category: Security
 image: /images/article-wordpress.webp
 ---
@@ -104,7 +104,7 @@ describe('applyEntryChanges', () => {
     const r = applyEntryChanges(SAMPLE, { frontmatter: { category: null } });
     if (!r.ok) throw new Error(r.error);
     expect(r.newSource).not.toContain('category:');
-    expect(r.newSource).toContain('author: Jan Cerny');
+    expect(r.newSource).toContain('author: Alex Sand');
   });
 
   it('leaves frontmatter byte-identical on a body-only change', () => {
