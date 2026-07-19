@@ -6,7 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Added
+
+-   Source peek: a read-only, syntax-highlighted view of the whole source file, shown in a wide in-browser panel scrolled to the element's line (line numbers, the focus line highlighted and centered, an **Open in editor** jump-out button; pathological multi-thousand-line files are trimmed to ±1000 lines around the focus, with "⋯ N more lines" markers). Backed by a new localhost-only `POST /__text-edit/peek` endpoint that goes through the same path gate as every other file-touching route and never writes
+-   The refusal notice's `file:line:col` line is now clickable and opens the source peek — you can see *why* content refused without leaving the browser
+
 ### Changed
+
+-   Clicking the hover pill's `file:loc` label now opens the source peek instead of jumping to the editor; the "open ↗" button next to it still opens the location in your editor
 
 -   The playground is now a neutral fictional site ("Copydesk", about visual editing for Astro) instead of a copy of a real business site — real branding, personal names, and company details are gone from the repo, and the imagery is replaced by tiny generated SVG placeholders. The blog collection schema now includes an enum `category` and a boolean `draft`, so the entry drawer's select and toggle widgets are exercised by real fixtures, and two entries are purpose-built: one with a markdown table (pins the raw-only body mode) and one draft (kept off the listing, page still renders)
 -   The playground's accent color changed from terracotta orange to the overlay's edit-button purple (`#7c5cff`), with the warm cream/sand neutrals shifted to cool lavender-tinted equivalents and the placeholder SVGs regenerated to match; the CSS variables are now named `--accent`/`--accent-dark`

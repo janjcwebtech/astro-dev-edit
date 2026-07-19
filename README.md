@@ -33,6 +33,14 @@ and the pill colors up to the verdict a click would get — **editable**,
 **image**, or **dynamic**. Verdicts are remembered until the file next
 changes, so known elements show theirs instantly.
 
+Clicking the pill's `file:loc` label opens a **source peek** — a wide
+read-only panel showing the whole file syntax-highlighted, with line numbers,
+scrolled to the element's line (highlighted and centered; scroll for full
+context) — while the "open ↗" button next to it jumps to the location in your
+editor. The refusal notice's location line opens the same peek, so you can
+see *why* something refused without leaving the browser. The peek's footer
+has its own **Open in editor** jump-out.
+
 ## Install
 
 Install from git (shipping TypeScript source — no build step):
@@ -221,15 +229,19 @@ Every overlay element carries a stable class, and the singletons carry IDs:
 `#atx-hide` (the ✕ shown on hover that hides the group until reload),
 `#atx-toggle-hint` (the "hold … to navigate" note under the buttons),
 `#atx-outline` (hover highlight),
-`#atx-tooltip` (the file:loc pill — both its label and the "open ↗" button
-jump to the source in your editor; inside the label, `atx-tooltip-loc` holds
+`#atx-tooltip` (the file:loc pill — its label opens the source peek, the
+"open ↗" button jumps to the source in your editor; inside the label,
+`atx-tooltip-loc` holds
 the location and `atx-tooltip-verdict` is the fixed-width verdict slot), plus
 classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
-`atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, and the rich body
+`atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, the rich body
 editor's `atx-rte`, `atx-rte-head` (sticky toolbar + image panel),
 `atx-rte-toolbar`, `atx-rte-btn`, `atx-rte-content`, `atx-rte-image-panel`,
-and the image field's `atx-image-field-preview|thumb|empty|path`.
+the image field's `atx-image-field-preview|thumb|empty|path`, and the source
+peek's `atx-peek-code` (scroll container), `atx-peek-line` / `atx-peek-focus`
+(rows), `atx-peek-gutter`, `atx-peek-text`, and `atx-peek-more` (the
+"⋯ N more lines" markers).
 
 One exception to the inline-styles rule: the rich editor's *content* elements
 (headings, lists, quotes… that you create while typing) are styled by a small
@@ -257,6 +269,10 @@ your overrides need `!important`:
 
 - **Dev only.** Nothing runs in build/preview/production.
 - **Localhost only.** All endpoints reject non-localhost requests.
+- **Source peek is read-only and confined.** It is the one endpoint that
+  returns raw file content to the browser, and it only serves files that are
+  already editable (inside `contentRoots`, allowed extension) — the same gate
+  as every other route.
 - **Content, never structure.** Inserted text is escaped so it can't introduce a
   tag, an expression, or an entity — edits change words, never behaviour.
 - **No in-place (click-on-the-page) editing of expression-driven text.** On

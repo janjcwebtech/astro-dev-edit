@@ -35,6 +35,7 @@ export function showDynamicNotice(
   src: SourceLoc,
   reason: string,
   openSource: (src: SourceLoc) => void,
+  openPeek: (src: SourceLoc) => void,
 ): void {
   clearHighlight();
   const panel = buildPanel('Can’t edit this here');
@@ -45,10 +46,19 @@ export function showDynamicNotice(
   });
   msg.textContent = reason;
 
+  // The location line opens the in-browser source peek — often all that's
+  // needed to see *why* this content refused, without leaving the page.
   const where = styled('p', 'atx-notice-loc', {
-    margin: '0 0 12px', font: `12px ${FONT.mono}`, color: '#999',
+    margin: '0 0 12px', font: `12px ${FONT.mono}`, color: '#999', cursor: 'pointer',
   });
   where.textContent = `${basename(src.file)}:${src.loc}`;
+  where.title = 'Peek at the source code';
+  where.addEventListener('mouseenter', () => (where.style.textDecoration = 'underline'));
+  where.addEventListener('mouseleave', () => (where.style.textDecoration = 'none'));
+  where.addEventListener('click', () => {
+    close();
+    openPeek(src);
+  });
 
   body.append(msg, where);
 

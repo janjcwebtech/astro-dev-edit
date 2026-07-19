@@ -304,6 +304,97 @@ describe('POST /open', () => {
   });
 });
 
+describe('POST /peek', () => {
+  it('returns the line window around the focus line with metadata', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/peek',
+      body: { file: 'src/pages/index.astro', loc: '5:3' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({
+      file: 'src/pages/index.astro',
+      startLine: 1,
+      focusLine: 5,
+      totalLines: 8,
+    });
+    expect(r.body.lines).toHaveLength(8);
+    expect(r.body.lines[4]).toContain('Editable text');
+  });
+
+  it('returns the whole file for normally sized sources', async () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `line ${i + 1}`);
+    await writeFile(join(root, 'src/content/long.md'), lines.join('\n') + '\n');
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/peek',
+      body: { file: 'src/content/long.md', loc: '50:1' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ startLine: 1, focusLine: 50, totalLines: 100 });
+    expect(r.body.lines).toHaveLength(100);
+    expect(r.body.lines[0]).toBe('line 1');
+    expect(r.body.lines[99]).toBe('line 100');
+  });
+
+  it('caps a pathological file to ±1000 lines around the focus', async () => {
+    const lines = Array.from({ length: 2500 }, (_, i) => `line ${i + 1}`);
+    await writeFile(join(root, 'src/content/huge.md'), lines.join('\n') + '\n');
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/peek',
+      body: { file: 'src/content/huge.md', loc: '1500:1' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ startLine: 500, focusLine: 1500, totalLines: 2500 });
+    expect(r.body.lines).toHaveLength(2001);
+    expect(r.body.lines[0]).toBe('line 500');
+    expect(r.body.lines[2000]).toBe('line 2500');
+  });
+
+  it('defaults to the top without a loc and clamps an out-of-range line', async () => {
+    const top = await request({
+      method: 'POST',
+      url: '/__text-edit/peek',
+      body: { file: 'src/pages/index.astro' },
+    });
+    expect(top.status).toBe(200);
+    expect(top.body.focusLine).toBe(1);
+    const beyond = await request({
+      method: 'POST',
+      url: '/__text-edit/peek',
+      body: { file: 'src/pages/index.astro', loc: '999:1' },
+    });
+    expect(beyond.status).toBe(200);
+    expect(beyond.body.focusLine).toBe(8);
+  });
+
+  it('rejects files outside the content roots with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/peek',
+      body: { file: 'outside.astro', loc: '1:1' },
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('content roots');
+  });
+
+  it('rejects nonexistent files with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/peek',
+      body: { file: 'src/pages/missing.astro', loc: '1:1' },
+    });
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects a missing file field with 400', async () => {
+    const r = await request({ method: 'POST', url: '/__text-edit/peek', body: {} });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('required');
+  });
+});
+
 describe('POST /classify', () => {
   it('classifies literal text in a real .astro file', async () => {
     const r = await request({

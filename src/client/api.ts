@@ -11,6 +11,8 @@ import type {
   EntryRequest,
   EntryResponse,
   OpenRequest,
+  PeekRequest,
+  PeekResponse,
   UploadRequest,
   UploadResponse,
 } from '../shared/protocol.ts';
@@ -71,6 +73,13 @@ export async function upload(req: UploadRequest): Promise<UploadResponse> {
 export async function open(req: OpenRequest): Promise<void> {
   const res = await post('/open', req);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `open failed (${res.status})`);
+}
+
+/** Read-only window of source lines around a loc, for the in-browser peek. */
+export async function peek(req: PeekRequest): Promise<PeekResponse> {
+  const res = await post('/peek', req);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `peek failed (${res.status})`);
+  return (await res.json()) as PeekResponse;
 }
 
 /** AST-truth classification of the clicked element. (spec §7.3, §16.1) */

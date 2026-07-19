@@ -7,6 +7,7 @@ import type {
   ApplyRequestWire,
   ClassifyRequest,
   OpenRequest,
+  PeekRequest,
   UploadRequest,
 } from '../shared/protocol.ts';
 import { listAssets, saveUpload } from './assets.ts';
@@ -18,7 +19,7 @@ import { BASE, dispatch, json, type Route } from './router.ts';
 /**
  * Dev-server middleware for astro-text-edit — the composition point for every
  * /__text-edit route group. This file owns the core loc-based editing routes
- * (health, assets, upload, open, classify, apply) and the localhost gate;
+ * (health, assets, upload, open, peek, classify, apply) and the localhost gate;
  * feature route groups (the /entry* CMS endpoints in entry-routes.ts) export
  * their own `Route[]` and are concatenated here. Every endpoint rejects
  * non-localhost requests — this API is strictly for the developer's own
@@ -46,6 +47,12 @@ interface MiddlewareDeps {
 }
 
 const NO_PATCHER_REASON = 'Only .astro templates support in-place editing so far.';
+
+/** Max lines of context on each side of the focus line in a /peek response.
+ *  Deliberately generous — in practice the peek returns the whole file and
+ *  the panel scrolls it; the cap only stops a pathological multi-thousand-line
+ *  file from flooding the response and the panel's DOM. */
+const PEEK_CONTEXT = 1000;
 
 /** Reject anything that isn't a same-machine request. (spec §8) */
 function isLocalRequest(req: Connect.IncomingMessage): boolean {
@@ -148,6 +155,40 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
         const launch = typeof mod === 'function' ? mod : mod.default;
         launch(spec);
         return { status: 200, body: { ok: true } };
+      },
+    },
+
+    // Read-only source peek: the file's lines (windowed only past the huge-
+    // file cap) plus focus metadata, so the overlay can show the code in the
+    // browser without launching an editor. Same path gate as every
+    // file-touching route; no writes.
+    {
+      method: 'POST',
+      path: '/peek',
+      maxBytes: 64 * 1024,
+      label: 'peek',
+      handler: async (body) => {
+        const { file, loc } = body as PeekRequest;
+        if (!file) throw new Error('file is required');
+        const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
+        const source = await readFile(abs, 'utf8');
+        const all = source.split(/\r?\n/);
+        // A trailing newline yields a phantom empty last line — drop it.
+        if (all.length > 1 && all[all.length - 1] === '') all.pop();
+        const line = parseInt((loc ?? '').split(':')[0] ?? '', 10);
+        const focusLine = Math.min(Math.max(Number.isFinite(line) ? line : 1, 1), all.length);
+        const startLine = Math.max(1, focusLine - PEEK_CONTEXT);
+        const endLine = Math.min(all.length, focusLine + PEEK_CONTEXT);
+        return {
+          status: 200,
+          body: {
+            file,
+            startLine,
+            focusLine,
+            totalLines: all.length,
+            lines: all.slice(startLine - 1, endLine),
+          },
+        };
       },
     },
 

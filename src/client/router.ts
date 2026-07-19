@@ -25,6 +25,8 @@ export interface RouterDeps {
   /** True while the navigate modifier (Ctrl / Alt) is held in edit mode. */
   isNavigating(): boolean;
   openSource(src: SourceLoc): void;
+  /** Open the in-browser source-peek panel for a loc. */
+  openPeek(src: SourceLoc): void;
 }
 
 const IS_MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform);
@@ -71,6 +73,7 @@ export function initRouter(deps: RouterDeps): void {
           src,
           'Both the image file and its alt text are set from code, so they must be edited in the source.',
           deps.openSource,
+          deps.openPeek,
         );
         return;
       }
@@ -83,6 +86,7 @@ export function initRouter(deps: RouterDeps): void {
         server.reason ??
           'This content is generated from a template expression or a loop, so editing it here could change behaviour, not just words. Edit it at the source instead.',
         deps.openSource,
+        deps.openPeek,
       );
     }
   }

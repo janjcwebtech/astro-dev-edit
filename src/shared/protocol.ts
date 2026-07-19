@@ -66,6 +66,28 @@ export interface OpenRequest {
   loc?: string;
 }
 
+// --- POST /peek --------------------------------------------------------------
+export interface PeekRequest {
+  file: string;
+  /** "line:col"; the line the panel highlights and scrolls to. Omitted or
+   *  empty peeks from the top of the file. */
+  loc?: string;
+}
+export interface PeekResponse {
+  file: string;
+  /** 1-based line number of `lines[0]` — 1 unless the huge-file cap cut the
+   *  window down. */
+  startLine: number;
+  /** 1-based line the loc points at, clamped into the file. */
+  focusLine: number;
+  /** Total lines in the file, so the client can say "N more lines" when the
+   *  cap applied. */
+  totalLines: number;
+  /** The file's source lines — the whole file, unless it exceeds the server's
+   *  huge-file cap, in which case a window around `focusLine`. */
+  lines: string[];
+}
+
 // --- POST /classify ----------------------------------------------------------
 export interface ClassifyRequest extends SourceLoc {
   /** Lowercased tag name of the clicked element. */

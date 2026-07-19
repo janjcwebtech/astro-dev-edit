@@ -38,6 +38,7 @@ Run in this order; each is cheaper than the next.
 | `GET /assets` — asset dirs listed as sorted web paths, `public/` mapped to `/` | `tests/middleware.test.ts` |
 | `POST /upload` — data-URL write into the configured `uploadDir`, clash suffixing, traversal sanitising, mime/payload rejection | `tests/middleware.test.ts` |
 | `POST /open` — disabled-by-config 403; path gate matches `/classify`/`/apply` (out-of-content-roots, out-resolving symlink, bad extension, nonexistent, missing field → 400) | `tests/middleware.test.ts` |
+| `POST /peek` — whole-file lines + focus/total metadata, ±1000-line huge-file cap, no-loc default, out-of-range clamp, path rejection | `tests/middleware.test.ts` |
 | `POST /classify` — literal text, dynamic for non-`.astro`, out-of-root and nonexistent rejection | `tests/middleware.test.ts` |
 | `POST /apply` — atomic on-disk patch, unsupported/refusal 422s, validation 400s | `tests/middleware.test.ts` |
 | `POST /entry` — schema fields + values + body + etag; inference fallback; path rejection | `tests/middleware-entry.test.ts` |
@@ -73,6 +74,7 @@ the loc rules in `astro.ts`.
 | --- | --- |
 | `markdown.ts` — `markdownToHtml` rendering subset, `canRichEdit` accept/refuse | `tests/markdown.test.ts` |
 | `classify-cache.ts` — verdict caching per file\|loc\|tag, in-flight dedupe, failure retry, HMR invalidation (incl. mid-flight) | `tests/classify-cache.test.ts` |
+| `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 
 **Everything else in `src/client/` has no unit tests** — it is DOM- and
 dev-server-bound and is verified only by the manual checklist below. When
@@ -106,10 +108,15 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Click on literal text opens the inline contenteditable (works before the
       verdict lands, too); save writes the file and HMR refreshes.
 - [ ] Mousing from an element up to its pill (crossing the parent en route)
-      keeps the pill in place — no instant retarget; both the pill's file:loc
-      label and its "open ↗" button jump to the source in the editor.
+      keeps the pill in place — no instant retarget; the pill's "open ↗"
+      button jumps to the source in the editor.
+- [ ] Clicking the pill's file:loc label opens the source-peek panel: wide
+      layout, line numbers, syntax tinting, the whole file scrollable with
+      the element's line highlighted and centered, Escape / backdrop / Close
+      dismisses, and "Open in editor" jumps out.
 - [ ] Clicking dynamic content (a resolved `{expression}`) opens the refusal
-      notice with a working "Open source" button — never a false edit.
+      notice with a working "Open source" button — never a false edit; its
+      file:loc line opens the source peek.
 - [ ] Escape / click-away discards; a stale edit (file changed underneath)
       fails safe with a mismatch message, file untouched.
 

@@ -22,6 +22,7 @@ import * as api from './api.ts';
 import { invalidateClassifications } from './classify-cache.ts';
 import { openEntryPanel } from './editors/entry.ts';
 import { pageSource } from './editors/notice.ts';
+import { openPeekPanel } from './editors/peek.ts';
 import { clearHighlight, initHover } from './hover.ts';
 import { initRouter } from './router.ts';
 import { cacheSourceMappings, startCapture } from './source-map.ts';
@@ -245,15 +246,20 @@ async function openSource(src: SourceLoc): Promise<void> {
 }
 
 const isEditMode = (): boolean => editMode;
+/** Open the in-browser source-peek panel; its footer's "Open in editor" falls
+ *  through to openSource. */
+const openPeek = (src: SourceLoc): void => openPeekPanel(src, (s) => void openSource(s));
 // Hover treats navigate-mode as "edit mode off": no outline, no tooltip.
 const hoverElements = initHover({
   isEditMode: () => editMode && !navigating,
   openSource: (src) => void openSource(src),
+  openPeek,
 });
 initRouter({
   isEditMode,
   isNavigating: () => navigating,
   openSource: (src) => void openSource(src),
+  openPeek,
 });
 
 // After an HMR update: drop stale hover state, and re-snapshot source

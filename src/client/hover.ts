@@ -6,8 +6,9 @@ import { COLOR, FONT, Z, basename, hexToRgba, styled } from "./ui.ts";
 /**
  * Hover behaviour: the outline that tracks the hovered source-mapped element
  * and the interactive tooltip pill (file:loc · verdict, plus an "open ↗"
- * button). Hover state is self-contained here — it never interacts with the
- * editing slot in state.ts.
+ * button). Clicking the file:loc label opens the in-browser source peek;
+ * the "open ↗" button jumps to the editor. Hover state is self-contained
+ * here — it never interacts with the editing slot in state.ts.
  *
  * The pill never guesses. It appears instantly in a neutral "checking" state
  * (no editability claim), and once the pointer has dwelled on one element the
@@ -83,8 +84,8 @@ const tooltip = styled(
   "atx-tooltip",
 );
 
-// The label is clickable like the button — the whole file:loc line jumps to
-// the source. (#3)
+// The label is clickable too — the whole file:loc line opens the in-browser
+// source peek (the "open ↗" button next to it is the editor jump). (#3)
 const tooltipLabel = styled("span", "atx-tooltip-label", {
   cursor: "pointer",
 });
@@ -98,7 +99,7 @@ const tooltipVerdict = styled("span", "atx-tooltip-verdict", {
   width: "8ch",
 });
 tooltipLabel.append(tooltipLoc, tooltipVerdict);
-tooltipLabel.title = "Open this location in your editor";
+tooltipLabel.title = "Peek at the source code";
 tooltipLabel.addEventListener("mouseenter", () => (tooltipLabel.style.textDecoration = "underline"));
 tooltipLabel.addEventListener("mouseleave", () => (tooltipLabel.style.textDecoration = "none"));
 const tooltipOpen = styled("button", "atx-tooltip-open", {
@@ -190,18 +191,20 @@ tooltip.addEventListener("mouseleave", scheduleHide);
 export interface HoverDeps {
   isEditMode(): boolean;
   openSource(src: SourceLoc): void;
+  /** Open the in-browser source-peek panel for a loc. */
+  openPeek(src: SourceLoc): void;
 }
 
 /** Wire the hover listeners; returns the elements for the boot code to append
  *  once the server health check passes. */
 export function initHover(deps: HoverDeps): HTMLElement[] {
-  const openHighlighted = (e: MouseEvent): void => {
+  const onHighlighted = (open: (src: SourceLoc) => void) => (e: MouseEvent): void => {
     e.preventDefault();
     e.stopPropagation();
-    if (highlightedSrc) deps.openSource(highlightedSrc);
+    if (highlightedSrc) open(highlightedSrc);
   };
-  tooltipOpen.addEventListener("click", openHighlighted);
-  tooltipLabel.addEventListener("click", openHighlighted);
+  tooltipOpen.addEventListener("click", onHighlighted(deps.openSource));
+  tooltipLabel.addEventListener("click", onHighlighted(deps.openPeek));
 
   /** Paint the outline + pill for `el` with the given verdict. */
   function render(el: HTMLElement, verdict: Verdict): void {
