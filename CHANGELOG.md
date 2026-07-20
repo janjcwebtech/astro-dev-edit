@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+## \[0.4.0\] - 2026-07-20
+
 ### Added
 
 -   **Astro 7 support via self-annotation.** Astro 7's Rust compiler doesn't emit the `data-astro-source-*` attributes the feature rides on, so the integration now injects them itself: a pre-compiler Vite transform (`src/server/annotate.ts`) parses each `.astro` file with the WASM compiler and stamps every plain element with the same file/loc annotation Astro 5/6 emitted — loc-rule-identical to the patcher, so classify/apply work unchanged against the on-disk source. Verified end-to-end on Astro 7.1.1 (annotation coverage, classify, inline edit, on-disk write, post-HMR re-capture). Details in [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md)
