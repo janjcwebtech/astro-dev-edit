@@ -23,6 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 -   Narrowed the `astro` peer range to `>=5.0.0 <7` (superseded above by self-annotation, which widened it to `<8`). Astro 7 makes the rewritten Rust compiler (`@astrojs/compiler-rs`) the default, and it no longer emits the `data-astro-source-file` / `-loc` attributes the whole feature depends on — so click-to-edit was inert on Astro 7 (the entry drawer, which uses the page-source meta + content config, still worked). Filed [withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96) upstream; full write-up, including the two-phase history and other tools on the same mechanism, in [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md)
 -   The playground now pins `astro` to `^7.0.0`, so the self-annotation regime is what the manual checklist exercises (Astro 5/6 keep their coverage through the loc-parity tests in `tests/annotate.test.ts`, which pin the same rules their compiler uses)
+-   The image swap panel and the entry drawer's image field now share one `buildAssetPicker` primitive (`src/client/editors/asset-picker.ts`) for the upload drop-zone and existing-asset browser, instead of each carrying its own copy. As a side effect the entry drawer's image picker gains the swap panel's richer list — retry-on-load-failure, a neutral fallback tile for thumbnails that don't load, hover states, and a highlight on the current selection
 
 ## \[0.3.0\] - 2026-07-19
 
