@@ -222,25 +222,46 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       maxBytes: 256 * 1024,
       label: 'apply',
       handler: async (body) => {
-        const { file, loc, tag, targetType, original, newText } = body as ApplyRequestWire;
+        const { file, loc, tag, ops } = body as ApplyRequestWire;
         if (!file || !loc || !tag) throw new Error('file, loc and tag are required');
-        if (!['text', 'src', 'alt'].includes(targetType)) throw new Error('bad targetType');
-        if (typeof original !== 'string' || typeof newText !== 'string') {
-          throw new Error('original and newText must be strings');
+        if (!Array.isArray(ops) || ops.length === 0) {
+          throw new Error('ops must be a non-empty array');
+        }
+        for (const op of ops) {
+          if (!op || !['text', 'src', 'alt'].includes(op.targetType)) {
+            throw new Error('bad targetType');
+          }
+          if (typeof op.original !== 'string' || typeof op.newText !== 'string') {
+            throw new Error('original and newText must be strings');
+          }
         }
         const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
         const patcher = patcherFor(extname(abs).toLowerCase());
         if (!patcher) {
           return { status: 422, body: { error: NO_PATCHER_REASON, code: 'unsupported' } };
         }
+        // Verify-all-then-write-once: apply each op to an in-memory copy of the
+        // source (re-parsing each time, so a later op sees the earlier edit) and
+        // write only after every op verifies. A single refusal writes nothing,
+        // so a batch (e.g. an image's src+alt) can never half-update the file.
         const source = await readFile(abs, 'utf8');
-        const result = await patcher.apply(source, { loc, tag, targetType, original, newText });
-        if (!result.ok) {
-          logger.warn(`apply refused (${result.code}): ${basename(abs)}:${loc} — ${result.error}`);
-          return { status: 422, body: { error: result.error, code: result.code } };
+        let working = source;
+        for (const op of ops) {
+          const result = await patcher.apply(working, {
+            loc,
+            tag,
+            targetType: op.targetType,
+            original: op.original,
+            newText: op.newText,
+          });
+          if (!result.ok) {
+            logger.warn(`apply refused (${result.code}): ${basename(abs)}:${loc} — ${result.error}`);
+            return { status: 422, body: { error: result.error, code: result.code } };
+          }
+          working = result.newSource;
         }
-        await atomicWrite(abs, result.newSource);
-        logger.info(`applied ${targetType} edit -> ${basename(abs)}:${loc}`);
+        await atomicWrite(abs, working);
+        logger.info(`applied ${ops.map((o) => o.targetType).join('+')} edit -> ${basename(abs)}:${loc}`);
         return { status: 200, body: { ok: true } };
       },
     },

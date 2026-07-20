@@ -43,6 +43,19 @@ function siblingPath(slug: string): string {
   return (parent === '/' ? '' : parent) + '/' + slug;
 }
 
+/** Navigate to a freshly created route once the content layer has synced it:
+ *  poll until it stops 404ing, then go. After ~10s give up and navigate
+ *  anyway, so a non-conventional detail route degrades to a visible 404
+ *  (reload once the sync lands) instead of stranding the user here. */
+async function navigateWhenReady(url: string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if (await api.routeExists(url)) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  location.assign(url);
+}
+
 // ---------------------------------------------------------------------------
 // Edit drawer
 // ---------------------------------------------------------------------------
@@ -203,10 +216,9 @@ function showCreateDrawer(entry: EntryResponse): void {
       const { file } = await api.createEntry({ collection, slug, frontmatter, body: bodyEditor.value() });
       toast(`Created ${basename(file)}`, 'ok');
       shell.teardown();
-      // Detail routes are conventionally siblings of the current page. Give
-      // Astro's content layer a beat to sync the new file before navigating,
-      // or the fresh route 404s.
-      setTimeout(() => location.assign(siblingPath(slug)), 800);
+      // Detail routes are conventionally siblings of the current page; the
+      // fresh route 404s until Astro's content layer syncs the new file.
+      void navigateWhenReady(siblingPath(slug));
     } catch (err) {
       createBtn.disabled = false;
       createBtn.textContent = 'Create';

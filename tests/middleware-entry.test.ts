@@ -107,7 +107,10 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-function request(opts: { url: string; body?: unknown }): Promise<{ status: number; body: any }> {
+function request(
+  opts: { url: string; body?: unknown },
+  h: Connect.NextHandleFunction = handler,
+): Promise<{ status: number; body: any }> {
   const payload = Buffer.from(JSON.stringify(opts.body ?? {}));
   const req = Readable.from([payload]) as any;
   req.method = 'POST';
@@ -123,7 +126,7 @@ function request(opts: { url: string; body?: unknown }): Promise<{ status: numbe
       },
     };
     try {
-      handler(req, res, () => resolve({ status: -1, body: null }));
+      h(req, res, () => resolve({ status: -1, body: null }));
     } catch (err) {
       reject(err);
     }
@@ -288,6 +291,101 @@ describe('POST /entry/create', () => {
       body: { collection: 'blog', slug: '///', frontmatter: {}, body: '' },
     });
     expect(empty.status).toBe(400);
+  });
+});
+
+describe('POST /entry/create — extension choice', () => {
+  let extRoot: string;
+  let extHandler: Connect.NextHandleFunction;
+
+  // Schemaless collections: 'docs' is all-.mdx (with a nested subdir), 'mixed'
+  // holds both extensions, 'notes' is empty but configured extension: '.mdx'.
+  const extProvider: EntrySchemaProvider = {
+    async forFile() {
+      return null;
+    },
+    async forCollection(name) {
+      if (name === 'docs') {
+        return { collection: 'docs', dir: 'src/content/docs', schema: null, fieldConfig: {} };
+      }
+      if (name === 'notes') {
+        return {
+          collection: 'notes',
+          dir: 'src/content/notes',
+          schema: null,
+          extension: '.mdx',
+          fieldConfig: {},
+        };
+      }
+      if (name === 'mixed') {
+        return { collection: 'mixed', dir: 'src/content/mixed', schema: null, fieldConfig: {} };
+      }
+      return null;
+    },
+  };
+
+  const deps = () => ({
+    logger,
+    root: extRoot,
+    assetDirs: ['public'],
+    uploadDir: 'public',
+    contentRoots: ['src', 'public'],
+    editableExtensions: ['.astro', '.md', '.mdx'],
+    openInEditor: false,
+    entryEditorEnabled: true,
+    schemaProvider: extProvider,
+  });
+
+  beforeAll(async () => {
+    extRoot = await mkdtemp(join(tmpdir(), 'atx-entry-ext-test-'));
+    await mkdir(join(extRoot, 'src/content/docs/guides'), { recursive: true });
+    await mkdir(join(extRoot, 'src/content/notes'), { recursive: true });
+    await mkdir(join(extRoot, 'src/content/mixed'), { recursive: true });
+    await writeFile(join(extRoot, 'src/content/docs/a.mdx'), '---\ntitle: A\n---\n');
+    await writeFile(join(extRoot, 'src/content/docs/guides/b.mdx'), '---\ntitle: B\n---\n');
+    await writeFile(join(extRoot, 'src/content/mixed/a.md'), '---\ntitle: A\n---\n');
+    await writeFile(join(extRoot, 'src/content/mixed/b.mdx'), '---\ntitle: B\n---\n');
+    extHandler = createMiddleware(deps());
+  });
+
+  afterAll(async () => {
+    await rm(extRoot, { recursive: true, force: true });
+  });
+
+  const create = (collection: string, slug: string, h?: Connect.NextHandleFunction) =>
+    request(
+      {
+        url: '/__text-edit/entry/create',
+        body: { collection, slug, frontmatter: { title: 'New' }, body: '' },
+      },
+      h ?? extHandler,
+    );
+
+  it('infers .mdx when every existing entry (nested included) is .mdx', async () => {
+    const r = await create('docs', 'inferred');
+    expect(r.status).toBe(200);
+    expect(r.body.file).toBe('src/content/docs/inferred.mdx');
+  });
+
+  it('uses the configured extension even for an empty collection', async () => {
+    const r = await create('notes', 'configured');
+    expect(r.status).toBe(200);
+    expect(r.body.file).toBe('src/content/notes/configured.mdx');
+  });
+
+  it('falls back to .md when the collection mixes extensions', async () => {
+    const r = await create('mixed', 'fallback');
+    expect(r.status).toBe(200);
+    expect(r.body.file).toBe('src/content/mixed/fallback.md');
+  });
+
+  it('422s when the chosen extension is not editable by configuration', async () => {
+    const noMdx = createMiddleware({ ...deps(), editableExtensions: ['.astro', '.md'] });
+    const r = await create('notes', 'blocked', noMdx);
+    expect(r.status).toBe(422);
+    expect(r.body.error).toContain('.mdx');
+    expect(existsSync(join(extRoot, 'src/content/notes/blocked.md'))).toBe(false);
+    expect(existsSync(join(extRoot, 'src/content/notes/blocked.mdx'))).toBe(false);
   });
 });
 

@@ -66,6 +66,28 @@ const NAMED_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",
   nbsp: ' ',
+  // Common typographic entities, so source that spells them as references
+  // still verify-matches the rendered text the client sends. Unknown names
+  // still pass through undecoded and fail safe with a mismatch refusal.
+  mdash: '—',
+  ndash: '–',
+  hellip: '…',
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+  laquo: '«',
+  raquo: '»',
+  middot: '·',
+  bull: '•',
+  copy: '©',
+  reg: '®',
+  trade: '™',
+  sect: '§',
+  deg: '°',
+  times: '×',
+  euro: '€',
+  pound: '£',
 };
 
 /** Decode the entities a source region may contain so it compares equal to the
@@ -364,6 +386,9 @@ function patchAttribute(
     return { ok: false, code: 'unsupported', error: `Could not locate the ${attrName} value in the source.` };
   }
 
+  // Deliberately exact — no whitespace normalization, unlike text content.
+  // The DOM preserves attribute values verbatim, so source and page only
+  // diverge when the file really changed out-of-band; refusing is safe.
   const current = decodeEntities(source.slice(span.from, span.to));
   if (current !== original) {
     return {

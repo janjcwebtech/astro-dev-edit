@@ -97,6 +97,18 @@ export async function apply(req: ApplyRequestWire): Promise<void> {
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `save failed (${res.status})`);
 }
 
+/** Probe a page route (NOT a /__text-edit endpoint): true once the dev server
+ *  answers it with something other than a 404. Used after entry create to
+ *  wait out the content-layer sync before navigating to the new page. */
+export async function routeExists(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    return res.status !== 404;
+  } catch {
+    return false;
+  }
+}
+
 // --- Entry editor ------------------------------------------------------------
 
 /** Entry-endpoint failure carrying the code and per-field validation messages

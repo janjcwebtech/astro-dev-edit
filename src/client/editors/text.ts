@@ -77,9 +77,7 @@ async function commitTextEdit(
       file: src.file,
       loc: src.loc,
       tag: el.tagName.toLowerCase(),
-      targetType: 'text',
-      original,
-      newText,
+      ops: [{ targetType: 'text', original, newText }],
     });
     toast(`Saved — ${basename(src.file)}:${src.loc}`, 'ok');
     // The file is written; Astro HMR reloads the page from disk.

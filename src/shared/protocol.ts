@@ -101,13 +101,23 @@ export interface ClassifyResult {
 }
 
 // --- POST /apply -------------------------------------------------------------
-export interface ApplyRequestWire extends SourceLoc {
-  tag: string;
+/** One field edit within an apply request. */
+export interface ApplyOp {
   targetType: TargetType;
   /** Rendered text / attr value the client saw — verified against the source
    *  before writing, so a stale page fails safe. */
   original: string;
   newText: string;
+}
+
+/** A verify-all-then-write-once batch of edits to ONE element (same file/loc/
+ *  tag). The server applies each op to an in-memory copy of the source and only
+ *  writes if every op verifies; a single failing op means nothing reaches disk,
+ *  so a multi-field edit can never leave the file half-updated. Text edits send
+ *  one op; the image panel sends up to two (src, alt). */
+export interface ApplyRequestWire extends SourceLoc {
+  tag: string;
+  ops: ApplyOp[];
 }
 
 /** Error body shape shared by all endpoints (4xx/5xx). */

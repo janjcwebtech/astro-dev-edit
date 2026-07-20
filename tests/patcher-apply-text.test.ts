@@ -27,6 +27,18 @@ describe('applyAstro — text content', () => {
     expect(res).toEqual({ ok: true, newSource: `<p>Plain fish</p>\n` });
   });
 
+  it('decodes common typographic entities (mdash, hellip, curly quotes) when verifying', async () => {
+    const src = `<p>Wait &mdash; there&rsquo;s more&hellip;</p>\n`;
+    const res = await applyAstro(src, textReq(src, 'Wait', 'p', 'Wait — there’s more…', 'Short.'));
+    expect(res).toEqual({ ok: true, newSource: `<p>Short.</p>\n` });
+  });
+
+  it('still refuses with mismatch on an entity it does not know', async () => {
+    const src = `<p>a &clubs; b</p>\n`;
+    const res = await applyAstro(src, textReq(src, 'a &clubs;', 'p', 'a ♣ b', 'x'));
+    expect(res).toMatchObject({ ok: false, code: 'mismatch' });
+  });
+
   it('escapes <, { and & in the new text so content cannot become structure', async () => {
     const src = `<p>Safe</p>\n`;
     const res = await applyAstro(src, textReq(src, 'Safe', 'p', 'Safe', 'A & B < C {x}'));

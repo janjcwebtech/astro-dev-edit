@@ -1,7 +1,7 @@
 import type { AstroIntegrationLogger } from 'astro';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile, realpath, unlink } from 'node:fs/promises';
+import { readdir, readFile, realpath, unlink } from 'node:fs/promises';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { applyEntryChanges, parseEntry, serializeEntry } from '../patcher/frontmatter.ts';
 import type {
@@ -50,6 +50,25 @@ const ENTRY_EXTENSIONS = ['.md', '.mdx'];
 
 function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+/** Extension for a newly created entry: the collection's configured one wins;
+ *  otherwise, when every existing entry in the dir shares one extension, new
+ *  entries follow it; mixed or empty collections fall back to .md. */
+async function pickEntryExtension(info: EntryCollectionInfo, dirAbs: string): Promise<string> {
+  if (info.extension) return info.extension;
+  try {
+    const files = await readdir(dirAbs, { recursive: true });
+    const seen = new Set<string>();
+    for (const f of files) {
+      const ext = ENTRY_EXTENSIONS.find((e) => String(f).endsWith(e));
+      if (ext) seen.add(ext);
+    }
+    if (seen.size === 1) return [...seen][0];
+  } catch {
+    // Unreadable dir — the create itself will surface the real error.
+  }
+  return '.md';
 }
 
 /** Assemble the panel's field list: schema-derived when possible (with
@@ -177,7 +196,8 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
     },
 
     // Create a new entry in a collection's directory. Full-object validation,
-    // sanitized slug, never overwrites. Always writes .md — see TODO.md.
+    // sanitized slug, never overwrites. Extension: configured per collection,
+    // else inferred from existing entries, else .md.
     {
       method: 'POST',
       path: '/entry/create',
@@ -209,13 +229,14 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
         if (relDir.startsWith('..') || !inContentRoot) {
           throw new Error('collection directory is outside the editable content roots');
         }
-        if (!entryExtensions.includes('.md')) {
-          return { status: 422, body: { error: '.md entries are not editable by configuration' } };
+        const ext = await pickEntryExtension(info, dirReal);
+        if (!entryExtensions.includes(ext)) {
+          return { status: 422, body: { error: `${ext} entries are not editable by configuration` } };
         }
 
-        const abs = join(dirReal, `${cleanSlug}.md`);
+        const abs = join(dirReal, `${cleanSlug}${ext}`);
         if (existsSync(abs)) {
-          return { status: 409, body: { error: `${cleanSlug}.md already exists`, code: 'exists' } };
+          return { status: 409, body: { error: `${cleanSlug}${ext} already exists`, code: 'exists' } };
         }
 
         if (info.schema) {

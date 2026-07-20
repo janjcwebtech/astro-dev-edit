@@ -28,6 +28,9 @@ export interface EntryEditorOptions {
     {
       /** Repo-relative collection dir; defaults to src/content/<name>. */
       dir?: string;
+      /** Extension for entries created via the panel. When omitted it is
+       *  inferred from the collection's existing entries (falling back to .md). */
+      extension?: '.md' | '.mdx';
       fields?: Record<string, EntryFieldOverride>;
     }
   >;
@@ -39,6 +42,9 @@ export interface EntryCollectionInfo {
   dir: string;
   /** The collection's zod object schema, or null when not resolvable. */
   schema: unknown;
+  /** Configured extension for new entries; when absent the create route
+   *  infers one from the collection's existing entries. */
+  extension?: '.md' | '.mdx';
   fieldConfig: Record<string, EntryFieldOverride>;
 }
 
@@ -117,6 +123,7 @@ export function createSchemaProvider(
       collection: name,
       dir: collectionDir(name),
       schema: entry ? await resolveSchema(entry.schema) : null,
+      extension: explicit[name]?.extension,
       fieldConfig: explicit[name]?.fields ?? {},
     };
   }

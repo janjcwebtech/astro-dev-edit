@@ -155,6 +155,10 @@ like a CMS would:
   a fresh reload instead of a lost update.
 - **Create** (the `+ New` button — slug auto-suggested from the title, schema
   defaults honoured, never overwrites) and **Delete** (confirmed; undo is git).
+  New entries take the collection's file extension: the per-collection
+  `extension` config wins; otherwise, when every existing entry shares one
+  extension the new entry follows it (an all-`.mdx` collection gets `.mdx`),
+  and mixed or empty collections fall back to `.md`.
 
 ### Setup per project
 
@@ -172,6 +176,7 @@ textEdit({
     collections: {
       blog: {
         // dir: 'content/posts',                 // if not src/content/blog
+        // extension: '.mdx',                    // for new entries; default: inferred (see below)
         fields: {
           excerpt: { widget: 'textarea' },
           image: { widget: 'image' },            // asset picker + upload
@@ -226,9 +231,10 @@ Rules of the contract:
 - Entries must live under a configured `contentRoots` dir (default `src`).
 
 After a create the browser navigates to the sibling URL (`/articles/<new-slug>`
-by convention); after a delete, to the parent listing. Projects with
-non-conventional detail routes still get the file written/removed — only the
-navigation guess differs.
+by convention), polling it first until Astro's content layer has synced the
+new file (up to ~10s) so you land on the rendered page, not a 404; after a
+delete, to the parent listing. Projects with non-conventional detail routes
+still get the file written/removed — only the navigation guess differs.
 
 ## Styling the overlay
 

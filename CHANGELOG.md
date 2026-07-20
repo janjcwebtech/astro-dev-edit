@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 -   **Astro 7 support via self-annotation.** Astro 7's Rust compiler doesn't emit the `data-astro-source-*` attributes the feature rides on, so the integration now injects them itself: a pre-compiler Vite transform (`src/server/annotate.ts`) parses each `.astro` file with the WASM compiler and stamps every plain element with the same file/loc annotation Astro 5/6 emitted — loc-rule-identical to the patcher, so classify/apply work unchanged against the on-disk source. Verified end-to-end on Astro 7.1.1 (annotation coverage, classify, inline edit, on-disk write, post-HMR re-capture). Details in [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md)
 -   New `sourceAnnotations` option (`'auto'` | `'force'` | `'off'`, default `'auto'`): `'auto'` injects only on Astro ≥7 (or when the Astro version can't be resolved); `'force'` always injects — which also lifts the dev-toolbar requirement on Astro 5/6; `'off'` never injects. The peer range widened back from `>=5.0.0 <7` to `>=5.0.0 <8`
+-   New `entryEditor.collections.<name>.extension` option (`'.md'` | `'.mdx'`) fixing the extension used for entries created via the panel
+
+### Fixed
+
+-   Image edits that change both the file and the alt text are now written in a single atomic pass, closing a partial-failure window. The image panel previously sent two sequential `/apply` requests (src, then alt); if the first succeeded and the second failed, the file was left half-updated while the overlay reverted both attributes, so page and source disagreed until reload. `/apply` now takes an `ops` array and the server does one verify-all-then-write-once pass — a single failing op writes nothing to disk
+-   Entry create now matches the collection's file extension instead of always writing `.md`: the per-collection `extension` config wins; otherwise, when every existing entry in the collection shares one extension, new entries follow it (an all-`.mdx` collection gets `.mdx`); mixed or empty collections still fall back to `.md`. The chosen extension is validated against `editableExtensions` (422 when excluded)
+-   `decodeEntities` now knows the common typographic named entities (`&mdash;`, `&ndash;`, `&hellip;`, curly single/double quotes, `&laquo;`/`&raquo;`, `&middot;`, `&bull;`, `&copy;`, `&reg;`, `&trade;`, `&sect;`, `&deg;`, `&times;`, `&euro;`, `&pound;`), so editing text whose source spells them as references no longer refuses with a `mismatch`. Unknown entities still pass through undecoded and fail safe
+-   After creating an entry the client now polls the new page's URL until Astro's content layer has synced it (250ms interval, ~10s cap, then navigates regardless) instead of a fixed 800ms wait — a slow sync lands on the rendered page instead of a 404
 
 ### Changed
 

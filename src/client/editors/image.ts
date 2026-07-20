@@ -1,4 +1,4 @@
-import type { AttrState, SourceLoc } from '../../shared/protocol.ts';
+import type { ApplyOp, AttrState, SourceLoc } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
@@ -246,13 +246,16 @@ async function commitImageEdit(
   try {
     img.setAttribute('src', v.nextSrc);
     img.setAttribute('alt', v.nextAlt);
-    const common = { file: src.file, loc: src.loc, tag: 'img' };
+    // One batched apply: the server verifies both attrs and writes once, so a
+    // src+alt change can never leave the file half-updated. (spec §6.3)
+    const ops: ApplyOp[] = [];
     if (v.nextSrc !== v.originalSrc) {
-      await api.apply({ ...common, targetType: 'src', original: v.originalSrc, newText: v.nextSrc });
+      ops.push({ targetType: 'src', original: v.originalSrc, newText: v.nextSrc });
     }
     if (v.nextAlt !== v.originalAlt) {
-      await api.apply({ ...common, targetType: 'alt', original: v.originalAlt, newText: v.nextAlt });
+      ops.push({ targetType: 'alt', original: v.originalAlt, newText: v.nextAlt });
     }
+    if (ops.length) await api.apply({ file: src.file, loc: src.loc, tag: 'img', ops });
     toast(`Saved — ${basename(src.file)}:${src.loc}`, 'ok');
   } catch (err) {
     img.setAttribute('src', v.originalSrc);

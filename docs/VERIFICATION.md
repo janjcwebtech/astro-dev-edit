@@ -40,10 +40,11 @@ Run in this order; each is cheaper than the next.
 | `POST /open` — disabled-by-config 403; path gate matches `/classify`/`/apply` (out-of-content-roots, out-resolving symlink, bad extension, nonexistent, missing field → 400) | `tests/middleware.test.ts` |
 | `POST /peek` — whole-file lines + focus/total metadata, ±1000-line huge-file cap, no-loc default, out-of-range clamp, path rejection | `tests/middleware.test.ts` |
 | `POST /classify` — literal text, dynamic for non-`.astro`, out-of-root and nonexistent rejection | `tests/middleware.test.ts` |
-| `POST /apply` — atomic on-disk patch, unsupported/refusal 422s, validation 400s | `tests/middleware.test.ts` |
+| `POST /apply` — atomic on-disk patch, multi-op batch (verify-all-then-write-once; a refused op writes nothing), unsupported/refusal 422s, empty-ops/validation 400s | `tests/middleware.test.ts` |
 | `POST /entry` — schema fields + values + body + etag; inference fallback; path rejection | `tests/middleware-entry.test.ts` |
 | `POST /entry/apply` — atomic frontmatter+body write, stale-etag 409, schema 422 with fieldErrors, date coercion | `tests/middleware-entry.test.ts` |
 | `POST /entry/create` — valid create, slug-clash 409, missing-required 422, unknown collection / empty slug rejection | `tests/middleware-entry.test.ts` |
+| `POST /entry/create` extension choice — configured `extension` wins, uniform-`.mdx` collection inferred (nested dirs included), mixed falls back to `.md`, non-editable extension 422 | `tests/middleware-entry.test.ts` |
 | `POST /entry/delete` — fresh-etag delete, stale-etag 409 keeps file | `tests/middleware-entry.test.ts` |
 | Entry editor disabled → all `/entry*` rejected | `tests/middleware-entry.test.ts` |
 | `annotateAstroSource` — self-annotation for Astro ≥7: loc parity with `locOf` (text/expression/childless rules), component skip, elements inside expressions, self-closing tags, attr escaping, no-newline invariant, classify/apply round-trip against the original source | `tests/annotate.test.ts` |
@@ -65,7 +66,7 @@ SSR contains `data-astro-source-*` on all files, not just page entries).
 | Functionality | Test file |
 | --- | --- |
 | `classifyAstro` — text/dynamic/empty/image classification, ambiguity refusal, unresolved locs, tag mismatch | `tests/patcher-classify.test.ts` |
-| `applyAstro` text — replace, whitespace frame, entity decoding, escaping `<`/`{`/`&`, whitespace-insensitive verify, mismatch/dynamic/unresolved/ambiguous refusals | `tests/patcher-apply-text.test.ts` |
+| `applyAstro` text — replace, whitespace frame, entity decoding (incl. typographic entities; unknown ones still refuse), escaping `<`/`{`/`&`, whitespace-insensitive verify, mismatch/dynamic/unresolved/ambiguous refusals | `tests/patcher-apply-text.test.ts` |
 | `applyAstro` attributes — src/alt replacement, quote escaping, missing-alt insertion (incl. self-closing and expression-attr neighbors), never-insert-src, exact-match verify | `tests/patcher-apply-attrs.test.ts` |
 | `frontmatter.ts` — parse (fences, BOM, CRLF, invalid YAML), surgical apply (comments, key order, quoting, no re-wrap), serialize new entries, refusals | `tests/frontmatter.test.ts` |
 
@@ -144,7 +145,9 @@ whichever sections your change touches; run the whole list before a release.
       preserved in the entry file.
 - [ ] Dirty-close asks for confirmation; a concurrent external file edit then
       save → etag conflict surfaced, file not clobbered.
-- [ ] Entry create (new slug) and delete flows work end-to-end.
+- [ ] Entry create (new slug) and delete flows work end-to-end; after create
+      the browser polls the new URL and lands on the rendered page (not a
+      404), even when the content-layer sync is slow.
 
 **Body editor**
 
@@ -164,7 +167,6 @@ whichever sections your change touches; run the whole list before a release.
 
 ## Known deferrals
 
-Deliberate quirks (entity decoding, verify strictness, partial-failure
-windows) are documented in
+Deliberate quirks and improvement candidates are documented in
 [TODO.md](../TODO.md) — check there before treating a checklist failure as a
 regression.

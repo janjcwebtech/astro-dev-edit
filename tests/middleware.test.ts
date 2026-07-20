@@ -458,9 +458,7 @@ describe('POST /apply', () => {
         file: 'src/pages/index.astro',
         loc: locOf(PAGE_ASTRO, 'Editable text'),
         tag: 'p',
-        targetType: 'text',
-        original: 'Editable text',
-        newText: 'Patched text',
+        ops: [{ targetType: 'text', original: 'Editable text', newText: 'Patched text' }],
       },
     });
     expect(r.status).toBe(200);
@@ -482,9 +480,7 @@ describe('POST /apply', () => {
         file: 'src/content/note.md',
         loc: '1:1',
         tag: 'h1',
-        targetType: 'text',
-        original: 'Note',
-        newText: 'New',
+        ops: [{ targetType: 'text', original: 'Note', newText: 'New' }],
       },
     });
     expect(r.status).toBe(422);
@@ -502,13 +498,69 @@ describe('POST /apply', () => {
         file: 'src/pages/index.astro',
         loc: locOf(PAGE_ASTRO, 'Editable text'),
         tag: 'p',
-        targetType: 'text',
-        original: 'Stale text the page never showed',
-        newText: 'X',
+        ops: [{ targetType: 'text', original: 'Stale text the page never showed', newText: 'X' }],
       },
     });
     expect(r.status).toBe(422);
     expect(r.body.code).toBe('mismatch');
+  });
+
+  it('batches multiple ops into a single atomic write (img src + alt)', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/apply',
+      body: {
+        file: 'src/pages/index.astro',
+        loc: locOf(PAGE_ASTRO, 'img src='),
+        tag: 'img',
+        ops: [
+          { targetType: 'src', original: '/photo.jpg', newText: '/new.jpg' },
+          { targetType: 'alt', original: 'A photo', newText: 'A new photo' },
+        ],
+      },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: true });
+    const after = String(await readFile(join(root, 'src/pages/index.astro')));
+    // The second op re-parses the source the first op already changed, so both
+    // edits land together.
+    expect(after).toContain('src="/new.jpg"');
+    expect(after).toContain('alt="A new photo"');
+    await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
+  });
+
+  it('writes nothing when any op in a batch is refused (no partial write)', async () => {
+    const before = String(await readFile(join(root, 'src/pages/index.astro')));
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/apply',
+      body: {
+        file: 'src/pages/index.astro',
+        loc: locOf(PAGE_ASTRO, 'img src='),
+        tag: 'img',
+        ops: [
+          // The first op would succeed on its own...
+          { targetType: 'src', original: '/photo.jpg', newText: '/new.jpg' },
+          // ...but the second fails to verify, so the whole batch is rolled back.
+          { targetType: 'alt', original: 'Stale alt the page never showed', newText: 'X' },
+        ],
+      },
+    });
+    expect(r.status).toBe(422);
+    expect(r.body.code).toBe('mismatch');
+    const after = String(await readFile(join(root, 'src/pages/index.astro')));
+    expect(after).toBe(before);
+    expect(after).toContain('src="/photo.jpg"');
+  });
+
+  it('rejects an empty ops array with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/apply',
+      body: { file: 'src/pages/index.astro', loc: '1:1', tag: 'p', ops: [] },
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('ops');
   });
 
   it('rejects a bad targetType with 400', async () => {
@@ -519,9 +571,7 @@ describe('POST /apply', () => {
         file: 'src/pages/index.astro',
         loc: '1:1',
         tag: 'p',
-        targetType: 'href',
-        original: '',
-        newText: '',
+        ops: [{ targetType: 'href', original: '', newText: '' }],
       },
     });
     expect(r.status).toBe(400);
@@ -536,9 +586,7 @@ describe('POST /apply', () => {
         file: 'src/pages/index.astro',
         loc: '1:1',
         tag: 'p',
-        targetType: 'text',
-        original: 42,
-        newText: 'x',
+        ops: [{ targetType: 'text', original: 42, newText: 'x' }],
       },
     });
     expect(r.status).toBe(400);
