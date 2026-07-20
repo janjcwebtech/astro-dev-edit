@@ -11,7 +11,7 @@ This site is a test fixture wearing a nice outfit. If you are trying the editor,
 
 ## Start with the obvious text
 
-The home page hero, this article's intro on the listing page, and the footer line are all literal text in templates. Click them in edit mode and they should open for editing directly.
+The home page hero, this article's intro on the listing page, and the footer line are all literal text in templates. Click them in edit mode and they should open for editing directly. It is simple as that.
 
 ## Then try what should refuse
 
