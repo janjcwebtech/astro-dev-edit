@@ -68,12 +68,11 @@ const pillStyle = (background: string): Partial<CSSStyleDeclaration> => ({
 });
 
 // Wrapper that stacks the pills (and, on hover, the hide button) in the
-// bottom-right corner. Offset up from the bottom so it clears Astro's dev
-// toolbar bar. (spec §4.2)
+// bottom-right corner. (spec §4.2)
 const controls = styled('div', 'atx-controls', {
   position: 'fixed',
   right: '16px',
-  bottom: '64px',
+  bottom: '16px',
   zIndex: String(Z + 2),
   display: 'flex',
   flexDirection: 'column',
