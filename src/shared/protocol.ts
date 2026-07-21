@@ -84,8 +84,14 @@ export interface PeekResponse {
    *  cap applied. */
   totalLines: number;
   /** The file's source lines — the whole file, unless it exceeds the server's
-   *  huge-file cap, in which case a window around `focusLine`. */
+   *  huge-file cap, in which case a window around `focusLine`. Empty when
+   *  `refused` is set. */
   lines: string[];
+  /** Set when the file exists but isn't the user's to look at through the
+   *  panel — e.g. a package-owned path like the `astro:assets` `<Image>`
+   *  component. The panel shows this sentence instead of source, and no file
+   *  contents are returned. Absent on success. */
+  refused?: string;
 }
 
 // --- POST /classify ----------------------------------------------------------

@@ -25,6 +25,13 @@ source; your Astro project compiles it like any other `.ts`.
   the editor. Expression-driven text (`{title}`), loop-generated content,
   components, `set:html`, and nested markup all fall here — on detail pages the
   refusal notice offers "Edit page content", which opens the entry drawer.
+- **Package-rendered elements** refuse the same quiet way. Astro's
+  `astro:assets` `<Image>` renders through
+  `node_modules/astro/components/Image.astro`, and that is the path its source
+  annotation carries — so those elements report "rendered by a package
+  component" rather than pointing at your file. Edit the `<Image>` usage in
+  your own component instead. Package paths are never writable: `contentRoots`
+  does not include `node_modules`, and widening it is not a supported fix.
 
 In edit mode, hovering an element outlines it and shows a `file:line:col`
 pill. The pill starts neutral (grey `loading…`, no editability claim); once

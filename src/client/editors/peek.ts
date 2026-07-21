@@ -148,6 +148,16 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
     try {
       const peeked = await api.peek({ file: src.file, loc: src.loc });
       if (closed) return;
+      // Not an error: the file is real but package-owned or out of the content
+      // roots, so the server explains instead of returning source. Show the
+      // sentence rather than an empty code pane. (Reached by clicking the
+      // hover pill on an `astro:assets` <Image>.)
+      if (peeked.refused) {
+        loading.textContent = peeked.refused;
+        loading.style.color = COLOR.warn;
+        loading.style.lineHeight = '1.6';
+        return;
+      }
       const { container, focusRow } = renderCode(peeked);
       loading.replaceWith(container);
       // Center the focused line in the scroll window once it has a layout.

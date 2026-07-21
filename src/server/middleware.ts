@@ -13,7 +13,7 @@ import type {
 import { listAssets, saveUpload } from './assets.ts';
 import type { EntrySchemaProvider } from './content-config.ts';
 import { createEntryRoutes } from './entry-routes.ts';
-import { atomicWrite, validateEditablePath } from './paths.ts';
+import { atomicWrite, checkEditablePath, isPackageOwned, validateEditablePath } from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
 
 /**
@@ -47,6 +47,19 @@ interface MiddlewareDeps {
 }
 
 const NO_PATCHER_REASON = 'Only .astro templates support in-place editing so far.';
+
+/** Reasons for elements whose source file exists but isn't yours to edit.
+ *  These are *verdicts*, not errors: /classify is advisory and runs on hover,
+ *  so an out-of-root path must answer "not editable here" rather than throw —
+ *  otherwise `astro:assets` <Image> (annotated to
+ *  node_modules/astro/components/Image.astro) floods the log with warnings on
+ *  any site using it. Widening contentRoots would be the wrong fix: it would
+ *  make Astro's own internals writable. */
+const PACKAGE_OWNED_REASON =
+  'Rendered by a package component (e.g. the astro:assets <Image>), not your source. ' +
+  'Edit where the component is used instead.';
+const OUT_OF_ROOT_REASON =
+  'This element comes from a file outside the editable content roots.';
 
 /** Max lines of context on each side of the focus line in a /peek response.
  *  Deliberately generous — in practice the peek returns the whole file and
@@ -170,7 +183,28 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       handler: async (body) => {
         const { file, loc } = body as PeekRequest;
         if (!file) throw new Error('file is required');
-        const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
+        // Clicking the hover pill's file:loc label on an <Image> lands here
+        // with a package-owned path. Same call as /classify: explain rather
+        // than 400, and return no source — the point is that it isn't ours.
+        const check = await checkEditablePath(root, contentRoots, editableExtensions, file);
+        if (!check.ok) {
+          if (check.code !== 'outside-roots') throw new Error(check.reason);
+          return {
+            status: 200,
+            body: {
+              file,
+              startLine: 1,
+              focusLine: 1,
+              totalLines: 0,
+              lines: [],
+              refused:
+                check.abs && isPackageOwned(check.abs)
+                  ? PACKAGE_OWNED_REASON
+                  : OUT_OF_ROOT_REASON,
+            },
+          };
+        }
+        const abs = check.abs;
         const source = await readFile(abs, 'utf8');
         const all = source.split(/\r?\n/);
         // A trailing newline yields a phantom empty last line — drop it.
@@ -203,7 +237,25 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       handler: async (body) => {
         const { file, loc, tag } = body as ClassifyRequest;
         if (!file || !loc || !tag) throw new Error('file, loc and tag are required');
-        const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
+        // Advisory and read-only — the hover tooltip calls this too, so a file
+        // that simply isn't ours to edit must answer with a verdict, not a
+        // thrown 400. Genuine anomalies (missing, escaping the root, wrong
+        // extension) still throw.
+        const check = await checkEditablePath(root, contentRoots, editableExtensions, file);
+        if (!check.ok) {
+          if (check.code !== 'outside-roots') throw new Error(check.reason);
+          return {
+            status: 200,
+            body: {
+              kind: 'dynamic',
+              reason:
+                check.abs && isPackageOwned(check.abs)
+                  ? PACKAGE_OWNED_REASON
+                  : OUT_OF_ROOT_REASON,
+            },
+          };
+        }
+        const abs = check.abs;
         const patcher = patcherFor(extname(abs).toLowerCase());
         if (!patcher) {
           return { status: 200, body: { kind: 'dynamic', reason: NO_PATCHER_REASON } };

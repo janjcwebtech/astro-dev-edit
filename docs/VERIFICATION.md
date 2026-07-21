@@ -38,8 +38,9 @@ Run in this order; each is cheaper than the next.
 | `GET /assets` — asset dirs listed as sorted web paths, `public/` mapped to `/` | `tests/middleware.test.ts` |
 | `POST /upload` — data-URL write into the configured `uploadDir`, clash suffixing, traversal sanitising, mime/payload rejection | `tests/middleware.test.ts` |
 | `POST /open` — disabled-by-config 403; path gate matches `/classify`/`/apply` (out-of-content-roots, out-resolving symlink, bad extension, nonexistent, missing field → 400) | `tests/middleware.test.ts` |
-| `POST /peek` — whole-file lines + focus/total metadata, ±1000-line huge-file cap, no-loc default, out-of-range clamp, path rejection | `tests/middleware.test.ts` |
-| `POST /classify` — literal text, dynamic for non-`.astro`, out-of-root and nonexistent rejection | `tests/middleware.test.ts` |
+| `POST /peek` — whole-file lines + focus/total metadata, ±1000-line huge-file cap, no-loc default, out-of-range clamp, path rejection; out-of-root/package-owned paths refuse softly (200 + `refused`, no source) | `tests/middleware.test.ts` |
+| `POST /classify` — literal text, dynamic for non-`.astro`, nonexistent rejection; out-of-root, `node_modules`, and out-resolving symlinks answer 200 `dynamic` instead of throwing | `tests/middleware.test.ts` |
+| Read/write asymmetry of the path gate — `/classify` and `/peek` soften for package-owned paths, while `/open` and `/apply` still refuse them with 400 and leave the file byte-identical | `tests/middleware.test.ts` |
 | `POST /apply` — atomic on-disk patch, multi-op batch (verify-all-then-write-once; a refused op writes nothing), unsupported/refusal 422s, empty-ops/validation 400s | `tests/middleware.test.ts` |
 | `POST /entry` — schema fields + values + body + etag; inference fallback; path rejection | `tests/middleware-entry.test.ts` |
 | `POST /entry/apply` — atomic frontmatter+body write, stale-etag 409, schema 422 with fieldErrors, date coercion | `tests/middleware-entry.test.ts` |

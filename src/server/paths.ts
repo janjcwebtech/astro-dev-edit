@@ -21,11 +21,77 @@ export function toWebPath(root: string, absFile: string): string {
     : '/' + relToRoot;
 }
 
+/** Why a path was refused. `outside-roots` is a *normal answer* for read-only
+ *  callers — the element belongs to a package or a non-content file, which is
+ *  information, not a fault. The others are anomalies worth surfacing. */
+export type PathRefusal = 'missing' | 'escapes-root' | 'outside-roots' | 'bad-extension';
+
+export type PathCheck =
+  | { ok: true; abs: string }
+  /** `abs` is present whenever the path resolved at all (absent only for
+   *  `missing`), so callers can tailor a message from where it landed. */
+  | { ok: false; code: PathRefusal; reason: string; abs?: string };
+
+/** True when the path lives inside an installed package. Such files are real
+ *  and readable but are never the user's own source — `astro:assets` renders
+ *  every `<Image>` through `node_modules/astro/components/Image.astro`, and
+ *  that is the path the source annotation carries. */
+export function isPackageOwned(abs: string): boolean {
+  return abs.split(sep).includes('node_modules');
+}
+
 /**
- * Resolve and validate a client-supplied source path for editing. The real
- * path (symlinks resolved) must live inside the project root AND inside one of
- * the configured content roots, with an allowed extension. Throws otherwise.
- * (spec §8)
+ * Resolve and check a client-supplied source path, *without* throwing. The
+ * real path (symlinks resolved) must live inside the project root AND inside
+ * one of the configured content roots, with an allowed extension.
+ *
+ * This is the single implementation of the gate; `validateEditablePath` is the
+ * throwing wrapper over it. Read-only callers that want to answer "not
+ * editable" instead of erroring use this directly. (spec §8)
+ */
+export async function checkEditablePath(
+  root: string,
+  contentRoots: string[],
+  editableExtensions: string[],
+  file: string,
+): Promise<PathCheck> {
+  let abs: string;
+  try {
+    abs = await realpath(resolve(root, file));
+  } catch {
+    return { ok: false, code: 'missing', reason: `no such file: ${file}` };
+  }
+  const rootReal = await realpath(root);
+  const rel = relative(rootReal, abs);
+  if (!rel || rel.startsWith('..') || rel.startsWith(sep)) {
+    return { ok: false, code: 'escapes-root', reason: 'path escapes the project root', abs };
+  }
+  const inContentRoot = contentRoots.some(
+    (cr) => rel === cr || rel.startsWith(cr.endsWith(sep) ? cr : cr + sep),
+  );
+  if (!inContentRoot) {
+    return {
+      ok: false,
+      code: 'outside-roots',
+      reason: 'path is outside the editable content roots',
+      abs,
+    };
+  }
+  if (!editableExtensions.includes(extname(abs).toLowerCase())) {
+    return {
+      ok: false,
+      code: 'bad-extension',
+      reason: `files of type ${extname(abs) || '(none)'} are not editable`,
+      abs,
+    };
+  }
+  return { ok: true, abs };
+}
+
+/**
+ * Throwing form of {@link checkEditablePath} — the gate every *writing* or
+ * file-launching route passes through. Unchanged in behavior: any refusal is
+ * an Error. (spec §8)
  */
 export async function validateEditablePath(
   root: string,
@@ -33,20 +99,9 @@ export async function validateEditablePath(
   editableExtensions: string[],
   file: string,
 ): Promise<string> {
-  const abs = await realpath(resolve(root, file)); // throws if it doesn't exist
-  const rootReal = await realpath(root);
-  const rel = relative(rootReal, abs);
-  if (!rel || rel.startsWith('..') || rel.startsWith(sep)) {
-    throw new Error('path escapes the project root');
-  }
-  const inContentRoot = contentRoots.some(
-    (cr) => rel === cr || rel.startsWith(cr.endsWith(sep) ? cr : cr + sep),
-  );
-  if (!inContentRoot) throw new Error('path is outside the editable content roots');
-  if (!editableExtensions.includes(extname(abs).toLowerCase())) {
-    throw new Error(`files of type ${extname(abs) || '(none)'} are not editable`);
-  }
-  return abs;
+  const check = await checkEditablePath(root, contentRoots, editableExtensions, file);
+  if (!check.ok) throw new Error(check.reason);
+  return check.abs;
 }
 
 /** Write atomically: temp file in the same directory, then rename. (spec §10) */

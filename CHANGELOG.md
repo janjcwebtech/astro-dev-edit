@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Fixed
+
+-   Elements rendered by a package no longer spam the dev log with `classify failed: path is outside the editable content roots`. Astro's `astro:assets` `<Image>` renders through `node_modules/astro/components/Image.astro`, and that is the path the source annotation carries — so on any site using `<Image>`, merely *hovering* (the tooltip verdict calls `/classify` too) threw a 400 and logged a WARN. An out-of-root path is a legitimate "not editable here" answer, so `/classify` now returns a normal `dynamic` verdict for it, naming the package when the path is inside `node_modules`. Clicking the hover pill's `file:loc` label on such an element hits `/peek`, which likewise now refuses with an explanation (200 + `refused`, no source returned) instead of a 400
+-   `POST /peek` responses gained an optional `refused` field carrying that explanation; the peek panel renders it in place of the code pane
+
+### Changed
+
+-   `paths.ts` now exposes `checkEditablePath()`, a non-throwing form of the path gate returning `{ok, code, reason}`, with `validateEditablePath()` re-expressed as the throwing wrapper over it. Read-only routes (`/classify`, `/peek`) use the former so they can answer instead of erroring; every route that writes or launches a file (`/apply`, `/open`, and the entry routes) keeps the identical throwing gate. Package internals stay unwritable — widening `contentRoots` to include `node_modules` remains the wrong fix and is called out as such in the README
+
 ## \[0.4.0\] - 2026-07-20
 
 ### Added

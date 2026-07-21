@@ -54,6 +54,11 @@ beforeAll(async () => {
   await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
   await writeFile(join(root, 'src/content/note.md'), '# Note\n\nBody.\n');
   await writeFile(join(root, 'outside.astro'), '<p>Outside content roots</p>\n');
+  // Package-owned file: `astro:assets` annotates every <Image> to exactly this
+  // path, so the read-only routes must answer *about* it without erroring —
+  // while the writing routes must still refuse it.
+  await mkdir(join(root, 'node_modules/astro/components'), { recursive: true });
+  await writeFile(join(root, 'node_modules/astro/components/Image.astro'), '<img src="x.jpg">\n');
   // Symlink inside the content roots pointing outside them — string-space
   // confinement passes it, realpath confinement must reject it.
   await symlink(join(root, 'outside.astro'), join(root, 'src/pages/link.astro'));
@@ -271,6 +276,19 @@ describe('POST /open', () => {
     expect(r.body.error).toContain('content roots');
   });
 
+  // The read-only routes softened for node_modules paths; the gate on routes
+  // that act on a file must NOT have. Package internals stay untouchable.
+  it('still rejects a package-owned node_modules path with 400', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/open',
+      body: { file: 'node_modules/astro/components/Image.astro' },
+      via: openHandler,
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('content roots');
+  });
+
   it('rejects disallowed extensions with 400', async () => {
     const r = await request({
       method: 'POST',
@@ -369,14 +387,28 @@ describe('POST /peek', () => {
     expect(beyond.body.focusLine).toBe(8);
   });
 
-  it('rejects files outside the content roots with 400', async () => {
+  // Out-of-root is a verdict, not an error: clicking the hover pill's file:loc
+  // label on an `astro:assets` <Image> lands here with a node_modules path.
+  it('refuses files outside the content roots with 200 and no source', async () => {
     const r = await request({
       method: 'POST',
       url: '/__text-edit/peek',
       body: { file: 'outside.astro', loc: '1:1' },
     });
-    expect(r.status).toBe(400);
-    expect(r.body.error).toContain('content roots');
+    expect(r.status).toBe(200);
+    expect(r.body.refused).toBeTruthy();
+    expect(r.body.lines).toEqual([]);
+  });
+
+  it('names the package when refusing a node_modules path', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/peek',
+      body: { file: 'node_modules/astro/components/Image.astro', loc: '1:1' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.refused).toContain('package component');
+    expect(r.body.lines).toEqual([]);
   });
 
   it('rejects nonexistent files with 400', async () => {
@@ -419,14 +451,39 @@ describe('POST /classify', () => {
     });
   });
 
-  it('rejects files outside the content roots with 400', async () => {
+  // The hover tooltip calls /classify too, so an out-of-root path must answer
+  // "not editable" instead of throwing — otherwise every `astro:assets`
+  // <Image> on the page logs a WARN just from being hovered.
+  it('answers 200 dynamic for files outside the content roots', async () => {
     const r = await request({
       method: 'POST',
       url: '/__text-edit/classify',
       body: { file: 'outside.astro', loc: '1:1', tag: 'p' },
     });
-    expect(r.status).toBe(400);
-    expect(r.body.error).toContain('content roots');
+    expect(r.status).toBe(200);
+    expect(r.body.kind).toBe('dynamic');
+    expect(r.body.reason).toBeTruthy();
+  });
+
+  it('answers 200 dynamic naming the package for a node_modules path', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/classify',
+      body: { file: 'node_modules/astro/components/Image.astro', loc: '1:1', tag: 'img' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.kind).toBe('dynamic');
+    expect(r.body.reason).toContain('package component');
+  });
+
+  it('still answers 200 dynamic for a symlink resolving outside the roots', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/classify',
+      body: { file: 'src/pages/link.astro', loc: '1:1', tag: 'p' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.kind).toBe('dynamic');
   });
 
   it('rejects nonexistent files with 400', async () => {
@@ -503,6 +560,26 @@ describe('POST /apply', () => {
     });
     expect(r.status).toBe(422);
     expect(r.body.code).toBe('mismatch');
+  });
+
+  // /classify and /peek answer softly for package paths; the write path must
+  // still refuse outright and leave the package file byte-identical.
+  it('refuses to write to a package-owned node_modules path with 400', async () => {
+    const target = join(root, 'node_modules/astro/components/Image.astro');
+    const before = String(await readFile(target));
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/apply',
+      body: {
+        file: 'node_modules/astro/components/Image.astro',
+        loc: '1:1',
+        tag: 'img',
+        ops: [{ targetType: 'src', original: 'x.jpg', newText: 'hacked.jpg' }],
+      },
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('content roots');
+    expect(String(await readFile(target))).toBe(before);
   });
 
   it('batches multiple ops into a single atomic write (img src + alt)', async () => {
