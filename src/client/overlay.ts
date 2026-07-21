@@ -146,13 +146,15 @@ const NAV_HINT = IS_MAC ? 'hold ⌃ or ⌥ to navigate' : 'hold Ctrl to navigate
 
 let navigating = false;
 
-// Small annotation under the toggle so hold-to-navigate isn't completely
-// hidden. Visible only while edit mode is on. Anchored 10px below the button
-// stack (absolute, so showing it never shifts the pills).
+// Small annotation beside the toggle so hold-to-navigate isn't completely
+// hidden. Visible only while edit mode is on. Anchored 10px to the left of the
+// button stack, bottom-aligned with the Edit pill (absolute, so showing it
+// never shifts the pills). Sits left rather than below to stay on-screen now
+// the controls hug the viewport bottom.
 const hint = styled('div', 'atx-toggle-hint', {
   position: 'absolute',
-  top: 'calc(100% + 10px)',
-  right: '0',
+  bottom: '0',
+  right: 'calc(100% + 10px)',
   padding: '3px 8px',
   font: `500 10px/1.3 ${FONT.ui}`,
   textAlign: 'center',

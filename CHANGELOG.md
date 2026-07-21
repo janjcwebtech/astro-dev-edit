@@ -14,7 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
--   The overlay controls (`.atx-controls`) now sit `16px` from the bottom of the viewport instead of `64px`. The former offset lifted the Edit/entry pills clear of Astro's dev toolbar bar; they now sit lower and may overlap the toolbar when it's shown
+-   The overlay controls (`.atx-controls`) now sit `16px` from the bottom of the viewport instead of `64px`. The former offset lifted the Edit/entry pills clear of Astro's dev toolbar bar; they now sit lower and may overlap the toolbar when it's shown. The hold-to-navigate hint (`.atx-toggle-hint`) now sits to the left of the Edit pill rather than below it, so it stays on-screen at the new lower position
 -   `paths.ts` now exposes `checkEditablePath()`, a non-throwing form of the path gate returning `{ok, code, reason}`, with `validateEditablePath()` re-expressed as the throwing wrapper over it. Read-only routes (`/classify`, `/peek`) use the former so they can answer instead of erroring; every route that writes or launches a file (`/apply`, `/open`, and the entry routes) keeps the identical throwing gate. Package internals stay unwritable — widening `contentRoots` to include `node_modules` remains the wrong fix and is called out as such in the README
 
 ## \[0.4.0\] - 2026-07-20
