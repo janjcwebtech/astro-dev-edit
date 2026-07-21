@@ -271,6 +271,21 @@ injected stylesheet, `#atx-rte-style`, scoped under `.atx-rte-content`. Those
 rules are ordinary CSS, so overriding them needs specificity, not
 `!important`.
 
+### Sites with smooth scrolling
+
+Smooth-scroll libraries (Lenis, Locomotive, GSAP ScrollSmoother) listen for
+`wheel` on `window` and `preventDefault()` it, driving the page from their own
+animation loop — which normally stops any nested container from scrolling, so
+the page slides around underneath an open panel instead. Every scrollable
+surface in the overlay (source peek, drawer and panel bodies, the asset list,
+the rich body editor) opts out of that: it sets `overscroll-behavior: contain`,
+carries the `data-lenis-prevent` / `data-scroll-ignore` attributes those
+libraries look for, and stops `wheel`/`touchmove` from reaching window-level
+listeners. Nothing calls `preventDefault`, so normal page scrolling outside the
+overlay is unaffected. No configuration needed; if you use a smooth-scroll
+library with a different opt-out convention, adding its attribute to
+`.atx-peek-code` (and the other surfaces above) from your own CSS/JS is enough.
+
 Form controls declare `color-scheme: dark`, so the browser renders native
 chrome — the date field's calendar-picker icon and popup, number-input
 spinners — in light colours that stay visible against the dark inputs. If you

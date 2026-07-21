@@ -1,5 +1,5 @@
 import { canRichEdit, escapeHtml, htmlToMarkdown, markdownToHtml } from '../markdown.ts';
-import { COLOR, FONT, INPUT_STYLE, basename, styled, toast } from '../ui.ts';
+import { COLOR, FONT, INPUT_STYLE, basename, isolateScroll, styled, toast } from '../ui.ts';
 import { buildImageField } from './asset-picker.ts';
 
 /**
@@ -109,6 +109,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
     background: '#fff', color: '#1a1a1a', border: '1px solid #444', colorScheme: 'light',
     font: `13px/1.6 ${FONT.ui}`, outline: 'none', overflowY: 'auto', cursor: 'text',
   });
+  isolateScroll(content);
   content.contentEditable = 'true';
   content.addEventListener('focus', () => {
     // Tag-based markup (<b>, <p>…), not styled spans — the serializer's format.

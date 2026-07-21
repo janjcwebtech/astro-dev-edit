@@ -123,6 +123,16 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Clicking dynamic content (a resolved `{expression}`) opens the refusal
       notice with a working "Open source" button — never a false edit; its
       file:loc line opens the source peek.
+- [ ] An element rendered by `astro:assets` `<Image>` reports "rendered by a
+      package component" instead of logging a `classify failed` WARN, and
+      clicking its file:loc label shows that sentence in the peek panel rather
+      than an error. The playground has no `<Image>` fixture — verify against a
+      consuming site that uses one.
+- [ ] **On a host page running a smooth-scroll library** (Lenis et al.): the
+      source peek scrolls under the cursor and the page behind it stays put,
+      including at the peek's top/bottom ends. Same for the entry drawer body
+      and the asset list. Not reproducible in the playground — it has no
+      smooth-scroll library.
 - [ ] Escape / click-away discards; a stale edit (file changed underneath)
       fails safe with a mismatch message, file untouched.
 

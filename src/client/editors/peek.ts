@@ -3,7 +3,7 @@ import * as api from '../api.ts';
 import { tokenizeLines, type TokenKind } from '../highlight.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
-import { COLOR, FONT, basename, buildBackdrop, buildPanel, footButton, hexToRgba, styled } from '../ui.ts';
+import { COLOR, FONT, basename, buildBackdrop, buildPanel, footButton, hexToRgba, isolateScroll, styled } from '../ui.ts';
 
 /**
  * Source-peek panel: a read-only, syntax-tinted view of the source file,
@@ -53,6 +53,9 @@ function renderCode(peeked: PeekResponse): { container: HTMLElement; focusRow: H
     font: `12.5px/1.65 ${FONT.mono}`,
     padding: '8px 0',
   });
+  // The peek is the tallest scroller in the overlay and the one most likely to
+  // be opened on a page driving its own scroll (Lenis and friends).
+  isolateScroll(container);
 
   const gutterWidth = `${String(peeked.startLine + peeked.lines.length - 1).length + 1}ch`;
   const tokenized = tokenizeLines(peeked.lines);

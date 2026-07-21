@@ -1,5 +1,5 @@
 import * as api from '../api.ts';
-import { COLOR, FONT, INPUT_STYLE, basename, styled, toast } from '../ui.ts';
+import { COLOR, FONT, INPUT_STYLE, basename, isolateScroll, styled, toast } from '../ui.ts';
 
 /**
  * Shared image-asset UI for the overlay. `buildAssetPicker` owns the upload
@@ -59,6 +59,7 @@ export function buildAssetPicker(opts: AssetPickerOptions): AssetPickerHandle {
   const list = styled('div', 'atx-asset-list', {
     maxHeight: '200px', overflowY: 'auto', display: 'grid', gap: '4px',
   });
+  isolateScroll(list);
   el.append(list);
 
   const DROP_IDLE = 'Drop an image here, or click to choose a file';

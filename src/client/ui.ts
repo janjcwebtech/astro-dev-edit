@@ -115,6 +115,40 @@ export function toast(message: string, kind: 'ok' | 'err'): void {
   }, 2400);
 }
 
+/**
+ * Let `el` scroll on its own, even on host pages that hijack wheel events.
+ *
+ * Smooth-scroll libraries (Lenis, Locomotive, GSAP ScrollSmoother) listen for
+ * `wheel` on window with `{passive:false}` and `preventDefault()` it, driving
+ * the page from their own animation loop. A nested overflow container then
+ * never scrolls natively — the page slides under our open panel instead. Every
+ * scrollable surface in the overlay goes through this.
+ *
+ * Three layers, cheapest first:
+ *  - `overscroll-behavior: contain` stops scroll *chaining* to the page when
+ *    this element is already at its top or bottom. Useful even without a
+ *    smooth-scroll library.
+ *  - the `data-*-prevent` attributes are the documented opt-outs those
+ *    libraries look for on the event target's ancestors (Lenis resolves them
+ *    with `closest()`, so a token `<span>` deep inside still matches). Inert
+ *    on pages that don't use them.
+ *  - stopping propagation keeps the event from reaching a window-level
+ *    listener at all, which also covers hand-rolled implementations. The
+ *    listener stays passive — it never calls `preventDefault`, so the browser's
+ *    own scrolling of this element is untouched.
+ */
+export function isolateScroll(el: HTMLElement): void {
+  el.style.overscrollBehavior = 'contain';
+  el.setAttribute('data-lenis-prevent', ''); // Lenis
+  el.setAttribute('data-scroll-ignore', ''); // Locomotive Scroll
+  el.addEventListener('wheel', stopScrollPropagation, { passive: true });
+  el.addEventListener('touchmove', stopScrollPropagation, { passive: true });
+}
+
+function stopScrollPropagation(e: Event): void {
+  e.stopPropagation();
+}
+
 /** A centered modal panel shell with a title bar, body slot, and footer slot. */
 export function buildPanel(title: string): HTMLElement {
   const panel = styled('div', 'atx-panel', {
@@ -135,6 +169,7 @@ export function buildPanel(title: string): HTMLElement {
 
   const body = styled('div', 'atx-panel-body', { padding: '16px' });
   body.dataset.body = '';
+  isolateScroll(body);
 
   const foot = styled('div', 'atx-panel-foot', {
     padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
@@ -182,6 +217,7 @@ export function buildDrawer(title: string): HTMLElement {
     padding: '16px', flex: '1 1 auto', overflowY: 'auto',
   });
   body.dataset.body = '';
+  isolateScroll(body);
 
   const foot = styled('div', 'atx-drawer-foot', {
     padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
