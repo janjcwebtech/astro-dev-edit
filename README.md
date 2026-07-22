@@ -10,6 +10,10 @@ clicks navigate normally — release to keep editing, no mode toggling.
 `astro preview`, so it can never reach a production bundle. It ships TypeScript
 source; your Astro project compiles it like any other `.ts`.
 
+
+https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
+
+
 ## What it can edit
 
 - **Literal text in `.astro` templates** — an element whose children are only
