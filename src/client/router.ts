@@ -46,8 +46,15 @@ function navigateThrough(e: MouseEvent): void {
   window.location.assign(a.href);
 }
 
+/** What initRouter hands back: a programmatic open so the element-tree panel can
+ *  open the editor for a row (double-click) through the same classify → route
+ *  path a page click takes. */
+export interface RouterHandle {
+  openElementAt(el: HTMLElement): void;
+}
+
 /** Register the capture-phase click/mousedown listeners. */
-export function initRouter(deps: RouterDeps): void {
+export function initRouter(deps: RouterDeps): RouterHandle {
   /**
    * Open the appropriate editor for a source-mapped element — after confirming
    * the target with the server's AST classification. The DOM can't distinguish
@@ -162,4 +169,11 @@ export function initRouter(deps: RouterDeps): void {
   document.addEventListener('click', onClick, true);
   document.addEventListener('mousedown', onMouseDown, true);
   document.addEventListener('contextmenu', onContextMenu, true);
+
+  return {
+    openElementAt(el: HTMLElement): void {
+      const src = sourceFor(el);
+      if (src) void openElement(el, src);
+    },
+  };
 }

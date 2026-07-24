@@ -77,6 +77,31 @@ export function cacheSourceMappings(): void {
   }
 }
 
+/**
+ * Every live element that carries a captured source loc, in document order.
+ *
+ * The `data-astro-source-*` attributes are gone by now (the toolbar stripped
+ * them), so we can't query them — we read the stamped JS property instead,
+ * which persists. This is the only way to enumerate annotated elements after
+ * boot; the element-tree panel derives its structure from it. Assumes the DOM
+ * has already been stamped (startCapture / cacheSourceMappings), which the boot
+ * and HMR paths guarantee before this is called.
+ */
+export function annotatedElements(root: HTMLElement = document.body): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  for (const el of root.querySelectorAll<Stamped>('*')) {
+    if (el[PROP]) out.push(el);
+  }
+  return out;
+}
+
+/** The structural path used as the cache's fallback key — a stable identity for
+ *  an element across HMR re-renders (which replace the element object). The tree
+ *  panel keys its collapse/selection state on this so both survive a save. */
+export function pathFor(el: HTMLElement): string {
+  return elementPath(el);
+}
+
 /** Resolve a live element's source loc: property first, path fallback. */
 export function sourceFor(el: HTMLElement): SourceLoc | undefined {
   return (el as Stamped)[PROP] ?? sourceByPath.get(elementPath(el));

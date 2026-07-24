@@ -83,6 +83,7 @@ the loc rules in `astro.ts`.
 | `markdown.ts` — `markdownToHtml` rendering subset, `canRichEdit` accept/refuse | `tests/markdown.test.ts` |
 | `classify-cache.ts` — verdict caching per file\|loc\|tag, in-flight dedupe, failure retry, HMR invalidation (incl. mid-flight) | `tests/classify-cache.test.ts` |
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
+| `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
 
 **Everything else in `src/client/` has no unit tests** — it is DOM- and
 dev-server-bound and is verified only by the manual checklist below. When
@@ -153,6 +154,28 @@ whichever sections your change touches; run the whole list before a release.
       `<style>` still shows its CSS but offers no open link.
 - [ ] `cssInspector: false` → no chips row at all. `openInEditor: false` → the
       card's open link fails with a toast (chips + CSS still shown).
+
+**Element tree** (left panel in edit mode)
+
+- [ ] Edit mode on → the tree (`.atx-tree`) docks to the left listing the page's
+      annotated elements, nested; leaving edit mode hides it. The ✕
+      (`.atx-tree-close`) hides it too; chevrons collapse/expand nodes.
+- [ ] Hovering a row outlines the matching element on the page with the verdict
+      pill and class/ID chips; hovering an element on the page highlights its row
+      (dashed, `.atx-tree-selection` distinct) and scrolls the tree to it.
+- [ ] Clicking a row locks a persistent selection outline and scrolls the element
+      into view; scrolling the page keeps the outline glued to it. With a row
+      selected, moving the mouse onto the element to read its classes leaves the
+      selection intact — it clears only on Escape, a click elsewhere on the page,
+      or selecting another row.
+- [ ] Double-clicking a row opens the correct editor (text / image / entry),
+      same as clicking the element on the page. Clicking a row's `line:col`
+      (`.atx-tree-loc`) instead jumps the editor to that file+line and does not
+      select the row.
+- [ ] Edit + save → after HMR the tree rebuilds and keeps its collapsed/expanded
+      and selected state (matched by structural path across the DOM replacement).
+- [ ] Opening the entry drawer overlays the tree; page clicks still route
+      normally while the tree is open (it never blocks the click router).
 
 **Image editing**
 

@@ -148,6 +148,12 @@ tooltip.append(tooltipRow, tooltipChips);
 
 // --- Hover state -------------------------------------------------------------
 
+// Set once by initHover. Notifies an observer (the element-tree panel) whenever
+// the highlighted page element changes, so it can mirror the highlight onto its
+// matching row (page → tree sync). Lives at module scope because clearHighlight
+// — which also changes the target — is exported and runs outside initHover.
+let onTargetCb: ((el: HTMLElement | null) => void) | null = null;
+
 let highlighted: HTMLElement | null = null;
 // Source of the currently-highlighted element, so the pill's "open" button
 // knows what to open.
@@ -229,10 +235,12 @@ export function clearHighlight(): void {
   cancelVerify();
   removeCard();
   highlightSeq++; // invalidate any /classify still in flight
+  const had = highlighted;
   highlighted = null;
   highlightedSrc = null;
   outline.style.display = "none";
   tooltip.style.display = "none";
+  if (had) onTargetCb?.(null);
 }
 
 // Keep the pill open while hovered. (#3)
@@ -248,11 +256,22 @@ export interface HoverDeps {
   cssInspector(): boolean;
   /** Open a CSS rule's source file at (near) the rule in the editor. */
   openRule(file: string, selector: string): void;
+  /** Notified whenever the highlighted element changes (element-tree sync). */
+  onTarget?(el: HTMLElement | null): void;
+}
+
+/** What initHover hands back to the composition root: the DOM nodes to append,
+ *  and a programmatic `highlight` so the element-tree panel can drive the same
+ *  outline + verdict pill from a row hover (tree → page sync). */
+export interface HoverHandle {
+  elements: HTMLElement[];
+  highlight(el: HTMLElement): void;
 }
 
 /** Wire the hover listeners; returns the elements for the boot code to append
- *  once the server health check passes. */
-export function initHover(deps: HoverDeps): HTMLElement[] {
+ *  once the server health check passes, plus a programmatic highlight. */
+export function initHover(deps: HoverDeps): HoverHandle {
+  onTargetCb = deps.onTarget ?? null;
   const onHighlighted = (open: (src: SourceLoc) => void) => (e: MouseEvent): void => {
     e.preventDefault();
     e.stopPropagation();
@@ -394,6 +413,7 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
     removeCard(); // drop any card left over from the previous element
     if (!el.isConnected) return; // HMR may have replaced it during the dwell
     highlighted = el;
+    onTargetCb?.(el); // mirror onto the element-tree row (page → tree)
     const src = sourceFor(el) ?? null;
     highlightedSrc = src;
     const seq = ++highlightSeq;
@@ -415,9 +435,11 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
 
   function onMouseMove(e: MouseEvent): void {
     if (!deps.isEditMode()) return;
-    // Moving onto our own pill — or the rules card, which sits outside it —
-    // must NOT count as leaving the element, and wins over any pending retarget.
-    if (e.target instanceof Node && (tooltip.contains(e.target) || rulesCard?.contains(e.target))) {
+    // Moving onto any of our own overlay UI — the pill, the rules card, or the
+    // element-tree panel driving highlights of its own — must NOT count as
+    // leaving the element, and wins over any pending retarget. (The tree hovers
+    // a row to highlight an element; that move must not then hide the pill.)
+    if (e.target instanceof Element && e.target.closest('[data-astro-text-edit-ui="1"]')) {
       cancelHide();
       cancelCardHide();
       cancelSwitch();
@@ -449,5 +471,5 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
   document.addEventListener("mousemove", onMouseMove, { passive: true });
   window.addEventListener("scroll", clearHighlight, { passive: true });
 
-  return [outline, tooltip];
+  return { elements: [outline, tooltip], highlight };
 }

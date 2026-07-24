@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+## \[0.6.0\] - 2026-07-24
+
+### Added
+
+-   **Element-tree panel in edit mode.** Turning on edit mode now docks a panel to the left of the viewport listing every source-annotated element on the page as a collapsible tree, two-way highlight-linked to the page. Hovering a row drives the same outline + verdict pill a page hover shows (and its class/ID chips); hovering an element on the page highlights its row and scrolls the tree to it. Clicking a row **locks** a persistent selection (the tree's own outline) and scrolls the element into view — it stays put while you move the mouse onto the element to inspect it, and clears only on Escape, a click elsewhere on the page, or selecting another row. Double-clicking a row opens the editor for that element, and clicking a row's `line:col` jumps your editor straight to that file and line (the same `/open` the hover pill's "open ↗" uses). The panel coexists with editing (it never claims the interaction slot) and is overlaid by the CMS drawer; it rebuilds itself after each HMR save, preserving collapse and selection state
+-   New `atx-*` theming hooks for the tree: `.atx-tree` (the panel), `.atx-tree-title` / `-text` / `.atx-tree-close` (the header), `.atx-tree-body`, `.atx-tree-row` with `.atx-tree-chevron`, `-tag`, `-preview`, `-loc`, `.atx-tree-empty`, and `.atx-tree-selection` (the locked-selection outline)
+
 ## \[0.5.0\] - 2026-07-24
 
 ### Added

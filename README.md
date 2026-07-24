@@ -64,6 +64,24 @@ editor to (near) the rule; rules from cross-origin/CDN stylesheets or an inline
 `openInEditor`, and reaches `.css` files as well as `.astro` `<style>` blocks
 (still confined to `contentRoots`, so `node_modules`/external CSS is excluded).
 
+### Element tree
+
+Turning on edit mode also docks a **tree of the page's elements** to the left
+edge — every source-annotated element, nested by structure. It's two-way linked
+to the page: hovering a row outlines the matching element (with the same verdict
+pill and class/ID chips), and hovering an element on the page highlights its row
+and scrolls the tree to it.
+
+Clicking a row **selects** the element — a persistent outline that stays put
+while you move the mouse onto the element to inspect it. The selection clears
+only when you press **Escape**, click elsewhere on the page, or select another
+row (plain hovering never changes it). **Double-click** a row to open the editor
+for that element, exactly as a page click would. Each row's **`line:col`** is a
+jump-out — click it to open that file at that line in your editor (the same
+`/open` the hover pill's "open ↗" uses). The tree collapses per node, rebuilds
+itself after each save, and is overlaid by the entry drawer when that's open.
+Leaving edit mode hides it.
+
 ## Install
 
 Install from git (shipping TypeScript source — no build step):
@@ -276,7 +294,11 @@ the location and `atx-tooltip-verdict` the fixed-width verdict slot, and
 `atx-tooltip-chips` / `atx-tooltip-chip` the CSS-inspector class/ID chips row;
 hovering a chip shows the rules card `atx-tooltip-rules` — `atx-tooltip-rule`
 per rule, with `-sel`, `-decl`, `-foot`, `-src`, `-open` inside it, and
-`atx-tooltip-rules-empty` when nothing applies), plus
+`atx-tooltip-rules-empty` when nothing applies),
+the element tree `atx-tree` (the left panel) — `atx-tree-title` / `-text` /
+`atx-tree-close` (header), `atx-tree-body` (scroll container), `atx-tree-row`
+with `atx-tree-chevron`, `-tag`, `-preview`, `-loc` inside it, `atx-tree-empty`,
+and `atx-tree-selection` (the locked-selection outline) — plus
 classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
 `atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, the rich body

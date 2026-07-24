@@ -26,6 +26,7 @@ import { openPeekPanel } from './editors/peek.ts';
 import { clearHighlight, initHover } from './hover.ts';
 import { initRouter } from './router.ts';
 import { cacheSourceMappings, startCapture } from './source-map.ts';
+import { initTree } from './tree.ts';
 import * as state from './state.ts';
 import { COLOR, FONT, Z, basename, styled, toast } from './ui.ts';
 
@@ -216,8 +217,12 @@ function setEditMode(on: boolean): void {
   } catch {
     // sessionStorage unavailable (rare) — edit mode just won't persist.
   }
-  if (!on) {
+  if (on) {
+    tree.rebuild();
+    tree.show();
+  } else {
     clearHighlight();
+    tree.hide();
     state.dismiss(); // cancel any open inline edit (restores text) / close any panel
   }
 }
@@ -225,12 +230,17 @@ function setEditMode(on: boolean): void {
 toggle.addEventListener('click', () => setEditMode(!editMode));
 
 // Global Escape closes any open modal interaction (image/dynamic panel) and
-// guarantees state resets. Inline text edits handle their own Escape (to
-// restore original text) before this ever sees it.
+// guarantees state resets, then clears a locked element-tree selection if one
+// is the only thing open. Inline text edits handle their own Escape (to restore
+// original text) before this ever sees it.
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && state.get()?.kind === 'panel') {
+  if (e.key !== 'Escape') return;
+  if (state.get()?.kind === 'panel') {
     e.preventDefault();
     state.dismiss();
+  } else if (tree.hasSelection()) {
+    e.preventDefault();
+    tree.clearSelection();
   }
 });
 
@@ -265,14 +275,28 @@ const isEditMode = (): boolean => editMode;
  *  through to openSource. */
 const openPeek = (src: SourceLoc): void => openPeekPanel(src, (s) => void openSource(s));
 // Hover treats navigate-mode as "edit mode off": no outline, no tooltip.
-const hoverElements = initHover({
+// Its onTarget feeds page-hover into the element tree (page → tree sync).
+const hover = initHover({
   isEditMode: () => editMode && !navigating,
   openSource: (src) => void openSource(src),
   openPeek,
   cssInspector: () => cssInspectorEnabled,
   openRule: (file, selector) => void openRule(file, selector),
+  onTarget: (el) => tree.syncActive(el),
 });
-initRouter({
+// The tree is created BEFORE the router so its capture-phase "click to deselect"
+// listener runs ahead of the router's (which stopImmediatePropagation()s clicks
+// on editable targets). `router` is referenced lazily in openEditor, so the
+// forward reference is safe — it only fires on a row double-click, long after
+// boot. Highlights reuse hover's outline + verdict pill (tree → page sync).
+const tree = initTree({
+  isEditMode: () => editMode && !navigating,
+  highlight: (el) => hover.highlight(el),
+  clearHighlight,
+  openEditor: (el) => router.openElementAt(el),
+  openSource: (src) => void openSource(src),
+});
+const router = initRouter({
   isEditMode,
   isNavigating: () => navigating,
   openSource: (src) => void openSource(src),
@@ -287,6 +311,9 @@ if (import.meta.hot) {
     clearHighlight();
     invalidateClassifications(); // the source changed — cached verdicts are stale
     cacheSourceMappings();
+    // The DOM (and every element object) was replaced — rebuild from the fresh
+    // annotations, preserving collapse + selection by their stable paths.
+    if (editMode) tree.rebuild();
   });
 }
 
@@ -301,7 +328,7 @@ async function boot(): Promise<void> {
   if (!info) return;
   cssInspectorEnabled = info.cssInspector;
   controls.append(hideButton, entryButton, toggle, hint);
-  document.body.append(...hoverElements, controls);
+  document.body.append(...hover.elements, tree.selectionOutline, tree.root, controls);
 
   // The entry pill is a one-click CMS action, useful outside edit mode too —
   // show it whenever the page declares a backing content file.
