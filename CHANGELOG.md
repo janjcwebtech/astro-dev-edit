@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+## \[0.5.0\] - 2026-07-24
+
 ### Added
 
 -   **CSS class/ID inspector in the hover pill.** With the inspector on (the new `cssInspector` option, default `true`), the hover pill grows a second row listing the element's classes and its ID as chips. Hovering a chip pops a card of the CSS rules that element actually matches through that class/ID — selector and syntax-highlighted declarations, read straight from the browser's `document.styleSheets`, so the whole display needs no server round-trip. Each rule with a resolvable source offers an `open ↗` that jumps the editor to (near) the rule. Rules from cross-origin stylesheets are skipped; Astro's `astro-*` scope class is filtered out; a rule whose source can't be resolved (inline `<style>`) still shows its CSS, just without the open link
@@ -20,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+-   The hover pill now sits fully above the highlighted element, positioned by its measured height (dropping just below only when there's no room above), so the new class/ID chips row — or any future taller pill — never overlaps the element. It previously used a fixed offset that assumed a single-line height
 -   The overlay controls (`.atx-controls`) now sit `16px` from the bottom of the viewport instead of `64px`. The former offset lifted the Edit/entry pills clear of Astro's dev toolbar bar; they now sit lower and may overlap the toolbar when it's shown. The hold-to-navigate hint (`.atx-toggle-hint`) now sits to the left of the Edit pill rather than below it, so it stays on-screen at the new lower position
 -   `paths.ts` now exposes `checkEditablePath()`, a non-throwing form of the path gate returning `{ok, code, reason}`, with `validateEditablePath()` re-expressed as the throwing wrapper over it. Read-only routes (`/classify`, `/peek`) use the former so they can answer instead of erroring; every route that writes or launches a file (`/apply`, `/open`, and the entry routes) keeps the identical throwing gate. Package internals stay unwritable — widening `contentRoots` to include `node_modules` remains the wrong fix and is called out as such in the README
 
