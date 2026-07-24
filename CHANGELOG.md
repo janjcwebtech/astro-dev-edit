@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Changed
+
+-   The element-tree panel now floats inset from the viewport edge (`5px` margins, `6px` border radius, `calc(100vh - 10px)` tall) over a darker translucent background instead of docking flush to the left edge at full height
+
 ## \[0.6.0\] - 2026-07-24
 
 ### Added
