@@ -1,5 +1,6 @@
 import type { ClassifyResult, SourceLoc } from "../shared/protocol.ts";
 import { classifyCached, peekClassification } from "./classify-cache.ts";
+import { buildRulesCard, rulesForToken } from "./css-inspect.ts";
 import { nearestSource, sourceFor } from "./source-map.ts";
 import { COLOR, FONT, Z, basename, hexToRgba, styled } from "./ui.ts";
 
@@ -78,11 +79,22 @@ const tooltip = styled(
     borderRadius: "5px",
     boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
     display: "none",
+    // Column so the loc line and the class/ID chips row stack; each row sizes
+    // to its own content (flex-start) rather than stretching to the widest.
+    flexDirection: "column",
+    alignItems: "flex-start",
     whiteSpace: "nowrap",
     cursor: "default",
   },
   "atx-tooltip",
 );
+
+// Row 1: the file:loc · verdict label and the "open ↗" editor jump, kept on one
+// line regardless of the chips row below.
+const tooltipRow = styled("span", "atx-tooltip-row", {
+  display: "flex",
+  alignItems: "center",
+});
 
 // The label is clickable too — the whole file:loc line opens the in-browser
 // source peek (the "open ↗" button next to it is the editor jump). (#3)
@@ -117,7 +129,22 @@ tooltipOpen.textContent = "open ↗";
 tooltipOpen.title = "Open this location in your editor";
 tooltipOpen.addEventListener("mouseenter", () => (tooltipOpen.style.background = "rgba(255,255,255,0.28)"));
 tooltipOpen.addEventListener("mouseleave", () => (tooltipOpen.style.background = "rgba(255,255,255,0.14)"));
-tooltip.append(tooltipLabel, tooltipOpen);
+tooltipRow.append(tooltipLabel, tooltipOpen);
+
+// Row 2: one chip per class + the id. Hovering a chip pops a rules card (see
+// css-inspect.ts). Wraps within a cap; hidden when the element has neither.
+const tooltipChips = styled("div", "atx-tooltip-chips", {
+  display: "none",
+  flexWrap: "wrap",
+  gap: "4px",
+  maxWidth: "340px",
+  marginTop: "5px",
+  paddingTop: "5px",
+  whiteSpace: "normal",
+  borderTop: "1px solid rgba(255,255,255,0.10)",
+});
+
+tooltip.append(tooltipRow, tooltipChips);
 
 // --- Hover state -------------------------------------------------------------
 
@@ -173,10 +200,34 @@ function cancelVerify(): void {
   }
 }
 
+// The rules card popped from a chip. On-demand (like a toast), never in the boot
+// append list: at most one exists, rebuilt per chip hover and removed on leave.
+let rulesCard: HTMLElement | null = null;
+let cardHideTimer: number | null = null;
+
+function cancelCardHide(): void {
+  if (cardHideTimer !== null) {
+    clearTimeout(cardHideTimer);
+    cardHideTimer = null;
+  }
+}
+
+function removeCard(): void {
+  cancelCardHide();
+  rulesCard?.remove();
+  rulesCard = null;
+}
+
+function scheduleCardHide(): void {
+  cancelCardHide();
+  cardHideTimer = window.setTimeout(removeCard, 200);
+}
+
 export function clearHighlight(): void {
   cancelHide();
   cancelSwitch();
   cancelVerify();
+  removeCard();
   highlightSeq++; // invalidate any /classify still in flight
   highlighted = null;
   highlightedSrc = null;
@@ -193,6 +244,10 @@ export interface HoverDeps {
   openSource(src: SourceLoc): void;
   /** Open the in-browser source-peek panel for a loc. */
   openPeek(src: SourceLoc): void;
+  /** Whether the CSS class/ID inspector is on — the chips row renders only then. */
+  cssInspector(): boolean;
+  /** Open a CSS rule's source file at (near) the rule in the editor. */
+  openRule(file: string, selector: string): void;
 }
 
 /** Wire the hover listeners; returns the elements for the boot code to append
@@ -205,6 +260,17 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
   };
   tooltipOpen.addEventListener("click", onHighlighted(deps.openSource));
   tooltipLabel.addEventListener("click", onHighlighted(deps.openPeek));
+
+  /** Sit the pill fully above the element, measured by its actual height (so the
+   *  taller chips-row variant never overlaps the element). Only when there's no
+   *  room above does it drop just below. Must run after the pill's content is in
+   *  place — including the chips — for offsetHeight to be right. */
+  function positionPill(rect: DOMRect): void {
+    const gap = 6;
+    const above = rect.top - tooltip.offsetHeight - gap;
+    tooltip.style.left = `${Math.max(4, rect.left)}px`;
+    tooltip.style.top = `${above >= 4 ? above : rect.bottom + gap}px`;
+  }
 
   /** Paint the outline + pill for `el` with the given verdict. */
   function render(el: HTMLElement, verdict: Verdict): void {
@@ -225,13 +291,8 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
     tooltipLoc.textContent = `${basename(file)}:${loc} · `;
     tooltipVerdict.textContent = verdict.word;
     tooltip.style.borderLeft = `3px solid ${verdict.color}`;
-    tooltip.style.display = "block";
-    // Prefer above the element; if there's no room, sit just below it. Add a
-    // little vertical overlap so travelling from element to pill doesn't cross
-    // a dead gap that would trigger the hide.
-    const top = rect.top - 28 < 4 ? rect.bottom + 4 : rect.top - 28;
-    tooltip.style.left = `${Math.max(4, rect.left)}px`;
-    tooltip.style.top = `${top}px`;
+    tooltip.style.display = "flex";
+    positionPill(rect);
   }
 
   /** Ask the server (through the cache) and, if the pointer is still on the
@@ -245,12 +306,92 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
     }
     // The mouse may have moved on (or the highlight cleared) mid-round-trip.
     if (seq !== highlightSeq || highlighted !== el) return;
+    // Chips stay put on a verdict upgrade — only the loc/verdict line repaints.
     render(el, verdictFor(result));
+  }
+
+  // --- Class/ID chips + rules card ------------------------------------------
+
+  /** Place the card below its chip, flipping above / clamping to stay on-screen. */
+  function positionCard(card: HTMLElement, anchor: HTMLElement): void {
+    const r = anchor.getBoundingClientRect();
+    const cw = card.offsetWidth;
+    const ch = card.offsetHeight;
+    let left = Math.min(r.left, window.innerWidth - 8 - cw);
+    left = Math.max(8, left);
+    let top = r.bottom + 6;
+    if (top + ch > window.innerHeight - 8) top = Math.max(8, r.top - 6 - ch);
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
+  }
+
+  function showCard(anchor: HTMLElement, token: string, kind: "class" | "id", el: HTMLElement): void {
+    removeCard();
+    const selector = (kind === "class" ? "." : "#") + token;
+    const card = buildRulesCard(selector, rulesForToken(el, token, kind), deps.openRule);
+    card.addEventListener("mouseenter", () => {
+      cancelHide();
+      cancelCardHide();
+    });
+    card.addEventListener("mouseleave", () => {
+      scheduleCardHide();
+      scheduleHide();
+    });
+    document.body.append(card);
+    positionCard(card, anchor);
+    rulesCard = card;
+  }
+
+  function makeChip(label: string, token: string, kind: "class" | "id", el: HTMLElement): HTMLElement {
+    const chip = styled("span", "atx-tooltip-chip", {
+      font: `500 11px ${FONT.mono}`,
+      color: "#c8c8e0",
+      background: "rgba(255,255,255,0.09)",
+      border: "1px solid transparent",
+      borderRadius: "4px",
+      padding: "1px 6px",
+      cursor: "default",
+    });
+    chip.textContent = label;
+    chip.title = `Show CSS applied via ${label}`;
+    chip.addEventListener("mouseenter", () => {
+      cancelHide();
+      chip.style.borderColor = COLOR.accent;
+      showCard(chip, token, kind, el);
+    });
+    chip.addEventListener("mouseleave", () => {
+      chip.style.borderColor = "transparent";
+      scheduleCardHide();
+    });
+    return chip;
+  }
+
+  /** Rebuild the chips row for `el` (classes, then id). Hidden when the
+   *  inspector is off or the element has neither. Astro's scope class is noise. */
+  function renderChips(el: HTMLElement): void {
+    tooltipChips.replaceChildren();
+    if (!deps.cssInspector()) {
+      tooltipChips.style.display = "none";
+      return;
+    }
+    const chips: HTMLElement[] = [];
+    el.classList.forEach((c) => {
+      if (/^astro-[\w-]+$/.test(c)) return; // Astro scoping class, not authored
+      chips.push(makeChip(`.${c}`, c, "class", el));
+    });
+    if (el.id) chips.push(makeChip(`#${el.id}`, el.id, "id", el));
+    if (chips.length === 0) {
+      tooltipChips.style.display = "none";
+      return;
+    }
+    tooltipChips.style.display = "flex";
+    tooltipChips.append(...chips);
   }
 
   function highlight(el: HTMLElement): void {
     cancelSwitch();
     cancelVerify();
+    removeCard(); // drop any card left over from the previous element
     if (!el.isConnected) return; // HMR may have replaced it during the dwell
     highlighted = el;
     const src = sourceFor(el) ?? null;
@@ -261,6 +402,10 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
     // render the neutral state and verify once the pointer has dwelled.
     const cached = src ? peekClassification({ file: src.file, loc: src.loc, tag: el.tagName.toLowerCase() }) : undefined;
     render(el, cached ? verdictFor(cached) : CHECKING);
+    renderChips(el);
+    // The chips row changes the pill's height — re-place it so it still clears
+    // the element (render's placement used the pre-chips height).
+    positionPill(el.getBoundingClientRect());
     if (!src || cached) return;
     verifyTimer = window.setTimeout(() => {
       verifyTimer = null;
@@ -270,10 +415,11 @@ export function initHover(deps: HoverDeps): HTMLElement[] {
 
   function onMouseMove(e: MouseEvent): void {
     if (!deps.isEditMode()) return;
-    // Moving onto our own pill must NOT count as leaving the element — and it
-    // wins over any pending retarget.
-    if (e.target instanceof Node && tooltip.contains(e.target)) {
+    // Moving onto our own pill — or the rules card, which sits outside it —
+    // must NOT count as leaving the element, and wins over any pending retarget.
+    if (e.target instanceof Node && (tooltip.contains(e.target) || rulesCard?.contains(e.target))) {
       cancelHide();
+      cancelCardHide();
       cancelSwitch();
       return;
     }

@@ -44,6 +44,8 @@ if (document.body) {
 // ---------------------------------------------------------------------------
 
 let editMode = false;
+// Set from the server's /health payload at boot. Gates the hover-pill chips row.
+let cssInspectorEnabled = false;
 
 // The toggle and entry pills share a fixed width so the stacked buttons read
 // as one aligned control group. They stay dimmed until the group is hovered.
@@ -246,6 +248,18 @@ async function openSource(src: SourceLoc): Promise<void> {
   }
 }
 
+/** Open a CSS rule's source in the editor (hover-pill inspector), reporting the
+ *  result — the server jumps to the located line, or the file top on a miss. */
+async function openRule(file: string, selector: string): Promise<void> {
+  try {
+    const { loc } = await api.inspectOpen({ file, selector });
+    const where = loc ? `${basename(file)}:${loc}` : basename(file);
+    toast(`Opened ${where} in your editor`, 'ok');
+  } catch (err) {
+    toast(`Could not open ${selector} — ${err instanceof Error ? err.message : 'unknown'}`, 'err');
+  }
+}
+
 const isEditMode = (): boolean => editMode;
 /** Open the in-browser source-peek panel; its footer's "Open in editor" falls
  *  through to openSource. */
@@ -255,6 +269,8 @@ const hoverElements = initHover({
   isEditMode: () => editMode && !navigating,
   openSource: (src) => void openSource(src),
   openPeek,
+  cssInspector: () => cssInspectorEnabled,
+  openRule: (file, selector) => void openRule(file, selector),
 });
 initRouter({
   isEditMode,
@@ -281,7 +297,9 @@ if (import.meta.hot) {
 async function boot(): Promise<void> {
   // Confirm the server side is alive before showing the button. If the health
   // check fails the overlay stays out of the way entirely.
-  if (!(await api.health())) return;
+  const info = await api.health();
+  if (!info) return;
+  cssInspectorEnabled = info.cssInspector;
   controls.append(hideButton, entryButton, toggle, hint);
   document.body.append(...hoverElements, controls);
 

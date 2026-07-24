@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Added
+
+-   **CSS class/ID inspector in the hover pill.** With the inspector on (the new `cssInspector` option, default `true`), the hover pill grows a second row listing the element's classes and its ID as chips. Hovering a chip pops a card of the CSS rules that element actually matches through that class/ID — selector and syntax-highlighted declarations, read straight from the browser's `document.styleSheets`, so the whole display needs no server round-trip. Each rule with a resolvable source offers an `open ↗` that jumps the editor to (near) the rule. Rules from cross-origin stylesheets are skipped; Astro's `astro-*` scope class is filtered out; a rule whose source can't be resolved (inline `<style>`) still shows its CSS, just without the open link
+-   New `cssInspector` option (default `true`); `false` disables the whole surface (no chips render). New `/inspect/open` endpoint backs the open-at-rule jump — it best-effort locates the selector in its source (for `.astro`, only within `<style>` blocks) and launches the editor there, falling back to the file top on a miss. The jump additionally honors `openInEditor`; the `.css` extension is admitted for *opening* only (never the write-side `editableExtensions`), and the path stays confined to `contentRoots`, so `node_modules`/external CSS is still excluded
+-   New `atx-*` theming hooks for the inspector: `.atx-tooltip-row` (the pill's loc/verdict line), `.atx-tooltip-chips` and `.atx-tooltip-chip` (the class/ID chips), and the rules card `.atx-tooltip-rules` with `.atx-tooltip-rule`, `-sel`, `-decl`, `-foot`, `-src`, `-open`, and `.atx-tooltip-rules-empty`
+
 ### Fixed
 
 -   Elements rendered by a package no longer spam the dev log with `classify failed: path is outside the editable content roots`. Astro's `astro:assets` `<Image>` renders through `node_modules/astro/components/Image.astro`, and that is the path the source annotation carries — so on any site using `<Image>`, merely *hovering* (the tooltip verdict calls `/classify` too) threw a 400 and logged a WARN. An out-of-root path is a legitimate "not editable here" answer, so `/classify` now returns a normal `dynamic` verdict for it, naming the package when the path is inside `node_modules`. Clicking the hover pill's `file:loc` label on such an element hits `/peek`, which likewise now refuses with an explanation (200 + `refused`, no source returned) instead of a 400

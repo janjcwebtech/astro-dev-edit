@@ -12,7 +12,9 @@ import type {
 } from '../shared/protocol.ts';
 import { listAssets, saveUpload } from './assets.ts';
 import type { EntrySchemaProvider } from './content-config.ts';
+import { launchInEditor } from './editor.ts';
 import { createEntryRoutes } from './entry-routes.ts';
+import { createInspectRoutes } from './inspect-routes.ts';
 import { atomicWrite, checkEditablePath, isPackageOwned, validateEditablePath } from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
 
@@ -40,6 +42,8 @@ interface MiddlewareDeps {
   editableExtensions: string[];
   /** Expose the open-in-editor endpoint. */
   openInEditor: boolean;
+  /** Expose the hover-pill CSS class/ID inspector (/inspect*). */
+  cssInspector: boolean;
   /** Expose the entry-editor endpoints (/entry*). */
   entryEditorEnabled: boolean;
   /** Collection/schema lookup for the entry editor; null → inference only. */
@@ -98,6 +102,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     contentRoots,
     editableExtensions,
     openInEditor,
+    cssInspector,
     entryEditorEnabled,
     schemaProvider,
   } = deps;
@@ -109,7 +114,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       label: 'health',
       handler: async () => ({
         status: 200,
-        body: { ok: true, name: 'astro-text-edit', milestone: 1 },
+        body: { ok: true, name: 'astro-text-edit', milestone: 1, cssInspector },
       }),
     },
 
@@ -160,13 +165,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
         const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
         const [line, col] = (loc ?? '').split(':');
         const spec = line ? `${abs}:${line}${col ? ':' + col : ''}` : abs;
-        // launch-editor is CommonJS: the module IS the function. Interop may
-        // wrap it under .default depending on the loader, so handle both.
-        const mod = (await import('launch-editor')) as unknown as
-          | ((f: string) => void)
-          | { default: (f: string) => void };
-        const launch = typeof mod === 'function' ? mod : mod.default;
-        launch(spec);
+        await launchInEditor(spec);
         return { status: 200, body: { ok: true } };
       },
     },
@@ -321,6 +320,14 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
 
   const routes: Route[] = [
     ...coreRoutes,
+    ...createInspectRoutes({
+      logger,
+      root,
+      contentRoots,
+      editableExtensions,
+      openInEditor,
+      enabled: cssInspector,
+    }),
     ...createEntryRoutes({
       logger,
       root,

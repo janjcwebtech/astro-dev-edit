@@ -40,6 +40,9 @@ export interface HealthResponse {
   ok: true;
   name: string;
   milestone: number;
+  /** Whether the hover-pill CSS class/ID inspector is enabled. The overlay
+   *  reads this at boot and skips rendering the chips row when false. */
+  cssInspector: boolean;
 }
 
 // --- GET /assets -------------------------------------------------------------
@@ -64,6 +67,23 @@ export interface OpenRequest {
   file: string;
   /** "line:col"; omitted or empty opens the file at its top. */
   loc?: string;
+}
+
+// --- POST /inspect/open ------------------------------------------------------
+/** Open the source of a CSS rule in the editor. The client resolves `file`
+ *  from the stylesheet URL; the server best-effort locates `selector` inside it
+ *  (for .astro, only within <style> blocks) and launches the editor there. */
+export interface InspectOpenRequest {
+  /** Source file the rule came from — root-relative or absolute. */
+  file: string;
+  /** The class/id selector fragment to locate, e.g. ".hero-title" or "#masthead". */
+  selector: string;
+}
+export interface InspectOpenResponse {
+  ok: true;
+  /** "line:col" where the selector was found, or null when it wasn't (the file
+   *  was opened at its top instead). */
+  loc: string | null;
 }
 
 // --- POST /peek --------------------------------------------------------------

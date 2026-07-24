@@ -94,6 +94,7 @@ beforeAll(async () => {
     contentRoots: ['src', 'public'],
     editableExtensions: ['.astro', '.md', '.mdx'],
     openInEditor: false,
+    cssInspector: true,
     entryEditorEnabled: true,
     schemaProvider: provider,
   });
@@ -332,6 +333,7 @@ describe('POST /entry/create — extension choice', () => {
     contentRoots: ['src', 'public'],
     editableExtensions: ['.astro', '.md', '.mdx'],
     openInEditor: false,
+    cssInspector: true,
     entryEditorEnabled: true,
     schemaProvider: extProvider,
   });
@@ -419,6 +421,7 @@ describe('disabled entry editor', () => {
       contentRoots: ['src', 'public'],
       editableExtensions: ['.astro', '.md', '.mdx'],
       openInEditor: false,
+      cssInspector: true,
       entryEditorEnabled: false,
       schemaProvider: null,
     });

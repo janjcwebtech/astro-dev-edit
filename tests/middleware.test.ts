@@ -71,6 +71,7 @@ beforeAll(async () => {
     contentRoots: ['src', 'public'],
     editableExtensions: ['.astro', '.md', '.mdx'],
     openInEditor: false,
+    cssInspector: true,
     entryEditorEnabled: true,
     schemaProvider: null,
   };

@@ -10,6 +10,9 @@ import type {
   EntryErrorResponse,
   EntryRequest,
   EntryResponse,
+  HealthResponse,
+  InspectOpenRequest,
+  InspectOpenResponse,
   OpenRequest,
   PeekRequest,
   PeekResponse,
@@ -39,13 +42,15 @@ async function post(path: string, payload: unknown): Promise<Response> {
   });
 }
 
-/** True when the server side is alive; the overlay stays out of the way otherwise. */
-export async function health(): Promise<boolean> {
+/** The server's health payload (config flags the overlay reads at boot), or
+ *  null when the server side isn't alive — the overlay stays out of the way. */
+export async function health(): Promise<HealthResponse | null> {
   try {
     const res = await fetch(`${API}/health`);
-    return res.ok;
+    if (!res.ok) return null;
+    return (await res.json()) as HealthResponse;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -73,6 +78,14 @@ export async function upload(req: UploadRequest): Promise<UploadResponse> {
 export async function open(req: OpenRequest): Promise<void> {
   const res = await post('/open', req);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `open failed (${res.status})`);
+}
+
+/** Open a CSS rule's source in the editor: the server best-effort locates the
+ *  selector and jumps there (or to the file top). */
+export async function inspectOpen(req: InspectOpenRequest): Promise<InspectOpenResponse> {
+  const res = await post('/inspect/open', req);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `open failed (${res.status})`);
+  return (await res.json()) as InspectOpenResponse;
 }
 
 /** Read-only window of source lines around a loc, for the in-browser peek. */

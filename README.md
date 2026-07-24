@@ -52,6 +52,18 @@ editor. The refusal notice's location line opens the same peek, so you can
 see *why* something refused without leaving the browser. The peek's footer
 has its own **Open in editor** jump-out.
 
+### CSS inspector
+
+The pill also lists the element's **classes and ID** as chips (turn this off
+with `cssInspector: false`). Hover a chip to pop a card of the CSS rules that
+element actually matches through that class/ID — selector and declarations,
+read straight from the browser, so it works without any server round-trip.
+Each rule whose source can be resolved offers an **open ↗** that jumps your
+editor to (near) the rule; rules from cross-origin/CDN stylesheets or an inline
+`<style>` still show their CSS but have no jump. The jump also honours
+`openInEditor`, and reaches `.css` files as well as `.astro` `<style>` blocks
+(still confined to `contentRoots`, so `node_modules`/external CSS is excluded).
+
 ## Install
 
 Install from git (shipping TypeScript source — no build step):
@@ -100,6 +112,7 @@ textEdit({
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],        // writes confined to these
   openInEditor: true,                     // expose "Open source" / jump-to-file
+  cssInspector: true,                     // hover-pill class/ID CSS inspector
   sourceAnnotations: 'auto',              // who emits data-astro-source-*
   entryEditor: {},                        // CMS entry drawer; false disables it
 })
@@ -113,6 +126,7 @@ textEdit({
 | `editableExtensions` | `['.astro', '.md', '.mdx']` | Extensions the patcher is allowed to write. |
 | `contentRoots` | `['src', 'public']` | Writes are confined to these (resolved, symlinks included). |
 | `openInEditor` | `true` | Expose the "Open source" / jump-to-file behaviour. |
+| `cssInspector` | `true` | The hover-pill CSS class/ID inspector. `false` hides the chips row entirely. The per-rule open-in-editor jump also honours `openInEditor`. |
 | `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. |
 | `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
 
@@ -256,9 +270,13 @@ Every overlay element carries a stable class, and the singletons carry IDs:
 `#atx-toggle-hint` (the "hold … to navigate" note under the buttons),
 `#atx-outline` (hover highlight),
 `#atx-tooltip` (the file:loc pill — its label opens the source peek, the
-"open ↗" button jumps to the source in your editor; inside the label,
-`atx-tooltip-loc` holds
-the location and `atx-tooltip-verdict` is the fixed-width verdict slot), plus
+"open ↗" button jumps to the source in your editor; inside it, `atx-tooltip-row`
+is the loc/verdict line, with `atx-tooltip-loc` holding
+the location and `atx-tooltip-verdict` the fixed-width verdict slot, and
+`atx-tooltip-chips` / `atx-tooltip-chip` the CSS-inspector class/ID chips row;
+hovering a chip shows the rules card `atx-tooltip-rules` — `atx-tooltip-rule`
+per rule, with `-sel`, `-decl`, `-foot`, `-src`, `-open` inside it, and
+`atx-tooltip-rules-empty` when nothing applies), plus
 classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
 `atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, the rich body

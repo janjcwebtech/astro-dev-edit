@@ -49,15 +49,17 @@ Run in this order; each is cheaper than the next.
 | `POST /entry/delete` — fresh-etag delete, stale-etag 409 keeps file | `tests/middleware-entry.test.ts` |
 | Entry editor disabled → all `/entry*` rejected | `tests/middleware-entry.test.ts` |
 | `annotateAstroSource` — self-annotation for Astro ≥7: loc parity with `locOf` (text/expression/childless rules), component skip, elements inside expressions, self-closing tags, attr escaping, no-newline invariant, classify/apply round-trip against the original source | `tests/annotate.test.ts` |
+| `locateSelector` — CSS-inspector best-effort selector→line: class/id hit in a `.css` file, token-boundary (no prefix collision), absent→null; `.astro` search confined to `<style>` blocks (markup class attrs ignored) | `tests/inspect-locate.test.ts` |
 | `zodToFields` — playground blog schema, primitive/enum/array mapping, wrapper unwrapping, image() stub, degrade-to-json | `tests/schema-introspect.test.ts` |
 | `validateChanges` — null-deletion rules for optional/defaulted/required/unknown keys | `tests/schema-introspect.test.ts` |
 | `inferFields` — type inference from frontmatter values | `tests/schema-introspect.test.ts` |
 
 Not automated: `content-config.ts` (loads the project's real
 `content.config.ts` via `ssrLoadModule`) is injected and **stubbed** in every
-test — its real code path only runs in the playground. Same for `/open`
-actually launching an editor (tests only pin its rejection paths, which fail
-before launch-editor is reached), and for `createAnnotatePlugin`'s Vite
+test — its real code path only runs in the playground. Same for `/open` and
+`/inspect/open` actually launching an editor (the pure `locateSelector` is
+tested directly; the route's fs read + launch only run in the playground), and
+for `createAnnotatePlugin`'s Vite
 hook-ordering (`transform: { order: 'pre' }` must beat Astro's own compile
 plugin — only observable against a real Astro ≥7 dev server; check that dev
 SSR contains `data-astro-source-*` on all files, not just page entries).
@@ -135,6 +137,22 @@ whichever sections your change touches; run the whole list before a release.
       smooth-scroll library.
 - [ ] Escape / click-away discards; a stale edit (file changed underneath)
       fails safe with a mismatch message, file untouched.
+
+**CSS inspector** (hover pill chips)
+
+- [ ] With `cssInspector` on (default), hovering an element that has classes/an
+      ID grows the pill with a chips row (`.atx-tooltip-chips`); an element with
+      neither leaves the pill unchanged. Astro's `astro-*` scope class is not
+      shown as a chip.
+- [ ] Hovering a class chip pops a rules card showing the applied declarations;
+      a chip whose token doesn't actually apply shows "No applied rules". Moving
+      the pointer from chip → card keeps both open; leaving both dismisses them.
+- [ ] The card's `open ↗` jumps the editor to (near) the rule — verify for a
+      **global `.css`** rule and an **Astro scoped `<style>`** rule (which
+      resolves to the `.astro` file). A rule from an external/CDN or inline
+      `<style>` still shows its CSS but offers no open link.
+- [ ] `cssInspector: false` → no chips row at all. `openInEditor: false` → the
+      card's open link fails with a toast (chips + CSS still shown).
 
 **Image editing**
 

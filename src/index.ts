@@ -37,6 +37,14 @@ export interface TextEditOptions {
   /** Expose the click-to-source fallback. */
   openInEditor?: boolean;
   /**
+   * The hover-pill CSS inspector: on hover, list an element's classes and ID,
+   * and reveal the CSS rules each one applies (read from the browser, no server
+   * round-trip) with a link to open the defining file at the rule. The
+   * open-at-rule jump additionally requires `openInEditor`. `false` disables the
+   * whole surface (no chips render).
+   */
+  cssInspector?: boolean;
+  /**
    * Who emits the `data-astro-source-*` attributes the feature rides on.
    * `'auto'` (default): Astro's own compiler on Astro 5/6; injected by this
    * integration on Astro ≥7, whose Rust compiler doesn't emit them
@@ -61,6 +69,7 @@ const DEFAULTS: Required<TextEditOptions> = {
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],
   openInEditor: true,
+  cssInspector: true,
   sourceAnnotations: 'auto',
   entryEditor: {},
 };
@@ -175,6 +184,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
             contentRoots: options.contentRoots,
             editableExtensions: options.editableExtensions,
             openInEditor: options.openInEditor,
+            cssInspector: options.cssInspector,
             entryEditorEnabled,
             schemaProvider: entryEditorEnabled
               ? createSchemaProvider(server, projectRoot, options.entryEditor || {})
