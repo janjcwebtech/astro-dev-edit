@@ -30,6 +30,15 @@ export interface TextEditOptions {
    * production build. Defaults to `public`.
    */
   uploadDir?: string;
+  /**
+   * Fallback directory for uploads that back an `image()` schema field, relative
+   * to the project root. Those assets are *imported* by Astro rather than served
+   * verbatim, so they must live under `src/` — `public/` files can't be
+   * imported. Only used when the field has no existing value to sit beside;
+   * otherwise the upload lands in that value's own directory. Defaults to
+   * `src/assets`.
+   */
+  imageUploadDir?: string;
   /** Extensions the patcher is allowed to write. */
   editableExtensions?: string[];
   /** Directories that writes are confined to. */
@@ -66,6 +75,7 @@ const DEFAULTS: Required<TextEditOptions> = {
   enabled: true,
   assetDirs: ['src/assets', 'public'],
   uploadDir: 'public',
+  imageUploadDir: 'src/assets',
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],
   openInEditor: true,
@@ -125,6 +135,24 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
           );
         }
 
+        // The mirror-image rule for image() fields: Astro imports those assets
+        // through Vite, and files in public/ are copied verbatim rather than
+        // importable, so a public/ target would fail the collection's own schema.
+        const imageUploadRel = relative(
+          projectRoot,
+          resolve(projectRoot, options.imageUploadDir),
+        );
+        const imageUploadImportable =
+          imageUploadRel === 'src' || imageUploadRel.startsWith('src' + sep);
+        if (!imageUploadImportable) {
+          logger.warn(
+            `imageUploadDir "${options.imageUploadDir}" is not under src/ — Astro ` +
+              'cannot import assets from there for an image() schema field, so ' +
+              'uploads to it will fail the collection schema. Point ' +
+              'imageUploadDir at a folder under src/.',
+          );
+        }
+
         // The whole feature rides on `data-astro-source-file` / `-loc`
         // attributes. On Astro 5/6 the compiler emits them (dev toolbar on);
         // on Astro ≥7 the Rust compiler doesn't (docs/ASTRO-COMPAT.md,
@@ -181,6 +209,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
             root: projectRoot,
             assetDirs: options.assetDirs,
             uploadDir: options.uploadDir,
+            imageUploadDir: options.imageUploadDir,
             contentRoots: options.contentRoots,
             editableExtensions: options.editableExtensions,
             openInEditor: options.openInEditor,

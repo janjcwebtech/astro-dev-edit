@@ -37,6 +37,9 @@ interface ControlContext {
   placeholder: string;
   /** Mount point: append the control's element(s) here. */
   root: HTMLElement;
+  /** Repo-relative path of the entry being edited; '' for a new one. Needed by
+   *  controls whose values are relative to the file (see FieldDescriptor.assetRef). */
+  entryFile: string;
 }
 
 type ControlBuilder = (ctx: ControlContext) => ControlParts;
@@ -131,9 +134,17 @@ const textarea: ControlBuilder = ({ initial, placeholder, root }) => {
   return { value: () => input.value, dirty: () => input.value !== initial };
 };
 
-const image: ControlBuilder = ({ initial, root }) => {
+const image: ControlBuilder = ({ field, initial, root, entryFile }) => {
   let current = initial;
-  root.append(buildImageField(initial, (next) => (current = next)));
+  root.append(
+    buildImageField({
+      initial,
+      onChange: (next) => (current = next),
+      // An image() field stores a path relative to the entry file, not a web
+      // URL — the control resolves previews and writes picks in that shape.
+      ...(field.assetRef ? { assetRef: field.assetRef, entryFile } : {}),
+    }),
+  );
   return { value: () => current, dirty: () => current !== initial };
 };
 
@@ -164,7 +175,11 @@ const CONTROL_BUILDERS: Record<FieldType, ControlBuilder> = {
 
 // --- assembly ----------------------------------------------------------------
 
-export function buildControl(field: FieldDescriptor, raw: unknown): FieldControl {
+export function buildControl(
+  field: FieldDescriptor,
+  raw: unknown,
+  entryFile = '',
+): FieldControl {
   const root = styled('div', 'atx-field', { marginBottom: '12px' });
 
   const label = styled('label', 'atx-field-label', {
@@ -188,7 +203,7 @@ export function buildControl(field: FieldDescriptor, raw: unknown): FieldControl
       : '';
 
   const builder = CONTROL_BUILDERS[field.type] ?? json;
-  const { value, dirty } = builder({ field, raw, initial, placeholder, root });
+  const { value, dirty } = builder({ field, raw, initial, placeholder, root, entryFile });
 
   root.append(error);
   return { field, root, value, dirty, setError };

@@ -2,13 +2,14 @@ import type { ClassifyResult, SourceLoc } from "../shared/protocol.ts";
 import { classifyCached, peekClassification } from "./classify-cache.ts";
 import { buildRulesCard, rulesForToken } from "./css-inspect.ts";
 import { nearestSource, sourceFor } from "./source-map.ts";
-import { COLOR, FONT, Z, basename, hexToRgba, styled } from "./ui.ts";
+import { COLOR, FONT, Z, basename, hexToRgba, pillButton, styled } from "./ui.ts";
 
 /**
  * Hover behaviour: the outline that tracks the hovered source-mapped element
- * and the interactive tooltip pill (file:loc · verdict, plus an "open ↗"
- * button). Clicking the file:loc label opens the in-browser source peek;
- * the "open ↗" button jumps to the editor. Hover state is self-contained
+ * and the interactive tooltip pill (file:loc · verdict, plus "open ↗" and
+ * "copy ⧉" buttons). Clicking the file:loc label opens the in-browser source
+ * peek; "open ↗" jumps to the editor; "copy ⧉" puts the element's context
+ * (HTML, CSS, source) on the clipboard. Hover state is self-contained
  * here — it never interacts with the editing slot in state.ts.
  *
  * The pill never guesses. It appears instantly in a neutral "checking" state
@@ -114,22 +115,38 @@ tooltipLabel.append(tooltipLoc, tooltipVerdict);
 tooltipLabel.title = "Peek at the source code";
 tooltipLabel.addEventListener("mouseenter", () => (tooltipLabel.style.textDecoration = "underline"));
 tooltipLabel.addEventListener("mouseleave", () => (tooltipLabel.style.textDecoration = "none"));
-const tooltipOpen = styled("button", "atx-tooltip-open", {
-  marginLeft: "8px",
-  padding: "2px 7px",
-  font: `600 11px ${FONT.ui}`,
-  color: "#fff",
-  background: "rgba(255,255,255,0.14)",
-  border: "none",
-  borderRadius: "4px",
-  cursor: "pointer",
-});
-tooltipOpen.type = "button";
-tooltipOpen.textContent = "open ↗";
-tooltipOpen.title = "Open this location in your editor";
-tooltipOpen.addEventListener("mouseenter", () => (tooltipOpen.style.background = "rgba(255,255,255,0.28)"));
-tooltipOpen.addEventListener("mouseleave", () => (tooltipOpen.style.background = "rgba(255,255,255,0.14)"));
-tooltipRow.append(tooltipLabel, tooltipOpen);
+const tooltipOpen = pillButton("atx-tooltip-open", "open ↗", "Open this location in your editor");
+
+// The context copy: everything we know about this element as one markdown
+// block, for pasting into an AI assistant. Its label swaps through
+// copying…/copied ✓, so it holds a fixed width — the pill must not resize
+// mid-interaction (the verdict slot next to it exists for the same reason).
+const COPY_IDLE = "copy ⧉";
+const tooltipCopy = pillButton(
+  "atx-tooltip-copy",
+  COPY_IDLE,
+  "Copy this element's HTML, CSS and source as context for an AI assistant",
+  { minWidth: "8ch", textAlign: "center" },
+);
+tooltipRow.append(tooltipLabel, tooltipOpen, tooltipCopy);
+
+let copyResetTimer: number | null = null;
+
+/** Back to the idle label, cancelling any pending flash. Runs on every
+ *  highlight change too, so a "copied ✓" never carries onto another element. */
+function resetCopy(): void {
+  if (copyResetTimer !== null) {
+    clearTimeout(copyResetTimer);
+    copyResetTimer = null;
+  }
+  tooltipCopy.disabled = false;
+  tooltipCopy.textContent = COPY_IDLE;
+}
+
+function flashCopy(label: string): void {
+  tooltipCopy.textContent = label;
+  copyResetTimer = window.setTimeout(resetCopy, 1200);
+}
 
 // Row 2: one chip per class + the id. Hovering a chip pops a rules card (see
 // css-inspect.ts). Wraps within a cap; hidden when the element has neither.
@@ -234,6 +251,7 @@ export function clearHighlight(): void {
   cancelSwitch();
   cancelVerify();
   removeCard();
+  resetCopy();
   highlightSeq++; // invalidate any /classify still in flight
   const had = highlighted;
   highlighted = null;
@@ -256,6 +274,10 @@ export interface HoverDeps {
   cssInspector(): boolean;
   /** Open a CSS rule's source file at (near) the rule in the editor. */
   openRule(file: string, selector: string): void;
+  /** Gather the element's context and put it on the clipboard. Resolves true
+   *  only when it actually landed there — a fallback panel or a failure
+   *  resolves false, and the button returns to its idle label. */
+  copyContext(el: HTMLElement, src: SourceLoc): Promise<boolean>;
   /** Notified whenever the highlighted element changes (element-tree sync). */
   onTarget?(el: HTMLElement | null): void;
 }
@@ -279,6 +301,26 @@ export function initHover(deps: HoverDeps): HoverHandle {
   };
   tooltipOpen.addEventListener("click", onHighlighted(deps.openSource));
   tooltipLabel.addEventListener("click", onHighlighted(deps.openPeek));
+
+  tooltipCopy.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = highlighted;
+    const src = highlightedSrc;
+    if (!el || !src) return;
+    // Gathering takes a /peek round-trip; hold the pill open across it. The
+    // element and loc are captured up front, so the copy still completes if the
+    // pointer wanders off and the highlight clears meanwhile.
+    cancelHide();
+    resetCopy();
+    tooltipCopy.disabled = true;
+    tooltipCopy.textContent = "copying…";
+    void deps.copyContext(el, src).then((copied) => {
+      tooltipCopy.disabled = false;
+      if (copied) flashCopy("copied ✓");
+      else resetCopy();
+    });
+  });
 
   /** Sit the pill fully above the element, measured by its actual height (so the
    *  taller chips-row variant never overlaps the element). Only when there's no
@@ -411,6 +453,7 @@ export function initHover(deps: HoverDeps): HoverHandle {
     cancelSwitch();
     cancelVerify();
     removeCard(); // drop any card left over from the previous element
+    resetCopy(); // a "copied ✓" belongs to the element it was clicked on
     if (!el.isConnected) return; // HMR may have replaced it during the dwell
     highlighted = el;
     onTargetCb?.(el); // mirror onto the element-tree row (page → tree)

@@ -1,98 +1,50 @@
 import type { FieldDescriptor, FieldType } from '../shared/protocol.ts';
+import { adapterFor, type ZodAdapter, type ZodNode } from './zod-adapt.ts';
 
 /**
  * Turn a collection's zod schema into form-field descriptors for the entry
- * panel. Pure and duck-typed: it reads `_def.typeName` off whatever zod v3
- * instance the project's own content config produced — we never import zod at
- * runtime, so there is no dual-instance hazard. Anything unrecognized degrades
- * to `null` (whole schema) or `json` (single field), never an error; the
- * middleware then falls back to value-based inference.
+ * panel. Pure and duck-typed: every zod internal is read through
+ * `zod-adapt.ts`, which speaks both v3 (Astro 5/6) and v4 (Astro 7) — we never
+ * import zod at runtime, so there is no dual-instance hazard. Anything
+ * unrecognized degrades to `null` (whole schema) or `json` (single field), never
+ * an error; the middleware then falls back to value-based inference.
  */
-
-interface ZodLike {
-  _def?: Record<string, unknown> & { typeName?: string };
-  safeParse?: (v: unknown) => { success: boolean; error?: { issues?: { message: string }[] } };
-}
 
 /** Mark used by the schema-function `image()` stub (see content-config.ts). */
 export const IMAGE_STUB_DESCRIPTION = 'atx:image';
 
-interface Unwrapped {
-  inner: ZodLike;
-  required: boolean;
-  defaultValue: unknown;
+interface TerminalDescriptor {
+  type: FieldType;
+  options?: string[];
+  assetRef?: 'relative';
 }
 
-/** Peel wrapper types (default/optional/effects/…) down to the terminal type. */
-function unwrap(schema: ZodLike): Unwrapped {
-  let inner = schema;
-  let required = true;
-  let defaultValue: unknown;
-  // Bounded loop: wrapper chains are short; 20 guards against cyclic defs.
-  for (let i = 0; i < 20; i++) {
-    const def = inner._def;
-    if (!def?.typeName) break;
-    switch (def.typeName) {
-      case 'ZodDefault': {
-        required = false;
-        const dv = def.defaultValue;
-        try {
-          defaultValue = typeof dv === 'function' ? (dv as () => unknown)() : dv;
-        } catch {
-          /* defaults must never break introspection */
-        }
-        inner = def.innerType as ZodLike;
-        continue;
-      }
-      case 'ZodOptional':
-      case 'ZodNullable':
-        required = false;
-        inner = def.innerType as ZodLike;
-        continue;
-      case 'ZodEffects':
-        inner = def.schema as ZodLike;
-        continue;
-      case 'ZodCatch':
-        required = false;
-        inner = def.innerType as ZodLike;
-        continue;
-      case 'ZodBranded':
-      case 'ZodReadonly':
-        inner = def.type as ZodLike;
-        continue;
-      case 'ZodPipeline':
-        inner = def.out as ZodLike;
-        continue;
-      default:
-        return { inner, required, defaultValue };
+function terminalType(a: ZodAdapter, inner: ZodNode): TerminalDescriptor {
+  switch (a.kind(inner)) {
+    case 'string': {
+      // Astro's `image()` is stubbed as a described string (content-config.ts).
+      // Its values are paths relative to the *entry file*, not web URLs, so the
+      // client needs that flagged to preview and write the right shape.
+      return a.description(inner) === IMAGE_STUB_DESCRIPTION
+        ? { type: 'image', assetRef: 'relative' }
+        : { type: 'text' };
     }
-  }
-  return { inner, required, defaultValue };
-}
-
-function terminalType(inner: ZodLike): { type: FieldType; options?: string[] } {
-  const def = inner._def;
-  switch (def?.typeName) {
-    case 'ZodString':
-      return { type: (def.description === IMAGE_STUB_DESCRIPTION ? 'image' : 'text') };
-    case 'ZodDate':
+    case 'date':
       return { type: 'date' };
-    case 'ZodNumber':
+    case 'number':
       return { type: 'number' };
-    case 'ZodBoolean':
+    case 'boolean':
       return { type: 'boolean' };
-    case 'ZodEnum': {
-      const values = def.values;
-      if (Array.isArray(values) && values.every((v) => typeof v === 'string')) {
-        return { type: 'select', options: values as string[] };
-      }
-      return { type: 'json' };
+    case 'enum': {
+      const options = a.enumOptions(inner);
+      return options ? { type: 'select', options } : { type: 'json' };
     }
-    case 'ZodLiteral':
-      return typeof def.value === 'string' ? { type: 'text' } : { type: 'json' };
-    case 'ZodArray': {
-      const el = unwrap(def.type as ZodLike);
-      return el.inner._def?.typeName === 'ZodString' ? { type: 'tags' } : { type: 'json' };
+    case 'literal':
+      return typeof a.literalValue(inner) === 'string' ? { type: 'text' } : { type: 'json' };
+    case 'array': {
+      const element = a.arrayElement(inner);
+      if (!element) return { type: 'json' };
+      return a.kind(a.unwrap(element).inner) === 'string' ? { type: 'tags' } : { type: 'json' };
     }
     default:
       return { type: 'json' };
@@ -108,30 +60,27 @@ function humanize(name: string): string {
 
 /**
  * Field descriptors from a zod object schema, or null when the value isn't
- * one (function schemas the provider couldn't call, zod v4, non-zod, …).
+ * one (function schemas the provider couldn't call, non-zod, a future major, …).
  */
 export function zodToFields(schema: unknown): FieldDescriptor[] | null {
-  const zs = schema as ZodLike | null | undefined;
-  if (!zs || zs._def?.typeName !== 'ZodObject') return null;
-  let shape: Record<string, ZodLike>;
-  try {
-    const rawShape = zs._def.shape;
-    shape = (typeof rawShape === 'function' ? rawShape() : rawShape) as Record<string, ZodLike>;
-  } catch {
-    return null;
-  }
-  if (!shape || typeof shape !== 'object') return null;
+  const a = adapterFor(schema);
+  if (!a) return null;
+  const root = schema as ZodNode;
+  if (a.kind(root) !== 'object') return null;
+  const shape = a.shape(root);
+  if (!shape) return null;
 
   const fields: FieldDescriptor[] = [];
   for (const [name, field] of Object.entries(shape)) {
-    const { inner, required, defaultValue } = unwrap(field);
-    const { type, options } = terminalType(inner);
+    const { inner, required, defaultValue } = a.unwrap(field);
+    const { type, options, assetRef } = terminalType(a, inner);
     fields.push({
       name,
       label: humanize(name),
       type,
       required,
       ...(options ? { options } : {}),
+      ...(assetRef ? { assetRef } : {}),
       ...(defaultValue !== undefined ? { defaultValue } : {}),
       present: false, // filled in by the endpoint against the file's data
       source: 'schema',
@@ -142,22 +91,18 @@ export function zodToFields(schema: unknown): FieldDescriptor[] | null {
 
 /** The object schema's shape record, or null when unavailable. */
 export function shapeOf(schema: unknown): Record<string, unknown> | null {
-  const zs = schema as ZodLike | null | undefined;
-  if (!zs || zs._def?.typeName !== 'ZodObject') return null;
-  try {
-    const raw = zs._def.shape;
-    const shape = (typeof raw === 'function' ? raw() : raw) as Record<string, unknown>;
-    return shape && typeof shape === 'object' ? shape : null;
-  } catch {
-    return null;
-  }
+  const a = adapterFor(schema);
+  if (!a) return null;
+  const root = schema as ZodNode;
+  return a.kind(root) === 'object' ? a.shape(root) : null;
 }
 
 /** Our YAML parse keeps dates as strings, but a project's `z.date()` expects a
- *  Date (Astro's own YAML pipeline hands it one) — bridge before validating. */
-function coerceForField(field: ZodLike, value: unknown): unknown {
-  const { inner } = unwrap(field);
-  if (inner._def?.typeName === 'ZodDate' && typeof value === 'string') {
+ *  Date (Astro's own YAML pipeline hands it one) — bridge before validating.
+ *  `z.coerce.date()` accepts the string itself, so this is a no-op for it. */
+function coerceForField(a: ZodAdapter, field: ZodNode, value: unknown): unknown {
+  const { inner } = a.unwrap(field);
+  if (a.kind(inner) === 'date' && typeof value === 'string') {
     const d = new Date(value);
     if (!Number.isNaN(d.getTime())) return d;
   }
@@ -173,19 +118,20 @@ export function validateChanges(
   schema: unknown,
   changes: Record<string, unknown>,
 ): Record<string, string> {
+  const a = adapterFor(schema);
   const shape = shapeOf(schema);
   const errors: Record<string, string> = {};
-  if (!shape) return errors;
+  if (!a || !shape) return errors;
   for (const [key, value] of Object.entries(changes)) {
-    const field = shape[key] as ZodLike | undefined;
+    const field = shape[key] as ZodNode | undefined;
     if (value === null) {
       // Deletion: the well-behaved client only sends null for optional fields,
       // but don't trust it — a required key must not be strippable.
-      if (field && unwrap(field).required) errors[key] = 'required';
+      if (field && a.unwrap(field).required) errors[key] = 'required';
       continue;
     }
     if (!field?.safeParse) continue;
-    const result = field.safeParse(coerceForField(field, value));
+    const result = field.safeParse(coerceForField(a, field, value));
     if (!result.success) {
       errors[key] = result.error?.issues?.[0]?.message ?? 'invalid value';
     }
@@ -198,13 +144,14 @@ export function validateFull(
   schema: unknown,
   values: Record<string, unknown>,
 ): Record<string, string> {
+  const a = adapterFor(schema);
   const shape = shapeOf(schema);
   const errors: Record<string, string> = {};
-  if (!shape) return errors;
-  for (const [key, field] of Object.entries(shape) as [string, ZodLike][]) {
+  if (!a || !shape) return errors;
+  for (const [key, field] of Object.entries(shape) as [string, ZodNode][]) {
     if (!field?.safeParse) continue;
     const has = key in values && values[key] !== undefined && values[key] !== '';
-    const result = field.safeParse(has ? coerceForField(field, values[key]) : undefined);
+    const result = field.safeParse(has ? coerceForField(a, field, values[key]) : undefined);
     if (!result.success) {
       errors[key] = has
         ? (result.error?.issues?.[0]?.message ?? 'invalid value')

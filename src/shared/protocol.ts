@@ -43,6 +43,12 @@ export interface HealthResponse {
   /** Whether the hover-pill CSS class/ID inspector is enabled. The overlay
    *  reads this at boot and skips rendering the chips row when false. */
   cssInspector: boolean;
+  /** Absolute project root. Astro's source annotations are absolute fsPaths,
+   *  which the overlay only ever showed a basename of; the copied element
+   *  context needs them repo-relative to be worth pasting anywhere, and this
+   *  is the only way the client can strip the prefix exactly. Dev-only, and
+   *  the annotations already carry the same information. */
+  root: string;
 }
 
 // --- GET /assets -------------------------------------------------------------
@@ -57,6 +63,20 @@ export interface UploadRequest {
   dataUrl: string;
   /** Client-suggested filename; sanitised server-side. */
   filename: string;
+  /**
+   * Marks the upload as backing an `assetRef: 'relative'` image field. Such
+   * assets are imported by Astro rather than served verbatim, so the write
+   * targets an importable `src/` dir and animated formats the image optimiser
+   * would flatten are refused.
+   */
+  assetRef?: 'relative';
+  /**
+   * Root-relative directory to write into, so an upload lands beside the
+   * field's existing asset instead of a shared root. Confined server-side to
+   * the configured asset directories; omitted or rejected falls back to
+   * `imageUploadDir` (relative fields) or `uploadDir`.
+   */
+  targetDir?: string;
 }
 export interface UploadResponse {
   webPath: string;
@@ -177,6 +197,14 @@ export interface FieldDescriptor {
   required: boolean;
   /** Enum values, for `select`. */
   options?: string[];
+  /**
+   * How an `image` field's value references its asset. Absent (the default)
+   * means a web-servable root-relative path, the shape a plain `<img src>`
+   * needs. `'relative'` marks a field backed by Astro's `image()` schema
+   * helper, whose values are paths relative to the *entry file* — the picker
+   * must resolve previews and write values in that shape instead.
+   */
+  assetRef?: 'relative';
   /** Schema default — shown as placeholder when the key is absent. */
   defaultValue?: unknown;
   /** Whether the key exists in the file's frontmatter. */
@@ -195,6 +223,10 @@ export interface EntryResponse {
   etag: string;
   /** Matched collection name, when the file maps to one. */
   collection: string | null;
+  /** Repo-relative directory holding the collection's entries, when matched.
+   *  The create drawer resolves `assetRef: 'relative'` values against it,
+   *  since a new entry has no path of its own yet. */
+  collectionDir: string | null;
   fields: FieldDescriptor[];
   /** Parsed frontmatter values (JSON-safe). */
   values: Record<string, unknown>;

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Onvero header">
+  <rect width="640" height="360" fill="#1b1b2e"/>
+  <circle cx="200" cy="180" r="96" fill="#6c5ce7"/>
+  <rect x="320" y="120" width="240" height="24" rx="12" fill="#f3f3f7"/>
+  <rect x="320" y="168" width="180" height="16" rx="8" fill="#8f8fa8"/>
+  <rect x="320" y="200" width="208" height="16" rx="8" fill="#8f8fa8"/>
+</svg>

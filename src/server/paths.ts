@@ -12,6 +12,32 @@ export function insideRoot(root: string, abs: string): boolean {
   return !rel.startsWith('..') && !rel.startsWith(sep);
 }
 
+/**
+ * Resolve a client-requested upload directory, or fall back.
+ *
+ * Uploads may only land in directories the integration already treats as asset
+ * locations — otherwise a client-supplied `targetDir` would be a general
+ * "write a file anywhere under the project root" capability. Anything outside
+ * them (or escaping the root) returns `fallback` rather than throwing, so a
+ * stale or hostile request writes somewhere safe instead of failing the upload.
+ * Pure string-space, like the rest of this module. (spec §8)
+ */
+export function resolveUploadDir(
+  root: string,
+  allowedDirs: string[],
+  fallback: string,
+  requested?: string,
+): string {
+  if (!requested) return fallback;
+  const abs = resolve(root, requested);
+  if (!insideRoot(root, abs)) return fallback;
+  const allowed = allowedDirs.some((dir) => {
+    const dirAbs = resolve(root, dir);
+    return insideRoot(root, dirAbs) && insideRoot(dirAbs, abs);
+  });
+  return allowed ? requested : fallback;
+}
+
 /** Map an absolute file under the project root to its web-servable path:
  *  `public/` maps to the site root; everything else keeps its project path. */
 export function toWebPath(root: string, absFile: string): string {

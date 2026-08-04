@@ -6,9 +6,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Added
+
+-   **Copy an element's context for an AI assistant.** The hover pill gained a `copy ⧉` button next to `open ↗` that puts everything the overlay knows about the hovered element on the clipboard as one markdown block: its repo-relative source location and editability verdict, the page URL, its DOM path, the page's content entry when it declares one, the rendered HTML, the surrounding source lines (30 either side, with `>` marking the element's own line, read through the existing `/peek` endpoint), the CSS rules that match it with the stylesheet each came from, and a summary of its rendered box and type. Paste it into an assistant with what you want changed instead of describing where the element lives. Sections degrade independently — a location the server won't serve (an `astro:assets` `<Image>`) says so and the rest still copies — and the payload states its own caps (4 000 characters of HTML, 40 rules) rather than truncating silently. New `atx-tooltip-copy` styling hook
+-   Clipboard-fallback panel (`atx-copy-note` / `atx-copy-text`): when the browser has no clipboard API to write to — a dev server reached over a network address is not a secure context — the context opens in a preselected read-only panel instead of failing
+-   `/health` now reports the project `root`. Astro's source annotations are absolute fsPaths and the overlay only ever showed their basename; the copied context needs them repo-relative, and this is the only way the client can strip the prefix exactly. Absent on an older server, in which case paths stay absolute rather than being guessed at
+-   **`image()` schema fields are now editable safely.** A collection field declared with Astro's `image()` helper stores a path relative to the *entry file* (`../../assets/blog/hero.png`), not a web URL. Such fields now carry `assetRef: 'relative'` on the wire, and the entry drawer's image control handles them end to end: the preview resolves the relative value to the path the dev server actually serves (so it renders instead of 404ing), Browse… lists the importable `src/` assets these fields need, and picking one writes the value back in entry-relative shape. A hint under the path input names the file the value is relative to. The `.astro` image swap panel is unchanged — it still deals only in web paths
+-   New `imageUploadDir` option (default `src/assets`): the fallback directory for uploads backing an `image()` field. Those assets are imported by Astro rather than served verbatim, so they must live under `src/` — a preflight warning fires if the configured directory isn't. When the field already has a value, uploads instead land in **that value's own directory**, so assets stay grouped the way the project groups them
+-   The asset picker gained a **text filter**, plus a directory scope toggle for relative fields (opens scoped to the field's own asset directory, with "Show all"). Both are needed at real-project scale — an unfiltered flat list of every listable asset is unusable. The filter is shared, so the swap panel gets it too
+-   `UploadRequest` gained `assetRef` and `targetDir`; `EntryResponse` gained `collectionDir`, which the create drawer uses to resolve relative asset values for an entry that doesn't have a path yet
+
+### Fixed
+
+-   **Schema introspection now works on Astro 7.** Astro 7 ships zod v4 (`astro/zod` re-exports `zod/v4`), which renamed every internal the introspector reads — `_def.typeName` → `_def.type`, enum values → `_def.entries`, array element → `_def.element`, literal value → `_def.values[0]` — and moved `.describe()` into `z.globalRegistry`, so `_def.description` reads empty. The result was that **every** field on **every** collection fell back to value inference on Astro 7: enums rendered as plain text instead of selects, `image()` fields as plain text boxes, and defaults were invisible. A new `server/zod-adapt.ts` holds one accessor table per major behind a single duck-typed interface (still no zod import, so no dual-instance hazard), and `schema-introspect.ts` reads through it
+-   **Entry saves are validated again on Astro 7.** `shapeOf` shared the same dead version guard, so `validateChanges` returned no errors at all: a required field could be blanked and a number field could take a string. Note this is a behaviour change as much as a fix — frontmatter that was silently tolerated may now come back as a field error
+-   `z.string().readonly()` no longer degrades to a read-only `json` widget on zod v3. The unwrapper read `_def.type` for both `ZodBranded` and `ZodReadonly`, but only branded stores its inner schema there — readonly uses `_def.innerType`, so it never unwrapped
+-   Under zod v4, a field declared with `.transform()` now resolves to the shape the form must *produce*. v4 compiles `.transform()` to `pipe{in, out}` whose `out` is a `transform` node no widget can render; the v4 table follows `in`. v3's `ZodPipeline` still follows `out`, unchanged
+
 ### Changed
 
 -   The element-tree panel now floats inset from the viewport edge (`5px` margins, `6px` border radius, `calc(100vh - 10px)` tall) over a darker translucent background instead of docking flush to the left edge at full height
+-   Uploads accept an optional `targetDir`, confined to the configured asset directories (`assetDirs` plus `uploadDir`/`imageUploadDir`). Anything outside them, or escaping the project root, is ignored in favour of the fallback directory and logged — a client-supplied target must never become a "write a file anywhere under the root" capability
+-   Uploading an animated GIF to an `image()` field is refused (422). Astro optimises those assets, which flattens the animation to a single frame; the refusal points at `public/` plus a plain `<img src>` instead. GIF uploads for web-path fields are unaffected
+-   `buildImageField` now takes an options object rather than positional `(initial, onChange)` arguments, so it can receive the field's asset mode and entry path. Internal to the client overlay; no effect on the public option surface
+
+### Security
+
+-   New `paths.ts::resolveUploadDir` is the single gate for a client-requested upload directory: realpath-free string confinement to the configured asset directories, falling back rather than throwing. Uploads continue to write only new asset files, never source patches
 
 ## \[0.6.0\] - 2026-07-24
 

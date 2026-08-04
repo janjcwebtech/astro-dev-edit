@@ -55,6 +55,13 @@ export async function listAssets(root: string, assetDirs: string[]): Promise<str
   return [...out].sort();
 }
 
+/** The mime type of a data: URL without decoding its payload — for policy
+ *  checks that must not pay for a base64 decode of the whole image. Empty
+ *  string when the value isn't a data URL. */
+export function dataUrlMime(dataUrl: string): string {
+  return /^data:([^;,]+)/.exec(dataUrl ?? '')?.[1]?.toLowerCase() ?? '';
+}
+
 /** Split a data: URL into its mime type and decoded bytes. Throws on
  *  anything that isn't a data URL. */
 export function parseDataUrl(dataUrl: string): { mime: string; data: Buffer } {

@@ -68,6 +68,7 @@ beforeAll(async () => {
     root,
     assetDirs: ['src/assets', 'public'],
     uploadDir: 'public',
+    imageUploadDir: 'src/assets',
     contentRoots: ['src', 'public'],
     editableExtensions: ['.astro', '.md', '.mdx'],
     openInEditor: false,
@@ -161,6 +162,11 @@ describe('routing & guards', () => {
     expect(r.body).toMatchObject({ ok: true, name: 'astro-text-edit' });
   });
 
+  it('GET /health reports the project root, so the overlay can relativize the absolute source annotations', async () => {
+    const r = await request({ method: 'GET', url: '/__text-edit/health' });
+    expect(r.body).toMatchObject({ root, cssInspector: true });
+  });
+
   it('GET /healthX no longer matches /health — routes are exact-path (intentional tightening)', async () => {
     // Pre-refactor this returned 200 via prefix matching; the route table
     // matches exact pathnames. The client only ever calls exact paths.
@@ -240,6 +246,113 @@ describe('POST /upload', () => {
     });
     expect(r.status).toBe(400);
     expect(r.body.error).toContain('expected a data: URL');
+  });
+
+  // An image() field's asset is imported by Astro, so it belongs under src/ —
+  // and lands beside the field's existing asset when one is known.
+  describe('assetRef: relative', () => {
+    it('falls back to imageUploadDir when no target is given', async () => {
+      const r = await request({
+        method: 'POST',
+        url: '/__text-edit/upload',
+        body: {
+          dataUrl: `data:image/png;base64,${PNG_B64}`,
+          filename: 'cover.png',
+          assetRef: 'relative',
+        },
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.webPath).toBe('/src/assets/cover.png');
+    });
+
+    it('honours a target directory inside a configured asset dir', async () => {
+      const r = await request({
+        method: 'POST',
+        url: '/__text-edit/upload',
+        body: {
+          dataUrl: `data:image/png;base64,${PNG_B64}`,
+          filename: 'hero.png',
+          assetRef: 'relative',
+          targetDir: 'src/assets/blog',
+        },
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.webPath).toBe('/src/assets/blog/hero.png');
+      expect(String(await readFile(join(root, 'src/assets/blog/hero.png')))).toBe('fake-png-bytes');
+    });
+
+    it('ignores a target outside the configured asset dirs', async () => {
+      const r = await request({
+        method: 'POST',
+        url: '/__text-edit/upload',
+        body: {
+          dataUrl: `data:image/png;base64,${PNG_B64}`,
+          filename: 'sneaky.png',
+          assetRef: 'relative',
+          targetDir: 'src/pages',
+        },
+      });
+      expect(r.status).toBe(200);
+      // Written to the fallback, not the requested dir.
+      expect(r.body.webPath).toBe('/src/assets/sneaky.png');
+      await expect(readFile(join(root, 'src/pages/sneaky.png'))).rejects.toThrow();
+    });
+
+    it('ignores a target that escapes the project root', async () => {
+      const r = await request({
+        method: 'POST',
+        url: '/__text-edit/upload',
+        body: {
+          dataUrl: `data:image/png;base64,${PNG_B64}`,
+          filename: 'escape.png',
+          assetRef: 'relative',
+          targetDir: '../../../tmp',
+        },
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.webPath).toBe('/src/assets/escape.png');
+    });
+
+    it('refuses an animated GIF, which Astro would flatten', async () => {
+      const gif = Buffer.from('fake-gif-bytes').toString('base64');
+      const r = await request({
+        method: 'POST',
+        url: '/__text-edit/upload',
+        body: {
+          dataUrl: `data:image/gif;base64,${gif}`,
+          filename: 'spin.gif',
+          assetRef: 'relative',
+        },
+      });
+      expect(r.status).toBe(422);
+      expect(r.body.code).toBe('unsupported');
+      expect(r.body.error).toContain('public/');
+    });
+
+    it('still accepts a GIF for a plain web-path upload', async () => {
+      const gif = Buffer.from('fake-gif-bytes').toString('base64');
+      const r = await request({
+        method: 'POST',
+        url: '/__text-edit/upload',
+        body: { dataUrl: `data:image/gif;base64,${gif}`, filename: 'spin.gif' },
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.webPath).toBe('/spin.gif');
+    });
+
+    it('honours a target for a plain web-path upload too', async () => {
+      const r = await request({
+        method: 'POST',
+        url: '/__text-edit/upload',
+        body: {
+          dataUrl: `data:image/png;base64,${PNG_B64}`,
+          filename: 'in-sub.png',
+          targetDir: 'public/sub',
+        },
+      });
+      expect(r.status).toBe(200);
+      expect(r.body.webPath).toBe('/sub/in-sub.png');
+    });
   });
 });
 

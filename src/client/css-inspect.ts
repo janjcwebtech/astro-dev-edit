@@ -9,7 +9,7 @@
  * (/inspect/open) to jump the editor there. See src/server/inspect-locate.ts.
  */
 
-import { COLOR, FONT, Z, basename, isolateScroll, styled } from './ui.ts';
+import { COLOR, FONT, Z, basename, isolateScroll, pillButton, styled } from './ui.ts';
 
 /** One applied rule, distilled for display. */
 export interface MatchedRule {
@@ -54,16 +54,20 @@ function splitSelectorList(selectorText: string): string[] {
   return out;
 }
 
-/** The sub-selectors of `rule` that reference the token AND that `el` matches. */
-function matchingSubSelectors(
-  rule: CSSStyleRule,
-  el: Element,
-  token: string,
-  kind: 'class' | 'id',
-): string[] {
+/** Which sub-selectors a scan cares about: one token's (the chips card) or all
+ *  of them (the copy-context collector). Matching against `el` happens either
+ *  way — this only narrows what's worth testing. */
+type SelectorFilter = (sub: string) => boolean;
+
+/** Selectors made of nothing but `*` and combinators (`*`, `* > *`). They match
+ *  every element, so a whole-element scan would drag in every reset rule. */
+const UNIVERSAL_ONLY = /^[\s*>+~]*$/;
+
+/** The sub-selectors of `rule` that pass `accept` AND that `el` matches. */
+function matchingSubSelectors(rule: CSSStyleRule, el: Element, accept: SelectorFilter): string[] {
   const matched: string[] = [];
   for (const sub of splitSelectorList(rule.selectorText)) {
-    if (!referencesToken(sub, token, kind)) continue;
+    if (!accept(sub)) continue;
     try {
       if (el.matches(sub)) matched.push(sub.trim());
     } catch {
@@ -133,15 +137,14 @@ function sheetSource(sheet: CSSStyleSheet): string | null {
 function walkRules(
   rules: CSSRuleList,
   el: Element,
-  token: string,
-  kind: 'class' | 'id',
+  accept: SelectorFilter,
   source: string | null,
   out: MatchedRule[],
   seen: Set<string>,
 ): void {
   for (const rule of Array.from(rules)) {
     if (rule instanceof CSSStyleRule) {
-      const matched = matchingSubSelectors(rule, el, token, kind);
+      const matched = matchingSubSelectors(rule, el, accept);
       if (matched.length === 0) continue;
       const declarations = formatDeclarations(rule);
       const key = `${matched.join(',')}|${declarations}|${source ?? ''}`;
@@ -150,13 +153,14 @@ function walkRules(
       out.push({ selectorText: matched.join(', '), declarations, sourceFile: source });
     } else if ('cssRules' in rule) {
       // @media / @supports / @layer / @container — recurse into the group.
-      walkRules((rule as CSSGroupingRule).cssRules, el, token, kind, source, out, seen);
+      walkRules((rule as CSSGroupingRule).cssRules, el, accept, source, out, seen);
     }
   }
 }
 
-/** Every rule `el` matches through `token`, across all readable stylesheets. */
-export function rulesForToken(el: Element, token: string, kind: 'class' | 'id'): MatchedRule[] {
+/** Scan every readable stylesheet for rules `el` matches through an accepted
+ *  sub-selector. Cross-origin sheets are skipped, not fatal. */
+function scan(el: Element, accept: SelectorFilter): MatchedRule[] {
   const out: MatchedRule[] = [];
   const seen = new Set<string>();
   for (const sheet of Array.from(document.styleSheets)) {
@@ -166,31 +170,34 @@ export function rulesForToken(el: Element, token: string, kind: 'class' | 'id'):
     } catch {
       continue; // cross-origin stylesheet — CSSOM access throws; skip it
     }
-    walkRules(rules, el, token, kind, sheetSource(sheet), out, seen);
+    walkRules(rules, el, accept, sheetSource(sheet), out, seen);
   }
   return out;
+}
+
+/** Every rule `el` matches through `token`, across all readable stylesheets. */
+export function rulesForToken(el: Element, token: string, kind: 'class' | 'id'): MatchedRule[] {
+  return scan(el, (sub) => referencesToken(sub, token, kind));
+}
+
+/**
+ * Every rule `el` matches, whatever the selector — the chips card's scan
+ * widened from "through this one class/ID" to "at all", for the copy-context
+ * collector. Rules that apply only to an *ancestor* are not included: this is
+ * what the browser matched against this element.
+ */
+export function rulesForElement(el: Element): MatchedRule[] {
+  return scan(el, (sub) => !UNIVERSAL_ONLY.test(sub));
 }
 
 // --- Card DOM ----------------------------------------------------------------
 
 /** A small "open ↗" button matching the pill's own, for a rule's source jump. */
 function openButton(onClick: () => void): HTMLButtonElement {
-  const btn = styled('button', 'atx-tooltip-rule-open', {
-    marginLeft: '8px',
-    padding: '2px 7px',
+  const btn = pillButton('atx-tooltip-rule-open', 'open ↗', 'Open this rule in your editor', {
     font: `600 10.5px ${FONT.ui}`,
-    color: '#fff',
-    background: 'rgba(255,255,255,0.14)',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
     flex: '0 0 auto',
   });
-  btn.type = 'button';
-  btn.textContent = 'open ↗';
-  btn.title = 'Open this rule in your editor';
-  btn.addEventListener('mouseenter', () => (btn.style.background = 'rgba(255,255,255,0.28)'));
-  btn.addEventListener('mouseleave', () => (btn.style.background = 'rgba(255,255,255,0.14)'));
   btn.addEventListener('click', onClick);
   return btn;
 }

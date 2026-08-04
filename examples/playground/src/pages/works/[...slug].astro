@@ -1,0 +1,34 @@
+---
+import Base from '../../layouts/Base.astro';
+import { Image } from 'astro:assets';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const works = await getCollection('works');
+  return works.map((work) => ({ params: { slug: work.id }, props: { work } }));
+}
+
+const { work } = Astro.props;
+const { Content } = await render(work);
+
+// Repo-relative path to the markdown source, so the entry drawer can open this
+// work's frontmatter — including its image() cover, whose value is relative to
+// this very file.
+const pageSource = work.filePath ?? `src/content/works/${work.id}.md`;
+---
+<Base title={`${work.data.title} · Copydesk`} description={work.data.summary} pageSource={pageSource}>
+  <article class="section">
+    <div class="container prose">
+      <a href="/works" style="color:var(--accent);text-decoration:none;font-size:0.9rem;">&larr; All work</a>
+      <p class="eyebrow" style="margin-top:1rem;">{work.data.client} · {work.data.year}</p>
+      <h1>{work.data.title}</h1>
+      <p class="meta" style="color:var(--grey);">{work.data.summary}</p>
+      <!-- An image() value is ImageMetadata, so this goes through <Image>. That
+           component is package-owned, which is also why clicking it gets the
+           "rendered by a package component" refusal rather than a swap panel —
+           edit the cover from the entry drawer instead. -->
+      <Image src={work.data.cover} alt={work.data.title} width={960} height={540} />
+      <Content />
+    </div>
+  </article>
+</Base>

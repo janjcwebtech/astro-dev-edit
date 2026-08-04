@@ -5,3 +5,4 @@ dist/
 .astro/
 .playwright-mcp/
 CLAUDE.md
+notes/

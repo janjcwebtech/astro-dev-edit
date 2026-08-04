@@ -50,9 +50,12 @@ Run in this order; each is cheaper than the next.
 | Entry editor disabled → all `/entry*` rejected | `tests/middleware-entry.test.ts` |
 | `annotateAstroSource` — self-annotation for Astro ≥7: loc parity with `locOf` (text/expression/childless rules), component skip, elements inside expressions, self-closing tags, attr escaping, no-newline invariant, classify/apply round-trip against the original source | `tests/annotate.test.ts` |
 | `locateSelector` — CSS-inspector best-effort selector→line: class/id hit in a `.css` file, token-boundary (no prefix collision), absent→null; `.astro` search confined to `<style>` blocks (markup class attrs ignored) | `tests/inspect-locate.test.ts` |
-| `zodToFields` — playground blog schema, primitive/enum/array mapping, wrapper unwrapping, image() stub, degrade-to-json | `tests/schema-introspect.test.ts` |
-| `validateChanges` — null-deletion rules for optional/defaulted/required/unknown keys | `tests/schema-introspect.test.ts` |
+| `zodToFields` — playground blog schema, primitive/enum/array mapping, wrapper unwrapping, `readonly`, image() stub → `assetRef: 'relative'` (bare **and** through `.optional()`), plain-string no-assetRef, degrade-to-json. **Runs against both zod majors from the same assertions** | `tests/schema-introspect.test.ts` |
+| `validateChanges` — null-deletion rules for optional/defaulted/required/unknown keys; wrong-type rejection, blanking a required field, `z.date()` string bridging. **Both majors** | `tests/schema-introspect.test.ts` |
+| `zod-adapt` accessor tables — major detection, kind normalization, every wrapper (`optional`/`nullable`/`default`/`catch`/`readonly`, v4 `nonoptional` pinning), `.describe()` post-unwrap, enum options, array element, literal value, object shape, transform/refine/brand see-through, v4 `pipe` following `in`; non-zod → null | `tests/zod-adapt.test.ts` |
 | `inferFields` — type inference from frontmatter values | `tests/schema-introspect.test.ts` |
+| `asset-path` conversions — entry-relative ↔ served path, nested/sibling/deeper dirs, round-trips, `./` for siblings, root-escape refusal, `public/` refusal for `image()`, Windows separators, upload-dir derivation | `tests/asset-path.test.ts` |
+| `POST /upload` `assetRef: 'relative'` — `imageUploadDir` fallback, honoured in-asset-dir target, ignored out-of-asset-dir and root-escaping targets, GIF refusal (422) vs GIF allowed for web-path uploads | `tests/middleware.test.ts` |
 
 Not automated: `content-config.ts` (loads the project's real
 `content.config.ts` via `ssrLoadModule`) is injected and **stubbed** in every
@@ -63,6 +66,15 @@ for `createAnnotatePlugin`'s Vite
 hook-ordering (`transform: { order: 'pre' }` must beat Astro's own compile
 plugin — only observable against a real Astro ≥7 dev server; check that dev
 SSR contains `data-astro-source-*` on all files, not just page entries).
+
+**zod majors.** The introspection suites import v3 from the `zod`
+devDependency and v4 from `astro/zod` — the exact module a consuming Astro 7
+project loads, so the tables break if zod moves its internals again. Note the
+asymmetry: the playground runs Astro 7 (zod v4), so **v3 has unit coverage but
+no live surface**. A regression in the v3 table would pass every automated gate
+and the playground drive alike; only a real Astro 5/6 project would catch it.
+This is also how the v4 breakage shipped unnoticed — the suite pinned v3
+behaviour that no Astro 7 consumer executes.
 
 ### Patchers (`src/patcher/`)
 
@@ -84,6 +96,7 @@ the loc rules in `astro.ts`.
 | `classify-cache.ts` — verdict caching per file\|loc\|tag, in-flight dedupe, failure retry, HMR invalidation (incl. mid-flight) | `tests/classify-cache.test.ts` |
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 | `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
+| `element-context.ts` — `formatContext` clipboard payload: section order and omission (absent verdict/entry/box), `>` focus-line gutter marking, quoted-range wording, fence language per extension, refused-source sentence, empty-CSS note, rule blocks with/without a source comment, both truncation notices; `relativize` root stripping (trailing slash, outside-root, already-relative, unknown root, Windows separators); `windowAround` 1-based slicing (clamped both ends, whole file, pre-windowed response) | `tests/element-context.test.ts` |
 
 **Everything else in `src/client/` has no unit tests** — it is DOM- and
 dev-server-bound and is verified only by the manual checklist below. When
@@ -139,6 +152,29 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Escape / click-away discards; a stale edit (file changed underneath)
       fails safe with a mismatch message, file untouched.
 
+**Copy context** (hover pill `copy ⧉`)
+
+- [ ] Hovering an element and clicking `copy ⧉` flips the label to
+      `copying…` → `copied ✓` (pill width unchanged) and toasts
+      "Copied context for `<label>` — N KB". Pasting gives a markdown block
+      whose loc is **repo-relative** (`src/pages/index.astro:12:3`, not an
+      absolute fsPath — the `root` from `/health`), with the rendered HTML, the
+      source window whose `>` line is the element's own, and the matching CSS
+      rules.
+- [ ] On a detail page the payload carries the **Content entry** line; on a
+      page without the meta tag it is absent.
+- [ ] An `astro:assets` `<Image>`: the Source section reads "Not available —
+      rendered by a package component" and everything else still copies.
+- [ ] The copied HTML contains no `data-astro-text-edit-ui` node and no
+      `atx-*` class, on a page where an overlay panel was open at copy time.
+- [ ] An element over the caps (>4 000 characters of markup, or >40 matching
+      rules) ends its section with the `_Truncated — …_` notice. No playground
+      fixture is that big — check on a real site.
+- [ ] Clipboard refused (open the playground over a LAN address, or block the
+      permission): the fallback panel opens with the text preselected, its Copy
+      works, Escape/backdrop/Close dismiss it, and the pill's button returns to
+      `copy ⧉` rather than claiming success.
+
 **CSS inspector** (hover pill chips)
 
 - [ ] With `cssInspector` on (default), hovering an element that has classes/an
@@ -192,7 +228,11 @@ whichever sections your change touches; run the whole list before a release.
 
 - [ ] ✎ Edit entry pill opens the drawer; fields match the collection's zod
       schema (date → native picker, enum → select, image → picker control,
-      unknown → read-only json).
+      unknown → read-only json). Fields report `source: "schema"`, **not
+      `"inferred"`** — inferred everywhere means schema introspection is dead
+      for that project's zod major, and every check below it is meaningless.
+- [ ] Blank a required field and save → 422 with an inline field error, not a
+      silent write. (Validation is only live when the schema resolved.)
 - [ ] Save writes frontmatter surgically — comments, key order, and quoting
       preserved in the entry file.
 - [ ] Dirty-close asks for confirmation; a concurrent external file edit then
@@ -200,6 +240,28 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Entry create (new slug) and delete flows work end-to-end; after create
       the browser polls the new URL and lands on the rendered page (not a
       404), even when the content-layer sync is slow.
+
+**`image()` schema fields** (`/works/onvero` — the `works` collection exists for
+this; `cover` is required and `thumbnail` is `image().optional()`, both pointing
+into a nested asset dir. `/works/ledger` leaves `thumbnail` unset.)
+
+- [ ] Both image fields show a **rendered preview**, not "No image — click to
+      browse", and a hint naming the file the value is relative to.
+- [ ] Browse… opens scoped to the field's own asset dir (count reads `N of M ·
+      src/assets/works/onvero`); the filter narrows; "Show all" widens.
+- [ ] **No `public/` assets appear** in the list for these fields.
+- [ ] Picking an asset in a *different* directory stores a relative value
+      (`../../assets/works/atlas-cover.svg`) and the preview follows it.
+- [ ] Save, then confirm the markdown holds the relative path and the page
+      still renders — no collection validation error in the dev log.
+- [ ] Dropping an image on a populated field uploads into **that field's**
+      directory; on the empty `thumbnail` of `/works/ledger` it falls back to
+      `imageUploadDir`.
+- [ ] Dropping an animated `.gif` on one of these fields is refused with a
+      pointer to `public/`.
+- [ ] **Regression:** on `/articles/…` (whose `image` is a plain string forced
+      to the `image` widget) the field stays web-shaped — no relative hint, no
+      scope toggle, `/src/` assets absent from the list, uploads to `uploadDir`.
 
 **Body editor**
 

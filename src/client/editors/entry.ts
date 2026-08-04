@@ -76,7 +76,9 @@ export async function openEntryPanel(file: string): Promise<void> {
 }
 
 function showEditDrawer(entry: EntryResponse): void {
-  const controls = entry.fields.map((f) => buildControl(f, entry.values[f.name]));
+  const controls = entry.fields.map((f) =>
+    buildControl(f, entry.values[f.name], entry.file),
+  );
   const bodyEditor = entry.bodyEditable ? buildBodyEditor(entry.body) : null;
 
   const shell = openDrawer(`Edit entry · ${basename(entry.file)}`, {
@@ -169,10 +171,15 @@ function showCreateDrawer(entry: EntryResponse): void {
   const slugInput = slugControl.root.querySelector('input') as HTMLInputElement;
   slugInput.placeholder = 'my-new-entry';
 
+  // A new entry has no path yet, but relative asset values only depend on the
+  // *directory* it will land in — which is the collection dir the create route
+  // writes to. Resolve against a placeholder sibling there.
+  const entryFile = entry.collectionDir ? `${entry.collectionDir}/_new.md` : entry.file;
+
   // Only schema fields make sense for a brand-new entry.
   const controls: FieldControl[] = entry.fields
     .filter((f) => f.source === 'schema' && f.type !== 'json')
-    .map((f) => buildControl(f, undefined));
+    .map((f) => buildControl(f, undefined, entryFile));
 
   const bodyEditor = buildBodyEditor('');
 

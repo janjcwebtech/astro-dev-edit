@@ -283,9 +283,14 @@ export function buildBodyEditor(initial: string): BodyEditor {
     altInput.value = target?.getAttribute('alt') ?? '';
     altTouched = target !== null || altInput.value !== '';
     imageFieldSlot.textContent = '';
-    imageFieldSlot.append(buildImageField(prefill, (v) => {
-      imageValue = v;
-      if (!altTouched) altInput.value = altFromPath(v);
+    // Body images stay web-path shaped: a markdown `![](…)` in a rendered page
+    // resolves against the site, not the entry file (unlike an image() field).
+    imageFieldSlot.append(buildImageField({
+      initial: prefill,
+      onChange: (v) => {
+        imageValue = v;
+        if (!altTouched) altInput.value = altFromPath(v);
+      },
     }));
     confirmBtn.textContent = target ? 'Replace' : 'Insert';
     imagePanel.style.display = 'block';

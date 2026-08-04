@@ -10,12 +10,18 @@ import type {
   PeekRequest,
   UploadRequest,
 } from '../shared/protocol.ts';
-import { listAssets, saveUpload } from './assets.ts';
+import { dataUrlMime, listAssets, saveUpload } from './assets.ts';
 import type { EntrySchemaProvider } from './content-config.ts';
 import { launchInEditor } from './editor.ts';
 import { createEntryRoutes } from './entry-routes.ts';
 import { createInspectRoutes } from './inspect-routes.ts';
-import { atomicWrite, checkEditablePath, isPackageOwned, validateEditablePath } from './paths.ts';
+import {
+  atomicWrite,
+  checkEditablePath,
+  isPackageOwned,
+  resolveUploadDir,
+  validateEditablePath,
+} from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
 
 /**
@@ -36,6 +42,10 @@ interface MiddlewareDeps {
   assetDirs: string[];
   /** Directory new uploads are written to, relative to root. */
   uploadDir: string;
+  /** Directory uploads for `assetRef: 'relative'` image() fields fall back to,
+   *  relative to root. Those assets are imported by Astro, so they belong under
+   *  `src/`, not in the web-servable uploadDir. */
+  imageUploadDir: string;
   /** Directories writes are confined to, relative to root. (spec §8) */
   contentRoots: string[];
   /** Extensions the patcher may write. (spec §8) */
@@ -51,6 +61,11 @@ interface MiddlewareDeps {
 }
 
 const NO_PATCHER_REASON = 'Only .astro templates support in-place editing so far.';
+
+/** Why an animated GIF can't back an `image()` field. */
+const GIF_REFUSAL =
+  'Astro optimises image() assets, which flattens an animated GIF to a single frame. ' +
+  'Keep animated GIFs in public/ and reference them from a plain <img src> instead.';
 
 /** Reasons for elements whose source file exists but isn't yours to edit.
  *  These are *verdicts*, not errors: /classify is advisory and runs on hover,
@@ -99,6 +114,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     root,
     assetDirs,
     uploadDir,
+    imageUploadDir,
     contentRoots,
     editableExtensions,
     openInEditor,
@@ -107,6 +123,11 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     schemaProvider,
   } = deps;
 
+  // The only directories an upload may be steered into. Without this, a
+  // client-supplied targetDir would be a "write a file anywhere in the project"
+  // capability rather than "put this image beside its siblings". (spec §8)
+  const uploadAllowedDirs = [...assetDirs, uploadDir, imageUploadDir];
+
   const coreRoutes: Route[] = [
     {
       method: 'GET',
@@ -114,7 +135,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       label: 'health',
       handler: async () => ({
         status: 200,
-        body: { ok: true, name: 'astro-text-edit', milestone: 1, cssInspector },
+        body: { ok: true, name: 'astro-text-edit', milestone: 1, cssInspector, root },
       }),
     },
 
@@ -138,7 +159,29 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       maxBytes: 25 * 1024 * 1024, // 25 MB cap
       label: 'upload',
       handler: async (body) => {
-        const { webPath } = await saveUpload(root, uploadDir, body as UploadRequest);
+        const req = body as UploadRequest;
+        const relative = req.assetRef === 'relative';
+        // An image() asset is imported and optimised by Astro, which flattens
+        // an animated GIF to a still frame. Refuse rather than write a value
+        // that silently degrades the image — public/ + the swap panel is the
+        // path that preserves animation.
+        if (relative && (dataUrlMime(req.dataUrl) === 'image/gif' || /\.gif$/i.test(req.filename ?? ''))) {
+          return {
+            status: 422,
+            body: { error: GIF_REFUSAL, code: 'unsupported' },
+          };
+        }
+        // Relative fields fall back to the src-side dir; a requested target is
+        // honoured only if it sits inside a configured asset directory.
+        const fallback = relative ? imageUploadDir : uploadDir;
+        const dir = resolveUploadDir(root, uploadAllowedDirs, fallback, req.targetDir);
+        if (req.targetDir && dir !== req.targetDir) {
+          logger.warn(
+            `upload targetDir "${req.targetDir}" is not inside a configured asset ` +
+              `directory — writing to "${dir}" instead`,
+          );
+        }
+        const { webPath } = await saveUpload(root, dir, req);
         logger.info(`uploaded image -> ${webPath}`);
         return { status: 200, body: { webPath } };
       },

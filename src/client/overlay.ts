@@ -20,10 +20,12 @@
 import type { SourceLoc } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { invalidateClassifications } from './classify-cache.ts';
+import { openCopyPanel } from './editors/copy-panel.ts';
 import { openEntryPanel } from './editors/entry.ts';
-import { pageSource } from './editors/notice.ts';
 import { openPeekPanel } from './editors/peek.ts';
+import { collectContext, formatContext } from './element-context.ts';
 import { clearHighlight, initHover } from './hover.ts';
+import { pageSource } from './page-source.ts';
 import { initRouter } from './router.ts';
 import { cacheSourceMappings, startCapture } from './source-map.ts';
 import { initTree } from './tree.ts';
@@ -47,6 +49,9 @@ if (document.body) {
 let editMode = false;
 // Set from the server's /health payload at boot. Gates the hover-pill chips row.
 let cssInspectorEnabled = false;
+// Also from /health: the absolute project root, so copied source paths come out
+// repo-relative (Astro's annotations are absolute). Null until boot completes.
+let projectRoot: string | null = null;
 
 // The toggle and entry pills share a fixed width so the stacked buttons read
 // as one aligned control group. They stay dimmed until the group is hovered.
@@ -270,6 +275,39 @@ async function openRule(file: string, selector: string): Promise<void> {
   }
 }
 
+/** Human-readable size for the copy toast — the payload's bulk is the one thing
+ *  you can't see from the button. */
+function sizeLabel(text: string): string {
+  return text.length < 1024 ? `${text.length} characters` : `${(text.length / 1024).toFixed(1)} KB`;
+}
+
+/**
+ * The hover pill's "copy ⧉": gather the element's context and write it to the
+ * clipboard. Resolves true only on a real clipboard write; when the API is
+ * missing (a dev server reached over the network is not a secure context) or
+ * refuses, the text goes to a panel the user can copy from by hand instead.
+ */
+async function copyContext(el: HTMLElement, src: SourceLoc): Promise<boolean> {
+  let text: string;
+  let label: string;
+  try {
+    const ctx = await collectContext(el, src, projectRoot);
+    text = formatContext(ctx);
+    label = ctx.label;
+  } catch (err) {
+    toast(`Could not gather context — ${err instanceof Error ? err.message : 'unknown'}`, 'err');
+    return false;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(`Copied context for ${label} — ${sizeLabel(text)}`, 'ok');
+    return true;
+  } catch {
+    openCopyPanel(`${basename(src.file)}:${src.loc}`, text);
+    return false;
+  }
+}
+
 const isEditMode = (): boolean => editMode;
 /** Open the in-browser source-peek panel; its footer's "Open in editor" falls
  *  through to openSource. */
@@ -282,6 +320,7 @@ const hover = initHover({
   openPeek,
   cssInspector: () => cssInspectorEnabled,
   openRule: (file, selector) => void openRule(file, selector),
+  copyContext,
   onTarget: (el) => tree.syncActive(el),
 });
 // The tree is created BEFORE the router so its capture-phase "click to deselect"
@@ -327,6 +366,7 @@ async function boot(): Promise<void> {
   const info = await api.health();
   if (!info) return;
   cssInspectorEnabled = info.cssInspector;
+  projectRoot = info.root ?? null; // older servers don't send it — paths stay absolute
   controls.append(hideButton, entryButton, toggle, hint);
   document.body.append(...hover.elements, tree.selectionOutline, tree.root, controls);
 

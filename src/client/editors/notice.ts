@@ -1,5 +1,6 @@
 import type { SourceLoc } from '../../shared/protocol.ts';
 import { clearHighlight } from '../hover.ts';
+import { pageSource } from '../page-source.ts';
 import * as state from '../state.ts';
 import { FONT, basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
 import { openEntryPanel } from './entry.ts';
@@ -10,26 +11,6 @@ import { openEntryPanel } from './entry.ts';
  * declares a backing content file, a primary "Edit page content" action that
  * opens the CMS entry drawer for it.
  */
-
-/**
- * The content file backing a detail page, if the page declares one.
- *
- * Detail routes (e.g. `/area/<slug>/`) render a markdown/MDX entry through a
- * template, so their dynamic text — the title, body prose, etc. — lives in a
- * `.md`/`.mdx` file, not in the `.astro` the source loc points at. Editing that
- * text in place needs expression-following (spec §16.3), which isn't built. As
- * a fast interim (§16.2), a page can opt in by emitting
- *   <meta name="astro-text-edit:page-source" content="src/content/…/x.mdx">
- * and we surface an "Edit page content" jump-to-source button on the refusal
- * notice. Archive/listing pages simply omit the meta and get nothing extra.
- */
-export function pageSource(): string | null {
-  const meta = document.querySelector<HTMLMetaElement>(
-    'meta[name="astro-text-edit:page-source"]',
-  );
-  const content = meta?.content?.trim();
-  return content ? content : null;
-}
 
 export function showDynamicNotice(
   src: SourceLoc,

@@ -139,6 +139,7 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
             file: rel,
             etag: sha256(source),
             collection: info?.collection ?? null,
+            collectionDir: info?.dir ?? null,
             fields: assembleFields(info, parsed.data),
             values: parsed.data,
             body: parsed.body,

@@ -265,6 +265,31 @@ export function footButton(label: string, kind: ButtonKind, onClick: () => void)
   return btn;
 }
 
+/**
+ * A small translucent button for the dark hover pill and its rules card — the
+ * pill's "open ↗" / "copy ⧉" and each rule's own "open ↗". One primitive so the
+ * three stay identical; `extra` covers the per-caller trim (font size, flex).
+ */
+export function pillButton(
+  className: string,
+  label: string,
+  title: string,
+  extra: Partial<CSSStyleDeclaration> = {},
+): HTMLButtonElement {
+  const btn = styled('button', className, {
+    marginLeft: '8px', padding: '2px 7px', font: `600 11px ${FONT.ui}`,
+    color: '#fff', background: 'rgba(255,255,255,0.14)',
+    border: 'none', borderRadius: '4px', cursor: 'pointer',
+    ...extra,
+  });
+  btn.type = 'button';
+  btn.textContent = label;
+  btn.title = title;
+  btn.addEventListener('mouseenter', () => (btn.style.background = 'rgba(255,255,255,0.28)'));
+  btn.addEventListener('mouseleave', () => (btn.style.background = 'rgba(255,255,255,0.14)'));
+  return btn;
+}
+
 /** Populate a panel's footer with cancel + confirm buttons, and optionally a
  *  secondary (outline) button between them for a second action. */
 export function wirePanelButtons(

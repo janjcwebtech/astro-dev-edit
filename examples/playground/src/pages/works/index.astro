@@ -1,0 +1,37 @@
+---
+import Base from '../../layouts/Base.astro';
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+
+// The `works` collection exists to exercise Astro's `image()` schema helper:
+// its cover/thumbnail values are paths relative to each markdown file, and
+// resolve to ImageMetadata rather than a string — so they render through
+// <Image>, not a plain <img src>.
+const works = (await getCollection('works')).sort((a, b) => b.data.year - a.data.year);
+---
+<Base title="Work · Copydesk">
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Selected work</p>
+      <h1>Projects with real asset paths</h1>
+      <p class="lead" style="max-width:55ch;">
+        Every cover on this page comes from an <code>image()</code> schema field,
+        stored relative to its own markdown file. Open one and edit its cover to
+        exercise the relative-path picker.
+      </p>
+
+      <div class="grid grid-3" style="margin-top:2.5rem;">
+        {works.map((work) => (
+          <a class="article-card" href={`/works/${work.id}`}>
+            <Image src={work.data.thumbnail ?? work.data.cover} alt={work.data.title} width={480} height={270} />
+            <div class="body">
+              <p class="meta">{work.data.client} · {work.data.year}{work.data.published ? '' : ' · unpublished'}</p>
+              <h3>{work.data.title}</h3>
+              <p>{work.data.summary}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Base>

@@ -115,6 +115,48 @@ The `data-astro-source-*` channel is shared, so the breakage is not unique to us
 The **entry drawer / CMS panel** never depended on `data-astro-source-*`: it's
 driven by the integration's own `<meta>` page-source tag plus
 `content.config.ts` loaded through `ssrLoadModule` and zod-schema
-introspection — verified working on Astro 7.1.1 before the annotator existed,
+introspection. It opened and saved on Astro 7.1.1 before the annotator existed,
 which is how the break was isolated to the annotation channel in the first
 place.
+
+That verification was *shallower than it looked*, though: the drawer opened and
+wrote correctly, but every field was arriving from **value inference**, not the
+schema — see the second regime below. A panel that silently degrades is a panel
+that looks verified.
+
+## The second version regime: zod v3 vs v4
+
+Source annotation isn't the only thing that changed across the Astro majors.
+The entry editor's schema introspection reads zod internals, and **which zod it
+gets depends on the Astro major**:
+
+| Astro | `astro/zod` re-exports | Internals |
+| --- | --- | --- |
+| 5, 6 | zod v3 | `_def.typeName` (`'ZodString'`), enum `_def.values`, array `_def.type`, literal `_def.value`, `.describe()` → `_def.description` |
+| 7 | `zod/v4` (zod 4.x) | `_def.type` (`'string'`), enum `_def.entries`, array `_def.element`, literal `_def.values[0]`, `.describe()` → `z.globalRegistry` |
+
+Every accessor moved. Because the introspector is deliberately duck-typed — it
+never imports zod, avoiding a dual-instance hazard and a peer dependency — a
+renamed internal doesn't fail loudly; it reads `undefined` and the code takes
+its degrade path. On Astro 7 that meant `zodToFields` bailed at its first guard
+and **every** field fell back to inference (enums as text, `image()` as text,
+defaults invisible), while `shapeOf` bailing meant `validateChanges` returned no
+errors at all, so entry saves went unvalidated.
+
+`src/server/zod-adapt.ts` now holds one accessor table per major behind a single
+interface, chosen by probing the schema itself (`_def.typeName` → v3,
+`_def.type` → v4). Three v4 shapes are worth knowing about:
+
+- `.describe()` is only readable through the **`.description` getter**, and only
+  on the *unwrapped* schema — `image().optional()` carries it on the inner node.
+- `.transform()` compiles to `pipe{in, out}` where `out` is a `transform` node no
+  widget can render, so the v4 table follows **`in`**. v3's `ZodPipeline` still
+  follows `out`.
+- `.brand()` and `.refine()` no longer wrap at all (the kind stays `'string'`),
+  so v3's `ZodBranded`/`ZodEffects` cases are simply dead on v4.
+
+A future Astro that ships zod v5 will hit the same class of break. The
+containment is that `adapterFor` returns `null` for internals it doesn't
+recognize, so the panel degrades to inference rather than erroring — and that
+the tests exercise the real `astro/zod`, so a bump surfaces as a red suite
+rather than a silent downgrade.

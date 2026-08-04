@@ -20,4 +20,24 @@ const blog = defineCollection({
   }),
 });
 
-export const collections = { blog };
+// Second collection, deliberately schema-shaped differently from `blog`: it
+// uses a *function* schema so it receives Astro's `image()` helper. Those values
+// are paths relative to this file, not web URLs, and the integration has to
+// preview and write them in that shape — including through `.optional()`, which
+// is where the describe() marker hides one level down. `cover` also points into
+// a nested asset directory, so the relative maths gets more than one `../`.
+const works = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/works' }),
+  schema: ({ image }) =>
+    z.object({
+      title: z.string(),
+      summary: z.string(),
+      client: z.string().default('Self-directed'),
+      year: z.number(),
+      cover: image(),
+      thumbnail: image().optional(),
+      published: z.boolean().default(true),
+    }),
+});
+
+export const collections = { blog, works };

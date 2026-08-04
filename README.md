@@ -52,6 +52,32 @@ editor. The refusal notice's location line opens the same peek, so you can
 see *why* something refused without leaving the browser. The peek's footer
 has its own **Open in editor** jump-out.
 
+### Copy context for an AI assistant
+
+Next to `open ↗` the pill has a **`copy ⧉`** button. It puts everything the
+overlay knows about that element on your clipboard as one markdown block,
+shaped for pasting into an assistant along with what you want changed:
+
+- the element's **source location**, repo-relative (`src/pages/index.astro:12:3`),
+  its **editability verdict** with the reason, the **page URL**, its **DOM
+  path**, and the page's **content entry** when it declares one;
+- the **rendered HTML** of the element (the overlay's own nodes stripped out);
+- the **source lines** around it — 30 either side, with `>` marking the
+  element's own line — read through the same `/peek` endpoint the source peek
+  uses. A location the server won't serve (an `astro:assets` `<Image>`, say)
+  says so here instead, and the rest is still copied;
+- **the CSS rules that apply to it**, with the stylesheet each came from —
+  read from the browser, so only rules matching *this* element are listed, not
+  ones it inherits from an ancestor;
+- a one-line summary of its **rendered box and type** (display, size, font,
+  colors).
+
+The copy is capped — 4 000 characters of HTML and 40 rules — and says in the
+payload when a cap applied, so nothing is silently left out. If your browser
+refuses clipboard access (reaching the dev server over a network address is not
+a secure context, so the API is simply absent) the text opens in a panel,
+preselected, to copy by hand.
+
 ### CSS inspector
 
 The pill also lists the element's **classes and ID** as chips (turn this off
@@ -127,6 +153,7 @@ textEdit({
   enabled: true,                          // kill switch
   assetDirs: ['src/assets', 'public'],    // scanned for swappable images
   uploadDir: 'public',                    // where new uploads are written
+  imageUploadDir: 'src/assets',           // fallback for image() field uploads
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],        // writes confined to these
   openInEditor: true,                     // expose "Open source" / jump-to-file
@@ -141,6 +168,7 @@ textEdit({
 | `enabled` | `true` | `false` disables the integration entirely. |
 | `assetDirs` | `['src/assets', 'public']` | Dirs scanned for the swap panel's replacement-image list. |
 | `uploadDir` | `'public'` | Where new uploads are written. Must be under `public/` — files here become a plain `<img src>`, so a `src/`-relative dir works in dev but 404s in a production build (a preflight warning fires if it isn't web-servable). |
+| `imageUploadDir` | `'src/assets'` | Fallback for uploads backing an [`image()` schema field](#image-fields-are-relative-to-the-entry-file). The mirror-image rule: these assets are *imported* by Astro, so they must be under `src/` — `public/` files can't be imported (a preflight warning fires if it isn't). Only used when the field is empty; otherwise the upload lands in the field's existing asset directory. |
 | `editableExtensions` | `['.astro', '.md', '.mdx']` | Extensions the patcher is allowed to write. |
 | `contentRoots` | `['src', 'public']` | Writes are confined to these (resolved, symlinks included). |
 | `openInEditor` | `true` | Expose the "Open source" / jump-to-file behaviour. |
@@ -177,9 +205,10 @@ like a CMS would:
   `content.config.ts` zod schema** (loaded through the dev server, always
   fresh). `z.string()` → text, `z.coerce.date()`/`z.date()` → native date
   picker, `z.number()` → number, `z.boolean()` → checkbox, `z.enum` → select,
-  `z.array(z.string())` → tags, and so on. No schema resolvable? Field types
-  are inferred from the entry's own values instead (a `YYYY-MM-DD` value infers
-  as a date) — the panel always works.
+  `z.array(z.string())` → tags, and so on. Both zod majors are read: v3 (Astro
+  5/6) and v4 (Astro 7, whose `astro/zod` re-exports `zod/v4`). No schema
+  resolvable? Field types are inferred from the entry's own values instead (a
+  `YYYY-MM-DD` value infers as a date) — the panel always works.
 - **Markdown body in a WYSIWYG editor** — a white writing surface with a
   sticky formatting toolbar: bold / italic / strikethrough, heading levels
   (H1–H6 dropdown), bulleted and numbered lists, quote, code block, inline
@@ -233,9 +262,33 @@ textEdit({
 
 Widgets: `text`, `textarea`, `date`, `number`, `boolean`, `select`, `tags`,
 `image`, `json` (read-only). Fields whose zod shape the panel can't edit
-(nested objects, unions) render read-only as `json`. Schema functions using
-`image()` helpers are handled best-effort: the image field edits the path
-string; full `astro:assets` metadata is out of scope.
+(nested objects, unions) render read-only as `json` — including an `image()`
+nested inside an object, which is a known gap.
+
+#### `image()` fields are relative to the entry file
+
+A field declared with Astro's `image()` helper doesn't hold a web URL — it holds
+a path relative to the markdown file it sits in (`../../assets/blog/hero.png`),
+which Astro imports at build time. The drawer detects these from your schema and
+treats them accordingly:
+
+- the **preview** resolves the relative value to the path the dev server serves,
+  so it renders (a hint under the input names the file it's relative to)
+- **Browse…** lists only the importable assets under `src/`, opening scoped to
+  the field's own asset directory with a text filter and a "Show all" toggle
+- **picking** writes the value back relative to the entry, never as a web path
+- **uploads** land in the field's existing asset directory, falling back to
+  `imageUploadDir`
+
+Animated GIFs are refused for these fields: Astro optimises `image()` assets,
+which flattens the animation. Keep those in `public/` and reference them from a
+plain `<img src>` instead.
+
+Fields whose values genuinely *are* web paths — a plain `z.string()`, or any
+field forced to the `image` widget via config — keep the original behaviour:
+`public/` assets, web-shaped values. The two sets never mix. Full
+`astro:assets` metadata (width/height/format) remains out of scope; the field
+edits the path.
 
 ### The page-source meta tag
 
@@ -288,7 +341,8 @@ Every overlay element carries a stable class, and the singletons carry IDs:
 `#atx-toggle-hint` (the "hold … to navigate" note under the buttons),
 `#atx-outline` (hover highlight),
 `#atx-tooltip` (the file:loc pill — its label opens the source peek, the
-"open ↗" button jumps to the source in your editor; inside it, `atx-tooltip-row`
+"open ↗" button jumps to the source in your editor and `atx-tooltip-copy`
+copies the element's context; inside it, `atx-tooltip-row`
 is the loc/verdict line, with `atx-tooltip-loc` holding
 the location and `atx-tooltip-verdict` the fixed-width verdict slot, and
 `atx-tooltip-chips` / `atx-tooltip-chip` the CSS-inspector class/ID chips row;
@@ -301,13 +355,16 @@ with `atx-tree-chevron`, `-tag`, `-preview`, `-loc` inside it, `atx-tree-empty`,
 and `atx-tree-selection` (the locked-selection outline) — plus
 classes like `atx-panel`,
 `atx-panel-body`, `atx-btn atx-btn-primary|secondary|cancel`, `atx-toast`,
-`atx-backdrop`, `atx-drop`, `atx-asset-row`, `atx-drawer`, the rich body
+`atx-backdrop`, `atx-drop`, `atx-drawer`, the asset picker's `atx-asset-row`
+plus `atx-asset-controls` (filter + scope row), `atx-asset-filter`,
+`atx-asset-scope` (the "Show all" toggle) and `atx-asset-count`, the rich body
 editor's `atx-rte`, `atx-rte-head` (sticky toolbar + image panel),
 `atx-rte-toolbar`, `atx-rte-btn`, `atx-rte-content`, `atx-rte-image-panel`,
-the image field's `atx-image-field-preview|thumb|empty|path`, and the source
+the image field's `atx-image-field-preview|thumb|empty|path|hint`, the source
 peek's `atx-peek-code` (scroll container), `atx-peek-line` / `atx-peek-focus`
 (rows), `atx-peek-gutter`, `atx-peek-text`, and `atx-peek-more` (the
-"⋯ N more lines" markers).
+"⋯ N more lines" markers), and the clipboard-fallback panel's `atx-copy-note`
+and `atx-copy-text`.
 
 One exception to the inline-styles rule: the rich editor's *content* elements
 (headings, lists, quotes… that you create while typing) are styled by a small

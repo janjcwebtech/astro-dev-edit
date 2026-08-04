@@ -1,3 +1,4 @@
+import { entryAssetDir, entryRelativeToWeb, webToEntryRelative } from '../../shared/asset-path.ts';
 import * as api from '../api.ts';
 import { COLOR, FONT, INPUT_STYLE, basename, isolateScroll, styled, toast } from '../ui.ts';
 
@@ -7,18 +8,37 @@ import { COLOR, FONT, INPUT_STYLE, basename, isolateScroll, styled, toast } from
  * entry panel's compact form control (preview + path input + collapsible
  * picker). The image swap panel (editors/image.ts) consumes the same
  * `buildAssetPicker` primitive, so the upload/list wiring lives in one place.
+ *
+ * Two path universes meet here. By default a pick is a **web-servable path**
+ * (`/images/hero.png`) — the shape a plain `<img src>` needs. With
+ * `assetRef: 'relative'` the picker instead deals in importable `src/` assets,
+ * because the caller is editing a field backed by Astro's `image()` helper whose
+ * values are relative to the entry file (see shared/asset-path.ts). The two sets
+ * are disjoint, so a field can never be handed a path of the wrong shape.
  */
 
 export interface AssetPickerOptions {
   /** Called when the user uploads a file or clicks an existing asset. The
    *  caller decides what a pick means — set a form value, or live-swap the
-   *  page image and commit. */
+   *  page image and commit. Always a web path; converting is the caller's job. */
   onPick: (webPath: string, origin: 'upload' | 'existing') => void;
   /** Rows matching this predicate are highlighted as the current selection,
    *  evaluated whenever the list (re)builds. */
   isCurrent?: (webPath: string) => boolean;
   /** Optional caption shown between the drop zone and the asset list. */
   listLabel?: string;
+  /**
+   * `'relative'` lists only importable `src/` assets and marks uploads as
+   * backing an `image()` field. Omitted (the default) lists only web-servable
+   * assets — files under `/src/` are served in dev but absent from a production
+   * build, so offering them would produce edits that break once deployed.
+   */
+  assetRef?: 'relative';
+  /** Root-relative directory the list opens scoped to, with a toggle to widen
+   *  to everything. Re-read on each render, so it follows the field's value. */
+  scopeDir?: () => string | undefined;
+  /** Root-relative directory uploads are written into. Re-read at upload time. */
+  uploadTargetDir?: () => string | undefined;
 }
 
 export interface AssetPickerHandle {
@@ -29,13 +49,17 @@ export interface AssetPickerHandle {
   loadList(): void;
 }
 
+const DROP_IDLE = 'Drop an image here, or click to choose a file';
+
 /**
  * Upload drop-zone + existing-asset browser: reads a dropped/chosen file,
- * uploads it, and lists the project's swap-candidate images with thumbnails.
- * Pure DOM + I/O; success routing is the caller's via `onPick`. Error toasts
- * (bad file, failed upload, failed listing with Retry) are handled here.
+ * uploads it, and lists the project's swap-candidate images with thumbnails,
+ * narrowed by a text filter and (optionally) scoped to one directory. Pure DOM
+ * + I/O; success routing is the caller's via `onPick`. Error toasts (bad file,
+ * failed upload, failed listing with Retry) are handled here.
  */
 export function buildAssetPicker(opts: AssetPickerOptions): AssetPickerHandle {
+  const relative = opts.assetRef === 'relative';
   const el = styled('div', 'atx-asset-picker', { display: 'grid', gap: '8px' });
 
   const drop = styled('label', 'atx-drop', {
@@ -43,12 +67,23 @@ export function buildAssetPicker(opts: AssetPickerOptions): AssetPickerHandle {
     border: '2px dashed #444', borderRadius: '8px', color: '#aaa', cursor: 'pointer',
     font: '13px system-ui', background: '#141420', transition: 'border-color 120ms, background 120ms',
   });
-  drop.textContent = 'Drop an image here, or click to choose a file';
   const fileInput = styled('input', 'atx-file-input', { display: 'none' });
   fileInput.type = 'file';
   fileInput.accept = 'image/*';
   drop.append(fileInput);
   el.append(drop);
+
+  /** Naming the destination matters most in relative mode, where uploads follow
+   *  the field's own asset directory rather than one fixed configured dir. */
+  const dropIdle = (): string => {
+    const dir = opts.uploadTargetDir?.();
+    return dir ? `${DROP_IDLE} — saves to ${dir}` : DROP_IDLE;
+  };
+  const resetDrop = (): void => {
+    drop.textContent = dropIdle();
+    drop.append(fileInput);
+  };
+  resetDrop();
 
   if (opts.listLabel) {
     const label = styled('div', 'atx-assets-label', { font: '600 12px system-ui', opacity: '0.8' });
@@ -56,13 +91,39 @@ export function buildAssetPicker(opts: AssetPickerOptions): AssetPickerHandle {
     el.append(label);
   }
 
+  // Filter + scope controls. A real project can have hundreds of listable
+  // assets, which is unusable as a flat list.
+  const controls = styled('div', 'atx-asset-controls', {
+    display: 'flex', alignItems: 'center', gap: '6px',
+  });
+  const filterInput = styled('input', 'atx-asset-filter', {
+    ...INPUT_STYLE, flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
+  });
+  filterInput.type = 'search';
+  filterInput.placeholder = 'Filter…';
+  const scopeToggle = styled('button', 'atx-btn atx-asset-scope', {
+    flex: '0 0 auto', display: 'none', padding: '6px 10px', borderRadius: '6px',
+    border: '1px solid #555', background: 'transparent', color: '#ccc',
+    cursor: 'pointer', font: '600 12px system-ui', whiteSpace: 'nowrap',
+  });
+  scopeToggle.type = 'button';
+  controls.append(filterInput, scopeToggle);
+  el.append(controls);
+
+  const count = styled('div', 'atx-asset-count', {
+    font: `11px ${FONT.mono}`, opacity: '0.6',
+  });
+  el.append(count);
+
   const list = styled('div', 'atx-asset-list', {
     maxHeight: '200px', overflowY: 'auto', display: 'grid', gap: '4px',
   });
   isolateScroll(list);
   el.append(list);
 
-  const DROP_IDLE = 'Drop an image here, or click to choose a file';
+  /** Everything the server listed that suits this picker's mode. */
+  let available: string[] = [];
+  let showAll = false;
 
   // Read the file, POST it, then hand the returned web path to onPick.
   const handleFile = async (file: File): Promise<void> => {
@@ -78,12 +139,18 @@ export function buildAssetPicker(opts: AssetPickerOptions): AssetPickerHandle {
         fr.onerror = () => reject(fr.error);
         fr.readAsDataURL(file);
       });
-      const { webPath } = await api.upload({ dataUrl, filename: file.name });
+      const targetDir = opts.uploadTargetDir?.();
+      const { webPath } = await api.upload({
+        dataUrl,
+        filename: file.name,
+        ...(relative ? { assetRef: 'relative' as const } : {}),
+        ...(targetDir ? { targetDir } : {}),
+      });
       opts.onPick(webPath, 'upload');
     } catch (err) {
       toast(`Upload failed — ${err instanceof Error ? err.message : 'unknown error'}`, 'err');
     } finally {
-      drop.textContent = DROP_IDLE;
+      resetDrop();
     }
   };
 
@@ -106,35 +173,36 @@ export function buildAssetPicker(opts: AssetPickerOptions): AssetPickerHandle {
     if (file) void handleFile(file);
   });
 
-  // Load the existing-images list, surfacing the real error and offering retry.
-  const loadList = async (): Promise<void> => {
-    list.textContent = 'Loading…';
-    let files: string[];
-    try {
-      // A plain <img src> must reference a path that exists in the built site.
-      // Files under /src/ are only served by the dev server — offering them
-      // here would produce edits that break in production.
-      files = (await api.getAssets()).filter((f) => !f.startsWith('/src/'));
-    } catch (err) {
-      list.textContent = '';
-      const msg = styled('div', 'atx-assets-error', {
-        color: COLOR.warn, font: '12px system-ui', marginBottom: '8px',
-      });
-      msg.textContent = `Could not load image list: ${err instanceof Error ? err.message : 'unknown error'}`;
-      const retry = styled('button', 'atx-btn atx-btn-retry', {
-        padding: '5px 12px', borderRadius: '6px', border: '1px solid #555',
-        background: 'transparent', color: '#ccc', cursor: 'pointer', font: '600 12px system-ui',
-      });
-      retry.type = 'button';
-      retry.textContent = 'Retry';
-      retry.addEventListener('click', () => void loadList());
-      list.append(msg, retry);
-      return;
+  /** Build the rows for the current filter + scope over `available`. */
+  const render = (): void => {
+    resetDrop();
+    const scope = opts.scopeDir?.();
+    const scoped = scope && !showAll
+      ? available.filter((f) => f.startsWith('/' + scope + '/'))
+      : available;
+    // An empty scope would look like "no assets" — widen rather than mislead.
+    const base = scope && !showAll && scoped.length === 0 ? available : scoped;
+    const needle = filterInput.value.trim().toLowerCase();
+    const files = needle ? base.filter((f) => f.toLowerCase().includes(needle)) : base;
+
+    if (scope) {
+      scopeToggle.style.display = '';
+      scopeToggle.textContent = showAll ? 'This folder' : 'Show all';
+      scopeToggle.title = showAll
+        ? `Show only ${scope}`
+        : `Showing ${scope} — click to list every asset`;
     }
+    count.textContent = available.length
+      ? `${files.length} of ${available.length}${scope && !showAll ? ` · ${scope}` : ''}`
+      : '';
 
     list.textContent = '';
     if (!files.length) {
-      list.textContent = 'No images found in asset directories.';
+      list.textContent = available.length
+        ? 'No images match.'
+        : relative
+          ? 'No importable images found under src/.'
+          : 'No images found in asset directories.';
       return;
     }
     for (const file of files) {
@@ -186,7 +254,59 @@ export function buildAssetPicker(opts: AssetPickerOptions): AssetPickerHandle {
     }
   };
 
+  filterInput.addEventListener('input', render);
+  scopeToggle.addEventListener('click', () => {
+    showAll = !showAll;
+    render();
+  });
+
+  // Load the existing-images list, surfacing the real error and offering retry.
+  const loadList = async (): Promise<void> => {
+    list.textContent = 'Loading…';
+    let files: string[];
+    try {
+      files = await api.getAssets();
+    } catch (err) {
+      list.textContent = '';
+      count.textContent = '';
+      const msg = styled('div', 'atx-assets-error', {
+        color: COLOR.warn, font: '12px system-ui', marginBottom: '8px',
+      });
+      msg.textContent = `Could not load image list: ${err instanceof Error ? err.message : 'unknown error'}`;
+      const retry = styled('button', 'atx-btn atx-btn-retry', {
+        padding: '5px 12px', borderRadius: '6px', border: '1px solid #555',
+        background: 'transparent', color: '#ccc', cursor: 'pointer', font: '600 12px system-ui',
+      });
+      retry.type = 'button';
+      retry.textContent = 'Retry';
+      retry.addEventListener('click', () => void loadList());
+      list.append(msg, retry);
+      return;
+    }
+    // The two modes take disjoint halves of the listing. A plain `<img src>`
+    // must reference a path that exists in the built site, so `/src/` files are
+    // excluded; an image() field is the exact inverse — only `src/` assets can
+    // be imported, and a public/ file would fail the collection's schema.
+    available = files.filter((f) => f.startsWith('/src/') === relative);
+    render();
+  };
+
   return { el, loadList: () => void loadList() };
+}
+
+export interface ImageFieldOptions {
+  /** The field's current stored value (a web path, or entry-relative). */
+  initial: string;
+  /** Called with the new stored value on every change. */
+  onChange: (value: string) => void;
+  /**
+   * Set for a field backed by Astro's `image()` helper: values are paths
+   * relative to `entryFile`, so previews resolve through it and picks are
+   * converted back into that shape.
+   */
+  assetRef?: 'relative';
+  /** Repo-relative path of the entry being edited. Required for relative mode. */
+  entryFile?: string;
 }
 
 /**
@@ -194,12 +314,19 @@ export function buildAssetPicker(opts: AssetPickerOptions): AssetPickerHandle {
  * path input, and a collapsible asset picker (upload / browse). Delegates the
  * upload + existing-asset wiring to `buildAssetPicker`; keeps its own thumbnail
  * preview and text path input on top.
+ *
+ * In relative mode this control is the *only* place that converts between the
+ * stored entry-relative value and the web path the browser and picker speak.
  */
-export function buildImageField(
-  initial: string,
-  onChange: (webPath: string) => void,
-): HTMLElement {
+export function buildImageField(opts: ImageFieldOptions): HTMLElement {
+  const { initial, onChange } = opts;
+  const entryFile = opts.entryFile ?? '';
+  const relative = opts.assetRef === 'relative' && entryFile !== '';
   let value = initial;
+
+  /** The stored value as something an <img> can load. */
+  const previewSrc = (raw: string): string =>
+    relative ? (entryRelativeToWeb(entryFile, raw) ?? '') : raw;
 
   const wrap = styled('div', 'atx-image-field', { display: 'grid', gap: '8px' });
 
@@ -247,6 +374,15 @@ export function buildImageField(
   row.append(pathInput, browse);
   wrap.append(row);
 
+  // A relative value is meaningless without knowing what it is relative to.
+  if (relative) {
+    const hint = styled('div', 'atx-image-field-hint', {
+      font: `11px ${FONT.mono}`, opacity: '0.6',
+    });
+    hint.textContent = `relative to ${entryFile}`;
+    wrap.append(hint);
+  }
+
   const showImage = (src: string): void => {
     if (src) {
       thumb.src = src;
@@ -259,16 +395,30 @@ export function buildImageField(
   const set = (next: string): void => {
     value = next;
     pathInput.value = next;
-    showImage(next);
+    showImage(previewSrc(next));
     onChange(next);
   };
 
   // Collapsible picker, holding the shared upload/browse UI.
   const picker = styled('div', 'atx-image-field-picker', { display: 'none' });
   const assets = buildAssetPicker({
-    isCurrent: (f) => f === value,
+    ...(relative ? { assetRef: 'relative' as const } : {}),
+    isCurrent: (f) => f === previewSrc(value),
+    // Open scoped to the directory this field's asset already lives in, and
+    // upload there too, so assets stay grouped the way the project groups them.
+    ...(relative
+      ? {
+          scopeDir: () => entryAssetDir(entryFile, value) ?? undefined,
+          uploadTargetDir: () => entryAssetDir(entryFile, value) ?? undefined,
+        }
+      : {}),
     onPick: (path, origin) => {
-      set(path);
+      const next = relative ? webToEntryRelative(entryFile, path) : path;
+      if (!next) {
+        toast('That image cannot back an image() field — it must live under src/.', 'err');
+        return;
+      }
+      set(next);
       if (origin === 'upload') toast(`Uploaded ${basename(path)}`, 'ok');
       else picker.style.display = 'none';
     },
@@ -280,7 +430,7 @@ export function buildImageField(
 
   pathInput.addEventListener('input', () => {
     value = pathInput.value;
-    showImage(value);
+    showImage(previewSrc(value));
     onChange(value);
   });
 
