@@ -101,8 +101,10 @@ describe('annotateAstroSource', () => {
     const img = await classifyAstro(src, injectedLoc(out, 'img'), 'img');
     expect(img.kind).toBe('image');
 
+    // {t} traces to the frontmatter const it renders, so it is editable by
+    // value; an expression with nowhere to trace to still refuses.
     const h3 = await classifyAstro(src, injectedLoc(out, 'h3'), 'h3');
-    expect(h3.kind).toBe('dynamic');
+    expect(h3.kind).toBe('expression');
   });
 
   it('round-trips: an injected loc drives a successful apply on the original source', async () => {

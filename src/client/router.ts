@@ -1,5 +1,6 @@
 import type { ClassifyResult, SourceLoc } from '../shared/protocol.ts';
 import * as api from './api.ts';
+import { beginExpressionEdit } from './editors/expression.ts';
 import { beginImageEdit } from './editors/image.ts';
 import { beginMarkupEdit } from './editors/markup.ts';
 import { showDynamicNotice } from './editors/notice.ts';
@@ -90,6 +91,8 @@ export function initRouter(deps: RouterDeps): RouterHandle {
       beginTextEdit(el, src);
     } else if (server.kind === 'markup' && server.markup) {
       beginMarkupEdit(el, src, server.markup.html);
+    } else if (server.kind === 'expression' && server.expression) {
+      beginExpressionEdit(el, src, server.expression);
     } else {
       showDynamicNotice(
         src,

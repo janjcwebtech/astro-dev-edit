@@ -322,7 +322,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
           throw new Error('ops must be a non-empty array');
         }
         for (const op of ops) {
-          if (!op || !['text', 'markup', 'src', 'alt'].includes(op.targetType)) {
+          if (!op || !['text', 'markup', 'expression', 'src', 'alt'].includes(op.targetType)) {
             throw new Error('bad targetType');
           }
           if (typeof op.original !== 'string' || typeof op.newText !== 'string') {

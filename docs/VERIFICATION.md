@@ -82,6 +82,7 @@ behaviour that no Astro 7 consumer executes.
 | --- | --- |
 | `classifyAstro` — text/markup/dynamic/empty/image classification, inline-safelist rules (block child, disallowed attr, expression attr, nested expression wins the reason), ambiguity refusal, unresolved locs, tag mismatch | `tests/patcher-classify.test.ts` |
 | `applyAstro` text — replace, whitespace frame, entity decoding (incl. typographic entities; unknown ones still refuse), escaping `<`/`{`/`&`, whitespace-insensitive verify, mismatch/dynamic/unresolved/ambiguous refusals | `tests/patcher-apply-text.test.ts` |
+| `expression-trace.ts` + `applyAstro` expressions — plain const and `.map()` member access, the rendered text picking the right item, quote style kept and quotes escaped, refusals for no-match/duplicate-text/imported array/computed/shadowed param/`.filter()` chain/interpolated template, and neither a matching string outside the array nor a same-named nested key confusing the match | `tests/patcher-apply-expression.test.ts` |
 | `applyAstro` markup — inner-source replacement, plain text gaining its first inline tag, whitespace frame, entities left as typed, `{` neutralised, source-vs-source verify, refusals for non-safelisted tags/`<script>`/event handlers/`javascript:` hrefs/unbalanced and crossed tags, allowed link attributes, self-closing `<br />` | `tests/patcher-apply-markup.test.ts` |
 | `applyAstro` attributes — src/alt replacement, quote escaping, missing-alt insertion (incl. self-closing and expression-attr neighbors), never-insert-src, exact-match verify | `tests/patcher-apply-attrs.test.ts` |
 | `frontmatter.ts` — parse (fences, BOM, CRLF, invalid YAML), surgical apply (comments, key order, quoting, no re-wrap), serialize new entries, refusals | `tests/frontmatter.test.ts` |
@@ -174,7 +175,7 @@ whichever sections your change touches; run the whole list before a release.
       Save (or Cmd/Ctrl+Enter) → the file is written with the `<br>` intact and
       HMR refreshes. Escape / backdrop / Cancel discards. Typing a `<div>`, a
       `<script>`, an `onclick=` attribute or an unclosed `<strong>` → the save
-      is refused with the reason shown **inside the popup** (`atx-markup-error`),
+      is refused with the reason shown **inside the popup** (`atx-popup-error`),
       the popup still open and the typed markup intact, the bar reading "Save
       failed", and the file untouched — fixing the markup and saving again
       succeeds and closes the popup.
@@ -185,9 +186,17 @@ whichever sections your change touches; run the whole list before a release.
       inside the quotes. Clicking a tag never collapses the selection first, the
       exit button turns purple (dirty), and Cmd/Ctrl+Z undoes the insertion.
       Restore the fixture afterwards.
-- [ ] Clicking dynamic content (a resolved `{expression}`) opens the refusal
-      notice with a working "Open source" button — never a false edit; its
-      file:loc line opens the source peek.
+- [ ] **Value popup** (the home page's benefit cards, a `.map()` over
+      `const benefits`): click the *fourth* card's heading → a popup titled
+      `Value · benefits[].title` holding that card's text and **no tag palette**
+      (`{value}` renders escaped). Change it → Save → the **fourth** array item
+      is the one rewritten, the other five untouched, HMR refreshes. Repeat on a
+      card's `<p>` → `benefits[].body`. Temporarily give two items the same
+      title, click one → the save refuses inside the popup as ambiguous and the
+      file is untouched. Restore the fixture afterwards.
+- [ ] Clicking dynamic content that can't be traced (`{n + 1}`, an imported
+      array) opens the refusal notice with a working "Open source" button —
+      never a false edit; its file:loc line opens the source peek.
 - [ ] An element rendered by `astro:assets` `<Image>` reports "rendered by a
       package component" instead of logging a `classify failed` WARN, and
       clicking its file:loc label shows that sentence in the peek panel rather

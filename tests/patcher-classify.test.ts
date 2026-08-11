@@ -23,15 +23,40 @@ describe('classifyAstro', () => {
     expect(res.kind).toBe('text');
   });
 
-  it('classifies an expression child as dynamic with the frontmatter-field reason', async () => {
+  it('classifies an expression that traces to a frontmatter const as expression', async () => {
     const src = `---\nconst title = 'x';\n---\n<h1>{title}</h1>\n`;
     // The compiler reports an expression's start one char BEFORE the `{`, so
     // the annotation loc (start + 1) lands on the `{` itself.
     const res = await classifyAstro(src, locOf(src, '{title'), 'h1');
+    expect(res.kind).toBe('expression');
+    expect(res.expression).toEqual({ property: 'title', label: 'title' });
+  });
+
+  it('classifies an untraceable expression as dynamic with the frontmatter-field reason', async () => {
+    // Computed at render time — there is no string constant to edit.
+    const src = `---\nconst n = 2;\n---\n<h1>{n + 1}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{n + 1'), 'h1');
     expect(res.kind).toBe('dynamic');
     expect(res.reason).toBe(
       'This text comes from a template expression (e.g. a frontmatter field or a variable), so editing it here would change code, not copy.',
     );
+  });
+
+  it('classifies a mapped member access as expression, labelled with the array', async () => {
+    const src =
+      `---\nconst items = [{ title: 'One' }, { title: 'Two' }];\n---\n` +
+      `<ul>\n  {items.map((it) => (\n    <li>{it.title}</li>\n  ))}\n</ul>\n`;
+    const res = await classifyAstro(src, locOf(src, '{it.title'), 'li');
+    expect(res.kind).toBe('expression');
+    expect(res.expression).toEqual({ property: 'title', label: 'items[].title' });
+  });
+
+  it('refuses a mapped member access whose array is not in this frontmatter', async () => {
+    const src =
+      `---\nimport { items } from '../data.ts';\n---\n` +
+      `<ul>\n  {items.map((it) => (\n    <li>{it.title}</li>\n  ))}\n</ul>\n`;
+    const res = await classifyAstro(src, locOf(src, '{it.title'), 'li');
+    expect(res.kind).toBe('dynamic');
   });
 
   it('classifies safelisted inline markup as markup, carrying the inner source', async () => {

@@ -18,8 +18,9 @@ export interface SourceLoc {
 }
 
 /** What an edit targets: the element's text content, its inner source when
- *  that text carries inline markup, or an img attribute. */
-export type TargetType = 'text' | 'markup' | 'src' | 'alt';
+ *  that text carries inline markup, the frontmatter string an `{expression}`
+ *  renders, or an img attribute. */
+export type TargetType = 'text' | 'markup' | 'expression' | 'src' | 'alt';
 
 /** Whether an attribute can be patched: statically quoted, expression-driven,
  *  or absent from the source. */
@@ -28,6 +29,7 @@ export type AttrState = 'static' | 'dynamic' | 'missing';
 export type ClassifyKind =
   | 'text' // children are exclusively literal text → editable inline
   | 'markup' // literal text plus safelisted inline tags → editable as raw source
+  | 'expression' // {expression} traced to a frontmatter string → editable by value
   | 'image' // an element whose src/alt attrs may be editable (see attrs)
   | 'empty' // no children; nothing to text-edit
   | 'dynamic' // expression / child elements / component content
@@ -153,6 +155,14 @@ export interface ClassifyResult {
    * the apply op's `original` keeps verify-then-patch comparing like with like.
    */
   markup?: { html: string };
+  /**
+   * For `expression` targets: which frontmatter string the text was traced to.
+   * `property` is the key holding it (`title`); `label` names the whole path
+   * for the editor's title (`benefits[].title`). No value is sent — for a
+   * `.map()` loop every card shares this classification, and which item is
+   * being edited is only settled by the text the client sends on apply.
+   */
+  expression?: { property: string; label: string };
 }
 
 // --- POST /apply -------------------------------------------------------------

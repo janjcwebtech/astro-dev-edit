@@ -1,6 +1,12 @@
 import { parse } from '@astrojs/compiler';
 import type { AttrState, ClassifyResult } from '../shared/protocol.ts';
 import type { ApplyResult, Patcher, PatchRequest } from './types.ts';
+import {
+  encodeLiteral,
+  hasCandidates,
+  locateValue,
+  traceExpression,
+} from './expression-trace.ts';
 
 /**
  * .astro source patcher — resolves a `data-astro-source-loc` back to the AST
@@ -27,7 +33,7 @@ interface Pos {
   line: number;
   column: number;
 }
-interface AstNode {
+export interface AstNode {
   type: string;
   name?: string;
   value?: string;
@@ -291,6 +297,35 @@ function collectElements(root: AstNode): AstNode[] {
   return out;
 }
 
+/** Child → parent for every node under `root`. The compiler's AST has no
+ *  upward links, and tracing `{b.title}` has to reach the `.map()` that bound
+ *  `b`. Built alongside the element sweep so resolution stays one pass. */
+function parentMap(root: AstNode): Map<AstNode, AstNode> {
+  const parents = new Map<AstNode, AstNode>();
+  const visit = (n: AstNode): void => {
+    for (const c of n.children ?? []) {
+      parents.set(c, n);
+      visit(c);
+    }
+  };
+  visit(root);
+  return parents;
+}
+
+/** The frontmatter body and where it starts in the source, or null when the
+ *  file has none. The node's own `offset` is byte-based and unusable here; the
+ *  body begins immediately after the opening `---`. */
+function frontmatterOf(
+  root: AstNode,
+  starts: number[],
+): { text: string; at: number } | null {
+  const node = (root.children ?? []).find((c) => c.type === 'frontmatter');
+  if (!node?.position || typeof node.value !== 'string') return null;
+  const at = indexOfPos(starts, node.position.start);
+  if (at < 0) return null;
+  return { text: node.value, at: at + 3 };
+}
+
 /** The loc Astro would annotate this element with (see header comment). */
 function annotationLoc(el: AstNode): Pos | null {
   const first = (el.children ?? []).find((c) => c.position);
@@ -305,6 +340,10 @@ function annotationLoc(el: AstNode): Pos | null {
 interface Resolution {
   status: 'ok' | 'ambiguous' | 'unresolved';
   element?: AstNode;
+  /** Present when resolution succeeded — the ancestor links and frontmatter
+   *  that expression tracing needs. */
+  parents?: Map<AstNode, AstNode>;
+  frontmatter?: { text: string; at: number } | null;
 }
 
 async function resolveElement(source: string, loc: string, tag: string): Promise<Resolution> {
@@ -320,8 +359,14 @@ async function resolveElement(source: string, loc: string, tag: string): Promise
     return cand !== null && cand.line === line && cand.column === column;
   });
 
-  if (hits.length === 1) return { status: 'ok', element: hits[0] };
-  return { status: hits.length ? 'ambiguous' : 'unresolved' };
+  if (hits.length !== 1) return { status: hits.length ? 'ambiguous' : 'unresolved' };
+  const root = ast as AstNode;
+  return {
+    status: 'ok',
+    element: hits[0],
+    parents: parentMap(root),
+    frontmatter: frontmatterOf(root, lineStartIndices(source)),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +392,12 @@ function innerSpan(starts: number[], el: AstNode): { from: number; to: number } 
   return { from, to };
 }
 
-function classifyResolved(el: AstNode, source: string, starts: number[]): ClassifyResult {
+function classifyResolved(
+  el: AstNode,
+  source: string,
+  starts: number[],
+  res?: Resolution,
+): ClassifyResult {
   const tag = (el.name ?? '').toLowerCase();
   const children = el.children ?? [];
 
@@ -363,6 +413,17 @@ function classifyResolved(el: AstNode, source: string, starts: number[]): Classi
     return { kind: 'empty', reason: 'This element has no text content in the source.' };
   }
   if (hasExpressionDeep(el)) {
+    // A `{title}` or a `{b.title}` inside a `.map()` still renders words that
+    // live in this file's frontmatter — traceable ones become editable through
+    // the value popup; everything else keeps the refusal.
+    const trace = res && traceExpression(el, res.parents!);
+    if (trace && res?.frontmatter && hasCandidates(res.frontmatter.text, trace)) {
+      return {
+        kind: 'expression',
+        reason: 'traced to a frontmatter string',
+        expression: { property: trace.property, label: trace.label },
+      };
+    }
     return {
       kind: 'dynamic',
       reason:
@@ -404,7 +465,7 @@ export async function classifyAstro(source: string, loc: string, tag: string): P
       reason: 'No element matches this source location — the file may have changed since the page loaded. Try reloading.',
     };
   }
-  return classifyResolved(res.element!, source, lineStartIndices(source));
+  return classifyResolved(res.element!, source, lineStartIndices(source), res);
 }
 
 // ---------------------------------------------------------------------------
@@ -618,6 +679,50 @@ function patchAttribute(
   return { ok: true, newSource: source.slice(0, span.from) + replacement + source.slice(span.to) };
 }
 
+/**
+ * Patch the frontmatter string an `{expression}` renders. The whole write is
+ * one string literal: the element's own markup is never touched, so a loop
+ * keeps rendering exactly as it did and only the words change.
+ *
+ * `original` is the text the page showed, and it is the *only* thing that says
+ * which item of a `.map()` was clicked — see `expression-trace.ts` on why the
+ * DOM index is not used. It therefore doubles as the verify step: no item still
+ * reading that way means the file moved on, and nothing is written.
+ */
+function patchExpression(
+  source: string,
+  el: AstNode,
+  res: Resolution,
+  original: string,
+  newText: string,
+): ApplyResult {
+  const trace = traceExpression(el, res.parents!);
+  if (!trace || !res.frontmatter) {
+    return {
+      ok: false,
+      code: 'dynamic',
+      error: 'This text can’t be traced back to a string in the frontmatter, so it must be edited in the source.',
+    };
+  }
+
+  const { text: frontmatter, at } = res.frontmatter;
+  const found = locateValue(frontmatter, trace, original);
+  if (!found.ok) {
+    return {
+      ok: false,
+      code: found.code === 'untraceable' ? 'dynamic' : found.code,
+      error: found.error,
+    };
+  }
+
+  const { from, to, quote } = found.span;
+  const replacement = quote + encodeLiteral(newText.trim(), quote) + quote;
+  return {
+    ok: true,
+    newSource: source.slice(0, at + from) + replacement + source.slice(at + to),
+  };
+}
+
 export async function applyAstro(source: string, req: PatchRequest): Promise<ApplyResult> {
   const res = await resolveElement(source, req.loc, req.tag);
   if (res.status === 'ambiguous') {
@@ -638,6 +743,9 @@ export async function applyAstro(source: string, req: PatchRequest): Promise<App
   }
   if (req.targetType === 'markup') {
     return patchMarkupContent(source, starts, el, req.original, req.newText);
+  }
+  if (req.targetType === 'expression') {
+    return patchExpression(source, el, res, req.original, req.newText);
   }
   return patchAttribute(source, starts, el, req.targetType, req.original, req.newText);
 }

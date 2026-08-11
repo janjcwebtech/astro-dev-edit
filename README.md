@@ -32,6 +32,20 @@ https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
   selected it wraps the selection (and keeps it selected, so tags stack),
   otherwise it drops an empty pair at the caret. `<br>` inserts alone, and
   `<a>` arrives as `<a href="">` with the caret already inside the quotes.
+- **Text rendered through an `{expression}`** — a frontmatter const
+  (`<h1>{title}</h1>`), or one item of an array a `.map()` loops over
+  (`{benefits.map((b) => <h3>{b.title}</h3>)}`). Clicking opens a **value
+  popup** titled with where the string lives (`benefits[].title`), and the edit
+  is written to that string in the frontmatter — the template itself is never
+  touched. Plain text only: `{value}` renders escaped, so tags typed here would
+  show as punctuation rather than markup.
+
+  Every card in a loop shares one source location, so **which item you clicked
+  is identified by the text on the page**: the item whose value equals what you
+  saw is the one patched. Two items reading exactly the same way refuse rather
+  than guess, as do computed expressions (`{n + 1}`), template literals with
+  `${…}` in them, `.filter().map()` chains, nested access (`{b.meta.label}`),
+  and arrays imported from another file.
 - **Images in `.astro`** — swap a static `src` from the project's images (with
   thumbnails) or upload a new file, and edit `alt`. Only statically-quoted
   attributes are editable; `src={…}` / `<Image>` are treated as dynamic.
@@ -40,8 +54,8 @@ https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
   form fields (generated from your own zod schema) plus the markdown body, and
   can create or delete entries. See [Entry editor](#entry-editor-cms-panel-for-content-collections).
 - Everything else **refuses safely** with a reason and an "Open source" jump to
-  the editor. Expression-driven text (`{title}`), loop-generated content,
-  components, `set:html`, and block-level nested markup all fall here — on
+  the editor. Expressions that can't be traced to a string, components,
+  `set:html`, and block-level nested markup all fall here — on
   detail pages the refusal notice offers "Edit page content", which opens the
   entry drawer.
 - **Package-rendered elements** refuse the same quiet way. Astro's
@@ -424,9 +438,10 @@ classes like `atx-panel`,
 `atx-backdrop`, `atx-drop`, `atx-drawer`, the asset picker's `atx-asset-row`
 plus `atx-asset-controls` (filter + scope row), `atx-asset-filter`,
 `atx-asset-scope` (the "Show all" toggle) and `atx-asset-count`, the rich body
-editor's `atx-rte`, the markup popup's `atx-markup-label` /
-`atx-markup-input` / `atx-markup-tags` (the palette row) / `atx-markup-hint` /
-`atx-markup-tag` (one per insertable tag) / `atx-markup-error`, `atx-rte-head` (sticky toolbar + image panel),
+editor's `atx-rte`, the source popups' shared `atx-popup-label` /
+`atx-popup-input` / `atx-popup-error` plus the markup palette's
+`atx-markup-tags` (the row) / `atx-markup-hint` / `atx-markup-tag` (one per
+insertable tag), `atx-rte-head` (sticky toolbar + image panel),
 `atx-rte-toolbar`, `atx-rte-btn`, `atx-rte-content`, `atx-rte-image-panel`,
 the image field's `atx-image-field-preview|thumb|empty|path|hint`, the source
 peek's `atx-peek-code` (scroll container), `atx-peek-line` / `atx-peek-focus`
@@ -484,9 +499,10 @@ your overrides need `!important`:
   lets tags through, but only the inline safelist above, only with
   presentational attributes, and only well-nested — `{` is still neutralised
   there, so no edit of any kind can introduce an expression.
-- **No in-place (click-on-the-page) editing of expression-driven text.** On
-  detail pages those clicks route to the entry drawer; elsewhere they refuse
-  with "Open source" as the escape hatch.
+- **Expression-driven text is edited in a popup, not in place**, and only when
+  it traces to a plain string in the same file's frontmatter (see above).
+  Anything else still refuses; on detail pages those clicks route to the entry
+  drawer, elsewhere to "Open source".
 - **The rich body editor covers a markdown subset** — headings, emphasis,
   lists, quotes, code, links, images, hr. Anything beyond it (tables, raw
   HTML/MDX, footnotes, nested lists) is still editable, but as markdown
