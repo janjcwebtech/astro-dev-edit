@@ -18,6 +18,19 @@ https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
 
 - **Literal text in `.astro` templates** — an element whose children are only
   plain text. Click → inline edit → Enter/blur to save, Esc to cancel.
+- **Literal text carrying inline markup** — a heading broken by a `<br>`, a
+  sentence with a `<strong>` or a link in it. Inline editing can't serve these
+  (it escapes `<`, which would turn the tag into visible punctuation), so a
+  click opens a **markup popup** showing the element's source instead. Save
+  with the button or Cmd/Ctrl+Enter. Only these inline tags are allowed —
+  `<a> <b> <br> <code> <em> <i> <small> <span> <strong> <sub> <sup> <u>` — with
+  presentational attributes (`class`, `id`, `title`, `lang`, `dir`, plus
+  `href`/`target`/`rel` on links); attributes already in your source are kept
+  as they are. Anything else, including unbalanced tags, is refused rather
+  than written. Each allowed tag is a **button** under the box: with text
+  selected it wraps the selection (and keeps it selected, so tags stack),
+  otherwise it drops an empty pair at the caret. `<br>` inserts alone, and
+  `<a>` arrives as `<a href="">` with the caret already inside the quotes.
 - **Images in `.astro`** — swap a static `src` from the project's images (with
   thumbnails) or upload a new file, and edit `alt`. Only statically-quoted
   attributes are editable; `src={…}` / `<Image>` are treated as dynamic.
@@ -27,8 +40,9 @@ https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
   can create or delete entries. See [Entry editor](#entry-editor-cms-panel-for-content-collections).
 - Everything else **refuses safely** with a reason and an "Open source" jump to
   the editor. Expression-driven text (`{title}`), loop-generated content,
-  components, `set:html`, and nested markup all fall here — on detail pages the
-  refusal notice offers "Edit page content", which opens the entry drawer.
+  components, `set:html`, and block-level nested markup all fall here — on
+  detail pages the refusal notice offers "Edit page content", which opens the
+  entry drawer.
 - **Package-rendered elements** refuse the same quiet way. Astro's
   `astro:assets` `<Image>` renders through
   `node_modules/astro/components/Image.astro`, and that is the path its source
@@ -409,7 +423,9 @@ classes like `atx-panel`,
 `atx-backdrop`, `atx-drop`, `atx-drawer`, the asset picker's `atx-asset-row`
 plus `atx-asset-controls` (filter + scope row), `atx-asset-filter`,
 `atx-asset-scope` (the "Show all" toggle) and `atx-asset-count`, the rich body
-editor's `atx-rte`, `atx-rte-head` (sticky toolbar + image panel),
+editor's `atx-rte`, the markup popup's `atx-markup-label` /
+`atx-markup-input` / `atx-markup-tags` (the palette row) / `atx-markup-hint` /
+`atx-markup-tag` (one per insertable tag), `atx-rte-head` (sticky toolbar + image panel),
 `atx-rte-toolbar`, `atx-rte-btn`, `atx-rte-content`, `atx-rte-image-panel`,
 the image field's `atx-image-field-preview|thumb|empty|path|hint`, the source
 peek's `atx-peek-code` (scroll container), `atx-peek-line` / `atx-peek-focus`
@@ -462,8 +478,11 @@ your overrides need `!important`:
   returns raw file content to the browser, and it only serves files that are
   already editable (inside `contentRoots`, allowed extension) — the same gate
   as every other route.
-- **Content, never structure.** Inserted text is escaped so it can't introduce a
-  tag, an expression, or an entity — edits change words, never behaviour.
+- **Content, never structure.** Inline-edited text is escaped so it can't
+  introduce a tag, an expression, or an entity. The markup popup deliberately
+  lets tags through, but only the inline safelist above, only with
+  presentational attributes, and only well-nested — `{` is still neutralised
+  there, so no edit of any kind can introduce an expression.
 - **No in-place (click-on-the-page) editing of expression-driven text.** On
   detail pages those clicks route to the entry drawer; elsewhere they refuse
   with "Open source" as the escape hatch.

@@ -34,14 +34,54 @@ describe('classifyAstro', () => {
     );
   });
 
-  it('classifies nested markup as dynamic', async () => {
+  it('classifies safelisted inline markup as markup, carrying the inner source', async () => {
     const src = `<p><strong>bold</strong> rest</p>\n`;
     // first child is the <strong> element → its start + 1 (the tag name)
     const res = await classifyAstro(src, locOf(src, 'strong>bold'), 'p');
+    expect(res.kind).toBe('markup');
+    expect(res.markup).toEqual({ html: '<strong>bold</strong> rest' });
+  });
+
+  it('classifies text broken by a <br> as markup', async () => {
+    const src = `<h2>The page is the best<br>editor for the page</h2>\n`;
+    const res = await classifyAstro(src, locOf(src, 'The page'), 'h2');
+    expect(res.kind).toBe('markup');
+    expect(res.markup).toEqual({ html: 'The page is the best<br>editor for the page' });
+  });
+
+  it('trims the region but keeps the inner source verbatim across lines', async () => {
+    const src = `<p>\n  one <em>two</em>\n  three\n</p>\n`;
+    const res = await classifyAstro(src, locOf(src, '\n  one'), 'p');
+    expect(res.kind).toBe('markup');
+    expect(res.markup?.html).toBe('one <em>two</em>\n  three');
+  });
+
+  it('classifies a block-level child as dynamic (not inline-safe)', async () => {
+    const src = `<div><p>para</p> rest</div>\n`;
+    const res = await classifyAstro(src, locOf(src, 'p>para'), 'div');
     expect(res.kind).toBe('dynamic');
     expect(res.reason).toBe(
       'This element contains nested markup, so its text cannot be edited as one block.',
     );
+  });
+
+  it('classifies an inline tag with a disallowed attribute as dynamic', async () => {
+    const src = `<p><span onclick="go()">x</span> rest</p>\n`;
+    const res = await classifyAstro(src, locOf(src, 'span onclick'), 'p');
+    expect(res.kind).toBe('dynamic');
+  });
+
+  it('classifies an inline tag with an expression attribute as dynamic', async () => {
+    const src = `---\nconst u = '/x';\n---\n<p><a href={u}>x</a> rest</p>\n`;
+    const res = await classifyAstro(src, locOf(src, 'a href={u}'), 'p');
+    expect(res.kind).toBe('dynamic');
+  });
+
+  it('prefers the expression reason when a nested inline tag holds an expression', async () => {
+    const src = `---\nconst x = 'y';\n---\n<p><strong>{x}</strong> rest</p>\n`;
+    const res = await classifyAstro(src, locOf(src, 'strong>{x}'), 'p');
+    expect(res.kind).toBe('dynamic');
+    expect(res.reason).toContain('template expression');
   });
 
   it('classifies a childless element as empty', async () => {

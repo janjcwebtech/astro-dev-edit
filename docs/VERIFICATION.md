@@ -80,8 +80,9 @@ behaviour that no Astro 7 consumer executes.
 
 | Functionality | Test file |
 | --- | --- |
-| `classifyAstro` — text/dynamic/empty/image classification, ambiguity refusal, unresolved locs, tag mismatch | `tests/patcher-classify.test.ts` |
+| `classifyAstro` — text/markup/dynamic/empty/image classification, inline-safelist rules (block child, disallowed attr, expression attr, nested expression wins the reason), ambiguity refusal, unresolved locs, tag mismatch | `tests/patcher-classify.test.ts` |
 | `applyAstro` text — replace, whitespace frame, entity decoding (incl. typographic entities; unknown ones still refuse), escaping `<`/`{`/`&`, whitespace-insensitive verify, mismatch/dynamic/unresolved/ambiguous refusals | `tests/patcher-apply-text.test.ts` |
+| `applyAstro` markup — inner-source replacement, plain text gaining its first inline tag, whitespace frame, entities left as typed, `{` neutralised, source-vs-source verify, refusals for non-safelisted tags/`<script>`/event handlers/`javascript:` hrefs/unbalanced and crossed tags, allowed link attributes, self-closing `<br />` | `tests/patcher-apply-markup.test.ts` |
 | `applyAstro` attributes — src/alt replacement, quote escaping, missing-alt insertion (incl. self-closing and expression-attr neighbors), never-insert-src, exact-match verify | `tests/patcher-apply-attrs.test.ts` |
 | `frontmatter.ts` — parse (fences, BOM, CRLF, invalid YAML), surgical apply (comments, key order, quoting, no re-wrap), serialize new entries, refusals | `tests/frontmatter.test.ts` |
 
@@ -93,6 +94,7 @@ the loc rules in `astro.ts`.
 | Functionality | Test file |
 | --- | --- |
 | `markdown.ts` — `markdownToHtml` rendering subset, `canRichEdit` accept/refuse | `tests/markdown.test.ts` |
+| `editors/markup-insert.ts` — tag palette: pair wraps and keeps the selection, empty pair at the caret, void tag replaces rather than wraps, `<a href="">` caret inside the quotes, palette matches the patcher's safelist | `tests/markup-insert.test.ts` |
 | `classify-cache.ts` — verdict caching per file\|loc\|tag, in-flight dedupe, failure retry, HMR invalidation (incl. mid-flight) | `tests/classify-cache.test.ts` |
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 | `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
@@ -165,6 +167,21 @@ whichever sections your change touches; run the whole list before a release.
       layout, line numbers, syntax tinting, the whole file scrollable with
       the element's line highlighted and centered, Escape / backdrop / Close
       dismisses, and "Open in editor" jumps out.
+- [ ] **Markup popup**: click the home page's `The page is the best<br>editor
+      for the page` heading → a popup titled `Markup · index.astro:44:13`
+      showing the raw source `The page is the best<br>editor for the page` (not
+      the DOM's innerHTML), the allowed-tags hint below it. Edit the words →
+      Save (or Cmd/Ctrl+Enter) → the file is written with the `<br>` intact and
+      HMR refreshes. Escape / backdrop / Cancel discards. Typing a `<div>`, a
+      `<script>`, an `onclick=` attribute or an unclosed `<strong>` → the save
+      is refused with a message naming the problem and the file is untouched.
+- [ ] **Tag palette** (same popup): select a word → click `<strong>` → it is
+      wrapped and stays selected; click `<em>` again → the tags stack. With no
+      selection, `<span>` drops an empty pair with the caret between the halves,
+      `<br>` inserts alone, and `<a>` inserts `<a href="">` with the caret
+      inside the quotes. Clicking a tag never collapses the selection first, the
+      exit button turns purple (dirty), and Cmd/Ctrl+Z undoes the insertion.
+      Restore the fixture afterwards.
 - [ ] Clicking dynamic content (a resolved `{expression}`) opens the refusal
       notice with a working "Open source" button — never a false edit; its
       file:loc line opens the source peek.

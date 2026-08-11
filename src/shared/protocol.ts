@@ -17,15 +17,17 @@ export interface SourceLoc {
   loc: string;
 }
 
-/** What an edit targets: the element's text content, or an img attribute. */
-export type TargetType = 'text' | 'src' | 'alt';
+/** What an edit targets: the element's text content, its inner source when
+ *  that text carries inline markup, or an img attribute. */
+export type TargetType = 'text' | 'markup' | 'src' | 'alt';
 
 /** Whether an attribute can be patched: statically quoted, expression-driven,
  *  or absent from the source. */
 export type AttrState = 'static' | 'dynamic' | 'missing';
 
 export type ClassifyKind =
-  | 'text' // children are exclusively literal text → editable
+  | 'text' // children are exclusively literal text → editable inline
+  | 'markup' // literal text plus safelisted inline tags → editable as raw source
   | 'image' // an element whose src/alt attrs may be editable (see attrs)
   | 'empty' // no children; nothing to text-edit
   | 'dynamic' // expression / child elements / component content
@@ -144,6 +146,13 @@ export interface ClassifyResult {
   reason: string;
   /** For `img` targets: whether src/alt are patchable. */
   attrs?: { src: AttrState; alt: AttrState };
+  /**
+   * For `markup` targets: the element's inner *source*, outer whitespace
+   * trimmed. The popup edits this rather than the DOM's `innerHTML` — only the
+   * source knows how entities and quoting were spelled, and sending it back as
+   * the apply op's `original` keeps verify-then-patch comparing like with like.
+   */
+  markup?: { html: string };
 }
 
 // --- POST /apply -------------------------------------------------------------

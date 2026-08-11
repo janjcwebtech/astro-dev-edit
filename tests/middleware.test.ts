@@ -35,6 +35,10 @@ const title = 'Dynamic';
 </main>
 `;
 
+/** Separate fixture so the markup tests can rewrite a file freely without
+ *  moving the line numbers the /peek tests pin against PAGE_ASTRO. */
+const MARKUP_ASTRO = `<main>\n  <h2>Two<br>lines</h2>\n</main>\n`;
+
 let root: string;
 let handler: Connect.NextHandleFunction;
 // Same tree, but with open-in-editor enabled — used to pin /open's path
@@ -52,6 +56,7 @@ beforeAll(async () => {
   await writeFile(join(root, 'public/readme.txt'), 'not an image');
   await writeFile(join(root, 'src/assets/c.webp'), 'webp-bytes');
   await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
+  await writeFile(join(root, 'src/pages/markup.astro'), MARKUP_ASTRO);
   await writeFile(join(root, 'src/content/note.md'), '# Note\n\nBody.\n');
   await writeFile(join(root, 'outside.astro'), '<p>Outside content roots</p>\n');
   // Package-owned file: `astro:assets` annotates every <Image> to exactly this
@@ -552,6 +557,17 @@ describe('POST /classify', () => {
     expect(r.body.kind).toBe('text');
   });
 
+  it('classifies text carrying an inline tag as markup, with the inner source', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/classify',
+      body: { file: 'src/pages/markup.astro', loc: locOf(MARKUP_ASTRO, 'Two<br>'), tag: 'h2' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.kind).toBe('markup');
+    expect(r.body.markup).toEqual({ html: 'Two<br>lines' });
+  });
+
   it('answers 200 dynamic for editable non-.astro files (.md)', async () => {
     const r = await request({
       method: 'POST',
@@ -641,6 +657,41 @@ describe('POST /apply', () => {
     expect(leftovers).toEqual([]);
     // restore for other tests
     await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
+  await writeFile(join(root, 'src/pages/markup.astro'), MARKUP_ASTRO);
+  });
+
+  it('accepts a markup op and writes the inline tags through unescaped', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/apply',
+      body: {
+        file: 'src/pages/markup.astro',
+        loc: locOf(MARKUP_ASTRO, 'Two<br>'),
+        tag: 'h2',
+        ops: [{ targetType: 'markup', original: 'Two<br>lines', newText: 'Two<br><strong>lines</strong>' }],
+      },
+    });
+    expect(r.status).toBe(200);
+    const after = String(await readFile(join(root, 'src/pages/markup.astro')));
+    expect(after).toContain('<h2>Two<br><strong>lines</strong></h2>');
+    await writeFile(join(root, 'src/pages/markup.astro'), MARKUP_ASTRO);
+  await writeFile(join(root, 'src/pages/markup.astro'), MARKUP_ASTRO);
+  });
+
+  it('answers 422 unsupported when a markup op carries a tag outside the safelist', async () => {
+    const r = await request({
+      method: 'POST',
+      url: '/__text-edit/apply',
+      body: {
+        file: 'src/pages/markup.astro',
+        loc: locOf(MARKUP_ASTRO, 'Two<br>'),
+        tag: 'h2',
+        ops: [{ targetType: 'markup', original: 'Two<br>lines', newText: 'Two<script>x()</script>' }],
+      },
+    });
+    expect(r.status).toBe(422);
+    expect(r.body.code).toBe('unsupported');
+    expect(String(await readFile(join(root, 'src/pages/markup.astro')))).toBe(MARKUP_ASTRO);
   });
 
   it('answers 422 unsupported for editable non-.astro files (.md)', async () => {
@@ -718,6 +769,7 @@ describe('POST /apply', () => {
     expect(after).toContain('src="/new.jpg"');
     expect(after).toContain('alt="A new photo"');
     await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
+  await writeFile(join(root, 'src/pages/markup.astro'), MARKUP_ASTRO);
   });
 
   it('writes nothing when any op in a batch is refused (no partial write)', async () => {

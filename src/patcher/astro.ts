@@ -116,6 +116,16 @@ function escapeText(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\{/g, '&#123;');
 }
 
+/**
+ * The markup path deliberately lets `<` and `&` through — the popup shows raw
+ * source and tags are the point — so only `{` is neutralised, keeping the one
+ * guarantee that matters: an edit can add formatting, never an expression.
+ * Tag and attribute names are vetted separately by `validateInlineMarkup`.
+ */
+function escapeMarkup(s: string): string {
+  return s.replace(/\{/g, '&#123;');
+}
+
 /** Escape an attribute value for insertion inside `quote`-delimited quotes. */
 function escapeAttrValue(s: string, quote: string): string {
   let out = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\{/g, '&#123;');
@@ -126,6 +136,145 @@ function escapeAttrValue(s: string, quote: string): string {
 /** Whitespace-insensitive comparison form. (spec §7.5) */
 function normalize(s: string): string {
   return s.replace(/[\s ]+/g, ' ').trim();
+}
+
+// ---------------------------------------------------------------------------
+// Inline markup safelist
+// ---------------------------------------------------------------------------
+
+/**
+ * Text with a `<br>` or a `<strong>` in it is still copy, but the literal-text
+ * path can't carry it: that path escapes `<`, so a round-trip would turn the
+ * tag into visible punctuation. These elements are instead classified as
+ * `markup` and edited as raw source through a popup.
+ *
+ * The safelist is intentionally small and inline-only — formatting a phrase,
+ * not restructuring a page. Anything outside it (a nested `<div>`, a component,
+ * an expression) keeps today's refusal and points at the source.
+ */
+const INLINE_TAGS = new Set([
+  'a', 'b', 'br', 'code', 'em', 'i', 'small', 'span', 'strong', 'sub', 'sup', 'u',
+]);
+
+/** The one safelisted tag that never closes. */
+const VOID_INLINE_TAGS = new Set(['br']);
+
+/** Attributes accepted on any safelisted tag. Presentational only: nothing
+ *  here can run code or load a resource. */
+const GLOBAL_ATTRS = new Set(['class', 'id', 'title', 'lang', 'dir']);
+
+/** Extra attributes accepted on specific tags. */
+const TAG_ATTRS: Record<string, Set<string>> = {
+  a: new Set(['href', 'target', 'rel']),
+};
+
+function attrAllowed(tag: string, attr: string): boolean {
+  return GLOBAL_ATTRS.has(attr) || (TAG_ATTRS[tag]?.has(attr) ?? false);
+}
+
+const ALLOWED_LIST = [...INLINE_TAGS].map((t) => `<${t}>`).join(', ');
+
+/**
+ * Whether a child node may appear inside a `markup` element: literal text, or a
+ * safelisted inline element (recursively) whose attributes are all statically
+ * quoted and allowed. An expression-valued attribute fails here on purpose —
+ * the popup rewrites the whole region as text, which would destroy it.
+ */
+function isInlineSafe(n: AstNode): boolean {
+  if (n.type === 'text') return true;
+  if (n.type !== 'element') return false;
+  const tag = (n.name ?? '').toLowerCase();
+  if (!INLINE_TAGS.has(tag)) return false;
+  const attrsOk = (n.attributes ?? []).every(
+    (a) => a.kind === 'quoted' && attrAllowed(tag, (a.name ?? '').toLowerCase()),
+  );
+  return attrsOk && (n.children ?? []).every(isInlineSafe);
+}
+
+/** An expression anywhere in the subtree — checked ahead of the markup rule so
+ *  `<p><strong>{x}</strong></p>` refuses with the expression reason, which is
+ *  the one that tells the user what to do about it. */
+function hasExpressionDeep(n: AstNode): boolean {
+  return (n.children ?? []).some((c) => c.type === 'expression' || hasExpressionDeep(c));
+}
+
+/**
+ * Vet a raw-markup replacement before it is written. Returns an error message,
+ * or null when the string is nothing but text and well-nested safelisted inline
+ * tags. Written as a scanner rather than a regex sweep because it also has to
+ * hold the open-tag stack: unbalanced markup would corrupt the rest of the
+ * page, so it is refused rather than repaired.
+ */
+function validateInlineMarkup(html: string): string | null {
+  const stack: string[] = [];
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf('<', i);
+    if (lt < 0) break;
+
+    let j = lt + 1;
+    const closing = html[j] === '/';
+    if (closing) j++;
+    const nameStart = j;
+    while (j < html.length && /[a-zA-Z0-9]/.test(html[j])) j++;
+    const tag = html.slice(nameStart, j).toLowerCase();
+    if (!tag) {
+      return 'A “<” here does not start a tag. Write it as &lt; if you meant the character itself.';
+    }
+    if (!INLINE_TAGS.has(tag)) {
+      return `<${tag}> can’t be added here. Allowed inline tags: ${ALLOWED_LIST}. Edit this element in the source instead.`;
+    }
+
+    // Scan to the closing `>`, stepping over quoted attribute values so a `>`
+    // inside one doesn't end the tag early.
+    let k = j;
+    let attrText = '';
+    while (k < html.length && html[k] !== '>') {
+      const ch = html[k];
+      if (ch === '"' || ch === "'") {
+        const close = html.indexOf(ch, k + 1);
+        if (close < 0) return `An attribute value on <${tag}> is missing its closing quote.`;
+        attrText += html.slice(k, close + 1);
+        k = close + 1;
+        continue;
+      }
+      attrText += ch;
+      k++;
+    }
+    if (k >= html.length) return `The <${tag}> tag is missing its closing “>”.`;
+
+    if (closing) {
+      if (attrText.trim()) return `A closing </${tag}> tag can’t carry attributes.`;
+      if (stack.pop() !== tag) {
+        return `</${tag}> doesn’t close the tag it should — check the tags nest correctly.`;
+      }
+    } else {
+      const bad = validateAttrs(tag, attrText);
+      if (bad) return bad;
+      const selfClosing = /\/\s*$/.test(attrText);
+      if (!VOID_INLINE_TAGS.has(tag) && !selfClosing) stack.push(tag);
+    }
+    i = k + 1;
+  }
+  if (stack.length) return `<${stack[stack.length - 1]}> is never closed.`;
+  return null;
+}
+
+/** Attribute-level vetting for one opening tag's attribute text. */
+function validateAttrs(tag: string, attrText: string): string | null {
+  const re = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*(=\s*("[^"]*"|'[^']*'|[^\s"'>]+))?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(attrText)) !== null) {
+    const name = m[1].toLowerCase();
+    if (!attrAllowed(tag, name)) {
+      return `The ${name} attribute isn’t allowed on <${tag}> here. Edit this element in the source instead.`;
+    }
+    const value = (m[3] ?? '').trim().replace(/^["']|["']$/g, '');
+    if (name === 'href' && /^\s*javascript:/i.test(value)) {
+      return 'A javascript: link can’t be added here. Edit this element in the source instead.';
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +334,20 @@ function attrState(el: AstNode, name: string): AttrState {
   return attr.kind === 'quoted' ? 'static' : 'dynamic';
 }
 
-function classifyResolved(el: AstNode): ClassifyResult {
+/** The source span covering all of an element's children — the region a text
+ *  or markup edit replaces. */
+function innerSpan(starts: number[], el: AstNode): { from: number; to: number } | null {
+  const children = el.children ?? [];
+  const first = children[0]?.position;
+  const last = children[children.length - 1]?.position;
+  if (!first || !last?.end) return null;
+  const from = indexOfPos(starts, first.start);
+  const to = indexOfPos(starts, last.end);
+  if (from < 0 || to < 0 || to < from) return null;
+  return { from, to };
+}
+
+function classifyResolved(el: AstNode, source: string, starts: number[]): ClassifyResult {
   const tag = (el.name ?? '').toLowerCase();
   const children = el.children ?? [];
 
@@ -200,20 +362,32 @@ function classifyResolved(el: AstNode): ClassifyResult {
   if (!children.length) {
     return { kind: 'empty', reason: 'This element has no text content in the source.' };
   }
-  if (children.some((c) => c.type === 'expression')) {
+  if (hasExpressionDeep(el)) {
     return {
       kind: 'dynamic',
       reason:
         'This text comes from a template expression (e.g. a frontmatter field or a variable), so editing it here would change code, not copy.',
     };
   }
-  if (children.some((c) => c.type !== 'text')) {
-    return {
-      kind: 'dynamic',
-      reason: 'This element contains nested markup, so its text cannot be edited as one block.',
-    };
+  if (children.every((c) => c.type === 'text')) {
+    return { kind: 'text', reason: 'literal text' };
   }
-  return { kind: 'text', reason: 'literal text' };
+  // Literal text carrying inline formatting: editable, but as raw source in a
+  // popup rather than inline, since the tags have to survive the round-trip.
+  if (children.every(isInlineSafe)) {
+    const span = innerSpan(starts, el);
+    if (span) {
+      return {
+        kind: 'markup',
+        reason: 'literal text with inline markup',
+        markup: { html: source.slice(span.from, span.to).trim() },
+      };
+    }
+  }
+  return {
+    kind: 'dynamic',
+    reason: 'This element contains nested markup, so its text cannot be edited as one block.',
+  };
 }
 
 export async function classifyAstro(source: string, loc: string, tag: string): Promise<ClassifyResult> {
@@ -230,7 +404,7 @@ export async function classifyAstro(source: string, loc: string, tag: string): P
       reason: 'No element matches this source location — the file may have changed since the page loaded. Try reloading.',
     };
   }
-  return classifyResolved(res.element!);
+  return classifyResolved(res.element!, source, lineStartIndices(source));
 }
 
 // ---------------------------------------------------------------------------
@@ -244,24 +418,17 @@ function patchTextContent(
   original: string,
   newText: string,
 ): ApplyResult {
-  const cls = classifyResolved(el);
+  const cls = classifyResolved(el, source, starts);
   if (cls.kind !== 'text') {
     return { ok: false, code: 'dynamic', error: cls.reason };
   }
 
-  const children = el.children!;
-  const first = children[0].position;
-  const last = children[children.length - 1].position;
-  if (!first || !last?.end) {
-    return { ok: false, code: 'unsupported', error: 'The source positions for this text are incomplete.' };
-  }
-  const from = indexOfPos(starts, first.start);
-  const to = indexOfPos(starts, last.end);
-  if (from < 0 || to < 0 || to < from) {
+  const span = innerSpan(starts, el);
+  if (!span) {
     return { ok: false, code: 'unsupported', error: 'The source positions for this text are invalid.' };
   }
 
-  const region = source.slice(from, to);
+  const region = source.slice(span.from, span.to);
   // Verify the source still says what the client saw. (spec §7.5)
   if (normalize(decodeEntities(region)) !== normalize(original)) {
     return {
@@ -271,12 +438,61 @@ function patchTextContent(
     };
   }
 
-  // Preserve the region's leading/trailing whitespace (indentation). (spec §6.1)
+  return { ok: true, newSource: splice(source, span, region, escapeText(newText.trim())) };
+}
+
+/**
+ * Replace an element's inner source with raw inline markup. Unlike the text
+ * path this compares source against source — `original` is the very string
+ * /classify handed the popup — so no entity decoding is involved on either
+ * side, and a file edited out-of-band still fails safe with a mismatch.
+ */
+function patchMarkupContent(
+  source: string,
+  starts: number[],
+  el: AstNode,
+  original: string,
+  newHtml: string,
+): ApplyResult {
+  const cls = classifyResolved(el, source, starts);
+  // `text` is accepted too: an element that holds only literal text today can
+  // legitimately gain its first <br> or <strong> through this path.
+  if (cls.kind !== 'markup' && cls.kind !== 'text') {
+    return { ok: false, code: 'dynamic', error: cls.reason };
+  }
+
+  const span = innerSpan(starts, el);
+  if (!span) {
+    return { ok: false, code: 'unsupported', error: 'The source positions for this text are invalid.' };
+  }
+
+  const region = source.slice(span.from, span.to);
+  if (normalize(region) !== normalize(original)) {
+    return {
+      ok: false,
+      code: 'mismatch',
+      error: 'The source no longer matches the markup on the page (it may have been edited elsewhere). Reload and try again.',
+    };
+  }
+
+  const trimmed = newHtml.trim();
+  const bad = validateInlineMarkup(trimmed);
+  if (bad) return { ok: false, code: 'unsupported', error: bad };
+
+  return { ok: true, newSource: splice(source, span, region, escapeMarkup(trimmed)) };
+}
+
+/** Swap `replacement` into `span`, keeping the region's own leading/trailing
+ *  whitespace so the file's indentation survives. (spec §6.1) */
+function splice(
+  source: string,
+  span: { from: number; to: number },
+  region: string,
+  replacement: string,
+): string {
   const lead = /^\s*/.exec(region)![0];
   const trail = lead.length === region.length ? '' : /\s*$/.exec(region)![0];
-  const replacement = lead + escapeText(newText.trim()) + trail;
-
-  return { ok: true, newSource: source.slice(0, from) + replacement + source.slice(to) };
+  return source.slice(0, span.from) + lead + replacement + trail + source.slice(span.to);
 }
 
 /**
@@ -419,6 +635,9 @@ export async function applyAstro(source: string, req: PatchRequest): Promise<App
   const el = res.element!;
   if (req.targetType === 'text') {
     return patchTextContent(source, starts, el, req.original, req.newText);
+  }
+  if (req.targetType === 'markup') {
+    return patchMarkupContent(source, starts, el, req.original, req.newText);
   }
   return patchAttribute(source, starts, el, req.targetType, req.original, req.newText);
 }

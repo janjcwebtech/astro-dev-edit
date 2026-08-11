@@ -1,6 +1,7 @@
 import type { ClassifyResult, SourceLoc } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { beginImageEdit } from './editors/image.ts';
+import { beginMarkupEdit } from './editors/markup.ts';
 import { showDynamicNotice } from './editors/notice.ts';
 import { beginTextEdit } from './editors/text.ts';
 import { nearestSource, sourceFor } from './source-map.ts';
@@ -87,6 +88,8 @@ export function initRouter(deps: RouterDeps): RouterHandle {
       void beginImageEdit(el, src, attrs);
     } else if (server.kind === 'text') {
       beginTextEdit(el, src);
+    } else if (server.kind === 'markup' && server.markup) {
+      beginMarkupEdit(el, src, server.markup.html);
     } else {
       showDynamicNotice(
         src,
