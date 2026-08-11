@@ -108,23 +108,67 @@ export function beginMarkupEdit(el: HTMLElement, src: SourceLoc, html: string): 
     tools.append(btn);
   }
 
-  body.append(label, input, tools);
+  // A refusal is an ordinary outcome here — typing a `<div>` earns one — so it
+  // is reported *in* the panel, next to the markup that caused it.
+  const error = styled('p', 'atx-markup-error', {
+    display: 'none', margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.err,
+  });
 
-  const close = (commit: boolean): void => {
+  body.append(label, input, tools, error);
+
+  let token = state.begin({ kind: 'panel', close: () => close(false) });
+  let saving = false;
+
+  const teardown = (): void => {
     state.releaseIf(token);
     panel.remove();
     backdrop.remove();
-    const next = input.value;
-    if (!commit || next.trim() === html.trim()) {
+  };
+
+  const setBusy = (busy: boolean): void => {
+    for (const btn of panel.querySelectorAll('button')) btn.disabled = busy;
+    input.readOnly = busy;
+  };
+
+  /**
+   * Save without closing first. The panel only comes down once the write has
+   * landed: a refusal (disallowed tag, unbalanced markup, stale source) is
+   * something you fix and retry, and closing would take the markup you typed
+   * with it.
+   */
+  const save = async (): Promise<void> => {
+    saving = true;
+    setBusy(true);
+    error.style.display = 'none';
+
+    const failure = await commitMarkupEdit(el, src, html, input.value);
+
+    saving = false;
+    if (!failure) {
+      teardown();
+      return;
+    }
+    // The in-flight `busy` interaction has released the slot; re-claim it so
+    // the still-open panel keeps owning the page's clicks.
+    token = state.begin({ kind: 'panel', close: () => close(false) });
+    setBusy(false);
+    error.textContent = failure;
+    error.style.display = '';
+    input.focus();
+  };
+
+  const close = (commit: boolean): void => {
+    if (saving) return; // the write is in flight; let it settle
+    if (!commit || input.value.trim() === html.trim()) {
+      teardown();
       state.setSavePhase('clean');
       return;
     }
-    void commitMarkupEdit(el, src, html, next);
+    void save();
   };
 
   const backdrop = buildBackdrop(() => close(false));
   wirePanelButtons(panel, () => close(false), () => close(true));
-  const token = state.begin({ kind: 'panel', close: () => close(false) });
 
   // A panel owns its Save button, so Enter must stay a newline; Cmd/Ctrl+Enter
   // is the keyboard commit, matching the drawer's body editor.
@@ -141,12 +185,14 @@ export function beginMarkupEdit(el: HTMLElement, src: SourceLoc, html: string): 
   input.setSelectionRange(input.value.length, input.value.length);
 }
 
+/** Writes the edit. Resolves to null on success, or the refusal message —
+ *  which the caller shows in the panel it deliberately left open. */
 async function commitMarkupEdit(
   el: HTMLElement,
   src: SourceLoc,
   original: string,
   newHtml: string,
-): Promise<void> {
+): Promise<string | null> {
   const busy = state.begin({ kind: 'busy' });
   const release = lockElement(el);
   state.setSavePhase('saving');
@@ -162,9 +208,10 @@ async function commitMarkupEdit(
     // The file is written; Astro HMR reloads the page from disk. Nothing is
     // patched into the live DOM here — a markup change can restructure the
     // element's children, and HMR is the one source of truth for that.
+    return null;
   } catch (err) {
     state.setSavePhase('error');
-    toast(`Save failed — ${err instanceof Error ? err.message : 'unknown error'}`, 'err');
+    return err instanceof Error ? err.message : 'The edit could not be saved.';
   } finally {
     release();
     state.releaseIf(busy);

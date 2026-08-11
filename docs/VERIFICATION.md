@@ -174,7 +174,10 @@ whichever sections your change touches; run the whole list before a release.
       Save (or Cmd/Ctrl+Enter) → the file is written with the `<br>` intact and
       HMR refreshes. Escape / backdrop / Cancel discards. Typing a `<div>`, a
       `<script>`, an `onclick=` attribute or an unclosed `<strong>` → the save
-      is refused with a message naming the problem and the file is untouched.
+      is refused with the reason shown **inside the popup** (`atx-markup-error`),
+      the popup still open and the typed markup intact, the bar reading "Save
+      failed", and the file untouched — fixing the markup and saving again
+      succeeds and closes the popup.
 - [ ] **Tag palette** (same popup): select a word → click `<strong>` → it is
       wrapped and stays selected; click `<em>` again → the tags stack. With no
       selection, `<span>` drops an empty pair with the caret between the halves,

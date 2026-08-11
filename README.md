@@ -27,7 +27,8 @@ https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
   presentational attributes (`class`, `id`, `title`, `lang`, `dir`, plus
   `href`/`target`/`rel` on links); attributes already in your source are kept
   as they are. Anything else, including unbalanced tags, is refused rather
-  than written. Each allowed tag is a **button** under the box: with text
+  than written — and a refusal is shown **in the popup**, which stays open with
+  your markup intact so you can fix it and retry. Each allowed tag is a **button** under the box: with text
   selected it wraps the selection (and keeps it selected, so tags stack),
   otherwise it drops an empty pair at the caret. `<br>` inserts alone, and
   `<a>` arrives as `<a href="">` with the caret already inside the quotes.
@@ -425,7 +426,7 @@ plus `atx-asset-controls` (filter + scope row), `atx-asset-filter`,
 `atx-asset-scope` (the "Show all" toggle) and `atx-asset-count`, the rich body
 editor's `atx-rte`, the markup popup's `atx-markup-label` /
 `atx-markup-input` / `atx-markup-tags` (the palette row) / `atx-markup-hint` /
-`atx-markup-tag` (one per insertable tag), `atx-rte-head` (sticky toolbar + image panel),
+`atx-markup-tag` (one per insertable tag) / `atx-markup-error`, `atx-rte-head` (sticky toolbar + image panel),
 `atx-rte-toolbar`, `atx-rte-btn`, `atx-rte-content`, `atx-rte-image-panel`,
 the image field's `atx-image-field-preview|thumb|empty|path|hint`, the source
 peek's `atx-peek-code` (scroll container), `atx-peek-line` / `atx-peek-focus`
