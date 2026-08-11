@@ -110,12 +110,41 @@ whichever sections your change touches; run the whole list before a release.
 
 **Boot & chrome**
 
-- [ ] Overlay pills appear bottom-corner (`#atx-controls` with `#atx-toggle`,
-      and `#atx-entry` on pages declaring a page-source meta); dimmed idle,
-      full opacity + hint on hover.
-- [ ] Hover reveals the ✕ (`#atx-hide`); clicking hides the pills and exits
-      edit mode until the next full reload.
+- [ ] The admin bar (`#atx-bar`) spans the top of the page, translucent at rest
+      and opaque as the pointer approaches, **overlaying** the site's own header
+      rather than pushing the page down. Order: mark · Elements · Edit page ·
+      Edit entry (only on pages declaring a page-source meta) … pin · dock ·
+      exit. Every icon renders (`atx-ico`, inline SVG).
+- [ ] **Pin**: lit while pinned. Unpin **out of edit mode** → the bar slides off
+      the edge and leaves the hairline (`#atx-hairline`); moving the pointer to
+      that edge brings it back, moving away retracts it again; a retracted bar
+      swallows no clicks. Pinned/unpinned survives a reload
+      (`localStorage.astroTextEditBar`).
+- [ ] Unpinned **in edit mode** the bar never retracts: it stays on the edge
+      (translucent at rest, opaque on approach) with no hairline, so the exit
+      button and save state are always on screen. Unpin mid-edit → nothing
+      slides away; leave edit mode → it retracts, pointer permitting. Enter edit
+      mode from a retracted bar → it comes out and stays out.
+- [ ] **Dock**: flips the bar to the bottom. The element tree and toasts move
+      clear of it, the overflow menu opens upward, and the choice persists.
+      Neither edge lets the bar overlap the tree, pinned or not.
+- [ ] The mark opens the overflow menu; Escape and an outside click close it,
+      and the bar cannot retract while it is open.
 - [ ] Edit mode persists across a reload (`sessionStorage.astroTextEditMode`).
+
+**Save state & leaving edit mode** (the bar's exit button)
+
+- [ ] Edit mode on with nothing pending → green **Done**; clicking it leaves
+      edit mode.
+- [ ] Type in an inline edit → purple **Save & exit**; typing the original text
+      back returns it to **Done**. Escape restores the text and clears the state
+      without writing.
+- [ ] Clicking **Save & exit** with unsaved keystrokes writes the file
+      (grey **Saving…** → green **Saved**) and leaves edit mode only after the
+      write lands — never before, and never discarding the change. Same for the
+      **Editing** toggle, which routes through the same exit.
+- [ ] A refused write (edit, then change the file underneath) shows red
+      **Save failed**, keeps you in edit mode, and the file is untouched.
 
 **Inline text editing** (e.g. `/articles/` listing)
 
@@ -130,7 +159,7 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Click on literal text opens the inline contenteditable (works before the
       verdict lands, too); save writes the file and HMR refreshes.
 - [ ] Mousing from an element up to its pill (crossing the parent en route)
-      keeps the pill in place — no instant retarget; the pill's "open ↗"
+      keeps the pill in place — no instant retarget; the pill's **open**
       button jumps to the source in the editor.
 - [ ] Clicking the pill's file:loc label opens the source-peek panel: wide
       layout, line numbers, syntax tinting, the whole file scrollable with
@@ -152,10 +181,10 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Escape / click-away discards; a stale edit (file changed underneath)
       fails safe with a mismatch message, file untouched.
 
-**Copy context** (hover pill `copy ⧉`)
+**Copy context** (hover pill `copy`)
 
-- [ ] Hovering an element and clicking `copy ⧉` flips the label to
-      `copying…` → `copied ✓` (pill width unchanged) and toasts
+- [ ] Hovering an element and clicking `copy` flips the label to
+      `copying…` → `copied` (pill width unchanged) and toasts
       "Copied context for `<label>` — N KB". Pasting gives a markdown block
       whose loc is **repo-relative** (`src/pages/index.astro:12:3`, not an
       absolute fsPath — the `root` from `/health`), with the rendered HTML, the
@@ -173,7 +202,7 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Clipboard refused (open the playground over a LAN address, or block the
       permission): the fallback panel opens with the text preselected, its Copy
       works, Escape/backdrop/Close dismiss it, and the pill's button returns to
-      `copy ⧉` rather than claiming success.
+      `copy` rather than claiming success.
 
 **CSS inspector** (hover pill chips)
 
@@ -184,18 +213,26 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Hovering a class chip pops a rules card showing the applied declarations;
       a chip whose token doesn't actually apply shows "No applied rules". Moving
       the pointer from chip → card keeps both open; leaving both dismisses them.
-- [ ] The card's `open ↗` jumps the editor to (near) the rule — verify for a
+- [ ] The card's `open` jumps the editor to (near) the rule — verify for a
       **global `.css`** rule and an **Astro scoped `<style>`** rule (which
       resolves to the `.astro` file). A rule from an external/CDN or inline
       `<style>` still shows its CSS but offers no open link.
 - [ ] `cssInspector: false` → no chips row at all. `openInEditor: false` → the
       card's open link fails with a toast (chips + CSS still shown).
 
-**Element tree** (left panel in edit mode)
+**Element tree** (left panel, opened on request in edit mode)
 
-- [ ] Edit mode on → the tree (`.atx-tree`) docks to the left listing the page's
-      annotated elements, nested; leaving edit mode hides it. The ✕
-      (`.atx-tree-close`) hides it too; chevrons collapse/expand nodes.
+- [ ] Edit mode on → the tree (`.atx-tree`) stays **closed**, showing only its
+      tab (`#atx-tree-tab`) on the left edge. The tab or the bar's **Elements**
+      opens it: it docks to the left listing the page's annotated elements,
+      nested; chevrons collapse/expand nodes.
+- [ ] Closing it with the ✕ (`.atx-tree-close`) while still editing puts the tab
+      back; the tab and **Elements** both reopen it, and **Elements** is lit
+      exactly while the panel is open. Leaving edit mode hides panel and tab
+      both. **Elements** from a cold page turns edit mode on with the tree.
+- [ ] Open the tree, edit + save → after the reload edit mode **and** the open
+      tree come back (session-remembered); do the same with the tree closed and
+      it stays closed, tab only.
 - [ ] Hovering a row outlines the matching element on the page with the verdict
       pill and class/ID chips; hovering an element on the page highlights its row
       (dashed, `.atx-tree-selection` distinct) and scrolls the tree to it.

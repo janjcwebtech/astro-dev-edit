@@ -47,14 +47,14 @@ changes, so known elements show theirs instantly.
 Clicking the pill's `file:loc` label opens a **source peek** — a wide
 read-only panel showing the whole file syntax-highlighted, with line numbers,
 scrolled to the element's line (highlighted and centered; scroll for full
-context) — while the "open ↗" button next to it jumps to the location in your
+context) — while the **open** button next to it jumps to the location in your
 editor. The refusal notice's location line opens the same peek, so you can
 see *why* something refused without leaving the browser. The peek's footer
 has its own **Open in editor** jump-out.
 
 ### Copy context for an AI assistant
 
-Next to `open ↗` the pill has a **`copy ⧉`** button. It puts everything the
+Next to `open` the pill has a **`copy`** button. It puts everything the
 overlay knows about that element on your clipboard as one markdown block,
 shaped for pasting into an assistant along with what you want changed:
 
@@ -84,19 +84,60 @@ The pill also lists the element's **classes and ID** as chips (turn this off
 with `cssInspector: false`). Hover a chip to pop a card of the CSS rules that
 element actually matches through that class/ID — selector and declarations,
 read straight from the browser, so it works without any server round-trip.
-Each rule whose source can be resolved offers an **open ↗** that jumps your
+Each rule whose source can be resolved offers an **open** that jumps your
 editor to (near) the rule; rules from cross-origin/CDN stylesheets or an inline
 `<style>` still show their CSS but have no jump. The jump also honours
 `openInEditor`, and reaches `.css` files as well as `.astro` `<style>` blocks
 (still confined to `contentRoots`, so `node_modules`/external CSS is excluded).
 
+### The admin bar
+
+Every global control lives in a slim bar across the top of the page:
+
+- **Elements** — show or hide the [element tree](#element-tree), which edit mode
+  no longer opens on its own. Asking for it from a cold page turns edit mode on
+  with it, since the tree's row highlights only mean anything while editing.
+- **Edit page** — the edit-mode toggle.
+- **Edit entry** — on pages that declare a backing content file, opens the
+  [entry drawer](#entry-editor--cms-panel-for-content-collections).
+- **The pin** — lit while the bar is pinned. Unpin it and the bar slides off the
+  edge leaving a thin accent line, returning the moment the pointer reaches that
+  edge again. **Edit mode overrides it**: while you are editing, the bar stays out
+  whether it is pinned or not, since it carries the save state and the way out.
+- **The dock button** — moves the bar to the **bottom** of the viewport, for
+  sites whose own chrome lives at the top.
+- **The purple mark** — the overflow menu (currently *Open page source*, which
+  opens the file this page is written in) plus the dev-server status.
+
+The bar **overlays** the page rather than pushing it down: the top edge is where
+sticky site headers live, and reflowing the page would change the very layout
+you are editing. It stays semi-transparent until the pointer comes near. Pin
+state and edge are remembered per browser.
+
+**The exit button is the save indicator.** In edit mode a button appears at the
+right end that answers "is my work on disk?" without guessing:
+
+| Button | Meaning |
+| --- | --- |
+| green **Done** | nothing pending — everything typed is written |
+| purple **Save & exit** | an inline edit has unsaved keystrokes |
+| grey **Saving…** | the write is in flight |
+| green **Saved** | it just landed |
+| red **Save failed** | the write was refused and the change rolled back |
+
+Every way out of edit mode goes through it, so leaving **saves first and exits
+after the write lands** — no path out silently drops what you typed. Throwing an
+edit away stays deliberate: press **Escape** while editing.
+
 ### Element tree
 
-Turning on edit mode also docks a **tree of the page's elements** to the left
-edge — every source-annotated element, nested by structure. It's two-way linked
-to the page: hovering a row outlines the matching element (with the same verdict
-pill and class/ID chips), and hovering an element on the page highlights its row
-and scrolls the tree to it.
+A **tree of the page's elements** — every source-annotated element, nested by
+structure — docks to the left edge on request. It is **opt-in**: edit mode leaves
+it closed and puts a small tab on the left edge, and it opens when you click that
+tab or **Elements** on the bar (so entering edit mode never covers the page you
+came to edit). It's two-way linked to the page: hovering a row outlines the
+matching element (with the same verdict pill and class/ID chips), and hovering an
+element on the page highlights its row and scrolls the tree to it.
 
 Clicking a row **selects** the element — a persistent outline that stays put
 while you move the mouse onto the element to inspect it. The selection clears
@@ -104,9 +145,12 @@ only when you press **Escape**, click elsewhere on the page, or select another
 row (plain hovering never changes it). **Double-click** a row to open the editor
 for that element, exactly as a page click would. Each row's **`line:col`** is a
 jump-out — click it to open that file at that line in your editor (the same
-`/open` the hover pill's "open ↗" uses). The tree collapses per node, rebuilds
+`/open` the hover pill's **open** button uses). The tree collapses per node, rebuilds
 itself after each save, and is overlaid by the entry drawer when that's open.
-Leaving edit mode hides it.
+Leaving edit mode hides it. Closing it with its ✕ while still editing leaves the
+left-edge tab that brings it back — as does **Elements** on the bar. Whether it
+was open is remembered for the session, so a save-triggered reload restores it
+the way you left it.
 
 ## Install
 
@@ -131,7 +175,8 @@ export default defineConfig({
 });
 ```
 
-Then `npm run dev` and click **Edit** (bottom-right of the page).
+Then `npm run dev` and click **Edit page** in the admin bar across the top of
+the page.
 
 ### Where the source locations come from
 
@@ -195,7 +240,7 @@ Treat it like editing the files directly, because that is what it does.
 ## Entry editor — CMS panel for content collections
 
 On a detail page that declares its backing content file (the meta tag below),
-an **✎ Edit entry** button is always visible (no need to enter edit mode —
+an **Edit entry** button is always visible (no need to enter edit mode —
 it's a one-click CMS action), and in edit mode clicking any collection-driven
 text offers **"Edit page content"**. Both open a drawer that edits the entry
 like a CMS would:
@@ -335,13 +380,19 @@ still get the file written/removed — only the navigation guess differs.
 ## Styling the overlay
 
 Every overlay element carries a stable class, and the singletons carry IDs:
-`#atx-controls` (the fixed bottom-right group holding the buttons),
-`#atx-toggle` (the Edit button), `#atx-entry` (the Edit entry button),
-`#atx-hide` (the ✕ shown on hover that hides the group until reload),
-`#atx-toggle-hint` (the "hold … to navigate" note under the buttons),
+`#atx-bar` (the admin bar) — inside it `atx-bar-group`, `atx-bar-sep`,
+`#atx-bar-brand` (the mark that opens the overflow menu), and one
+`atx-bar-btn` per control (`atx-bar-btn-icon` when icon-only, with the text in
+`atx-bar-btn-label`): `#atx-bar-elements`, `#atx-toggle` (Edit page),
+`#atx-entry` (Edit entry), `#atx-bar-pin`, `#atx-bar-edge`, `#atx-bar-exit`
+(the save-state exit button) and `#atx-bar-hint` (the "hold … to navigate"
+note) — plus `#atx-hairline` (the line an unpinned bar leaves behind) and
+`#atx-menu` with `atx-menu-item` / `atx-menu-foot`,
+`#atx-tree-tab` (the tab that reopens a closed element tree),
+`atx-ico` (every icon — an inline SVG inheriting `currentColor`),
 `#atx-outline` (hover highlight),
 `#atx-tooltip` (the file:loc pill — its label opens the source peek, the
-"open ↗" button jumps to the source in your editor and `atx-tooltip-copy`
+**open** button jumps to the source in your editor and `atx-tooltip-copy`
 copies the element's context; inside it, `atx-tooltip-row`
 is the loc/verdict line, with `atx-tooltip-loc` holding
 the location and `atx-tooltip-verdict` the fixed-width verdict slot, and
@@ -399,8 +450,8 @@ host-page CSS so the overlay renders correctly on every site — which means
 your overrides need `!important`:
 
 ```css
-/* e.g. move the edit buttons above a cookie banner */
-#atx-controls { bottom: 120px !important; }
+/* e.g. keep the admin bar fully opaque, even at rest */
+#atx-bar { opacity: 1 !important; }
 ```
 
 ## Scope and limitations

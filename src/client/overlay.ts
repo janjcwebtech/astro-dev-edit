@@ -13,11 +13,12 @@
  * disk; edit mode survives the reload via sessionStorage.
  *
  * This module only wires the pieces together: source-map capture, hover,
- * click routing, the edit-mode toggle, and boot. Vanilla TS, no framework,
+ * click routing, the admin bar, edit mode, and boot. Vanilla TS, no framework,
  * no dependencies. (spec §4.2)
  */
 
 import type { SourceLoc } from '../shared/protocol.ts';
+import { initAdminBar } from './admin-bar.ts';
 import * as api from './api.ts';
 import { invalidateClassifications } from './classify-cache.ts';
 import { openCopyPanel } from './editors/copy-panel.ts';
@@ -27,10 +28,10 @@ import { collectContext, formatContext } from './element-context.ts';
 import { clearHighlight, initHover } from './hover.ts';
 import { pageSource } from './page-source.ts';
 import { initRouter } from './router.ts';
-import { cacheSourceMappings, startCapture } from './source-map.ts';
+import { annotatedElements, cacheSourceMappings, sourceFor, startCapture } from './source-map.ts';
 import { initTree } from './tree.ts';
 import * as state from './state.ts';
-import { COLOR, FONT, Z, basename, styled, toast } from './ui.ts';
+import { basename, toast } from './ui.ts';
 
 // Begin capturing source annotations as early as possible. If the body isn't
 // parsed yet, wait for it; the observer then catches every annotated node as
@@ -43,106 +44,21 @@ if (document.body) {
 }
 
 // ---------------------------------------------------------------------------
-// Edit-mode toggle
+// Edit mode
 // ---------------------------------------------------------------------------
 
 let editMode = false;
+// Whether the element tree should be open while editing. The tree does NOT ride
+// along with edit mode — it stays closed until asked for (the bar's Elements
+// button or the panel's edge tab), so entering edit mode never covers the page
+// you came to edit. The choice does survive the full-page reload that follows
+// every save, like edit mode itself.
+let treeWanted = false;
 // Set from the server's /health payload at boot. Gates the hover-pill chips row.
 let cssInspectorEnabled = false;
 // Also from /health: the absolute project root, so copied source paths come out
 // repo-relative (Astro's annotations are absolute). Null until boot completes.
 let projectRoot: string | null = null;
-
-// The toggle and entry pills share a fixed width so the stacked buttons read
-// as one aligned control group. They stay dimmed until the group is hovered.
-const PILL_WIDTH = '120px';
-const PILL_OPACITY = '0.6';
-const pillStyle = (background: string): Partial<CSSStyleDeclaration> => ({
-  width: PILL_WIDTH,
-  boxSizing: 'border-box',
-  // Left-aligned so the ✎ icon lands in the same spot on every pill,
-  // regardless of label length.
-  textAlign: 'left',
-  padding: '8px 12px',
-  font: `600 13px/1 ${FONT.ui}`,
-  color: '#fff',
-  background,
-  border: 'none',
-  borderRadius: '999px',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-  cursor: 'pointer',
-  opacity: PILL_OPACITY,
-  transition: 'opacity 120ms',
-});
-
-// Wrapper that stacks the pills (and, on hover, the hide button) in the
-// bottom-right corner. (spec §4.2)
-const controls = styled('div', 'atx-controls', {
-  position: 'fixed',
-  right: '16px',
-  bottom: '16px',
-  zIndex: String(Z + 2),
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'flex-end',
-  gap: '10px',
-}, 'atx-controls');
-
-const toggle = styled('button', 'atx-toggle', pillStyle(COLOR.idle), 'atx-toggle');
-toggle.type = 'button';
-toggle.textContent = '✎ Edit';
-toggle.title = 'Toggle text-edit mode';
-
-// On detail pages that declare a backing content file (the page-source meta
-// tag), a second pill opens the CMS entry drawer. It shows whenever the page
-// declares one — a one-click action, independent of edit mode.
-const entryButton = styled('button', 'atx-entry', {
-  ...pillStyle(COLOR.image),
-  display: 'none',
-}, 'atx-entry');
-entryButton.type = 'button';
-entryButton.textContent = '✎ Edit entry';
-entryButton.title = 'Edit this page’s content entry';
-entryButton.addEventListener('click', () => {
-  const file = pageSource();
-  if (file) void openEntryPanel(file);
-});
-
-// Small ✕ above the pills, revealed while the group is hovered: hides the
-// whole control group (buttons + hint) until the next page reload.
-const hideButton = styled('button', 'atx-hide', {
-  width: '20px',
-  height: '20px',
-  padding: '0',
-  font: `600 11px/1 ${FONT.ui}`,
-  textAlign: 'center',
-  color: '#ddd',
-  background: 'rgba(28, 28, 43, 0.85)',
-  border: 'none',
-  borderRadius: '999px',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-  cursor: 'pointer',
-  alignSelf: 'flex-end',
-  display: 'none',
-}, 'atx-hide');
-hideButton.type = 'button';
-hideButton.textContent = '✕';
-hideButton.title = 'Hide editing buttons until reload';
-hideButton.addEventListener('click', () => {
-  setEditMode(false);
-  controls.style.display = 'none';
-});
-
-controls.addEventListener('mouseenter', () => {
-  hideButton.style.display = '';
-  toggle.style.opacity = '1';
-  entryButton.style.opacity = '1';
-});
-controls.addEventListener('mouseleave', () => {
-  hideButton.style.display = 'none';
-  toggle.style.opacity = PILL_OPACITY;
-  entryButton.style.opacity = PILL_OPACITY;
-});
 
 // ---------------------------------------------------------------------------
 // Navigate-while-held: holding Ctrl or Alt/Option suspends editing so clicks
@@ -154,27 +70,6 @@ const NAV_HINT = IS_MAC ? 'hold ⌃ or ⌥ to navigate' : 'hold Ctrl to navigate
 
 let navigating = false;
 
-// Small annotation beside the toggle so hold-to-navigate isn't completely
-// hidden. Visible only while edit mode is on. Anchored 10px to the left of the
-// button stack, bottom-aligned with the Edit pill (absolute, so showing it
-// never shifts the pills). Sits left rather than below to stay on-screen now
-// the controls hug the viewport bottom.
-const hint = styled('div', 'atx-toggle-hint', {
-  position: 'absolute',
-  bottom: '0',
-  right: 'calc(100% + 10px)',
-  padding: '3px 8px',
-  font: `500 10px/1.3 ${FONT.ui}`,
-  textAlign: 'center',
-  whiteSpace: 'nowrap',
-  color: '#ddd',
-  background: 'rgba(28, 28, 43, 0.85)',
-  borderRadius: '999px',
-  pointerEvents: 'none',
-  display: 'none',
-}, 'atx-toggle-hint');
-hint.textContent = NAV_HINT;
-
 function refreshCursor(): void {
   document.body.style.cursor = editMode && !navigating ? 'crosshair' : '';
 }
@@ -184,7 +79,8 @@ function setNavigating(on: boolean): void {
   if (navigating === next) return;
   navigating = next;
   refreshCursor();
-  hint.textContent = navigating ? 'release to edit' : NAV_HINT;
+  // The bar carries the hint, so hold-to-navigate isn't completely hidden.
+  bar.setHint(navigating ? 'release to edit' : NAV_HINT);
   if (navigating) clearHighlight();
 }
 
@@ -209,12 +105,19 @@ document.addEventListener('mousemove', (e) => {
   if (editMode) setNavigating(e.ctrlKey || e.altKey);
 }, true);
 
+/** Remember whether the tree is wanted, across the save-triggered reload. */
+function rememberTree(open: boolean): void {
+  treeWanted = open;
+  try {
+    sessionStorage.setItem('astroTextEditTree', open ? '1' : '0');
+  } catch {
+    // sessionStorage unavailable (rare) — the choice just won't persist.
+  }
+}
+
 function setEditMode(on: boolean): void {
   editMode = on;
   if (!on) setNavigating(false);
-  toggle.style.background = on ? COLOR.accent : COLOR.idle;
-  toggle.textContent = on ? '✎ Editing' : '✎ Edit';
-  hint.style.display = on ? 'block' : 'none';
   refreshCursor();
   // Survive the full-page reload that follows every successful save.
   try {
@@ -224,15 +127,56 @@ function setEditMode(on: boolean): void {
   }
   if (on) {
     tree.rebuild();
-    tree.show();
+    // Closed by default: hide() is what puts the edge tab up now that editing
+    // is on, so the tree is one click away without being in the way.
+    if (treeWanted) tree.show();
+    else tree.hide();
   } else {
     clearHighlight();
     tree.hide();
-    state.dismiss(); // cancel any open inline edit (restores text) / close any panel
+    // Only panels can still be open here: every exit path commits an inline
+    // edit first (exitEditing), so this can no longer discard typing.
+    state.dismiss();
   }
+  bar.setHint(on ? NAV_HINT : null);
+  bar.refresh();
+  // Edit mode holds the bar out whether or not it is pinned — it carries the
+  // save state and the way out — so the retract state has to be recomputed.
+  bar.syncVisibility();
 }
 
-toggle.addEventListener('click', () => setEditMode(!editMode));
+// The single way out of edit mode. Anything pending is written first and we
+// only leave once the write has landed, so "am I done?" is answered by the
+// bar's exit button rather than by hoping. A cancel (Escape) is the *other*
+// path and stays deliberate — it is the only way to throw a change away.
+let settleWatcher: (() => void) | null = null;
+
+function exitEditing(): void {
+  if (state.savePhase() === 'saving') {
+    leaveWhenSettled();
+    return;
+  }
+  if (state.get()) {
+    state.commit(); // a text edit saves; a panel just closes
+    if (state.savePhase() === 'saving') {
+      leaveWhenSettled();
+      return;
+    }
+  }
+  setEditMode(false);
+}
+
+/** Hold edit mode open until the in-flight write settles, then leave — unless
+ *  it failed, in which case stay so the red exit button is there to be read. */
+function leaveWhenSettled(): void {
+  if (settleWatcher) return;
+  settleWatcher = state.onSavePhase((phase) => {
+    if (phase === 'saving') return;
+    settleWatcher?.();
+    settleWatcher = null;
+    if (phase !== 'error') setEditMode(false);
+  });
+}
 
 // Global Escape closes any open modal interaction (image/dynamic panel) and
 // guarantees state resets, then clears a locked element-tree selection if one
@@ -263,6 +207,42 @@ async function openSource(src: SourceLoc): Promise<void> {
   }
 }
 
+/**
+ * The file this page is written in, for the bar menu's "Open page source".
+ *
+ * There is no annotation for "the page" — only per-element ones — so this takes
+ * the source file that renders the most annotated elements on the page. That is
+ * the page's own template in every ordinary case, and a component only when it
+ * really does contribute most of the markup (in which case it is the file you'd
+ * want anyway).
+ */
+function pageSourceFile(): string | null {
+  const counts = new Map<string, number>();
+  for (const el of annotatedElements()) {
+    const src = sourceFor(el);
+    if (!src) continue;
+    counts.set(src.file, (counts.get(src.file) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [file, count] of counts) {
+    if (count > bestCount) {
+      best = file;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+function openPageSource(): void {
+  const file = pageSourceFile();
+  if (!file) {
+    toast('No source-annotated elements on this page to locate it by', 'err');
+    return;
+  }
+  void openSource({ file, loc: '1:1' });
+}
+
 /** Open a CSS rule's source in the editor (hover-pill inspector), reporting the
  *  result — the server jumps to the located line, or the file top on a miss. */
 async function openRule(file: string, selector: string): Promise<void> {
@@ -282,7 +262,7 @@ function sizeLabel(text: string): string {
 }
 
 /**
- * The hover pill's "copy ⧉": gather the element's context and write it to the
+ * The hover pill's "copy": gather the element's context and write it to the
  * clipboard. Resolves true only on a real clipboard write; when the API is
  * missing (a dev server reached over the network is not a secure context) or
  * refuses, the text goes to a panel the user can copy from by hand instead.
@@ -334,12 +314,49 @@ const tree = initTree({
   clearHighlight,
   openEditor: (el) => router.openElementAt(el),
   openSource: (src) => void openSource(src),
+  // The ✕ and the edge tab toggle the panel themselves; record the choice so a
+  // save-triggered reload brings the tree back the way the user left it.
+  onToggle: (open) => {
+    rememberTree(open);
+    bar.refresh();
+  },
 });
 const router = initRouter({
   isEditMode,
   isNavigating: () => navigating,
   openSource: (src) => void openSource(src),
   openPeek,
+});
+// The admin bar is a view over everything above: it owns no editing state, it
+// reads and drives it. Created last so its deps close over live references.
+const bar = initAdminBar({
+  isEditMode,
+  enterEdit: () => setEditMode(true),
+  exitEdit: exitEditing,
+  // The tree's row hover only means anything in edit mode, so asking for the
+  // tree from a cold page turns edit mode on with it.
+  showTree: () => {
+    rememberTree(true);
+    if (!editMode) {
+      setEditMode(true); // opens the tree with it, now that it is wanted
+      return;
+    }
+    tree.rebuild();
+    tree.show();
+    bar.refresh();
+  },
+  hideTree: () => {
+    rememberTree(false);
+    tree.hide();
+    bar.refresh();
+  },
+  isTreeOpen: () => tree.isOpen(),
+  hasEntry: () => pageSource() !== null,
+  openEntry: () => {
+    const file = pageSource();
+    if (file) void openEntryPanel(file);
+  },
+  openPageSource,
 });
 
 // After an HMR update: drop stale hover state, and re-snapshot source
@@ -353,6 +370,7 @@ if (import.meta.hot) {
     // The DOM (and every element object) was replaced — rebuild from the fresh
     // annotations, preserving collapse + selection by their stable paths.
     if (editMode) tree.rebuild();
+    bar.refresh(); // a navigation may have gained or lost a content entry
   });
 }
 
@@ -361,21 +379,25 @@ if (import.meta.hot) {
 // ---------------------------------------------------------------------------
 
 async function boot(): Promise<void> {
-  // Confirm the server side is alive before showing the button. If the health
+  // Confirm the server side is alive before showing the bar. If the health
   // check fails the overlay stays out of the way entirely.
   const info = await api.health();
   if (!info) return;
   cssInspectorEnabled = info.cssInspector;
   projectRoot = info.root ?? null; // older servers don't send it — paths stay absolute
-  controls.append(hideButton, entryButton, toggle, hint);
-  document.body.append(...hover.elements, tree.selectionOutline, tree.root, controls);
+  document.body.append(
+    ...hover.elements,
+    tree.selectionOutline,
+    tree.root,
+    tree.tab,
+    ...bar.elements,
+  );
+  bar.refresh();
 
-  // The entry pill is a one-click CMS action, useful outside edit mode too —
-  // show it whenever the page declares a backing content file.
-  entryButton.style.display = pageSource() ? 'block' : 'none';
-
-  // Restore edit mode across the full-page reload that follows every save.
+  // Restore edit mode — and whether the tree was open with it — across the
+  // full-page reload that follows every save.
   try {
+    treeWanted = sessionStorage.getItem('astroTextEditTree') === '1';
     if (sessionStorage.getItem('astroTextEditMode') === '1') setEditMode(true);
   } catch {
     // sessionStorage unavailable — start with edit mode off.

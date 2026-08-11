@@ -1,8 +1,19 @@
 import type { ClassifyResult, SourceLoc } from "../shared/protocol.ts";
 import { classifyCached, peekClassification } from "./classify-cache.ts";
 import { buildRulesCard, rulesForToken } from "./css-inspect.ts";
+import { icon, setIcon } from "./icons.ts";
 import { nearestSource, sourceFor } from "./source-map.ts";
-import { COLOR, FONT, Z, basename, hexToRgba, pillButton, styled } from "./ui.ts";
+import {
+  COLOR,
+  FONT,
+  Z,
+  basename,
+  chromeInset,
+  hexToRgba,
+  pillButton,
+  setPillLabel,
+  styled,
+} from "./ui.ts";
 
 /**
  * Hover behaviour: the outline that tracks the hovered source-mapped element
@@ -115,36 +126,46 @@ tooltipLabel.append(tooltipLoc, tooltipVerdict);
 tooltipLabel.title = "Peek at the source code";
 tooltipLabel.addEventListener("mouseenter", () => (tooltipLabel.style.textDecoration = "underline"));
 tooltipLabel.addEventListener("mouseleave", () => (tooltipLabel.style.textDecoration = "none"));
-const tooltipOpen = pillButton("atx-tooltip-open", "open ↗", "Open this location in your editor");
+const tooltipOpen = pillButton(
+  "atx-tooltip-open",
+  "open",
+  "Open this location in your editor",
+  {},
+  icon("external", 12),
+);
 
 // The context copy: everything we know about this element as one markdown
 // block, for pasting into an AI assistant. Its label swaps through
-// copying…/copied ✓, so it holds a fixed width — the pill must not resize
+// copying…/copied, so it holds a fixed width — the pill must not resize
 // mid-interaction (the verdict slot next to it exists for the same reason).
-const COPY_IDLE = "copy ⧉";
+const COPY_IDLE = "copy";
+const copyIcon = icon("copy", 12);
 const tooltipCopy = pillButton(
   "atx-tooltip-copy",
   COPY_IDLE,
   "Copy this element's HTML, CSS and source as context for an AI assistant",
-  { minWidth: "8ch", textAlign: "center" },
+  { minWidth: "86px" },
+  copyIcon,
 );
 tooltipRow.append(tooltipLabel, tooltipOpen, tooltipCopy);
 
 let copyResetTimer: number | null = null;
 
 /** Back to the idle label, cancelling any pending flash. Runs on every
- *  highlight change too, so a "copied ✓" never carries onto another element. */
+ *  highlight change too, so a "copied" never carries onto another element. */
 function resetCopy(): void {
   if (copyResetTimer !== null) {
     clearTimeout(copyResetTimer);
     copyResetTimer = null;
   }
   tooltipCopy.disabled = false;
-  tooltipCopy.textContent = COPY_IDLE;
+  setPillLabel(tooltipCopy, COPY_IDLE);
+  setIcon(copyIcon, "copy", 12);
 }
 
 function flashCopy(label: string): void {
-  tooltipCopy.textContent = label;
+  setPillLabel(tooltipCopy, label);
+  setIcon(copyIcon, "check", 12);
   copyResetTimer = window.setTimeout(resetCopy, 1200);
 }
 
@@ -314,23 +335,31 @@ export function initHover(deps: HoverDeps): HoverHandle {
     cancelHide();
     resetCopy();
     tooltipCopy.disabled = true;
-    tooltipCopy.textContent = "copying…";
+    setPillLabel(tooltipCopy, "copying…");
+    setIcon(copyIcon, "spinner", 12);
     void deps.copyContext(el, src).then((copied) => {
       tooltipCopy.disabled = false;
-      if (copied) flashCopy("copied ✓");
+      if (copied) flashCopy("copied");
       else resetCopy();
     });
   });
 
   /** Sit the pill fully above the element, measured by its actual height (so the
    *  taller chips-row variant never overlaps the element). Only when there's no
-   *  room above does it drop just below. Must run after the pill's content is in
-   *  place — including the chips — for offsetHeight to be right. */
+   *  room above does it drop just below. The admin bar's strip counts as "no
+   *  room" — a pill hidden under it is worse than one below the element. Must run
+   *  after the pill's content is in place — including the chips — for
+   *  offsetHeight to be right. */
   function positionPill(rect: DOMRect): void {
     const gap = 6;
+    const inset = chromeInset();
+    const minTop = inset.top + 4;
+    const maxBottom = window.innerHeight - inset.bottom - 4;
     const above = rect.top - tooltip.offsetHeight - gap;
+    const below = rect.bottom + gap;
     tooltip.style.left = `${Math.max(4, rect.left)}px`;
-    tooltip.style.top = `${above >= 4 ? above : rect.bottom + gap}px`;
+    const fitsBelow = below + tooltip.offsetHeight <= maxBottom;
+    tooltip.style.top = `${above >= minTop ? above : fitsBelow ? below : minTop}px`;
   }
 
   /** Paint the outline + pill for `el` with the given verdict. */

@@ -1,8 +1,9 @@
 import type { SourceLoc } from '../shared/protocol.ts';
+import { icon } from './icons.ts';
 import { isOwnUi } from './router.ts';
 import { annotatedElements, pathFor, sourceFor } from './source-map.ts';
 import { type TreeNode, buildTreeModel } from './tree-model.ts';
-import { COLOR, FONT, Z, basename, isolateScroll, styled } from './ui.ts';
+import { COLOR, FONT, Z, basename, isolateScroll, onChromeInset, styled } from './ui.ts';
 
 /**
  * Element-tree panel: a left-docked, non-modal outline of the page's
@@ -41,17 +42,24 @@ export interface TreeDeps {
   openEditor(el: HTMLElement): void;
   /** Jump the user's editor straight to a source location (row loc click). */
   openSource(src: SourceLoc): void;
+  /** The panel showed or hid itself (its ✕, or the restore tab), so the admin
+   *  bar's Elements button can follow. Not called for show()/hide() driven from
+   *  outside — the caller already knows. */
+  onToggle?(open: boolean): void;
 }
 
 export interface TreeHandle {
   /** The panel root — appended to <body> at boot. */
   root: HTMLElement;
+  /** The edge tab that brings a closed panel back — appended to <body> at boot. */
+  tab: HTMLElement;
   /** The locked-selection outline — appended to <body> at boot. */
   selectionOutline: HTMLElement;
   /** Re-enumerate the DOM and rebuild rows (boot, edit-on, after HMR). */
   rebuild(): void;
   show(): void;
   hide(): void;
+  isOpen(): boolean;
   /** Mirror the current page-hover element onto its row (page → tree). */
   syncActive(el: HTMLElement | null): void;
   clearSelection(): void;
@@ -71,9 +79,11 @@ export function initTree(deps: TreeDeps): TreeHandle {
     {
       position: 'fixed',
       left: '5px',
+      // Top/bottom rather than a height: the admin bar reserves a strip of one
+      // edge (onChromeInset below), and the panel must never sit under it.
       top: '5px',
+      bottom: '5px',
       borderRadius: '6px',
-      height: 'calc(100vh - 10px)',
       width: 'min(320px, 90vw)',
       zIndex: String(Z + 3),
       display: 'none',
@@ -104,10 +114,12 @@ export function initTree(deps: TreeDeps): TreeHandle {
   barText.textContent = 'Elements';
   const closeBtn = styled('button', 'atx-tree-close', {
     flex: '0 0 auto',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     width: '20px',
     height: '20px',
     padding: '0',
-    font: `600 12px/1 ${FONT.ui}`,
     color: '#ddd',
     background: 'rgba(255,255,255,0.08)',
     border: 'none',
@@ -115,10 +127,52 @@ export function initTree(deps: TreeDeps): TreeHandle {
     cursor: 'pointer',
   });
   closeBtn.type = 'button';
-  closeBtn.textContent = '✕';
+  closeBtn.append(icon('x', 13));
   closeBtn.title = 'Hide the element tree';
-  closeBtn.addEventListener('click', () => hide());
+  closeBtn.addEventListener('click', () => {
+    hide();
+    deps.onToggle?.(false);
+  });
   bar.append(barText, closeBtn);
+
+  // What the panel leaves behind while edit mode is still on: a tab on the left
+  // edge that brings it back, so closing the tree is never a one-way door (the
+  // bar's Elements button does the same job from the other end).
+  const tab = styled(
+    'button',
+    'atx-tree-tab',
+    {
+      position: 'fixed',
+      left: '0',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      zIndex: String(Z + 3),
+      display: 'none',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '24px',
+      height: '64px',
+      padding: '0',
+      border: 'none',
+      borderRight: '1px solid rgba(255,255,255,0.10)',
+      borderRadius: '0 7px 7px 0',
+      background: 'rgba(22, 21, 34, 0.88)',
+      backdropFilter: 'blur(10px)',
+      color: '#b9b0ff',
+      boxShadow: '2px 0 14px rgba(0,0,0,0.3)',
+      cursor: 'pointer',
+    },
+    'atx-tree-tab',
+  );
+  tab.type = 'button';
+  tab.title = 'Show the element tree';
+  tab.append(icon('sidebar', 15));
+  tab.addEventListener('mouseenter', () => (tab.style.color = '#fff'));
+  tab.addEventListener('mouseleave', () => (tab.style.color = '#b9b0ff'));
+  tab.addEventListener('click', () => {
+    show();
+    deps.onToggle?.(true);
+  });
 
   const body = styled('div', 'atx-tree-body', {
     flex: '1 1 auto',
@@ -129,6 +183,13 @@ export function initTree(deps: TreeDeps): TreeHandle {
   isolateScroll(body);
 
   root.append(bar, body);
+
+  // Keep clear of the admin bar, whichever edge it is docked to. Fires once on
+  // subscribe, so the panel is correct however the two modules boot.
+  onChromeInset(({ top, bottom }) => {
+    root.style.top = `${top + 5}px`;
+    root.style.bottom = `${bottom + 5}px`;
+  });
 
   // The locked-selection outline — this panel's own, distinct from hover's
   // transient one: solid + glow, no fill, no transition (tracks scroll crisply).
@@ -282,12 +343,17 @@ export function initTree(deps: TreeDeps): TreeHandle {
     const path = pathFor(el);
     const chevron = styled('span', 'atx-tree-chevron', {
       flex: '0 0 auto',
-      width: '10px',
-      textAlign: 'center',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '12px',
       color: COLOR.muted,
       cursor: hasChildren ? 'pointer' : 'default',
     });
-    chevron.textContent = hasChildren ? (collapsed.has(path) ? '▸' : '▾') : '·';
+    // A leaf gets a small dot in the same slot, so tags stay column-aligned.
+    chevron.append(
+      hasChildren ? icon(collapsed.has(path) ? 'chevronRight' : 'chevronDown', 12) : icon('dot', 7),
+    );
     if (hasChildren) {
       chevron.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -401,13 +467,32 @@ export function initTree(deps: TreeDeps): TreeHandle {
 
   function show(): void {
     root.style.display = 'flex';
+    tab.style.display = 'none';
   }
 
   function hide(): void {
     root.style.display = 'none';
+    // The tab only makes sense while editing — outside edit mode the tree has
+    // nothing live to point at, and the bar's Elements button reopens both.
+    tab.style.display = deps.isEditMode() ? 'flex' : 'none';
     syncActive(null);
     clearSelection();
   }
 
-  return { root, selectionOutline, rebuild, show, hide, syncActive, clearSelection, hasSelection };
+  function isOpen(): boolean {
+    return root.style.display !== 'none';
+  }
+
+  return {
+    root,
+    tab,
+    selectionOutline,
+    rebuild,
+    show,
+    hide,
+    isOpen,
+    syncActive,
+    clearSelection,
+    hasSelection,
+  };
 }

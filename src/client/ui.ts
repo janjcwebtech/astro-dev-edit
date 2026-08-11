@@ -77,6 +77,42 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// --- Viewport chrome ---------------------------------------------------------
+
+/** Strips of the viewport that the overlay's own fixed chrome occupies. */
+export interface ChromeInset {
+  top: number;
+  bottom: number;
+}
+
+let inset: ChromeInset = { top: 0, bottom: 0 };
+const insetListeners = new Set<(i: ChromeInset) => void>();
+
+/** The current chrome inset — read it when placing anything against a viewport
+ *  edge (the hover pill, a docked panel), so it can't hide under the admin bar. */
+export function chromeInset(): ChromeInset {
+  return inset;
+}
+
+/**
+ * Declare how much of the viewport edge the admin bar occupies. One-directional
+ * on purpose: the bar tells ui.ts, and the surfaces that must keep clear (toast,
+ * element tree, hover pill) read it back or subscribe — so nothing here has to
+ * import the bar.
+ */
+export function setChromeInset(next: ChromeInset): void {
+  if (next.top === inset.top && next.bottom === inset.bottom) return;
+  inset = next;
+  for (const fn of insetListeners) fn(inset);
+}
+
+/** Subscribe to inset changes. Fires immediately with the current value, so a
+ *  subscriber is correct whether it registers before or after the bar. */
+export function onChromeInset(fn: (i: ChromeInset) => void): void {
+  insetListeners.add(fn);
+  fn(inset);
+}
+
 /** Lock an element during a save: dim + spinner overlay. Returns a release fn. */
 export function lockElement(el: HTMLElement): () => void {
   const rect = el.getBoundingClientRect();
@@ -97,10 +133,11 @@ export function lockElement(el: HTMLElement): () => void {
   return () => veil.remove();
 }
 
-/** Bottom-center toast. `kind` sets the accent. Auto-dismisses. */
+/** Bottom-center toast, lifted clear of a bottom-docked admin bar. `kind` sets
+ *  the accent. Auto-dismisses. */
 export function toast(message: string, kind: 'ok' | 'err'): void {
   const t = styled('div', `atx-toast atx-toast-${kind}`, {
-    position: 'fixed', zIndex: String(Z + 5), left: '50%', bottom: '24px',
+    position: 'fixed', zIndex: String(Z + 5), left: '50%', bottom: `${24 + inset.bottom}px`,
     transform: 'translateX(-50%)', padding: '10px 16px', borderRadius: '8px',
     font: '500 13px system-ui', color: '#fff',
     background: kind === 'ok' ? COLOR.ok : COLOR.err,
@@ -267,27 +304,44 @@ export function footButton(label: string, kind: ButtonKind, onClick: () => void)
 
 /**
  * A small translucent button for the dark hover pill and its rules card — the
- * pill's "open ↗" / "copy ⧉" and each rule's own "open ↗". One primitive so the
- * three stay identical; `extra` covers the per-caller trim (font size, flex).
+ * pill's "open" / "copy" and each rule's own "open". One primitive so the three
+ * stay identical; `extra` covers the per-caller trim (font size, flex).
+ *
+ * The label always lives in its own `[data-label]` span so `setPillLabel` can
+ * swap the text without disturbing the icon (icons come from icons.ts, passed
+ * in as an element — ui.ts stays the leaf module nothing else here imports).
  */
 export function pillButton(
   className: string,
   label: string,
   title: string,
   extra: Partial<CSSStyleDeclaration> = {},
+  iconEl?: HTMLElement,
 ): HTMLButtonElement {
   const btn = styled('button', className, {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
     marginLeft: '8px', padding: '2px 7px', font: `600 11px ${FONT.ui}`,
     color: '#fff', background: 'rgba(255,255,255,0.14)',
     border: 'none', borderRadius: '4px', cursor: 'pointer',
     ...extra,
   });
   btn.type = 'button';
-  btn.textContent = label;
+  const text = styled('span', 'atx-pill-label', {});
+  text.dataset.label = '';
+  text.textContent = label;
+  if (iconEl) btn.append(iconEl);
+  btn.append(text);
   btn.title = title;
   btn.addEventListener('mouseenter', () => (btn.style.background = 'rgba(255,255,255,0.28)'));
   btn.addEventListener('mouseleave', () => (btn.style.background = 'rgba(255,255,255,0.14)'));
   return btn;
+}
+
+/** Retarget a pill button's label (its icon, if any, stays put). */
+export function setPillLabel(btn: HTMLButtonElement, label: string): void {
+  const text = btn.querySelector<HTMLElement>('[data-label]');
+  if (text) text.textContent = label;
+  else btn.textContent = label;
 }
 
 /** Populate a panel's footer with cancel + confirm buttons, and optionally a

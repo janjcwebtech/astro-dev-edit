@@ -196,7 +196,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
           `import ${JSON.stringify(fileURLToPath(overlayUrl))};`,
         );
 
-        logger.info('edit mode available — toggle from the button in the page corner');
+        logger.info('edit mode available — toggle it from the admin bar at the top of the page');
       },
 
       'astro:server:setup': ({ server, logger }) => {

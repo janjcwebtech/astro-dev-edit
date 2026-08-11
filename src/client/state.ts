@@ -55,3 +55,72 @@ export function dismiss(): void {
   if (interaction.kind === 'panel') interaction.close();
   else if (interaction.kind === 'text') interaction.finish(false);
 }
+
+/**
+ * Close whatever is open, *keeping* the user's work: a text edit commits
+ * (writing to disk) instead of reverting; a panel still just closes, since it
+ * owns its own Save button. The counterpart to `dismiss()` — leaving edit mode
+ * must never silently discard typing, so the exit path goes through here.
+ */
+export function commit(): void {
+  const interaction = current;
+  current = null;
+  if (!interaction) return;
+  if (interaction.kind === 'panel') interaction.close();
+  else if (interaction.kind === 'text') interaction.finish(true);
+}
+
+// --- Save phase --------------------------------------------------------------
+
+/**
+ * How the on-disk state of the page relates to what's on screen — the admin
+ * bar's exit button renders this, so "are my changes saved?" is answerable at a
+ * glance:
+ *
+ *   - 'clean'  — nothing pending; everything typed has been written
+ *   - 'dirty'  — an inline edit has unsaved keystrokes in it
+ *   - 'saving' — a write is in flight
+ *   - 'saved'  — a write just landed (decays back to 'clean')
+ *   - 'error'  — the last write failed and its change was rolled back
+ *
+ * It lives beside the interaction slot because the same editors drive both, but
+ * it is deliberately *reported* rather than derived: only the editor knows
+ * whether the keystrokes so far differ from the original, and only the commit
+ * knows whether the server accepted them.
+ */
+export type SavePhase = 'clean' | 'dirty' | 'saving' | 'saved' | 'error';
+
+/** How long 'saved' stays on screen before decaying to 'clean'. */
+const SAVED_LINGER = 1400;
+
+let phase: SavePhase = 'clean';
+let decayTimer: number | null = null;
+const phaseListeners = new Set<(p: SavePhase) => void>();
+
+export function savePhase(): SavePhase {
+  return phase;
+}
+
+/** Report a phase change. Repeats are dropped, so an editor may call this on
+ *  every keystroke without waking any listener more than once. */
+export function setSavePhase(next: SavePhase): void {
+  if (next === phase) return;
+  if (decayTimer !== null) {
+    clearTimeout(decayTimer);
+    decayTimer = null;
+  }
+  phase = next;
+  for (const fn of phaseListeners) fn(phase);
+  if (phase === 'saved') {
+    decayTimer = window.setTimeout(() => {
+      decayTimer = null;
+      setSavePhase('clean');
+    }, SAVED_LINGER);
+  }
+}
+
+/** Subscribe to phase changes; returns an unsubscribe. */
+export function onSavePhase(fn: (p: SavePhase) => void): () => void {
+  phaseListeners.add(fn);
+  return () => phaseListeners.delete(fn);
+}

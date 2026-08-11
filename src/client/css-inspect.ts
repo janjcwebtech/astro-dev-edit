@@ -9,6 +9,7 @@
  * (/inspect/open) to jump the editor there. See src/server/inspect-locate.ts.
  */
 
+import { icon } from './icons.ts';
 import { COLOR, FONT, Z, basename, isolateScroll, pillButton, styled } from './ui.ts';
 
 /** One applied rule, distilled for display. */
@@ -192,12 +193,15 @@ export function rulesForElement(el: Element): MatchedRule[] {
 
 // --- Card DOM ----------------------------------------------------------------
 
-/** A small "open ↗" button matching the pill's own, for a rule's source jump. */
+/** A small "open" button matching the pill's own, for a rule's source jump. */
 function openButton(onClick: () => void): HTMLButtonElement {
-  const btn = pillButton('atx-tooltip-rule-open', 'open ↗', 'Open this rule in your editor', {
-    font: `600 10.5px ${FONT.ui}`,
-    flex: '0 0 auto',
-  });
+  const btn = pillButton(
+    'atx-tooltip-rule-open',
+    'open',
+    'Open this rule in your editor',
+    { font: `600 10.5px ${FONT.ui}`, flex: '0 0 auto' },
+    icon('external', 11),
+  );
   btn.addEventListener('click', onClick);
   return btn;
 }
