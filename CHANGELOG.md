@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/): fix-only releases bump the patch (`0.0.x`), releases with feature work bump the minor (`0.x.0`), and the major (`X.0.0`) moves only on an explicitly confirmed bigger release. While the project is in alpha (`0.x.x`), breaking changes may land in minor releases.
 
+## \[Unreleased\]
+
+### Fixed
+
+-   The label in a pill button (the popups' **open**, the hover pill's **open** and **copy**) sat about 1.5px low, so the button read as pushed down — the text more than the icon. Flex centring lines up the *boxes*, and a text box is asymmetric around its ink: on an 11px label it reserves ~11px above the baseline for ascenders and 2px below, while an all-lowercase word ("open", "copy") only paints the ~6px x-height band. The label is now lifted onto the pill's centre; the icon, whose glyph does fill its box, was already right
+
 ## \[0.7.1\] - 2026-08-12
 
 ### Added

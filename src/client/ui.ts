@@ -338,7 +338,20 @@ export function pillButton(
     ...extra,
   });
   btn.type = 'button';
-  const text = styled('span', 'atx-pill-label', {});
+  /**
+   * Optical centring, which flexbox can't do for text. `align-items: center`
+   * lines up the *boxes*, but a text box is asymmetric around its ink: on an
+   * 11px label it reserves ~11px above the baseline for ascenders and 2px
+   * below, while an all-lowercase word ("open", "copy") only paints the ~6px
+   * x-height band. Centred by box, that band lands ~1.5px below the middle of
+   * the pill and the label reads as sitting low. Lift it onto the pill's
+   * centre; the icon, whose glyph does fill its box, needs no correction.
+   *
+   * Offset rather than margin (a margin would be half-absorbed by the centring
+   * it is correcting) and `relative` rather than a transform (the spinner icon
+   * animates the host's own transform).
+   */
+  const text = styled('span', 'atx-pill-label', { position: 'relative', top: '-1.5px' });
   text.dataset.label = '';
   text.textContent = label;
   if (iconEl) btn.append(iconEl);
