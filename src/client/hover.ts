@@ -68,7 +68,7 @@ const outline = styled(
     zIndex: String(Z),
     border: `2px solid ${COLOR.accent}`,
     borderRadius: "3px",
-    background: "rgba(124, 92, 255, 0.08)",
+    background: "rgba(97, 68, 215, 0.08)",
     display: "none",
     transition: "all 60ms ease-out",
   },

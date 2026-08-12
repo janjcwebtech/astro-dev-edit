@@ -67,7 +67,7 @@ export interface TreeHandle {
 }
 
 const ROW_INK = '#c8c8e0';
-const ACTIVE_BG = 'rgba(124, 92, 255, 0.16)';
+const ACTIVE_BG = 'rgba(97, 68, 215, 0.16)';
 
 export function initTree(deps: TreeDeps): TreeHandle {
   // Panel shell: fixed to the left edge, full height. Below modal panels/drawer

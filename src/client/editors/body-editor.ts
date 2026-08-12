@@ -41,7 +41,7 @@ const CONTENT_CSS = `
 .atx-rte-content li { margin: 0.2em 0; }
 .atx-rte-content blockquote {
   margin: 0.6em 0; padding: 0.3em 0.9em; border-left: 3px solid ${COLOR.accent};
-  background: rgba(124, 92, 255, 0.07); border-radius: 0 6px 6px 0;
+  background: rgba(97, 68, 215, 0.07); border-radius: 0 6px 6px 0;
 }
 .atx-rte-content pre {
   margin: 0.6em 0; padding: 8px 10px; background: #f4f4f6; border: 1px solid #ddd;

@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 
 -   The admin bar's **Elements** button now carries the same icon as the element tree's edge tab (`#atx-tree-tab`) — the left-panel glyph — instead of its own tree-outline one. Both controls open the same panel from opposite ends, so they now read as one control. The unused `tree` icon was dropped from the icon set
+-   The overlay's primary accent moved from `#7c5cff` to a deeper `#6144d7` — the edit-mode toggle and every primary button, the hover outline and its pill, the editable-text veil, the element tree's active row, the admin bar's mark and its accent edge. The translucent tints derived from it (the hover fill, the veil, the tree row, the rich-text blockquote) were re-derived from the new value; the lighter purples used as *text* on the dark panels are unchanged, as they read as the same family and are tuned for contrast rather than to the brand hex. The playground's own `--accent` still carries the old value
 
 ### Fixed
 

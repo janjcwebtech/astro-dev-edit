@@ -13,7 +13,7 @@ export const Z = 2147483000; // above Astro's dev toolbar, below nothing that ma
 
 export const COLOR = {
   /** Brand / editable-text accent. */
-  accent: '#7c5cff',
+  accent: '#6144d7',
   /** Image classification. */
   image: '#2bb673',
   /** Dynamic-content classification and warnings. */
@@ -120,7 +120,7 @@ export function lockElement(el: HTMLElement): () => void {
     position: 'fixed', zIndex: String(Z + 3), pointerEvents: 'all',
     left: `${rect.left - 2}px`, top: `${rect.top - 2}px`,
     width: `${rect.width + 4}px`, height: `${rect.height + 4}px`,
-    background: 'rgba(124, 92, 255, 0.12)', borderRadius: '3px',
+    background: 'rgba(97, 68, 215, 0.12)', borderRadius: '3px',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   });
   const chip = styled('div', 'atx-veil-chip', {
