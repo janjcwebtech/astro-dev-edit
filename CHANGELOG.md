@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Changed
+
+-   The admin bar's **Elements** button now carries the same icon as the element tree's edge tab (`#atx-tree-tab`) — the left-panel glyph — instead of its own tree-outline one. Both controls open the same panel from opposite ends, so they now read as one control. The unused `tree` icon was dropped from the icon set
+
 ### Fixed
 
 -   The label in a pill button (the popups' **open**, the hover pill's **open** and **copy**) sat about 1.5px low, so the button read as pushed down — the text more than the icon. Flex centring lines up the *boxes*, and a text box is asymmetric around its ink: on an 11px label it reserves ~11px above the baseline for ascenders and 2px below, while an all-lowercase word ("open", "copy") only paints the ~6px x-height band. The label is now lifted onto the pill's centre; the icon, whose glyph does fill its box, was already right

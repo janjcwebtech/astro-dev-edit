@@ -19,7 +19,6 @@ export type IconName =
   | 'cursor'
   | 'pencil'
   | 'file'
-  | 'tree'
   | 'pin'
   | 'pinOff'
   | 'panelTop'
@@ -43,7 +42,6 @@ const PATHS: Record<IconName, string> = {
     '<path d="M5 3.5 11.2 20l2.1-6.2 6.2-2.1z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   pencil: '<path d="M4 20h4L19.2 8.8a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5 4 20z"/><path d="M14.8 6.2 18 9.4"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/>',
-  tree: '<path d="M4 4v11a2 2 0 0 0 2 2h2"/><path d="M4 10h4"/><path d="M11 4h9"/><path d="M11 10h9"/><path d="M11 17h9"/>',
   pin: '<path d="M12 17.5V22"/><path d="M9 3h6v7.5l2.5 3.5h-11L9 10.5z"/>',
   pinOff: '<path d="M12 17.5V22"/><path d="M9 3h6v7.5l2.5 3.5h-11L9 10.5z"/><path d="M3.5 3.5 20.5 20.5"/>',
   panelTop:

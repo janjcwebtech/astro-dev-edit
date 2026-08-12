@@ -654,7 +654,9 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   register({
     id: 'atx-bar-elements',
     label: 'Elements',
-    icon: 'tree',
+    // Same glyph as the tree's own edge tab (#atx-tree-tab): both open the
+    // panel, so they should read as one control from either end.
+    icon: 'sidebar',
     title: 'Show the element tree for this page',
     active: () => deps.isTreeOpen(),
     onSelect: () => (deps.isTreeOpen() ? deps.hideTree() : deps.showTree()),
