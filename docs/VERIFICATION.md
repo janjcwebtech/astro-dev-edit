@@ -179,6 +179,9 @@ whichever sections your change touches; run the whole list before a release.
       the popup still open and the typed markup intact, the bar reading "Save
       failed", and the file untouched — fixing the markup and saving again
       succeeds and closes the popup.
+- [ ] **Open from the title bar** (both source popups): click **open** →
+      the editor jumps to that `file:line:col`, a toast confirms it, and the
+      popup stays open with the typed text intact.
 - [ ] **Tag palette** (same popup): select a word → click `<strong>` → it is
       wrapped and stays selected; click `<em>` again → the tags stack. With no
       selection, `<span>` drops an empty pair with the caret between the halves,

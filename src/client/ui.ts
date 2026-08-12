@@ -186,8 +186,14 @@ function stopScrollPropagation(e: Event): void {
   e.stopPropagation();
 }
 
-/** A centered modal panel shell with a title bar, body slot, and footer slot. */
-export function buildPanel(title: string): HTMLElement {
+/**
+ * A centered modal panel shell with a title bar, body slot, and footer slot.
+ * `action` is placed at the right of the title bar — a jump-to-editor button,
+ * for panels whose title names a source location. It arrives built rather than
+ * described because icons.ts imports this module, and reaching back for
+ * `icon()` here would close a cycle.
+ */
+export function buildPanel(title: string, action?: HTMLElement): HTMLElement {
   const panel = styled('div', 'atx-panel', {
     position: 'fixed', zIndex: String(Z + 6), left: '50%', top: '50%',
     transform: 'translate(-50%, -50%)', width: 'min(420px, 92vw)',
@@ -201,8 +207,14 @@ export function buildPanel(title: string): HTMLElement {
 
   const bar = styled('div', 'atx-panel-title', {
     padding: '12px 16px', font: '600 13px system-ui', borderBottom: `1px solid ${COLOR.panelDivider}`,
+    display: 'flex', alignItems: 'center', gap: '8px',
   });
-  bar.textContent = title;
+  const heading = styled('span', 'atx-panel-heading', {
+    flex: '1', minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  });
+  heading.textContent = title;
+  bar.append(heading);
+  if (action) bar.append(action);
 
   const body = styled('div', 'atx-panel-body', { padding: '16px' });
   body.dataset.body = '';

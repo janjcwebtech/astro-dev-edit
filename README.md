@@ -22,7 +22,8 @@ https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
   sentence with a `<strong>` or a link in it. Inline editing can't serve these
   (it escapes `<`, which would turn the tag into visible punctuation), so a
   click opens a **markup popup** showing the element's source instead. Save
-  with the button or Cmd/Ctrl+Enter. Only these inline tags are allowed —
+  with the button or Cmd/Ctrl+Enter; **open** in the title bar jumps to the
+  file in your editor without closing the popup. Only these inline tags are allowed —
   `<a> <b> <br> <code> <em> <i> <small> <span> <strong> <sub> <sup> <u>` — with
   presentational attributes (`class`, `id`, `title`, `lang`, `dir`, plus
   `href`/`target`/`rel` on links); attributes already in your source are kept
@@ -37,7 +38,7 @@ https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
   (`{benefits.map((b) => <h3>{b.title}</h3>)}`). Clicking opens a **value
   popup** titled with where the string lives (`benefits[].title`), and the edit
   is written to that string in the frontmatter — the template itself is never
-  touched. Plain text only: `{value}` renders escaped, so tags typed here would
+  touched. Its title bar carries the same **open** jump to your editor. Plain text only: `{value}` renders escaped, so tags typed here would
   show as punctuation rather than markup.
 
   Every card in a loop shares one source location, so **which item you clicked
@@ -438,7 +439,9 @@ classes like `atx-panel`,
 `atx-backdrop`, `atx-drop`, `atx-drawer`, the asset picker's `atx-asset-row`
 plus `atx-asset-controls` (filter + scope row), `atx-asset-filter`,
 `atx-asset-scope` (the "Show all" toggle) and `atx-asset-count`, the rich body
-editor's `atx-rte`, the source popups' shared `atx-popup-label` /
+editor's `atx-rte`, `atx-panel-title` (with `atx-panel-heading` and, on the
+source popups, the `atx-panel-open` jump-to-editor button),
+the source popups' shared `atx-popup-label` /
 `atx-popup-input` / `atx-popup-error` plus the markup palette's
 `atx-markup-tags` (the row) / `atx-markup-hint` / `atx-markup-tag` (one per
 insertable tag), `atx-rte-head` (sticky toolbar + image panel),

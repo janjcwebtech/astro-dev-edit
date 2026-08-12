@@ -81,7 +81,12 @@ function buildPalette(input: HTMLTextAreaElement, markDirty: () => void): HTMLEl
   return tools;
 }
 
-export function beginMarkupEdit(el: HTMLElement, src: SourceLoc, html: string): void {
+export function beginMarkupEdit(
+  el: HTMLElement,
+  src: SourceLoc,
+  html: string,
+  openSource: (src: SourceLoc) => void,
+): void {
   clearHighlight();
   openSourcePopup({
     title: `Markup · ${basename(src.file)}:${src.loc}`,
@@ -89,6 +94,7 @@ export function beginMarkupEdit(el: HTMLElement, src: SourceLoc, html: string): 
     value: html,
     mono: true,
     tools: buildPalette,
+    openSource: () => openSource(src),
     save: (value) => commitMarkupEdit(el, src, html, value),
   });
 }

@@ -90,9 +90,9 @@ export function initRouter(deps: RouterDeps): RouterHandle {
     } else if (server.kind === 'text') {
       beginTextEdit(el, src);
     } else if (server.kind === 'markup' && server.markup) {
-      beginMarkupEdit(el, src, server.markup.html);
+      beginMarkupEdit(el, src, server.markup.html, deps.openSource);
     } else if (server.kind === 'expression' && server.expression) {
-      beginExpressionEdit(el, src, server.expression);
+      beginExpressionEdit(el, src, server.expression, deps.openSource);
     } else {
       showDynamicNotice(
         src,

@@ -29,6 +29,7 @@ export function beginExpressionEdit(
   el: HTMLElement,
   src: SourceLoc,
   info: { property: string; label: string },
+  openSource: (src: SourceLoc) => void,
 ): void {
   clearHighlight();
   const original = el.textContent ?? '';
@@ -37,6 +38,9 @@ export function beginExpressionEdit(
     label: `Text of ${info.property}, in ${basename(src.file)}`,
     value: original,
     minHeight: '90px',
+    // The element's own loc: that is where the {expression} sits, which is the
+    // way in to both the loop and the const it reads.
+    openSource: () => openSource(src),
     save: (value) => commitExpressionEdit(el, src, original, value),
   });
 }

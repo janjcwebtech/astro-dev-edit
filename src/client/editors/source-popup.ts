@@ -1,9 +1,11 @@
+import { icon } from '../icons.ts';
 import * as state from '../state.ts';
 import {
   COLOR,
   INPUT_STYLE,
   buildBackdrop,
   buildPanel,
+  pillButton,
   styled,
   wirePanelButtons,
 } from '../ui.ts';
@@ -44,10 +46,30 @@ export interface SourcePopupOptions {
    * message to show inside the still-open panel.
    */
   save: (value: string) => Promise<string | null>;
+  /**
+   * Jump to the source in the user's editor. Adds an **open** button to the
+   * title bar: what these popups edit *is* source, so the file it came from
+   * should be one click away — the same escape hatch the hover pill and the
+   * refusal notice offer. Editing continues; the panel stays open.
+   */
+  openSource?: () => void;
 }
 
 export function openSourcePopup(opts: SourcePopupOptions): void {
-  const panel = buildPanel(opts.title);
+  let jump: HTMLElement | undefined;
+  if (opts.openSource) {
+    const btn = pillButton(
+      'atx-panel-open',
+      'open',
+      'Open this location in your editor',
+      { marginLeft: '0', flex: '0 0 auto' },
+      icon('external', 12),
+    );
+    btn.addEventListener('click', () => opts.openSource?.());
+    jump = btn;
+  }
+
+  const panel = buildPanel(opts.title, jump);
   const body = panel.querySelector('[data-body]') as HTMLElement;
 
   const label = styled('label', 'atx-popup-label', {
