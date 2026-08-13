@@ -43,6 +43,25 @@ export function releaseIf(token: Interaction): void {
 }
 
 /**
+ * Hand the slot back to whoever held it before `token` claimed it — the
+ * counterpart to `begin()` for a **nested** interaction.
+ *
+ * `begin()` replaces the current holder outright. That is right when one thing
+ * is open at a time, but wrong when something opens *above* something else: the
+ * media modal can open over the CMS drawer, and a plain `releaseIf` would leave
+ * the still-open drawer owning nothing — its Escape and backdrop would silently
+ * stop working, with the user's unsaved fields still in it.
+ *
+ * Capture `get()` immediately before `begin()`, and pass it here on close. If a
+ * third interaction has since taken the slot, this does nothing rather than
+ * stealing it back.
+ */
+export function releaseTo(token: Interaction, previous: Interaction | null): void {
+  if (current !== token) return;
+  current = previous;
+}
+
+/**
  * Tear down whatever is open: a panel closes, a text edit cancels (restoring
  * the original text), a busy marker is simply dropped. The slot is cleared
  * BEFORE the teardown runs, so closers that release their own token can't

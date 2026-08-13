@@ -14,6 +14,10 @@ export const Z = 2147483000; // above Astro's dev toolbar, below nothing that ma
 export const COLOR = {
   /** Brand / editable-text accent. */
   accent: '#6144d7',
+  /** The accent lightened enough to read as *text* on `panelBg` — the solid
+   *  accent is a background colour and fails contrast as a foreground. Used for
+   *  links inside panels. */
+  accentText: '#a893ff',
   /** Image classification. */
   image: '#2bb673',
   /** Dynamic-content classification and warnings. */
@@ -192,14 +196,36 @@ function stopScrollPropagation(e: Event): void {
  * for panels whose title names a source location. It arrives built rather than
  * described because icons.ts imports this module, and reaching back for
  * `icon()` here would close a cycle.
+ *
+ * `opts` covers the panels that need a different size or stacking layer (the
+ * media modal, the widened image panel). Sizing stays here rather than being
+ * poked into `panel.style` by callers, so one module owns panel chrome.
  */
-export function buildPanel(title: string, action?: HTMLElement): HTMLElement {
+export interface PanelOptions {
+  /** CSS width; defaults to `min(420px, 92vw)`. */
+  width?: string;
+  /** CSS height. Omitted means auto — the panel is as tall as its content.
+   *  Setting it makes the body the scrolling region. */
+  height?: string;
+  /** Offset added to the base `Z`. Defaults to 6 (the standard panel layer);
+   *  the media modal uses 8 so it can stack above the CMS drawer. */
+  layer?: number;
+}
+export function buildPanel(
+  title: string,
+  action?: HTMLElement,
+  opts: PanelOptions = {},
+): HTMLElement {
   const panel = styled('div', 'atx-panel', {
-    position: 'fixed', zIndex: String(Z + 6), left: '50%', top: '50%',
-    transform: 'translate(-50%, -50%)', width: 'min(420px, 92vw)',
+    position: 'fixed', zIndex: String(Z + (opts.layer ?? 6)), left: '50%', top: '50%',
+    transform: 'translate(-50%, -50%)', width: opts.width ?? 'min(420px, 92vw)',
+    ...(opts.height ? { height: opts.height } : {}),
+    // A sized panel lays its title/body/foot out as a column so the body is the
+    // only part that grows; the default auto-height panel is unaffected.
+    ...(opts.height ? { display: 'flex', flexDirection: 'column' } : {}),
     background: COLOR.panelBg, color: '#eee', borderRadius: '12px',
     boxShadow: '0 12px 48px rgba(0,0,0,0.5)', border: `1px solid ${COLOR.panelBorder}`,
-    overflow: 'hidden', font: '13px system-ui',
+    overflow: 'hidden', font: '13px system-ui', boxSizing: 'border-box',
     // Edit mode sets a crosshair cursor on the whole page; our UI is not a
     // click-to-edit surface, so restore normal per-element cursors.
     cursor: 'auto',
@@ -216,13 +242,19 @@ export function buildPanel(title: string, action?: HTMLElement): HTMLElement {
   bar.append(heading);
   if (action) bar.append(action);
 
-  const body = styled('div', 'atx-panel-body', { padding: '16px' });
+  const body = styled('div', 'atx-panel-body', {
+    padding: '16px',
+    // In a sized panel the body absorbs the leftover height and scrolls;
+    // `minHeight: 0` is what lets a flex child actually shrink to do that.
+    ...(opts.height ? { flex: '1 1 auto', minHeight: '0', overflowY: 'auto' } : {}),
+  });
   body.dataset.body = '';
   isolateScroll(body);
 
   const foot = styled('div', 'atx-panel-foot', {
     padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
     borderTop: `1px solid ${COLOR.panelDivider}`,
+    ...(opts.height ? { flex: '0 0 auto' } : {}),
   });
   foot.dataset.foot = '';
 
@@ -278,10 +310,43 @@ export function buildDrawer(title: string): HTMLElement {
   return drawer;
 }
 
-/** Dim backdrop that closes the panel when clicked. */
-export function buildBackdrop(onClose: () => void): HTMLElement {
+/**
+ * Point an `<img>` at a file that was *just* written, retrying briefly.
+ *
+ * Vite's static middleware 404s a newly written file for a short window — long
+ * enough that the load fired the instant an upload or import returns will fail,
+ * leaving an empty box even though the same URL serves fine a moment later
+ * (verified: 404 at write time, 200 immediately after). The browser also caches
+ * that 404 for the life of the page, so each attempt carries a fresh query
+ * string to defeat both.
+ *
+ * Display only — the value written into source is always the clean path.
+ */
+export function setFreshSrc(img: HTMLImageElement, path: string): void {
+  const ATTEMPTS = 8;
+  const DELAY_MS = 200;
+  let left = ATTEMPTS;
+  const bust = (): string => `${path}${path.includes('?') ? '&' : '?'}atx=${Date.now()}`;
+  const onError = (): void => {
+    if (--left <= 0) {
+      img.removeEventListener('error', onError);
+      return;
+    }
+    setTimeout(() => {
+      img.src = bust();
+    }, DELAY_MS);
+  };
+  img.addEventListener('error', onError);
+  img.addEventListener('load', () => img.removeEventListener('error', onError), { once: true });
+  img.src = bust();
+}
+
+/** Dim backdrop that closes the panel when clicked. `layer` matches the panel
+ *  it sits under — the media modal's backdrop must land above the CMS drawer it
+ *  can open over, not at the standard panel layer. */
+export function buildBackdrop(onClose: () => void, layer = 5): HTMLElement {
   const b = styled('div', 'atx-backdrop', {
-    position: 'fixed', inset: '0', zIndex: String(Z + 5),
+    position: 'fixed', inset: '0', zIndex: String(Z + layer),
     background: 'rgba(0,0,0,0.4)',
   });
   b.addEventListener('click', onClose);
@@ -312,6 +377,18 @@ export function footButton(label: string, kind: ButtonKind, onClick: () => void)
   btn.textContent = label;
   btn.addEventListener('click', onClick);
   return btn;
+}
+
+/**
+ * Enable or disable a button *visibly*. There is no stylesheet, so `:disabled`
+ * cannot dim it — a disabled primary button would otherwise look identical to a
+ * live one and read as broken rather than as unavailable. Every caller that sets
+ * `.disabled` on an overlay button should go through this instead.
+ */
+export function setButtonEnabled(btn: HTMLButtonElement, enabled: boolean): void {
+  btn.disabled = !enabled;
+  btn.style.opacity = enabled ? '1' : '0.45';
+  btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
 }
 
 /**

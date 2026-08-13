@@ -34,14 +34,18 @@ Run in this order; each is cheaper than the next.
 | Route dispatch: base-path passthrough, exact-path matching, query strings, 404s | `tests/middleware.test.ts` (routing & guards) |
 | Security gate: non-localhost 403, foreign-Origin 403, localhost Origin accepted | `tests/middleware.test.ts` (routing & guards) |
 | Request hygiene: body size caps, malformed JSON, missing/mistyped fields → 400 | `tests/middleware.test.ts` (per-route cases) |
-| `GET /health` | `tests/middleware.test.ts` |
+| `GET /health` — config flags; `unsplash` true only when enabled *and* a key resolves, false when disabled / empty key / resolution throws | `tests/middleware.test.ts`, `tests/unsplash-routes.test.ts` |
 | `GET /assets` — asset dirs listed as sorted web paths, `public/` mapped to `/` | `tests/middleware.test.ts` |
-| `POST /upload` — data-URL write into the configured `uploadDir`, clash suffixing, traversal sanitising, mime/payload rejection | `tests/middleware.test.ts` |
+| `listAssets` — `AssetInfo` shape (`path`/`size`/`mtime`), mtime ordering for the newest-first sort, extension filter, dedupe across nested asset dirs, escaping/nonexistent dirs skipped | `tests/assets.test.ts` |
+| `POST /upload` — data-URL write into the configured `uploadDir`, clash suffixing, traversal sanitising, mime/payload rejection (the `saveBuffer`/`resolveAssetTarget` extractions are pinned by these passing unedited) | `tests/middleware.test.ts` |
 | `POST /open` — disabled-by-config 403; path gate matches `/classify`/`/apply` (out-of-content-roots, out-resolving symlink, bad extension, nonexistent, missing field → 400) | `tests/middleware.test.ts` |
 | `POST /peek` — whole-file lines + focus/total metadata, ±1000-line huge-file cap, no-loc default, out-of-range clamp, path rejection; out-of-root/package-owned paths refuse softly (200 + `refused`, no source) | `tests/middleware.test.ts` |
 | `POST /classify` — literal text, dynamic for non-`.astro`, nonexistent rejection; out-of-root, `node_modules`, and out-resolving symlinks answer 200 `dynamic` instead of throwing | `tests/middleware.test.ts` |
 | Read/write asymmetry of the path gate — `/classify` and `/peek` soften for package-owned paths, while `/open` and `/apply` still refuse them with 400 and leave the file byte-identical | `tests/middleware.test.ts` |
 | `POST /apply` — atomic on-disk patch, multi-op batch (verify-all-then-write-once; a refused op writes nothing), unsupported/refusal 422s, empty-ops/validation 400s | `tests/middleware.test.ts` |
+| `POST /unsplash/search` — outbound query/paging/orientation + `Client-ID`/`Accept-Version` headers, the reshape (no raw Unsplash field, no download/raw URL crosses the wire), utm params appended with correct separator, perPage/page clamping, blank query 400, disabled 403, unconfigured 403 **with fetch never called**, 401→502 / 403→429 / 5xx→502 / network→502 / `TimeoutError`→504 / malformed JSON→502, TTL cache serving a repeat from one call | `tests/unsplash-routes.test.ts` |
+| `POST /unsplash/import` — bytes land in `uploadDir`, byte URL carries `w`/`fit`/`q`/`fm=jpg` and preserves `ixid`, the `download_location` ping fires authenticated with its `ixid`, a failed ping still succeeds, `assetRef: 'relative'` → `imageUploadDir`, targetDir honoured/ignored-outside/ignored-escaping, hostile description → safe basename, re-import suffixes, unknown id → 409 `expired`, byte-fetch failure / non-image content-type / over-cap body → 502 **with nothing written**, cache eviction 409s the oldest id | `tests/unsplash-routes.test.ts` |
+| `GET`/`POST /settings` — write-then-read reports masked and **never the raw key**, fixed root path written `0600` with no temp file left, malformed file degrades to unconfigured, clearing, `config` > `env` > `file` precedence, a config/env key refuses a store (409), disabled 403 touching no filesystem, and a stored key usable by the **next** search with no restart | `tests/unsplash-routes.test.ts` |
 | `POST /entry` — schema fields + values + body + etag; inference fallback; path rejection | `tests/middleware-entry.test.ts` |
 | `POST /entry/apply` — atomic frontmatter+body write, stale-etag 409, schema 422 with fieldErrors, date coercion | `tests/middleware-entry.test.ts` |
 | `POST /entry/create` — valid create, slug-clash 409, missing-required 422, unknown collection / empty slug rejection | `tests/middleware-entry.test.ts` |
@@ -97,6 +101,7 @@ the loc rules in `astro.ts`.
 | `markdown.ts` — `markdownToHtml` rendering subset, `canRichEdit` accept/refuse | `tests/markdown.test.ts` |
 | `editors/markup-insert.ts` — tag palette: pair wraps and keeps the selection, empty pair at the caret, void tag replaces rather than wraps, `<a href="">` caret inside the quotes, palette matches the patcher's safelist | `tests/markup-insert.test.ts` |
 | `classify-cache.ts` — verdict caching per file\|loc\|tag, in-flight dedupe, failure retry, HMR invalidation (incl. mid-flight) | `tests/classify-cache.test.ts` |
+| `unsplash-search.ts` — the DOM-free search controller: debounce collapsing keystrokes to one request, blank/whitespace staying idle with no fetch, immediate reset on clear, `retry()` bypassing the debounce, stale responses (and stale errors) discarded, zero results as `empty` not an empty `ready`, error code/retryability surfaced, `loadMore` appending and bumping the page, discarded when the query or orientation changed mid-flight, a failed page keeping the shown results via `moreError`, orientation re-running immediately, `dispose()` cancelling | `tests/unsplash-search.test.ts` |
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 | `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
 | `element-context.ts` — `formatContext` clipboard payload: section order and omission (absent verdict/entry/box), `>` focus-line gutter marking, quoted-range wording, fence language per extension, refused-source sentence, empty-CSS note, rule blocks with/without a source comment, both truncation notices; `relativize` root stripping (trailing slash, outside-root, already-relative, unknown root, Windows separators); `windowAround` 1-based slicing (clamped both ends, whole file, pre-windowed response) | `tests/element-context.test.ts` |
@@ -343,13 +348,67 @@ into a nested asset dir. `/works/ledger` leaves `thumbnail` unset.)
 - [ ] Clicking an image inside the rich editor opens the replace picker; alt
       is auto-suggested from the filename and preserved on swap.
 
+**Media picker**
+
+- [ ] With no `unsplash` option, the modal has **one** tab, no source strip, and
+      `/health` reports `unsplash: false` — a pure grid upgrade for projects that
+      never opt in.
+- [ ] Five columns at the default modal width, no horizontal scroll; a fresh
+      upload appears first under **Newest**, and switching to **Name** re-sorts.
+- [ ] **Staged pick:** select a tile, press Escape — `git status` clean, nothing
+      written. Select, **Use image**, then **Save** — written once, and the
+      source holds the clean path with **no `?atx=` cache-buster in it**.
+- [ ] **Stacking:** open the modal from the CMS drawer's image field with a
+      dirty field. Escape closes the **modal only**, the drawer keeps its unsaved
+      values; a second Escape reaches the drawer's own "Discard unsaved changes?".
+      (The drawer uses a blocking `window.confirm`, which stalls a Playwright
+      driver — stub `window.confirm` before driving this one.)
+- [ ] The modal opens from all four hosts: the swap panel's **Browse all**, the
+      entry drawer's image field, the rich body editor's image panel, and the
+      swap panel's preview.
+- [ ] A just-uploaded or just-imported image renders in the preview, the recents
+      strip, the grid and the rail — **not** an empty box (Vite 404s a file for a
+      moment after it lands; `ui.ts::setFreshSrc` retries).
+- [ ] On an `image()` field the pick lands in the field's own asset dir and the
+      stored value is entry-relative.
+
+**Unsplash**
+
+- [ ] Settings opens from the admin bar's overflow menu, accepts a key, and
+      reports it configured with a masked hint; reload keeps it; the raw key is
+      **not** in any response (check the Network tab).
+- [ ] `.astro-text-edit.json` appears at the project root, is `0600`, and
+      `git status` does **not** list it. **Clear** removes the key.
+- [ ] With a key in `.env` or the config, the Settings field is **disabled** and
+      names which one takes precedence; the Save button is visibly disabled.
+- [ ] Switching to the Unsplash tab fires no request until you type; typing
+      issues **one** `/unsplash/search` after you stop, not one per keystroke.
+- [ ] Every tile shows the photographer; the link opens their profile in a new
+      tab carrying `utm_source`/`utm_medium`, and clicking it does **not** select
+      the photo.
+- [ ] `Load more (N of M)` appends a page and disappears on the last.
+- [ ] **Import stays interactive:** during a download the tile is busy but the
+      backdrop still closes the modal and Escape still works.
+- [ ] After an import, `git status` shows a new `.jpg` plus the `src` change, and
+      **no `images.unsplash.com` anywhere in the source**.
+- [ ] With no key, the pane shows an *Add an Unsplash access key* card whose
+      button opens Settings **above** the modal; entering a key re-runs the
+      search.
+- [ ] A bad key shows an error naming the setting with **no** Retry; offline
+      shows the reach/timeout error **with** Retry.
+- [ ] The requests-left line appears at the foot of the rail.
+
 **Cleanup**
 
 - [ ] Restore playground fixtures: overlay edits write into
       `examples/playground/src/` — check `git status` and revert.
+- [ ] Delete imported photos from `examples/playground/public/images/` and remove
+      `examples/playground/.astro-text-edit.json` if the Settings panel wrote one.
 
 ## Known deferrals
 
-Deliberate quirks and improvement candidates are documented in
-[TODO.md](../TODO.md) — check there before treating a checklist failure as a
-regression.
+Deliberate quirks and improvement candidates live on the
+[roadmap board](https://github.com/users/janjcwebtech/projects/1/views/1?layout=board)
+as `deferral`-type items — check there before treating a checklist failure as a
+regression. (This used to point at an in-repo `TODO.md`, which the board
+replaced.)

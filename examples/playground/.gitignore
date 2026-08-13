@@ -2,3 +2,10 @@ node_modules/
 dist/
 .astro/
 *.log
+
+# Secrets — never commit. .astro-text-edit.json is written by the Settings panel;
+# .*.text-edit-tmp-* is atomicWrite's mid-write sibling.
+.env
+.env.*
+.astro-text-edit.json
+.*.text-edit-tmp-*

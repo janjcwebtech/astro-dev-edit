@@ -78,6 +78,9 @@ export interface AdminBarDeps {
   openEntry(): void;
   /** Open the file this page is written in, in the user's editor. */
   openPageSource(): void;
+  /** Open the integration settings panel (currently: the Unsplash access key).
+   *  Injected because admin-bar.ts imports nothing from `editors/`. */
+  openSettings(): void;
 }
 
 export interface AdminBarHandle {
@@ -741,6 +744,15 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     icon: 'code',
     title: 'Open the file this page is written in, in your editor',
     onSelect: () => deps.openPageSource(),
+  });
+
+  register({
+    id: 'atx-menu-settings',
+    place: 'menu',
+    label: 'Settings',
+    icon: 'settings',
+    title: 'Integration settings — Unsplash access key',
+    onSelect: () => deps.openSettings(),
   });
 
   // The exit button's whole point is to track the save state, so the bar

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
+import type { AssetInfo } from '../src/shared/protocol.ts';
 import { createMiddleware } from '../src/server/middleware.ts';
 import { locOf } from './helpers.ts';
 
@@ -80,6 +81,7 @@ beforeAll(async () => {
     cssInspector: true,
     entryEditorEnabled: true,
     schemaProvider: null,
+    unsplash: null,
   };
   handler = createMiddleware(deps);
   openHandler = createMiddleware({ ...deps, openInEditor: true });
@@ -195,7 +197,11 @@ describe('GET /assets', () => {
   it('lists images from asset dirs as sorted web paths, public/ mapped to /', async () => {
     const r = await request({ method: 'GET', url: '/__text-edit/assets' });
     expect(r.status).toBe(200);
-    expect(r.body.files).toEqual(['/a.jpg', '/src/assets/c.webp', '/sub/b.png']);
+    expect(r.body.files.map((f: AssetInfo) => f.path)).toEqual([
+      '/a.jpg',
+      '/src/assets/c.webp',
+      '/sub/b.png',
+    ]);
   });
 });
 

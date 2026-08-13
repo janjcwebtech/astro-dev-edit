@@ -1,26 +1,37 @@
-import type { ApplyOp, AttrState, SourceLoc } from '../../shared/protocol.ts';
+import type { ApplyOp, AssetInfo, AttrState, SourceLoc } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
 import {
   COLOR,
+  FONT,
   basename,
   buildBackdrop,
   buildPanel,
+  setFreshSrc,
   lockElement,
   styled,
   toast,
   wirePanelButtons,
 } from '../ui.ts';
-import { buildAssetPicker } from './asset-picker.ts';
+import { openMediaModal } from './media-modal.ts';
 
 /**
- * Image swap panel: edit alt text, upload a new image (drop zone / picker),
- * or pick a replacement from the project's existing assets — with thumbnails.
- * The upload/browse UI is the shared `buildAssetPicker`; this panel adds the
- * alt-text field and live page-image preview on top. Only statically-quoted
- * attributes are patchable; a missing alt can be added. (spec §6.3)
+ * Image swap panel: a preview of the image as it is now, its alt text, and a
+ * way to replace it.
+ *
+ * It stopped being a browser. Picking from hundreds of project images (or from
+ * Unsplash) is the media modal's job; this panel keeps only what belongs to
+ * *this* element — the preview, the alt field, and a strip of the few most
+ * recently added images for the common "swap in the thing I just uploaded"
+ * case, with `Browse all` opening the modal for everything else.
+ *
+ * Only statically-quoted attributes are patchable; a missing alt can be added.
+ * (spec §6.3)
  */
+
+/** How many recent images the quick strip offers before you need the modal. */
+const RECENTS = 6;
 
 export async function beginImageEdit(
   img: HTMLImageElement,
@@ -35,8 +46,47 @@ export async function beginImageEdit(
   const srcEditable = attrs.src === 'static';
   const altEditable = attrs.alt !== 'dynamic';
 
-  const panel = buildPanel(`Image · ${basename(src.file)}:${src.loc}`);
+  const panel = buildPanel(`Image · ${basename(src.file)}:${src.loc}`, undefined, {
+    width: 'min(520px, 92vw)',
+  });
   const body = panel.querySelector('[data-body]') as HTMLElement;
+
+  /** What the panel will save — starts as what the element already has. */
+  let chosenSrc = originalSrc;
+
+  // --- preview ---------------------------------------------------------------
+  // Shown even when the file cannot be swapped: writing alt text for an image
+  // you cannot see is the exact problem this fixes, and the preview is read
+  // from the DOM rather than from anything patchable.
+  const preview = styled('div', 'atx-image-preview', {
+    width: '100%', maxHeight: '180px', height: '180px', marginBottom: '10px',
+    borderRadius: '8px', overflow: 'hidden', border: '1px solid #333',
+    background: 'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 14px 14px',
+  });
+  const previewImg = styled('img', 'atx-image-preview-img', {
+    width: '100%', height: '100%', objectFit: 'contain', display: 'block',
+  });
+  previewImg.alt = '';
+  previewImg.decoding = 'async';
+  previewImg.addEventListener('error', () => (previewImg.style.display = 'none'));
+  previewImg.addEventListener('load', () => (previewImg.style.display = ''));
+  preview.append(previewImg);
+
+  const meta = styled('p', 'atx-image-meta', {
+    margin: '0 0 12px', font: `11px ${FONT.mono}`, color: COLOR.muted,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  });
+
+  /** `fresh` marks a file written seconds ago, which needs the retrying loader;
+   *  `path` is always the clean value the metadata line and the save refer to. */
+  const setPreview = (path: string, fresh = false): void => {
+    if (fresh) setFreshSrc(previewImg, path);
+    else previewImg.src = path;
+    meta.textContent = path ? basename(path) : '';
+    meta.title = path;
+  };
+  setPreview(originalSrc);
+  body.append(preview, meta);
 
   if (!srcEditable) {
     const note = styled('p', 'atx-note', {
@@ -47,6 +97,7 @@ export async function beginImageEdit(
     body.append(note);
   }
 
+  // --- alt text --------------------------------------------------------------
   const altLabel = styled('label', 'atx-alt-label', {
     display: 'block', font: '600 12px system-ui', marginBottom: '4px', opacity: '0.8',
   });
@@ -63,7 +114,7 @@ export async function beginImageEdit(
   }
   body.append(altLabel, altInput);
 
-  const close = (commit: boolean, chosenSrc?: string): void => {
+  const close = (commit: boolean): void => {
     state.releaseIf(token);
     panel.remove();
     backdrop.remove();
@@ -72,10 +123,9 @@ export async function beginImageEdit(
       img.setAttribute('alt', originalAlt);
       return;
     }
-    const nextSrc = chosenSrc ?? originalSrc;
     const nextAlt = altInput.value;
-    if (nextSrc === originalSrc && nextAlt === originalAlt) return;
-    void commitImageEdit(img, src, { originalSrc, originalAlt, nextSrc, nextAlt });
+    if (chosenSrc === originalSrc && nextAlt === originalAlt) return;
+    void commitImageEdit(img, src, { originalSrc, originalAlt, nextSrc: chosenSrc, nextAlt });
   };
 
   const backdrop = buildBackdrop(() => close(false));
@@ -84,20 +134,114 @@ export async function beginImageEdit(
   document.body.append(backdrop, panel);
   altInput.focus();
 
-  // The image file can only be swapped when statically quoted; picking an image
-  // (upload or existing) previews it on the page and commits straight away.
-  if (srcEditable) {
-    const assets = buildAssetPicker({
-      listLabel: 'Or replace with an existing image',
-      isCurrent: (f) => f === originalSrc,
-      onPick: (path) => {
-        img.setAttribute('src', path); // live preview
-        close(true, path);
-      },
-    });
-    body.append(assets.el);
-    assets.loadList();
+  // --- replace ---------------------------------------------------------------
+  if (!srcEditable) return;
+
+  /** Stage a replacement: preview it here and on the page, but write nothing
+   *  until Save. `fresh` marks a file written seconds ago, which needs the
+   *  retrying loader to survive Vite's 404 window (see ui.ts::setFreshSrc). */
+  const stage = (webPath: string, fresh = false): void => {
+    chosenSrc = webPath;
+    setPreview(webPath, fresh);
+    // Live preview on the page itself.
+    if (fresh) setFreshSrc(img, webPath);
+    else img.setAttribute('src', webPath);
+    paintRecents();
+  };
+
+  const strip = styled('div', 'atx-image-recents', {
+    display: 'grid', gridTemplateColumns: `repeat(${RECENTS}, 1fr)`, gap: '6px',
+  });
+  const stripLabel = styled('div', 'atx-image-recents-label', {
+    display: 'flex', alignItems: 'baseline', gap: '8px',
+    font: '600 12px system-ui', opacity: '0.8', margin: '0 0 6px',
+  });
+  const stripTitle = styled('span', 'atx-image-recents-title', {});
+  stripTitle.textContent = 'Recently added';
+  const browseAll = styled('button', 'atx-btn atx-image-browse-all', {
+    marginLeft: 'auto', padding: '0', border: 'none', background: 'transparent',
+    color: COLOR.accentText, cursor: 'pointer', font: '600 12px system-ui',
+  });
+  browseAll.type = 'button';
+  browseAll.textContent = 'Browse all →';
+  browseAll.addEventListener('click', () => void browse());
+  stripLabel.append(stripTitle, browseAll);
+  body.append(stripLabel, strip);
+
+  let recents: AssetInfo[] = [];
+  const openedAt = Date.now();
+
+  function paintRecents(): void {
+    strip.textContent = '';
+    for (const asset of recents) {
+      const current = asset.path === chosenSrc;
+      const btn = styled('button', 'atx-image-recent', {
+        padding: '0', width: '100%', aspectRatio: '4 / 3', overflow: 'hidden',
+        borderRadius: '6px', border: `1px solid ${current ? COLOR.accent : '#333'}`,
+        outline: current ? `1px solid ${COLOR.accent}` : 'none',
+        background: 'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 10px 10px',
+        cursor: 'pointer',
+      });
+      btn.type = 'button';
+      btn.title = asset.path;
+      const thumb = styled('img', 'atx-image-recent-thumb', {
+        width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+      });
+      // Anything written since this panel opened may still be in Vite's 404
+      // window, so it gets the retrying loader; everything else loads normally.
+      if (asset.mtime > openedAt) setFreshSrc(thumb, asset.path);
+      else thumb.src = asset.path;
+      thumb.alt = '';
+      thumb.loading = 'lazy';
+      thumb.decoding = 'async';
+      thumb.addEventListener('error', () => (thumb.style.display = 'none'));
+      // A retry that finally succeeds must undo that — see ui.ts::setFreshSrc.
+      thumb.addEventListener('load', () => (thumb.style.display = 'block'));
+      btn.append(thumb);
+      btn.addEventListener('click', () => stage(asset.path));
+      strip.append(btn);
+    }
   }
+
+  /** Everything beyond the six most recent lives in the modal. */
+  async function browse(): Promise<void> {
+    const pick = await openMediaModal({
+      title: 'Replace image',
+      ...(chosenSrc ? { currentWebPath: chosenSrc } : {}),
+    });
+    if (!pick) return; // cancelled — nothing staged
+    stage(pick.webPath, pick.origin !== 'existing');
+    // A newly uploaded or imported file belongs at the head of the strip.
+    void loadRecents();
+  }
+
+  async function loadRecents(): Promise<void> {
+    try {
+      const files = await api.getAssets();
+      // Same rule as the modal's project pane: a plain `<img src>` can only
+      // reference paths that exist in the built site.
+      recents = files
+        .filter((f) => !f.path.startsWith('/src/'))
+        .sort((a, b) => b.mtime - a.mtime)
+        .slice(0, RECENTS);
+      // The current image's own metadata, now that we have the listing.
+      const self = files.find((f) => f.path === chosenSrc);
+      if (self) meta.textContent = `${basename(self.path)} · ${formatBytes(self.size)}`;
+      paintRecents();
+    } catch {
+      // The strip is a convenience; the modal's Browse all still works, and it
+      // reports its own failure with a Retry.
+      stripLabel.style.display = 'none';
+    }
+  }
+
+  void loadRecents();
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 async function commitImageEdit(

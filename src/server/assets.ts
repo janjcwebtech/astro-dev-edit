@@ -1,6 +1,6 @@
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
-import type { UploadRequest } from '../shared/protocol.ts';
+import type { AssetInfo, UploadRequest } from '../shared/protocol.ts';
 import { insideRoot, toWebPath } from './paths.ts';
 
 /**
@@ -31,11 +31,13 @@ async function walk(dir: string): Promise<string[]> {
   return found;
 }
 
-/** List image files under the configured asset dirs, as web-servable paths.
- *  Read-only. Every directory is confined to the project root. (spec §6.3, §8) */
-export async function listAssets(root: string, assetDirs: string[]): Promise<string[]> {
-  // A Set because asset dirs may nest (e.g. public/photos inside public).
-  const out = new Set<string>();
+/** List image files under the configured asset dirs, as web-servable paths with
+ *  size and mtime. Read-only. Every directory is confined to the project root.
+ *  Sorted by path; the client re-sorts (by recency, by default). (spec §6.3, §8) */
+export async function listAssets(root: string, assetDirs: string[]): Promise<AssetInfo[]> {
+  // A Map because asset dirs may nest (e.g. public/photos inside public), so
+  // the same file can be reached twice — keyed by web path, first one wins.
+  const out = new Map<string, AssetInfo>();
   for (const dir of assetDirs) {
     const abs = resolve(root, dir);
     // Refuse anything that escaped the root (e.g. via `..`). (spec §8)
@@ -49,10 +51,19 @@ export async function listAssets(root: string, assetDirs: string[]): Promise<str
     for (const file of entries) {
       const ext = file.slice(file.lastIndexOf('.')).toLowerCase();
       if (!IMAGE_EXT.has(ext)) continue;
-      out.add(toWebPath(root, file));
+      const path = toWebPath(root, file);
+      if (out.has(path)) continue;
+      // Statted after the extension filter, so non-images cost nothing. A file
+      // deleted between the readdir and the stat is simply left out.
+      try {
+        const info = await stat(file);
+        out.set(path, { path, size: info.size, mtime: info.mtimeMs });
+      } catch {
+        continue;
+      }
     }
   }
-  return [...out].sort();
+  return [...out.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
 
 /** The mime type of a data: URL without decoding its payload — for policy
@@ -82,26 +93,31 @@ export function safeFileName(name: string, fallbackExt: string): string {
 }
 
 /**
- * Write an uploaded image into the configured upload directory. Accepts a
- * data-URL. The destination is confined to the upload dir inside the project
- * root, the extension must be an allowed image type, and the name is sanitised.
- * On a name clash a numeric suffix is added rather than overwriting. Returns the
- * web-servable path. (safe: writes a NEW asset file, never patches source)
+ * Write image bytes into the configured upload directory. The destination is
+ * confined to the upload dir inside the project root, the mime must be an
+ * allowed image type, and the name is sanitised. On a name clash a numeric
+ * suffix is added rather than overwriting. Returns the web-servable path and
+ * the name actually written. (safe: writes a NEW asset file, never patches
+ * source)
+ *
+ * Bytes-in rather than data-URL-in because not every caller has a data URL:
+ * `/unsplash/import` downloads a response body, and synthesising a data URL
+ * from it would mean a ~33% larger base64 string and a decode straight back to
+ * the Buffer we started with.
  */
-export async function saveUpload(
+export async function saveBuffer(
   root: string,
   uploadDir: string,
-  payload: UploadRequest,
-): Promise<{ webPath: string }> {
-  const { mime, data } = parseDataUrl(payload.dataUrl);
-  const fallbackExt = EXT_BY_MIME[mime];
-  if (!fallbackExt) throw new Error(`unsupported image type: ${mime}`);
+  file: { mime: string; data: Buffer; filename: string },
+): Promise<{ webPath: string; filename: string }> {
+  const fallbackExt = EXT_BY_MIME[file.mime];
+  if (!fallbackExt) throw new Error(`unsupported image type: ${file.mime}`);
 
   // Uploads land in the configured upload dir, confined to the project root.
   const dir = resolve(root, uploadDir);
   if (!insideRoot(root, dir)) throw new Error('upload directory escapes the project root');
 
-  const fileName = safeFileName(payload.filename || 'upload', fallbackExt);
+  const fileName = safeFileName(file.filename || 'upload', fallbackExt);
   let target = join(dir, fileName);
   // Confirm the resolved target is still inside the asset dir. (spec §8)
   if (!insideRoot(dir, target)) throw new Error('path escapes asset dir');
@@ -116,7 +132,20 @@ export async function saveUpload(
   }
 
   await mkdir(dirname(target), { recursive: true });
-  await writeFile(target, data);
+  await writeFile(target, file.data);
 
-  return { webPath: toWebPath(root, target) };
+  return { webPath: toWebPath(root, target), filename: basename(target) };
+}
+
+/**
+ * Write an uploaded image into the configured upload directory. Accepts a
+ * data-URL; everything past the decode is {@link saveBuffer}.
+ */
+export async function saveUpload(
+  root: string,
+  uploadDir: string,
+  payload: UploadRequest,
+): Promise<{ webPath: string }> {
+  const { mime, data } = parseDataUrl(payload.dataUrl);
+  return saveBuffer(root, uploadDir, { mime, data, filename: payload.filename });
 }

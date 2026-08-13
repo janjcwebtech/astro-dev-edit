@@ -1,5 +1,6 @@
 import type {
   ApplyRequestWire,
+  AssetInfo,
   AssetsResponse,
   ClassifyRequest,
   ClassifyResult,
@@ -16,6 +17,14 @@ import type {
   OpenRequest,
   PeekRequest,
   PeekResponse,
+  SettingsResponse,
+  SettingsUpdateRequest,
+  UnsplashErrorCode,
+  UnsplashErrorResponse,
+  UnsplashImportRequest,
+  UnsplashImportResponse,
+  UnsplashSearchRequest,
+  UnsplashSearchResponse,
   UploadRequest,
   UploadResponse,
 } from '../shared/protocol.ts';
@@ -54,8 +63,8 @@ export async function health(): Promise<HealthResponse | null> {
   }
 }
 
-/** List the project's swap-candidate images as web paths. */
-export async function getAssets(): Promise<string[]> {
+/** List the project's swap-candidate images, with size and mtime. */
+export async function getAssets(): Promise<AssetInfo[]> {
   const res = await fetch(`${API}/assets`);
   if (!res.ok) throw new Error(`server returned ${res.status}`);
   const ct = res.headers.get('content-type') ?? '';
@@ -165,4 +174,63 @@ export async function createEntry(req: EntryCreateRequest): Promise<EntryCreateR
 /** Delete an entry (etag-guarded; undo is git). */
 export async function deleteEntry(req: EntryDeleteRequest): Promise<void> {
   await entryPost<{ ok: true }>('/entry/delete', req, 'delete');
+}
+
+// --- Unsplash + settings -----------------------------------------------------
+
+/** Unsplash-endpoint failure carrying the server's `code`, which is what the
+ *  pane branches on: a bad key or a disabled feature needs a settings change,
+ *  while a timeout or an upstream fault is worth a Retry button. Mirrors the
+ *  EntryApplyError/entryPost pair. */
+export class UnsplashError extends Error {
+  code: UnsplashErrorCode | 'unknown';
+  constructor(body: Partial<UnsplashErrorResponse>, status: number) {
+    super(body.error || `Unsplash request failed (${status})`);
+    this.name = 'UnsplashError';
+    this.code = body.code ?? 'unknown';
+  }
+  /** Whether offering a Retry makes sense. Configuration faults do not fix
+   *  themselves, so the pane shows a link to Settings instead. */
+  get retryable(): boolean {
+    return !['disabled', 'unconfigured', 'unauthorized', 'expired'].includes(this.code);
+  }
+}
+
+async function unsplashPost<T>(path: string, payload: unknown): Promise<T> {
+  const res = await post(path, payload);
+  const body = (await res.json().catch(() => ({}))) as T | UnsplashErrorResponse;
+  if (!res.ok) throw new UnsplashError(body as UnsplashErrorResponse, res.status);
+  return body as T;
+}
+
+/** Search Unsplash through the dev server, which holds the key and reshapes
+ *  every photo. Throws UnsplashError. */
+export async function unsplashSearch(
+  req: UnsplashSearchRequest,
+): Promise<UnsplashSearchResponse> {
+  return unsplashPost<UnsplashSearchResponse>('/unsplash/search', req);
+}
+
+/** Download a searched photo into the project. Throws UnsplashError — notably
+ *  `expired` when the dev server restarted since the search. */
+export async function unsplashImport(
+  req: UnsplashImportRequest,
+): Promise<UnsplashImportResponse> {
+  return unsplashPost<UnsplashImportResponse>('/unsplash/import', req);
+}
+
+/** Read the settings status. Never returns the access key itself — only
+ *  whether one resolved, from where, and a masked hint. */
+export async function getSettings(): Promise<SettingsResponse> {
+  const res = await fetch(`${API}/settings`);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `settings failed (${res.status})`);
+  return (await res.json()) as SettingsResponse;
+}
+
+/** Store (or, with an empty string, clear) the Unsplash access key. Resolves to
+ *  the same shape a read would, so the panel needs no follow-up request. */
+export async function saveSettings(req: SettingsUpdateRequest): Promise<SettingsResponse> {
+  const res = await post('/settings', req);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `settings save failed (${res.status})`);
+  return (await res.json()) as SettingsResponse;
 }

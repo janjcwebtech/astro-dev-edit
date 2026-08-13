@@ -38,6 +38,31 @@ export function resolveUploadDir(
   return allowed ? requested : fallback;
 }
 
+/**
+ * Where an asset write should land — the shared rule behind `/upload` and
+ * `/unsplash/import`.
+ *
+ * Two decisions in one place. An `assetRef: 'relative'` field's asset is
+ * imported by Astro rather than served verbatim, so it falls back to the
+ * src-side dir instead of the web-servable one; and a client-supplied
+ * `targetDir` is honoured only when {@link resolveUploadDir} finds it inside a
+ * configured asset directory. Extracted rather than duplicated because a drift
+ * between two copies of this is a path-confinement bug — the exact class this
+ * module exists to centralise.
+ *
+ * `redirected` is true when a requested `targetDir` was refused, so the caller
+ * can log it: the rule lives here, the logger does not.
+ */
+export function resolveAssetTarget(
+  root: string,
+  dirs: { uploadDir: string; imageUploadDir: string; allowedDirs: string[] },
+  req: { assetRef?: 'relative'; targetDir?: string },
+): { dir: string; redirected: boolean } {
+  const fallback = req.assetRef === 'relative' ? dirs.imageUploadDir : dirs.uploadDir;
+  const dir = resolveUploadDir(root, dirs.allowedDirs, fallback, req.targetDir);
+  return { dir, redirected: Boolean(req.targetDir) && dir !== req.targetDir };
+}
+
 /** Map an absolute file under the project root to its web-servable path:
  *  `public/` maps to the site root; everything else keeps its project path. */
 export function toWebPath(root: string, absFile: string): string {

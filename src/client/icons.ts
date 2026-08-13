@@ -33,7 +33,11 @@ export type IconName =
   | 'chevronDown'
   | 'copy'
   | 'code'
-  | 'external';
+  | 'external'
+  | 'settings'
+  | 'image'
+  | 'search'
+  | 'upload';
 
 /** Path geometry only — the wrapper `<svg>` supplies stroke, width and caps. */
 const PATHS: Record<IconName, string> = {
@@ -62,6 +66,15 @@ const PATHS: Record<IconName, string> = {
   code: '<path d="m8 6-6 6 6 6"/><path d="m16 6 6 6-6 6"/>',
   external:
     '<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>',
+  // A cog: eight teeth as one path, plus the hub. Drawn rather than borrowed so
+  // it matches the 24-box, 1.6-stroke geometry of everything above.
+  settings:
+    '<path d="M12 2.6l1.5 2.2 2.6-.6.6 2.6 2.2 1.5-1.2 2.4 1.2 2.4-2.2 1.5-.6 2.6-2.6-.6L12 21.4l-1.5-2.2-2.6.6-.6-2.6-2.2-1.5 1.2-2.4-1.2-2.4 2.2-1.5.6-2.6 2.6.6z"/><circle cx="12" cy="12" r="3.2"/>',
+  // Picture frame with a sun and a hill — the media/asset glyph.
+  image:
+    '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="m3.5 17.5 5-5 4.5 4.5 3-2.5 4.5 4"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/>',
+  upload: '<path d="M12 16V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
 };
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

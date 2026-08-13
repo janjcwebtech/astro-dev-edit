@@ -24,7 +24,9 @@ import { invalidateClassifications } from './classify-cache.ts';
 import { openCopyPanel } from './editors/copy-panel.ts';
 import { openEntryPanel } from './editors/entry.ts';
 import { openPeekPanel } from './editors/peek.ts';
+import { openSettingsPanel } from './editors/settings-panel.ts';
 import { collectContext, formatContext } from './element-context.ts';
+import { setFeatures } from './features.ts';
 import { clearHighlight, initHover } from './hover.ts';
 import { pageSource } from './page-source.ts';
 import { initRouter } from './router.ts';
@@ -357,6 +359,7 @@ const bar = initAdminBar({
     if (file) void openEntryPanel(file);
   },
   openPageSource,
+  openSettings: openSettingsPanel,
 });
 
 // After an HMR update: drop stale hover state, and re-snapshot source
@@ -385,6 +388,9 @@ async function boot(): Promise<void> {
   if (!info) return;
   cssInspectorEnabled = info.cssInspector;
   projectRoot = info.root ?? null; // older servers don't send it — paths stay absolute
+  // Read through features.ts rather than a local, so the media modal can see
+  // this without importing the composition root. (see features.ts)
+  setFeatures(info);
   document.body.append(
     ...hover.elements,
     tree.selectionOutline,

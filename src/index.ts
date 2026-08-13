@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createAnnotatePlugin } from './server/annotate.ts';
 import { createSchemaProvider, type EntryEditorOptions } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
+import { resolveUnsplashKey } from './server/settings.ts';
 
 /**
  * astro-text-edit — in-browser visual content editing for the local dev server.
@@ -67,6 +68,39 @@ export interface TextEditOptions {
    * `src/content/<name>/` layouts; `false` disables the whole surface.
    */
   entryEditor?: false | EntryEditorOptions;
+  /**
+   * The Unsplash photo source in the media picker. `unsplash: {}` turns it on
+   * with defaults; omitted (the default) leaves it off entirely, and the media
+   * modal renders as a single-source project-asset grid.
+   *
+   * Every user brings their own access key. The recommended way to give one is
+   * the overlay's own Settings panel (admin bar → ⚙ Settings), which stores it
+   * outside the repo — see `accessKey` for why not here.
+   */
+  unsplash?: false | UnsplashOptions;
+}
+
+/** Options for the Unsplash photo source. See `TextEditOptions.unsplash`. */
+export interface UnsplashOptions {
+  /**
+   * Access key, as an escape hatch for programmatic config. **Not the
+   * recommended path:** `astro.config.mjs` is committed *and* is read by
+   * `astro build`, so a key here travels with the repo. Prefer the Settings
+   * panel, or `UNSPLASH_ACCESS_KEY` in the environment. When set, it wins over
+   * both and the Settings panel says so rather than accepting a value that
+   * would do nothing.
+   */
+  accessKey?: string;
+  /**
+   * Application name sent as `utm_source` on every photographer credit link,
+   * as the Unsplash API guidelines require. Should match the application name
+   * registered at unsplash.com/oauth/applications. Defaults to
+   * `astro-text-edit`.
+   */
+  appName?: string;
+  /** Results per search page. Clamped to Unsplash's own maximum of 30.
+   *  Defaults to 20. */
+  perPage?: number;
 }
 
 export type { EntryEditorOptions, EntryFieldOverride } from './server/content-config.ts';
@@ -82,7 +116,13 @@ const DEFAULTS: Required<TextEditOptions> = {
   cssInspector: true,
   sourceAnnotations: 'auto',
   entryEditor: {},
+  // Off unless asked for: the feature reaches a third-party API and needs a key
+  // the user has to supply, so opting in is deliberate.
+  unsplash: false,
 };
+
+/** Unsplash's own ceiling on `per_page`. */
+const UNSPLASH_MAX_PER_PAGE = 30;
 
 /** The project's installed Astro major, resolved from the project root (the
  *  integration's own tree has no astro). null when resolution fails. */
@@ -202,6 +242,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
       'astro:server:setup': ({ server, logger }) => {
         if (!active) return;
         const entryEditorEnabled = options.entryEditor !== false;
+        const unsplashOptions = options.unsplash === false ? null : options.unsplash;
         // Vite dev middleware exposes the edit API under /__text-edit/. (spec §4.3)
         server.middlewares.use(
           createMiddleware({
@@ -218,8 +259,34 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
             schemaProvider: entryEditorEnabled
               ? createSchemaProvider(server, projectRoot, options.entryEditor || {})
               : null,
+            unsplash: unsplashOptions && {
+              // A thunk, not a value: resolution happens per request, so a key
+              // entered through the Settings panel takes effect without a
+              // dev-server restart and nothing depends on hook ordering.
+              resolve: () => resolveUnsplashKey(projectRoot, unsplashOptions.accessKey),
+              appName: unsplashOptions.appName || 'astro-text-edit',
+              perPage: Math.min(
+                Math.max(1, Math.trunc(unsplashOptions.perPage ?? 20)),
+                UNSPLASH_MAX_PER_PAGE,
+              ),
+            },
           }),
         );
+
+        if (unsplashOptions) {
+          if (unsplashOptions.accessKey) {
+            logger.warn(
+              'unsplash.accessKey is set in your Astro config. That file is ' +
+                'committed and is read by `astro build`, so the key travels ' +
+                'with the repo — prefer the overlay’s Settings panel or ' +
+                'UNSPLASH_ACCESS_KEY.',
+            );
+          }
+          logger.info(
+            'Unsplash photo source enabled' +
+              (unsplashOptions.accessKey ? '' : ' — add an access key from the admin bar’s Settings panel'),
+          );
+        }
       },
     },
   };

@@ -53,12 +53,28 @@ export interface HealthResponse {
    *  is the only way the client can strip the prefix exactly. Dev-only, and
    *  the annotations already carry the same information. */
   root: string;
+  /** Whether the Unsplash photo source is both enabled AND holds a usable key.
+   *  The overlay reads this at boot to decide whether the media modal renders
+   *  its source tabs at all — a project that never opts in gets a single-source
+   *  modal, not a tab that errors when clicked. */
+  unsplash: boolean;
 }
 
 // --- GET /assets -------------------------------------------------------------
+/** One image under the configured asset dirs. Metadata rather than a bare path
+ *  so the picker can sort by recency and caption a tile — an image uploaded a
+ *  minute ago is otherwise buried in an alphabetical list. */
+export interface AssetInfo {
+  /** Web-servable path, e.g. `/src/assets/hero.jpg`. */
+  path: string;
+  /** Size in bytes. */
+  size: number;
+  /** Last-modified time, epoch ms — the sort key behind "Newest first". */
+  mtime: number;
+}
 export interface AssetsResponse {
-  /** Web-servable image paths under the configured asset dirs. */
-  files: string[];
+  /** Images under the configured asset dirs, sorted by path. */
+  files: AssetInfo[];
 }
 
 // --- POST /upload ------------------------------------------------------------
@@ -291,4 +307,135 @@ export interface EntryErrorResponse {
   code?: RefusalCode | 'conflict' | 'validation' | 'exists';
   /** Field name → message, for 422 validation failures. */
   fieldErrors?: Record<string, string>;
+}
+
+// --- The media modal ---------------------------------------------------------
+/** What the shared media modal resolves with. Lives here rather than in the
+ *  client because `origin` is a server-side distinction: the modal's three
+ *  sources produce the same kind of path by different routes, and a caller may
+ *  want to know which (an Unsplash pick has already been downloaded and
+ *  attributed by the time it reaches this shape). */
+export interface MediaPick {
+  /** The value to write — already relative-converted if the field needs it. */
+  webPath: string;
+  origin: 'existing' | 'upload' | 'unsplash';
+}
+
+// --- POST /unsplash/search ---------------------------------------------------
+/**
+ * A photo, reshaped by the server. Unsplash's own object carries exif, tags,
+ * topics, sponsorship, the full user record and a dozen URL variants; none of
+ * that crosses the wire, so it can never become an accidental API surface.
+ *
+ * Deliberately carries **no** raw or download_location URL. The server keeps
+ * those in a bounded in-memory map keyed by `id`, so `/unsplash/import` never
+ * fetches a URL the browser supplied — that removes an SSRF-shaped capability
+ * from the dev server. The cost is that an `id` minted before a restart imports
+ * as `409 expired`.
+ */
+export interface UnsplashPhoto {
+  /** Unsplash's id — the only handle `/unsplash/import` accepts. */
+  id: string;
+  /** Grid thumbnail (urls.small), hotlinked in the picker UI only. */
+  thumbUrl: string;
+  /** Average colour, painted behind the tile while the thumb loads. */
+  color: string;
+  width: number;
+  height: number;
+  description: string;
+  photographer: string;
+  /** Profile URL with the required utm params already attached, so the client
+   *  cannot forget them and the app name lives in one place. */
+  photographerUrl: string;
+  pageUrl: string;
+}
+
+export type UnsplashOrientation = 'any' | 'landscape' | 'portrait' | 'squarish';
+
+export interface UnsplashSearchRequest {
+  query: string;
+  /** 1-based; clamped to >= 1 server-side. */
+  page?: number;
+  /** Clamped to Unsplash's own maximum of 30. */
+  perPage?: number;
+  orientation?: UnsplashOrientation;
+}
+export interface UnsplashSearchResponse {
+  photos: UnsplashPhoto[];
+  /** Total matches across all pages, for the "Load more (20 of 1,283)" label. */
+  total: number;
+  totalPages: number;
+  page: number;
+  /** Requests left this hour, when Unsplash reported it. Surfaced at the foot
+   *  of the details rail — the demo tier allows only 50/hour. */
+  remaining?: number;
+}
+
+// --- POST /unsplash/import ---------------------------------------------------
+export interface UnsplashImportRequest {
+  /** An id from a search in this dev-server process; see UnsplashPhoto. */
+  id: string;
+  /** Same semantics as UploadRequest: marks an `image()`-backed field, so the
+   *  bytes land in an importable `src/` dir rather than the web-servable one. */
+  assetRef?: 'relative';
+  /** Root-relative directory, confined server-side exactly as /upload's is. */
+  targetDir?: string;
+}
+export interface UnsplashImportResponse {
+  /** Web-servable path of the downloaded file. */
+  webPath: string;
+  /** The name actually written, after sanitising and clash-suffixing. */
+  filename: string;
+}
+
+/**
+ * Why an Unsplash call failed. These routes answer with an explicit code rather
+ * than throwing, because a thrown error becomes a 400 — which would read as
+ * "your query was malformed" when the real cause is upstream. See the module
+ * header in server/unsplash-routes.ts.
+ */
+export type UnsplashErrorCode =
+  | 'disabled' // the integration option is off
+  | 'unconfigured' // enabled, but no access key resolved
+  | 'unauthorized' // Unsplash rejected the key
+  | 'rate-limited' // hourly quota exhausted (50/hr on the demo tier)
+  | 'expired' // photo id is no longer in the server's cache
+  | 'timeout' // the upstream call took too long
+  | 'too-large' // the download exceeded the size cap
+  | 'upstream'; // anything else on Unsplash's side
+
+export interface UnsplashErrorResponse {
+  error: string;
+  code: UnsplashErrorCode;
+}
+
+// --- GET/POST /settings ------------------------------------------------------
+/** Where a resolved access key came from. Config beats env beats the file the
+ *  Settings panel writes; the panel disables its input for the first two, since
+ *  silently accepting a value that does nothing is worse than saying so. */
+export type SettingsSource = 'config' | 'env' | 'file';
+
+/**
+ * The key itself is **never** in this shape. Only whether one resolved, where
+ * from, and a masked fragment for recognition.
+ */
+export interface SettingsResponse {
+  unsplash: {
+    /** Whether the option is enabled at all, independent of a key. */
+    enabled: boolean;
+    configured: boolean;
+    source: SettingsSource | null;
+    /** Masked tail, e.g. `••••••••Ab3d`. Absent when nothing is configured. */
+    hint?: string;
+    /** True when the settings file is not covered by the project's .gitignore
+     *  — a warning the panel repeats, since this integration cannot fix a
+     *  consuming project's ignore rules. */
+    gitignoreWarning?: boolean;
+  };
+}
+export interface SettingsUpdateRequest {
+  unsplash?: {
+    /** The access key to store. An empty string clears it. */
+    accessKey: string;
+  };
 }

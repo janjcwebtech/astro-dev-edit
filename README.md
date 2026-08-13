@@ -136,8 +136,9 @@ Every global control lives in a slim bar across the top of the page:
   whether it is pinned or not, since it carries the save state and the way out.
 - **The dock button** — moves the bar to the **bottom** of the viewport, for
   sites whose own chrome lives at the top.
-- **The purple mark** — the overflow menu (currently *Open page source*, which
-  opens the file this page is written in) plus the dev-server status.
+- **The purple mark** — the overflow menu (*Open page source*, which opens the
+  file this page is written in, and *Settings*, which holds the
+  [Unsplash access key](#unsplash-photo-picker)) plus the dev-server status.
 
 The bar **overlays** the page rather than pushing it down: the top edge is where
 sticky site headers live, and reflowing the page would change the very layout
@@ -235,6 +236,7 @@ textEdit({
   cssInspector: true,                     // hover-pill class/ID CSS inspector
   sourceAnnotations: 'auto',              // who emits data-astro-source-*
   entryEditor: {},                        // CMS entry drawer; false disables it
+  unsplash: false,                        // Unsplash photo source; {} turns it on
 })
 ```
 
@@ -250,6 +252,7 @@ textEdit({
 | `cssInspector` | `true` | The hover-pill CSS class/ID inspector. `false` hides the chips row entirely. The per-rule open-in-editor jump also honours `openInEditor`. |
 | `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. |
 | `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
+| `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-text-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30). |
 
 ## Undo is git — there is no in-app undo
 
@@ -266,6 +269,81 @@ working tree**:
   succeeds, reverting it is a git operation, not an app feature.
 
 Treat it like editing the files directly, because that is what it does.
+
+## Media picker
+
+Anywhere you choose an image — the swap panel, the entry drawer's `image()`
+fields, the rich body editor's image panel — the same picker opens: a grid of
+your project's images, a filter, a folder scope toggle, and a details rail
+showing the selected file's path, size and modified time.
+
+Two things about how it behaves:
+
+- **Newest first by default.** A file you uploaded a minute ago is the first
+  thing you see, not something to hunt for alphabetically. Switch the sort to
+  **Name** if you prefer.
+- **Picking is staged, not applied.** Clicking a tile selects it; the footer's
+  **Use image** is what hands it back to the field. **Cancel** or **Escape**
+  writes nothing at all — which matters, because this modal can open on top of
+  the entry drawer, and closing it must never disturb the fields underneath.
+
+Uploading works from the **Upload file…** button or by dropping a file anywhere
+on the modal. Uploads land in `uploadDir` — or, for an `image()` field, beside
+the field's existing asset.
+
+The swap panel keeps a shortcut for the common case: a preview of the image you
+are editing, and a strip of the **six most recently added** images, with
+**Browse all** opening the full picker.
+
+## Unsplash photo picker
+
+Off by default. Turn it on with `unsplash: {}` and the picker grows a second
+source: search Unsplash from inside the overlay, pick a photo, and the dev
+server **downloads it into your project** like any other upload.
+
+```js
+textEdit({ unsplash: {} })
+```
+
+The photo is a normal file in your repo afterwards. Nothing but the local path
+is written into your source, so your published site never depends on Unsplash
+being up — and an `image()` field can use it, which a remote URL cannot.
+
+### Your access key
+
+Every user brings their own, from
+[unsplash.com/oauth/applications](https://unsplash.com/oauth/applications). The
+demo tier allows **50 API requests an hour** until Unsplash approves your
+application for production (then 1000). Resolution order, highest first:
+
+| Where | Notes |
+| --- | --- |
+| `unsplash.accessKey` in `astro.config.mjs` | An escape hatch for programmatic config, **not recommended**: that file is committed *and* is read by `astro build`, so the key travels with the repo. |
+| `UNSPLASH_ACCESS_KEY` in the environment | For teams and CI. Read through Vite's own env loader, so a `.env` file works — note that `astro dev` does **not** copy `.env` into `process.env` itself. |
+| The **Settings** panel (admin bar → the purple mark → *Settings*) | The recommended path. Writes `.astro-text-edit.json` at your project root, `0600`. |
+
+**Gitignore `.astro-text-edit.json` and your `.env`.** The Settings panel warns
+if the first isn't covered, but this integration cannot edit your ignore rules
+for you. The key is never sent back to the browser: a read reports only whether
+one resolved, from where, and a masked fragment like `••••••••Ab3d`. When a key
+comes from the config or the environment the panel's field is disabled and says
+so, rather than accepting a value that would be ignored.
+
+### Attribution
+
+Handled for you, because the API guidelines require it: every photographer is
+credited in the grid and in the details rail, linked to their profile with the
+`utm_source`/`utm_medium` parameters attached **server-side** (so the client
+cannot forget them), and each import pings Unsplash's download endpoint. Set
+`appName` to the application name you registered, which is what `utm_source`
+carries.
+
+### Staying inside the rate limit
+
+Searches are debounced, paging is a **Load more** button rather than infinite
+scroll, and an identical search is served from a 5-minute server-side cache. Only
+JSON calls count against the limit — the thumbnails in the grid are free — and
+the requests you have left this hour are shown at the foot of the details rail.
 
 ## Entry editor — CMS panel for content collections
 
@@ -446,7 +524,26 @@ the source popups' shared `atx-popup-label` /
 `atx-markup-tags` (the row) / `atx-markup-hint` / `atx-markup-tag` (one per
 insertable tag), `atx-rte-head` (sticky toolbar + image panel),
 `atx-rte-toolbar`, `atx-rte-btn`, `atx-rte-content`, `atx-rte-image-panel`,
-the image field's `atx-image-field-preview|thumb|empty|path|hint`, the source
+the image field's `atx-image-field-preview|thumb|empty|path|hint`,
+the media picker's `atx-media-*` — `atx-media-tabs` / `atx-media-tab`
+(one per source, `atx-media-tab-project` / `-unsplash`), `atx-media-toolbars`
+/ `atx-media-toolbar`, `atx-media-sort`, `atx-media-upload`, `atx-media-panes`,
+`atx-media-pane` (the grid's scroller), `atx-media-grid`, `atx-media-tile`
+wrapping `atx-media-pick` (the button) with `atx-media-thumb`,
+`atx-media-fallback`, `atx-media-check` (selection badge) and
+`atx-media-current` (the "Current" chip) inside it, `atx-media-cap` (the
+caption, a *sibling* of the button), `atx-media-rail` with
+`atx-media-rail-preview|img|title|line|key|value|empty`, `atx-media-status`,
+`atx-media-more` (the Load more footer), `atx-media-drop` /
+`atx-media-dropzone` (the drag overlay) and `atx-media-error`;
+the Unsplash pane's `atx-unsplash-search` / `atx-unsplash-input` /
+`atx-unsplash-orient`, `atx-unsplash-credit` with `atx-unsplash-author` and
+`atx-unsplash-link`, and `atx-unsplash-rate` (the requests-left line);
+the settings panel's `atx-settings-heading|blurb|link|status|text|label|row|key|hint|warning|error`;
+the swap panel's `atx-image-preview` / `atx-image-preview-img` /
+`atx-image-meta` and its `atx-image-recents` strip
+(`atx-image-recents-label|title`, `atx-image-recent`, `atx-image-recent-thumb`,
+`atx-image-browse-all`), the source
 peek's `atx-peek-code` (scroll container), `atx-peek-line` / `atx-peek-focus`
 (rows), `atx-peek-gutter`, `atx-peek-text`, and `atx-peek-more` (the
 "⋯ N more lines" markers), and the clipboard-fallback panel's `atx-copy-note`
@@ -514,6 +611,17 @@ your overrides need `!important`:
   (dev toolbar required, above); on ≥7 the integration injects them itself,
   since the Rust compiler no longer emits them. See
   [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md).
+- **Unsplash is the only photo source**, and only its free tier. Unsplash+ is a
+  consumer subscription with no API surface, so premium content cannot be
+  offered by a package many people install.
+- **An Unsplash photo id is only importable while the dev server that searched
+  for it is running.** The server keeps the download URLs in memory rather than
+  letting the browser supply them — the browser can name a photo but cannot
+  point the dev server at an arbitrary host. After a restart an import answers
+  "search again" instead.
+- **A strict `img-src` CSP on your dev page blocks the Unsplash thumbnails.**
+  The grid stays usable — credits still read and photos still import — but the
+  tiles show a placeholder.
 
 ## How it works (short version)
 

@@ -19,10 +19,11 @@ import {
   atomicWrite,
   checkEditablePath,
   isPackageOwned,
-  resolveUploadDir,
+  resolveAssetTarget,
   validateEditablePath,
 } from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
+import { createUnsplashRoutes, type UnsplashConfig } from './unsplash-routes.ts';
 
 /**
  * Dev-server middleware for astro-text-edit — the composition point for every
@@ -58,6 +59,9 @@ interface MiddlewareDeps {
   entryEditorEnabled: boolean;
   /** Collection/schema lookup for the entry editor; null → inference only. */
   schemaProvider: EntrySchemaProvider | null;
+  /** Unsplash photo source; null → the feature is off and /unsplash* answers
+   *  `disabled`. Its access key resolves lazily, per request. */
+  unsplash: UnsplashConfig | null;
 }
 
 const NO_PATCHER_REASON = 'Only .astro templates support in-place editing so far.';
@@ -85,6 +89,18 @@ const OUT_OF_ROOT_REASON =
  *  the panel scrolls it; the cap only stops a pathological multi-thousand-line
  *  file from flooding the response and the panel's DOM. */
 const PEEK_CONTEXT = 1000;
+
+/** Whether the Unsplash source is usable: enabled AND a key resolves. Degrades
+ *  to false rather than throwing — /health must answer even when a settings
+ *  file is unreadable, and the key itself never reaches the response. */
+async function hasUnsplashKey(cfg: UnsplashConfig | null): Promise<boolean> {
+  if (!cfg) return false;
+  try {
+    return Boolean((await cfg.resolve()).key.trim());
+  } catch {
+    return false;
+  }
+}
 
 /** Reject anything that isn't a same-machine request. (spec §8) */
 function isLocalRequest(req: Connect.IncomingMessage): boolean {
@@ -121,12 +137,17 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     cssInspector,
     entryEditorEnabled,
     schemaProvider,
+    unsplash,
   } = deps;
 
-  // The only directories an upload may be steered into. Without this, a
+  // The only directories an asset write may be steered into. Without this, a
   // client-supplied targetDir would be a "write a file anywhere in the project"
   // capability rather than "put this image beside its siblings". (spec §8)
-  const uploadAllowedDirs = [...assetDirs, uploadDir, imageUploadDir];
+  const assetTargetDirs = {
+    uploadDir,
+    imageUploadDir,
+    allowedDirs: [...assetDirs, uploadDir, imageUploadDir],
+  };
 
   const coreRoutes: Route[] = [
     {
@@ -135,7 +156,18 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       label: 'health',
       handler: async () => ({
         status: 200,
-        body: { ok: true, name: 'astro-text-edit', milestone: 1, cssInspector, root },
+        body: {
+          ok: true,
+          name: 'astro-text-edit',
+          milestone: 1,
+          cssInspector,
+          root,
+          // Enabled *and* holding a usable key — the overlay uses this to
+          // decide whether to render the Unsplash tab at all, and a tab that
+          // errors on click is worse than no tab. Resolved here rather than
+          // cached so a key entered through Settings shows up on the next poll.
+          unsplash: await hasUnsplashKey(unsplash),
+        },
       }),
     },
 
@@ -173,9 +205,8 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
         }
         // Relative fields fall back to the src-side dir; a requested target is
         // honoured only if it sits inside a configured asset directory.
-        const fallback = relative ? imageUploadDir : uploadDir;
-        const dir = resolveUploadDir(root, uploadAllowedDirs, fallback, req.targetDir);
-        if (req.targetDir && dir !== req.targetDir) {
+        const { dir, redirected } = resolveAssetTarget(root, assetTargetDirs, req);
+        if (redirected) {
           logger.warn(
             `upload targetDir "${req.targetDir}" is not inside a configured asset ` +
               `directory — writing to "${dir}" instead`,
@@ -379,6 +410,9 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       enabled: entryEditorEnabled,
       schemaProvider,
     }),
+    // Registered even when disabled, so a client that asks gets an explicit
+    // `disabled` code rather than a 404 it would have to guess the meaning of.
+    ...createUnsplashRoutes({ logger, root, dirs: assetTargetDirs, unsplash }),
   ];
 
   return (req, res, next) => {

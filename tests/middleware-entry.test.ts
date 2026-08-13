@@ -98,6 +98,7 @@ beforeAll(async () => {
     cssInspector: true,
     entryEditorEnabled: true,
     schemaProvider: provider,
+    unsplash: null,
   });
 });
 
@@ -338,6 +339,7 @@ describe('POST /entry/create — extension choice', () => {
     cssInspector: true,
     entryEditorEnabled: true,
     schemaProvider: extProvider,
+    unsplash: null,
   });
 
   beforeAll(async () => {
@@ -427,6 +429,7 @@ describe('disabled entry editor', () => {
       cssInspector: true,
       entryEditorEnabled: false,
       schemaProvider: null,
+      unsplash: null,
     });
     const r = await new Promise<{ status: number }>((resolve) => {
       const payload = Buffer.from(JSON.stringify({ file: entryRel }));
