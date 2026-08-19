@@ -35,6 +35,7 @@ export type IconName =
   | 'code'
   | 'external'
   | 'settings'
+  | 'collections'
   | 'lock'
   | 'image'
   | 'search'
@@ -72,6 +73,10 @@ const PATHS: Record<IconName, string> = {
   settings:
     '<path d="M12 2.6l1.5 2.2 2.6-.6.6 2.6 2.2 1.5-1.2 2.4 1.2 2.4-2.2 1.5-.6 2.6-2.6-.6L12 21.4l-1.5-2.2-2.6.6-.6-2.6-2.2-1.5 1.2-2.4-1.2-2.4 2.2-1.5.6-2.6 2.6.6z"/><circle cx="12" cy="12" r="3.2"/>',
   // A closed padlock — marks a setting the project's own config owns.
+  // Collections: the stacked-cylinder data-store mark. A collection *is* the
+  // content store behind the pages, so the conventional glyph is the right one.
+  collections:
+    '<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8v-13"/><path d="M4.5 12c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8"/>',
   lock:
     '<rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
   // Picture frame with a sun and a hill — the media/asset glyph.

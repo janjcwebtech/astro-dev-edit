@@ -73,7 +73,8 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
   const body = panel.querySelector('[data-body]') as HTMLElement;
 
   const label = styled('label', 'atx-popup-label', {
-    display: 'block', font: '600 12px system-ui', marginBottom: '4px', opacity: '0.8',
+    display: 'block', font: '600 12px system-ui', marginBottom: '4px',
+    color: '#eee', opacity: '0.8',
   });
   label.textContent = opts.label;
 
@@ -88,7 +89,7 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
   input.value = opts.value;
 
   const error = styled('p', 'atx-popup-error', {
-    display: 'none', margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.err,
+    display: 'none', margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.errText,
   });
 
   const markDirty = (): void => {

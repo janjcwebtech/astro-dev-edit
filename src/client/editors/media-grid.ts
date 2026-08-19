@@ -174,7 +174,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     });
     const fallback = styled('span', 'atx-media-fallback', {
       display: 'none', width: '100%', height: '100%', alignItems: 'center',
-      justifyContent: 'center', font: '18px system-ui', color: '#666',
+      justifyContent: 'center', font: '18px system-ui', color: COLOR.faint,
     });
     fallback.textContent = '🖼';
     pick.append(img, fallback);
@@ -289,7 +289,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     if (retry) {
       const btn = styled('button', 'atx-btn atx-btn-retry', {
         display: 'block', margin: '12px auto 0', padding: '5px 12px', borderRadius: '6px',
-        border: '1px solid #555', background: 'transparent', color: '#ccc',
+        border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#ccc',
         cursor: 'pointer', font: '600 12px system-ui',
       });
       btn.type = 'button';

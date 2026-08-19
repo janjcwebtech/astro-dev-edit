@@ -221,7 +221,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     const selected = el === selectedEl;
     const active = el === activeEl;
     row.style.background = selected ? COLOR.accent : active ? ACTIVE_BG : 'transparent';
-    row.style.color = selected ? '#fff' : active ? COLOR.accent : ROW_INK;
+    row.style.color = selected ? '#fff' : active ? COLOR.accentText : ROW_INK;
     // Hover-active reads as a dashed ring so it never looks like the solid
     // locked selection, even when both land on the same row.
     row.style.outline = active && !selected ? `1px dashed ${COLOR.accent}` : 'none';
@@ -399,8 +399,8 @@ export function initTree(deps: TreeDeps): TreeHandle {
     loc.textContent = source.loc || '?';
     loc.title = `Open ${basename(source.file)}:${source.loc} in your editor`;
     loc.addEventListener('mouseenter', () => {
-      loc.style.color = COLOR.accent;
-      loc.style.textDecorationColor = COLOR.accent;
+      loc.style.color = COLOR.accentText;
+      loc.style.textDecorationColor = COLOR.accentText;
     });
     loc.addEventListener('mouseleave', () => {
       loc.style.color = COLOR.muted;

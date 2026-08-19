@@ -35,7 +35,7 @@ const FOCUS_BG = hexToRgba(COLOR.accent, 0.16);
 function moreRow(count: number, where: 'above' | 'below'): HTMLElement {
   const row = styled('div', 'atx-peek-more', {
     padding: '4px 12px 4px 15px',
-    color: '#666',
+    color: COLOR.faint,
     fontStyle: 'italic',
     userSelect: 'none',
   });
@@ -78,7 +78,7 @@ function renderCode(peeked: PeekResponse): { container: HTMLElement; focusRow: H
       width: gutterWidth,
       padding: '0 12px 0 0',
       textAlign: 'right',
-      color: isFocus ? '#bda9ff' : '#5a5a72',
+      color: isFocus ? '#bda9ff' : COLOR.faint,
       userSelect: 'none',
     });
     gutter.textContent = String(lineNo);
@@ -119,7 +119,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
 
   const loading = styled('div', 'atx-peek-loading', {
     padding: '24px 16px',
-    color: '#999',
+    color: COLOR.muted,
     font: `12.5px ${FONT.mono}`,
     background: CODE_BG,
   });
@@ -173,7 +173,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
     } catch (err) {
       if (closed) return;
       loading.textContent = `Could not load source — ${err instanceof Error ? err.message : 'unknown error'}`;
-      loading.style.color = '#ff8a80';
+      loading.style.color = COLOR.errText;
     }
   })();
 }

@@ -361,7 +361,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
 
       const scopeToggle = styled('button', 'atx-btn atx-asset-scope', {
         flex: '0 0 auto', display: 'none', padding: '6px 10px', borderRadius: '6px',
-        border: '1px solid #555', background: 'transparent', color: '#ccc',
+        border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#ccc',
         cursor: 'pointer', font: '600 12px system-ui', whiteSpace: 'nowrap',
       });
       scopeToggle.type = 'button';

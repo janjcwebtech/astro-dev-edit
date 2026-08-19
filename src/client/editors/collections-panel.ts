@@ -9,6 +9,7 @@ import type {
 } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { has } from '../features.ts';
+import { clearHighlight } from '../hover.ts';
 import { icon } from '../icons.ts';
 import {
   COLOR,
@@ -20,10 +21,17 @@ import {
   styled,
   toast,
 } from '../ui.ts';
+import { openDrawer } from './drawer.ts';
 import { openEntryCreatePanel, openEntryPanel } from './entry.ts';
 
 /**
- * The Collections tab — the collection and field designer.
+ * The Collections drawer — the collection and field designer.
+ *
+ * A **peer** of the Settings drawer, opened from its own item in the admin bar's
+ * menu rather than as a tab inside Settings. Options and content structure are
+ * different jobs: an option is a switch on this tool, while a collection's shape
+ * is the project's own committed source. Reaching the designer should not mean
+ * going through a settings screen first.
  *
  * Shaped like Webflow's collections UI, adapted to a drawer: a list of
  * collections, then one collection's field table, then a create form. What it
@@ -100,7 +108,7 @@ const RESUME_KEY = 'astroTextEditCollection';
 /** How long a remembered collection stays valid. Long enough to survive the
  *  reload (Astro emits more than one while it resyncs, so the key must outlive
  *  the first boot), short enough that it can never hijack a later, unrelated
- *  visit to this tab. */
+ *  visit to the designer. */
 const RESUME_TTL_MS = 20_000;
 
 /**
@@ -145,10 +153,10 @@ export interface CollectionsPaneOptions {
   /**
    * Close the surface this pane lives in, then run `open`.
    *
-   * The entry drawers are *peers* of the Settings drawer, not children: they
-   * claim the same interaction slot, so stacking one on the other would leave the
-   * outer drawer unable to close itself. Handing off instead is also the honest
-   * reading of the gesture — clicking an entry means "edit this entry now".
+   * The entry drawers are *peers* of this one, not children: they claim the same
+   * interaction slot, so stacking one on the other would leave the outer drawer
+   * unable to close itself. Handing off instead is also the honest reading of the
+   * gesture — clicking an entry means "edit this entry now".
    */
   handoff(open: () => void): void;
   /** Open straight into this collection's detail view, when it exists. Set by the
@@ -157,13 +165,57 @@ export interface CollectionsPaneOptions {
 }
 
 export interface CollectionsPane {
-  /** Mount point for the tab's host. */
+  /** Mount point for the drawer's body. */
   root: HTMLElement;
   /** Read (or re-read) from the server. Safe to call again at any time. */
   load(): void;
   /** Whether anything is queued but unsaved — folded into the drawer's
    *  discard-confirm so a stray backdrop click can't lose a field edit. */
   isDirty(): boolean;
+}
+
+export interface CollectionsPanelOptions {
+  /** Open straight into this collection's fields. Set by the overlay when a
+   *  schema write reloaded the page out from under the drawer. */
+  collection?: string;
+  /** Run after the drawer closes, whatever the outcome. */
+  onClose?(): void;
+}
+
+/**
+ * Open the Collections drawer.
+ *
+ * The pane below carries all the state; this is only its shell. The footer holds
+ * nothing but Close, deliberately: every save in here belongs to the row or the
+ * form it changes — a schema write and an override write are different stores —
+ * so a single drawer-wide Save would have to lie about which one it meant.
+ */
+export function openCollectionsPanel(opts: CollectionsPanelOptions = {}): void {
+  clearHighlight();
+
+  const pane = buildCollectionsPane({
+    // An entry drawer replaces this one rather than stacking on it (see
+    // `handoff`). The dirty check runs first, so a queued field edit can't be
+    // lost by clicking an entry.
+    handoff: (open) => {
+      if (!shell.close()) return;
+      open();
+    },
+    ...(opts.collection ? { initialCollection: opts.collection } : {}),
+  });
+
+  const shell = openDrawer('Collections', {
+    isDirty: () => pane.isDirty(),
+    discardMessage: 'Discard unsaved collection changes?',
+    // Wider than the default drawer: a field row carries both stores' controls
+    // side by side, and wrapping them would hide the split the legend explains.
+    width: 'min(max(560px, 48vw), 96vw)',
+    ...(opts.onClose ? { onClose: opts.onClose } : {}),
+  });
+
+  shell.body.append(pane.root);
+  shell.foot.append(footButton('Close', 'cancel', () => shell.close()));
+  pane.load();
 }
 
 export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsPane {
@@ -249,7 +301,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
   function render(): void {
     root.textContent = '';
     // The editor list belongs to the DOM this call is about to build. Without
-    // clearing it, a return to this tab would leave detached editors from the
+    // clearing it, a return to this view would leave detached editors from the
     // previous render in the dirty check and in the next save's payload.
     editors = [];
     if (!data) return;
@@ -278,7 +330,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
             icon('lock', 11),
             textNode(
               'Schema editing is off, so fields and collections are read-only here. ' +
-                'The Editing tab turns it on. Widget, label and hidden still save.',
+                'Settings → Editing turns it on. Widget, label and hidden still save.',
             ),
           ],
           COLOR.muted,
@@ -1017,14 +1069,18 @@ interface FieldEditor {
 
 // --- small DOM helpers ------------------------------------------------------
 
-/** Two-store legend. The one piece of chrome that explains the whole tab. */
+/** Two-store legend. The one piece of chrome that explains the whole drawer. */
 function legend(): HTMLElement {
   const wrap = styled('div', 'atx-collections-legend', {
     padding: '9px 11px', borderRadius: '7px', background: '#16161f',
     border: `1px solid ${COLOR.panelDivider}`, font: '11px/1.55 system-ui', color: COLOR.muted,
   });
   const line = (word: string, rest: string): HTMLElement => {
-    const p = styled('p', 'atx-collections-legend-line', { margin: '0' });
+    // The colour is repeated from the wrapper rather than inherited: a host
+    // page's own `p { color }` rule outranks an inherited value (only the
+    // *inline* declaration outranks the host), and silently repainted this
+    // legend in the page's body colour.
+    const p = styled('p', 'atx-collections-legend-line', { margin: '0', color: COLOR.muted });
     const strong = styled('strong', 'atx-collections-legend-word', { color: '#ddd' });
     strong.textContent = word;
     p.append(strong, document.createTextNode(` ${rest}`));
@@ -1110,7 +1166,7 @@ function checkbox(
   const box = styled('input', 'atx-collections-check', { accentColor: COLOR.accent, margin: '0' });
   box.type = 'checkbox';
   box.checked = checked;
-  const hint = styled('span', 'atx-collections-check-hint', { font: '12px system-ui', color: '#999' });
+  const hint = styled('span', 'atx-collections-check-hint', { font: '12px system-ui', color: COLOR.muted });
   hint.textContent = checked ? 'Yes' : 'No';
   box.addEventListener('change', () => {
     hint.textContent = box.checked ? 'Yes' : 'No';

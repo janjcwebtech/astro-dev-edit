@@ -21,10 +21,14 @@ import type { SourceLoc } from '../shared/protocol.ts';
 import { initAdminBar } from './admin-bar.ts';
 import * as api from './api.ts';
 import { invalidateClassifications } from './classify-cache.ts';
+import {
+  clearPendingCollection,
+  openCollectionsPanel,
+  takePendingCollection,
+} from './editors/collections-panel.ts';
 import { openCopyPanel } from './editors/copy-panel.ts';
 import { openEntryPanel } from './editors/entry.ts';
 import { openPeekPanel } from './editors/peek.ts';
-import { clearPendingCollection, takePendingCollection } from './editors/collections-panel.ts';
 import { openSettingsPanel } from './editors/settings-panel.ts';
 import { collectContext, formatContext } from './element-context.ts';
 import { has, setFeatures } from './features.ts';
@@ -361,8 +365,10 @@ const bar = initAdminBar({
     if (file) void openEntryPanel(file);
   },
   openPageSource,
+  openCollections: () => openCollectionsPanel({ onClose: () => bar.refresh() }),
   // Saving settings changes what the bar should show (the entry button, the
-  // page-source item), so the bar re-evaluates its specs once the drawer is gone.
+  // page-source item, Collections itself), so the bar re-evaluates its specs
+  // once the drawer is gone.
   openSettings: () => openSettingsPanel({ onClose: () => bar.refresh() }),
 });
 
@@ -418,8 +424,7 @@ async function boot(): Promise<void> {
   // they were.
   const resumeCollection = takePendingCollection();
   if (resumeCollection) {
-    openSettingsPanel({
-      tab: 'collections',
+    openCollectionsPanel({
       collection: resumeCollection,
       onClose: () => {
         clearPendingCollection();

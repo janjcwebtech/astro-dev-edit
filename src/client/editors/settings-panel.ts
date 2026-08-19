@@ -13,7 +13,6 @@ import {
   styled,
   toast,
 } from '../ui.ts';
-import { buildCollectionsPane } from './collections-panel.ts';
 import { openDrawer } from './drawer.ts';
 import { applyFieldErrors, buildControl, collectChanges, type FieldControl } from './fields.ts';
 
@@ -70,22 +69,11 @@ const GROUPS: ReadonlyArray<{ id: string; label: string; blurb: string }> = [
     blurb: 'Where images are read from, and where new ones are written.',
   },
   {
-    id: 'collections',
-    label: 'Collections',
-    blurb: '',
-  },
-  {
     id: 'unsplash',
     label: 'Unsplash',
     blurb: 'An optional photo source in the media picker.',
   },
 ];
-
-/** The Collections tab holds no options — it is a designer over the project's
- *  own content config, so it renders its own pane and saves through its own
- *  endpoints. Kept in this drawer rather than given a button of its own because
- *  it is where a user goes looking for "how is my content configured". */
-const COLLECTIONS_TAB = 'collections';
 
 export interface SettingsPanelOptions {
   /** Open on a particular tab. Used by the media modal's "no key configured"
@@ -96,9 +84,6 @@ export interface SettingsPanelOptions {
   layer?: number;
   /** Run after the drawer closes, whatever the outcome. */
   onClose?(): void;
-  /** Open the Collections tab straight into this collection. Set by the overlay
-   *  when a schema write reloaded the page out from under the drawer. */
-  collection?: string;
 }
 
 export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
@@ -111,20 +96,8 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
    *  field can report, since it never pre-fills. */
   const keyDirty = (): boolean => keyInput.value.trim().length > 0;
 
-  const collections = buildCollectionsPane({
-    // The entry drawers claim the same interaction slot this one holds, so they
-    // replace it rather than stack on it. The dirty check runs first, so a queued
-    // field edit can't be lost by clicking an entry.
-    handoff: (open) => {
-      if (!shell.close()) return;
-      open();
-    },
-    ...(opts.collection ? { initialCollection: opts.collection } : {}),
-  });
-
   const isDirty = (): boolean =>
-    !saving &&
-    (keyDirty() || Object.keys(collectChanges(controls)).length > 0 || collections.isDirty());
+    !saving && (keyDirty() || Object.keys(collectChanges(controls)).length > 0);
 
   const shell = openDrawer('Settings', {
     isDirty,
@@ -176,7 +149,8 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   );
 
   const keyStatus = styled('p', 'atx-settings-key-status', {
-    margin: '0 0 10px', font: '12px system-ui', display: 'flex', alignItems: 'center', gap: '6px',
+    color: '#eee', margin: '0 0 10px', font: '12px system-ui',
+    display: 'flex', alignItems: 'center', gap: '6px',
   });
 
   const keyRow = styled('div', 'atx-settings-row', { display: 'flex', gap: '6px' });
@@ -213,21 +187,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
 
   const tabs = buildTabs(
     GROUPS.map((g) => ({ id: g.id, label: g.label, pane: panes.get(g.id)! })),
-    {
-      classPrefix: 'settings',
-      // The designer costs a request and a directory scan per collection, so it
-      // reads when the user asks for it — and re-reads on every return, since a
-      // schema written from here changes what the next read must show. A pending
-      // edit suppresses that, so switching tabs can't discard queued work.
-      //
-      // The footer's Save writes options; the Collections tab saves through its
-      // own buttons, right beside the fields they change. Hiding the footer
-      // button there is what keeps "which button does what" unambiguous.
-      onChange: (id) => {
-        if (id === COLLECTIONS_TAB && !collections.isDirty()) collections.load();
-        refreshFoot();
-      },
-    },
+    { classPrefix: 'settings' },
   );
   body.append(status, tabs.strip, tabs.host, warning, error);
 
@@ -242,11 +202,6 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
       const pane = panes.get(g.id)!;
       pane.textContent = '';
       const mine = options.filter((o) => o.group === g.id);
-
-      if (g.id === COLLECTIONS_TAB) {
-        pane.append(collections.root);
-        continue;
-      }
 
       const blurb = styled('p', 'atx-settings-blurb', {
         margin: '0 0 14px', font: '12px/1.5 system-ui', color: COLOR.muted,
@@ -267,7 +222,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     }
 
     paintKey(data);
-    refreshFoot();
+    setButtonEnabled(saveBtn, true);
   };
 
   const paintKey = (data: SettingsResponse): void => {
@@ -358,9 +313,9 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     return note;
   };
 
-  /** Freeze the drawer during a write. Un-freezing defers to `refreshFoot`
-   *  rather than blanket-enabling, so a control disabled *by state* stays
-   *  that way. */
+  /** Freeze the drawer during a write. Un-freezing repaints from the current
+   *  response rather than blanket-enabling, so a control disabled *by state* —
+   *  a config-overridden key field — stays that way. */
   const setBusy = (busy: boolean): void => {
     saving = busy;
     keyInput.readOnly = busy;
@@ -370,7 +325,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
       // Rebuilt by the paint that follows a successful save; on a failure this
       // restores the pre-save enablement.
       if (current) paintKey(current);
-      refreshFoot();
+      setButtonEnabled(saveBtn, current !== null);
     }
   };
 
@@ -433,12 +388,6 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   const closeBtn = footButton('Close', 'cancel', () => shell.close());
   const saveBtn = footButton('Save', 'primary', () => void save());
   foot.append(closeBtn, saveBtn);
-
-  function refreshFoot(): void {
-    const onCollections = tabs.activeId() === COLLECTIONS_TAB;
-    saveBtn.style.display = onCollections ? 'none' : '';
-    setButtonEnabled(saveBtn, current !== null);
-  }
 
   // --- boot ------------------------------------------------------------------
   status.append(icon('spinner', 13), text('Reading settings…', COLOR.muted));

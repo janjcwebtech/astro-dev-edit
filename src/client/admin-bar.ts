@@ -79,6 +79,8 @@ export interface AdminBarDeps {
   openEntry(): void;
   /** Open the file this page is written in, in the user's editor. */
   openPageSource(): void;
+  /** Open the collection and field designer. */
+  openCollections(): void;
   /** Open the integration settings drawer. Injected because admin-bar.ts
    *  imports nothing from `editors/`. */
   openSettings(): void;
@@ -103,12 +105,18 @@ const BAR_H = 36;
 const HOT_ZONE = 4;
 /** Grace period before an unpinned bar slides away again. */
 const RETRACT_DELAY = 350;
-/** Opacity while pinned but not approached — visible, never in the way. */
-const REST_OPACITY = '0.5';
+/** Opacity while pinned but not approached — visible, never in the way, but
+ *  still *readable*: at 0.5 the bar's own labels composited down to 2.8:1
+ *  against a white page, so the resting bar was the least legible thing the
+ *  overlay drew. 0.72 keeps it recessive and clears AA (5.3:1). */
+const REST_OPACITY = '0.72';
 
 const BTN_BG = 'rgba(255,255,255,0.09)';
 const BTN_BG_HOVER = 'rgba(255,255,255,0.20)';
 const BTN_INK = '#e7e6f2';
+/** The save button's label while writing — reads as busy without dropping below
+ *  AA on the button's own hover background (white at 0.20 over the bar). */
+const SAVING_INK = '#d2d0de';
 
 const PHASE_LABEL: Record<state.SavePhase, string> = {
   clean: 'Done',
@@ -211,7 +219,11 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
       gap: '6px',
       padding: '0 8px',
       boxSizing: 'border-box',
-      background: 'rgba(22, 21, 34, 0.78)',
+      // Opaque enough to guarantee the bar's own contrast. At 0.78 a white page
+      // showed through to an effective #494853, which dropped the hint and menu
+      // inks to ~3:1; the blur still reads as glass at 0.94, and over a dark
+      // page (the common case) the two are indistinguishable.
+      background: 'rgba(22, 21, 34, 0.94)',
       backdropFilter: 'blur(12px) saturate(1.3)',
       color: '#fff',
       font: `500 12px ${FONT.ui}`,
@@ -305,8 +317,11 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     'span',
     'atx-bar-hint',
     {
+      // The bar's primary ink rather than `muted`: the resting bar is itself at
+      // REST_OPACITY, which dims whatever ink sits on it, and a hint is a
+      // message to be read. Its 10.5px size is what keeps it secondary.
       font: `500 10.5px/1 ${FONT.ui}`,
-      color: '#9d9ab5',
+      color: BTN_INK,
       paddingRight: '4px',
       whiteSpace: 'nowrap',
       display: 'none',
@@ -349,7 +364,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     paddingTop: '7px',
     borderTop: `1px solid ${COLOR.panelDivider}`,
     font: `500 10.5px ${FONT.mono}`,
-    color: '#7d7d95',
+    color: COLOR.faint,
   });
   const liveDot = styled('span', 'atx-menu-live', {
     width: '6px',
@@ -731,7 +746,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
       const phase = state.savePhase();
       const bg = PHASE_BG[phase];
       btn.style.background = bg;
-      btn.style.color = phase === 'saving' ? '#b9b6cc' : '#fff';
+      btn.style.color = phase === 'saving' ? SAVING_INK : '#fff';
       btn.style.cursor = phase === 'saving' ? 'progress' : 'pointer';
       return { bg, bgHover: bg.startsWith('#') ? lift(bg) : bg };
     },
@@ -747,6 +762,21 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     // The whole item is a launch-my-editor action, so it goes when that is off.
     visible: () => has('openInEditor'),
     onSelect: () => deps.openPageSource(),
+  });
+
+  // Collections is a *peer* of Settings, not a tab inside it: a collection's
+  // shape is the project's own committed source, while an option is a switch on
+  // this tool. Reaching the designer should not mean going through settings.
+  register({
+    id: 'atx-menu-collections',
+    place: 'menu',
+    label: 'Collections',
+    icon: 'collections',
+    title: 'Design your content collections — fields, types and entries',
+    // The whole designer sits behind the entry editor server-side, so the item
+    // goes when that is off rather than opening a drawer that can only refuse.
+    visible: () => has('entryEditor'),
+    onSelect: () => deps.openCollections(),
   });
 
   register({

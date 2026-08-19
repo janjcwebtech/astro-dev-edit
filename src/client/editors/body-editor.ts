@@ -229,7 +229,8 @@ export function buildBodyEditor(initial: string): BodyEditor {
     (basename(path).replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ')).trim();
   let altTouched = false;
   const altLabel = styled('label', 'atx-rte-image-alt-label', {
-    display: 'block', font: `600 11px ${FONT.ui}`, margin: '8px 0 4px', opacity: '0.85',
+    display: 'block', font: `600 11px ${FONT.ui}`, margin: '8px 0 4px',
+    color: '#eee', opacity: '0.85',
   });
   altLabel.textContent = 'Alt text';
   const altInput = styled('input', 'atx-rte-image-alt', { ...INPUT_STYLE });

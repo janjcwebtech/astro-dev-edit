@@ -114,6 +114,7 @@ the loc rules in `astro.ts`.
 | `unsplash-search.ts` — the DOM-free search controller: debounce collapsing keystrokes to one request, blank/whitespace staying idle with no fetch, immediate reset on clear, `retry()` bypassing the debounce, stale responses (and stale errors) discarded, zero results as `empty` not an empty `ready`, error code/retryability surfaced, `loadMore` appending and bumping the page, discarded when the query or orientation changed mid-flight, a failed page keeping the shown results via `moreError`, orientation re-running immediately, `dispose()` cancelling | `tests/unsplash-search.test.ts` |
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 | `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
+| `ui.ts` — contrast guard on the ink tokens: each foreground (`muted`, `faint`, `accentText`, `errText`, `warn`, `image`) against every surface it is painted on at AA 4.5:1, white on each colour used as a *background* (`accent`, `ok`, `err`, `idle`), `control`/`errBorder` at the 3:1 WCAG requires of a control boundary, and that `accent`/`err` still fail as foregrounds — which is what the `*Text` pair is for | `tests/contrast.test.ts` |
 | `element-context.ts` — `formatContext` clipboard payload: section order and omission (absent verdict/entry/box), `>` focus-line gutter marking, quoted-range wording, fence language per extension, refused-source sentence, empty-CSS note, rule blocks with/without a source comment, both truncation notices; `relativize` root stripping (trailing slash, outside-root, already-relative, unknown root, Windows separators); `windowAround` 1-based slicing (clamped both ends, whole file, pre-windowed response) | `tests/element-context.test.ts` |
 
 The Settings drawer itself has no unit tests — it is DOM-bound — but it is
@@ -121,7 +122,7 @@ The Settings drawer itself has no unit tests — it is DOM-bound — but it is
 type and every `locked` flag come from `/settings`, so `tests/settings-routes.test.ts`
 pins what the drawer will render. What remains manual is the rendering itself.
 
-The same holds for the **Collections tab**: the collection list, each field's
+The same holds for the **Collections drawer**: the collection list, each field's
 type, its verbatim expression, which fields' overrides are locked and whether the
 schema is patchable at all come from `/collections`, and every write it can make
 is pinned in `tests/schema-routes.test.ts` against the patcher tests underneath.
@@ -452,15 +453,19 @@ split.
       "add `unsplash: {}` … then restart the dev server" text. Enabling it makes
       the media picker's Unsplash tab appear. Restore the config line after.
 
-**Collections tab (the designer)**
+**Collections drawer (the designer)**
 
-The playground gives both schema forms — `blog` is a plain `z.object`, `works` a
+Opened from **Collections** in the admin bar's overflow menu — its own item, not a
+tab inside Settings. The playground gives both schema forms — `blog` is a plain `z.object`, `works` a
 function schema with `image()` fields — and its config sets widget overrides on
 `blog.excerpt` and `blog.image`, which makes it a good test of the locked split.
 
-- [ ] The tab lists `blog` (5 entries, 8 fields) and `works` (2 entries, 7
-      fields) with their directories. The drawer's footer **Save** button is
-      hidden here — this tab saves through its own buttons.
+- [ ] The menu item is present while `entryEditor` is on and **gone** when the
+      Settings drawer's Editing tab switches the entry editor off (the whole
+      designer sits behind that gate server-side).
+- [ ] The drawer lists `blog` (5 entries, 8 fields) and `works` (2 entries, 7
+      fields) with their directories. Its footer holds **Close** only — every save
+      in here belongs to the row or the form it changes.
 - [ ] Opening `blog` shows the meta line *plain z.object schema*, the two-store
       legend, and a card per field: a **Schema** group (type / required / default,
       plus options for a select) and an **Editor** group (widget / label /
@@ -473,8 +478,8 @@ function schema with `image()` fields — and its config sets widget overrides o
       `textarea` is absent from the type list — it is a widget, offered in the
       Editor group.
 - [ ] Add `subtitle` (Text, not required) to `blog` and **Save changes**: the page
-      reloads as Astro resyncs, and the drawer **reopens on this tab in `blog`**
-      with `subtitle` showing `z.string().optional()`. `git diff` on
+      reloads as Astro resyncs, and the drawer **reopens itself in `blog`** with
+      `subtitle` showing `z.string().optional()`. `git diff` on
       `src/content.config.ts` is **one inserted line**, every comment and quote
       style intact.
 - [ ] The new field appears in the entry drawer for a blog entry — with **no
@@ -495,16 +500,39 @@ function schema with `image()` fields — and its config sets widget overrides o
       field names read from the source; the broken one is badged *no readable
       schema* and adding a field to it is refused as `unrecognized`. Restore.
 - [ ] Forcing an `image` field onto `blog` (devtools) is refused with the
-      convert-the-schema message; a stale etag is refused with *reopen the tab*;
+      convert-the-schema message; a stale etag is refused with *reopen*;
       both leave the config byte-identical.
-- [ ] Turn **Schema editing** off in the Editing tab: the Collections list carries
-      a padlock note, field Schema groups are disabled, **New collection** is
+- [ ] Turn **Schema editing** off in the Settings drawer's Editing tab: the
+      Collections list carries a padlock note, field Schema groups are disabled, **New collection** is
       gone, and widget/label/hidden still save.
-- [ ] **Items**: the tab shows all 5 blog entries newest-first, with a **draft**
+- [ ] **Items**: the view shows all 5 blog entries newest-first, with a **draft**
       badge on `drafts-live-here-too` — an entry the rendered site hides. Clicking
-      one **closes the Settings drawer** and opens the entry drawer for that file.
+      one **closes the Collections drawer** and opens the entry drawer for that
+      file.
       Do it with a queued field edit pending: the discard confirm appears first,
       and cancelling keeps you where you were.
+
+**Contrast** (`tests/contrast.test.ts` pins the tokens; these two things it cannot)
+
+- [ ] **Host-page CSS cannot repaint overlay text.** The inline-style rule only
+      protects the element carrying the declaration — a child taking its colour
+      by *inheritance* loses to an ordinary `p { color: … }` or `label { … }` on
+      the page, which is how the Collections legend once rendered in the site's
+      body colour. Paste this in the console on any open panel; it must report
+      nothing. If it names an element, that element needs its own inline colour:
+
+      ```js
+      [...document.querySelectorAll('[data-astro-text-edit-ui="1"]')]
+        .filter(el => !el.style.color && el.parentElement?.closest('[data-astro-text-edit-ui="1"]')
+          && getComputedStyle(el).color !== getComputedStyle(el.parentElement).color
+          && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))
+        .map(el => el.className + ' → ' + getComputedStyle(el).color)
+      ```
+
+- [ ] **The admin bar stays legible over a light page.** It is the one surface
+      that is translucent *and* dimmed at rest, so its contrast depends on what
+      is behind it. On a white section of the playground, the resting bar's
+      labels and its `#atx-bar-hint` are readable without hovering.
 
 **Cleanup**
 

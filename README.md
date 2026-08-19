@@ -136,10 +136,11 @@ Every global control lives in a slim bar across the top of the page:
   whether it is pinned or not, since it carries the save state and the way out.
 - **The dock button** — moves the bar to the **bottom** of the viewport, for
   sites whose own chrome lives at the top.
-- **The purple mark** — the overflow menu (*Open page source*, which opens the
-  file this page is written in, and *Settings*, where [every integration
-  option](#settings-drawer) — including the [Unsplash access
-  key](#unsplash-photo-picker) — is editable) plus the dev-server status.
+- **The purple mark** — the overflow menu plus the dev-server status. It holds
+  *Open page source*, which opens the file this page is written in;
+  *Collections*, the [collection and field designer](#collections--the-collection-designer);
+  and *Settings*, where [every integration option](#settings-drawer) — including the
+  [Unsplash access key](#unsplash-photo-picker) — is editable.
 
 The bar **overlays** the page rather than pushing it down: the top edge is where
 sticky site headers live, and reflowing the page would change the very layout
@@ -267,7 +268,7 @@ textEdit({
 | `cssInspector` | `true` | The hover-pill CSS class/ID inspector. `false` hides the chips row entirely. The per-rule open-in-editor jump also honours `openInEditor`. |
 | `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. **Config-only** — it registers a Vite plugin, so changing it needs a restart. |
 | `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
-| `schemaEditor` | `true` | Whether the [collection designer](#collections-tab--the-collection-designer) may write your `src/content.config.ts`. `false` keeps the Collections tab read-only for schema edits — collections and fields still list, and the editor-only overrides (widget, label, hidden) still save, because those go to `.astro-text-edit.json` rather than to committed source. |
+| `schemaEditor` | `true` | Whether the [collection designer](#collections--the-collection-designer) may write your `src/content.config.ts`. `false` keeps the designer read-only for schema edits — collections and fields still list, and the editor-only overrides (widget, label, hidden) still save, because those go to `.astro-text-edit.json` rather than to committed source. |
 | `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults, or just switch it on in the Settings drawer. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-text-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30). |
 
 Every option except `enabled` and `sourceAnnotations` is editable from the
@@ -277,13 +278,13 @@ read-only and says a restart is needed.
 
 ### Settings drawer
 
-Opened from the admin bar's overflow menu. Five tabs — **General**, **Editing**,
-**Media**, **Collections**, **Unsplash** — the first three, and the last, holding
-one control per option with a line of prose saying what it does. Saving writes
-only the options you changed into `.astro-text-edit.json`, merging with whatever
-is already there. **Collections** is not an options tab: it is the
-[collection designer](#collections-tab--the-collection-designer), and it saves
-through its own buttons.
+Opened from the admin bar's overflow menu. Four tabs — **General**, **Editing**,
+**Media**, **Unsplash** — each holding one control per option with a line of prose
+saying what it does. Saving writes only the options you changed into
+`.astro-text-edit.json`, merging with whatever is already there. Collections are
+not settings: they have their own
+[drawer](#collections--the-collection-designer), alongside this one in the same
+menu.
 
 A few properties worth knowing:
 
@@ -303,13 +304,15 @@ The options the drawer offers come from the server, so it renders whatever your
 installed version declares; an option added in a later release appears without
 any change to the overlay.
 
-### Collections tab — the collection designer
+### Collections — the collection designer
 
-The Collections tab lists every collection your content config declares, opens
-one into its field table, and can append a new one. It is part of the
-[entry editor](#entry-editor-cms-panel-for-content-collections) surface, so
-`entryEditor: false` removes it along with the drawer. Two things it does that the
-rest of the overlay doesn't:
+**Collections** in the admin bar's overflow menu lists every collection your
+content config declares, opens one into its field table, and can append a new one.
+It is its own drawer, alongside Settings rather than inside it: an option is a
+switch on this tool, while a collection's shape is your own committed source. It is
+part of the [entry editor](#entry-editor-cms-panel-for-content-collections)
+surface, so `entryEditor: false` removes the menu item along with the drawer. Two
+things it does that the rest of the overlay doesn't:
 
 **It writes `src/content.config.ts`.** Adding a field, changing a field's type,
 removing one, creating a collection — all of it patches that file, which is
@@ -332,8 +335,8 @@ for the same reason a config-set option does.
 Worth knowing before you use it:
 
 -   **A schema save reloads the page.** Astro resyncs its content layer whenever
-    that file changes. The drawer reopens itself on this tab, in the collection
-    you were editing.
+    that file changes. The drawer reopens itself in the collection you were
+    editing.
 -   **A retype your existing entries don't satisfy will fail that sync.** Change
     a field from text to number while entries hold strings and Astro refuses the
     collection until you update them — it names the first offending file. That is
@@ -362,7 +365,7 @@ Worth knowing before you use it:
 Each collection also has an **Items** view: its entry files, newest first, with a
 badge on drafts. This is the way to reach an entry no rendered page links to — a
 draft, or one whose route doesn't exist yet. Clicking an item opens the ordinary
-entry drawer for it (the Settings drawer hands over rather than stacking); **New
+entry drawer for it (this drawer hands over rather than stacking); **New
 item** opens the ordinary create drawer, built from the collection's schema.
 Deleting is still done from the entry drawer, still etag-guarded, and still has no
 in-app undo.
@@ -699,6 +702,20 @@ your overrides need `!important`:
 /* e.g. keep the admin bar fully opaque, even at rest */
 #atx-bar { opacity: 1 !important; }
 ```
+
+That protection is per element, not per subtree: an inline colour on a panel
+does not shield a child that takes its colour by inheritance, because an
+ordinary `p { color: … }` or `label { … }` rule on your page outranks an
+inherited value. Every piece of text in the overlay therefore sets its own
+colour, so styling elements by tag on your site cannot repaint it. If you
+*want* to re-colour the overlay, target the `atx-*` hooks above with
+`!important` rather than element selectors.
+
+Overlay text is picked to clear **WCAG AA** contrast (4.5:1) against the
+surface it sits on, and control borders the 3:1 that applies to a control's
+boundary; `tests/contrast.test.ts` holds those tokens to it. If you re-theme
+the panels, note that a lighter panel background will need darker inks to keep
+that.
 
 ## Scope and limitations
 

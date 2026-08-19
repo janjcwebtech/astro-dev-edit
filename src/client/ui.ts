@@ -26,12 +26,30 @@ export const COLOR = {
   image: '#2bb673',
   /** Dynamic-content classification and warnings. */
   warn: '#e0a800',
-  /** Unknown classification. */
-  muted: '#888',
-  /** Success toast. */
-  ok: '#2b8a4a',
-  /** Error toast. */
+  /** Secondary ink: help text, hints, unknown classification — everything that
+   *  should read quieter than `#eee` while still being *read*. Chosen so the
+   *  worst case in the overlay (11px on the lightest surface we paint,
+   *  `#20202e`) clears WCAG AA at 6.3:1. */
+  muted: '#a3a0ba',
+  /** Tertiary ink, one step below `muted`: peek line numbers, empty-state
+   *  glyphs, the menu's status footer. Still AA (4.9:1 worst case) — quiet is
+   *  not the same as unreadable. Nothing may go fainter than this. */
+  faint: '#918fa8',
+  /** Boundary of an interactive control — input/textarea/select borders and
+   *  outline buttons. Sized for WCAG 1.4.11 non-text contrast (3:1) against
+   *  both the field interior (`#111`) and every panel surface it sits on. */
+  control: '#6a6a82',
+  /** Success toast / the bar's saved state — a *background* carrying white
+   *  text, so it is dark enough for white to clear AA on it (5.4:1). */
+  ok: '#1f7a3f',
+  /** Error toast — likewise a background under white text. */
   err: '#c0392b',
+  /** `err` lightened enough to read as *text* on a panel, the same split as
+   *  `accent`/`accentText`: the solid error red is 3.1:1 as a foreground and
+   *  fails. Used for field errors and failure lines inside panels. */
+  errText: '#ff8a80',
+  /** Border of a danger (outline) button — the `err` hue at control contrast. */
+  errBorder: '#a85450',
   /** Toggle button when edit mode is off. */
   idle: '#4a4a6a',
   panelBg: '#1c1c2b',
@@ -50,7 +68,7 @@ export const FONT = {
  *  dark background instead of as a near-invisible dark glyph. */
 export const INPUT_STYLE: Partial<CSSStyleDeclaration> = {
   width: '100%', padding: '6px 8px', boxSizing: 'border-box',
-  border: '1px solid #444', borderRadius: '5px', background: '#111', color: '#fff',
+  border: `1px solid ${COLOR.control}`, borderRadius: '5px', background: '#111', color: '#fff',
   font: '13px system-ui', colorScheme: 'dark',
 };
 
@@ -491,12 +509,12 @@ export type ButtonKind = 'primary' | 'secondary' | 'cancel' | 'ghost' | 'danger'
 
 const BUTTON_STYLES: Record<ButtonKind, Partial<CSSStyleDeclaration>> = {
   primary: { border: 'none', background: COLOR.accent, color: '#fff' },
-  secondary: { border: '1px solid #5a5a7a', background: 'transparent', color: '#cdd' },
-  cancel: { border: '1px solid #3a3a4d', background: 'transparent', color: '#ccc' },
-  ghost: { border: '1px solid #3a3a4d', background: 'transparent', color: '#ccc' },
+  secondary: { border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#cdd' },
+  cancel: { border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#ccc' },
+  ghost: { border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#ccc' },
   // marginRight:auto pushes a danger button to the far left of a flex footer,
   // away from the safe actions.
-  danger: { border: '1px solid #7a3a3a', background: 'transparent', color: '#ff8a80', marginRight: 'auto' },
+  danger: { border: `1px solid ${COLOR.errBorder}`, background: 'transparent', color: COLOR.errText, marginRight: 'auto' },
 };
 
 /** A panel/drawer footer button. The single source of button styling. */

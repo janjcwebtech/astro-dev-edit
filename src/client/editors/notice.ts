@@ -2,7 +2,7 @@ import type { SourceLoc } from '../../shared/protocol.ts';
 import { clearHighlight } from '../hover.ts';
 import { pageSource } from '../page-source.ts';
 import * as state from '../state.ts';
-import { FONT, basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
+import { COLOR, FONT, basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
 import { openEntryPanel } from './entry.ts';
 
 /**
@@ -30,7 +30,7 @@ export function showDynamicNotice(
   // The location line opens the in-browser source peek — often all that's
   // needed to see *why* this content refused, without leaving the page.
   const where = styled('p', 'atx-notice-loc', {
-    margin: '0 0 12px', font: `12px ${FONT.mono}`, color: '#999', cursor: 'pointer',
+    margin: '0 0 12px', font: `12px ${FONT.mono}`, color: COLOR.muted, cursor: 'pointer',
   });
   where.textContent = `${basename(src.file)}:${src.loc}`;
   where.title = 'Peek at the source code';

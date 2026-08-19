@@ -104,7 +104,7 @@ const plainInput: ControlBuilder = ({ field, initial, placeholder, root }) => {
 const checkbox: ControlBuilder = ({ field, raw, root }) => {
   const wrap = styled('label', 'atx-field-check', {
     display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
-    font: '13px system-ui',
+    font: '13px system-ui', color: '#eee',
   });
   const input = styled('input', 'atx-field-input', { cursor: 'pointer' });
   input.type = 'checkbox';
@@ -204,13 +204,14 @@ export function buildControl(
   const root = styled('div', 'atx-field', { marginBottom: '12px' });
 
   const label = styled('label', 'atx-field-label', {
-    display: 'block', font: '600 12px system-ui', marginBottom: '4px', opacity: '0.85',
+    display: 'block', font: '600 12px system-ui', marginBottom: '4px',
+    color: '#eee', opacity: '0.85',
   });
   label.textContent = field.required ? `${field.label} *` : field.label;
   root.append(label);
 
   const error = styled('div', 'atx-field-error', {
-    display: 'none', marginTop: '3px', font: '12px system-ui', color: '#ff8a80',
+    display: 'none', marginTop: '3px', font: '12px system-ui', color: COLOR.errText,
   });
   const setError = (message: string | null): void => {
     error.textContent = message ?? '';

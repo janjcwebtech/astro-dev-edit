@@ -1,5 +1,5 @@
 import { entryAssetDir, entryRelativeToWeb, webToEntryRelative } from '../../shared/asset-path.ts';
-import { FONT, INPUT_STYLE, setFreshSrc, styled, toast } from '../ui.ts';
+import { COLOR, FONT, INPUT_STYLE, setFreshSrc, styled, toast } from '../ui.ts';
 import { openMediaModal } from './media-modal.ts';
 
 /**
@@ -55,7 +55,7 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
   const thumbWrap = styled('button', 'atx-image-field-preview', {
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0',
     width: '240px', height: '160px', overflow: 'hidden', cursor: 'pointer',
-    borderRadius: '8px', border: '1px solid #333',
+    borderRadius: '8px', border: `1px solid ${COLOR.control}`,
     background: 'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 16px 16px',
   });
   thumbWrap.type = 'button';
@@ -65,7 +65,7 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
   });
   thumb.alt = '';
   const thumbEmpty = styled('span', 'atx-image-field-empty', {
-    font: '12px system-ui', color: '#888', pointerEvents: 'none',
+    font: '12px system-ui', color: COLOR.muted, pointerEvents: 'none',
   });
   thumbEmpty.textContent = 'No image — click to browse';
   // A path that fails to load falls back to the placeholder, never a broken icon.
@@ -87,7 +87,7 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
     ...INPUT_STYLE, flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
   });
   const browse = styled('button', 'atx-btn atx-image-field-browse', {
-    flex: '0 0 auto', padding: '6px 10px', borderRadius: '6px', border: '1px solid #555',
+    flex: '0 0 auto', padding: '6px 10px', borderRadius: '6px', border: `1px solid ${COLOR.control}`,
     background: 'transparent', color: '#ccc', cursor: 'pointer', font: '600 12px system-ui',
   });
   browse.type = 'button';
