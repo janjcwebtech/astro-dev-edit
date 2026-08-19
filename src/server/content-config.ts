@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ViteDevServer } from 'vite';
-import type { FieldType } from '../shared/protocol.ts';
+import type { FieldOverride } from '../shared/protocol.ts';
 import { IMAGE_STUB_DESCRIPTION } from './schema-introspect.ts';
 
 /**
@@ -12,13 +12,10 @@ import { IMAGE_STUB_DESCRIPTION } from './schema-introspect.ts';
  * to value-based field inference instead of erroring.
  */
 
-export interface EntryFieldOverride {
-  /** Force a widget for this field (e.g. 'textarea', 'image'). */
-  widget?: FieldType;
-  label?: string;
-  /** Hide the field from the panel entirely. */
-  hidden?: boolean;
-}
+/** The editor half of a field — widget, label, hidden. Defined in `protocol.ts`
+ *  because the collection designer now reads and writes it over the wire; this
+ *  alias keeps the option-facing name the config documents. */
+export type EntryFieldOverride = FieldOverride;
 
 export interface EntryEditorOptions {
   /** Repo-relative path to the content config; auto-detected when omitted. */
@@ -53,6 +50,18 @@ export interface EntrySchemaProvider {
   forFile(relFile: string): Promise<EntryCollectionInfo | null>;
   /** Info for a collection by name (create flow), or null when unknown. */
   forCollection(name: string): Promise<EntryCollectionInfo | null>;
+  /**
+   * Every collection the project declares, in config order, plus any configured
+   * explicitly in `entryEditor.collections`. Empty when no content config
+   * resolved — the collections panel then says so rather than showing nothing.
+   */
+  listCollections(): Promise<EntryCollectionInfo[]>;
+  /**
+   * Repo-relative path of the content config this provider reads, or null when
+   * none exists. The collection designer patches **this** path and never one the
+   * client supplies, which is what keeps a schema write confined.
+   */
+  configPath(): Promise<string | null>;
 }
 
 const CONFIG_CANDIDATES = [
@@ -81,6 +90,14 @@ export function createSchemaProvider(
     return normalizeDir(explicit[name]?.dir ?? `src/content/${name}`);
   }
 
+  /** The content config that exists on disk, repo-relative; null when none does.
+   *  Server-side discovery only — a configured path or the conventional
+   *  candidates, never anything a request names. */
+  function findConfig(configPath: string | undefined): string | null {
+    const candidates = configPath ? [configPath] : CONFIG_CANDIDATES;
+    return candidates.find((c) => existsSync(join(root, c))) ?? null;
+  }
+
   /** Load `collections` from the project's content config; null on any failure.
    *  ssrLoadModule is cached by Vite and invalidated when the config changes,
    *  so calling per-request stays cheap and always fresh. */
@@ -88,8 +105,7 @@ export function createSchemaProvider(
     configPath: string | undefined,
   ): Promise<Record<string, { schema?: unknown }> | null> {
     try {
-      const candidates = configPath ? [configPath] : CONFIG_CANDIDATES;
-      const rel = candidates.find((c) => existsSync(join(root, c)));
+      const rel = findConfig(configPath);
       if (!rel) return null;
       const mod = (await server.ssrLoadModule('/' + rel.replace(/\\/g, '/'))) as {
         collections?: Record<string, { schema?: unknown }>;
@@ -139,6 +155,25 @@ export function createSchemaProvider(
   return {
     async forCollection(name) {
       return info(name);
+    },
+
+    async listCollections() {
+      const options = await readOptions();
+      const declared = await loadCollections(options.configPath);
+      const names = new Set([
+        ...Object.keys(declared ?? {}),
+        ...Object.keys(options.collections ?? {}),
+      ]);
+      const out: EntryCollectionInfo[] = [];
+      for (const name of names) {
+        const one = await info(name);
+        if (one) out.push(one);
+      }
+      return out;
+    },
+
+    async configPath() {
+      return findConfig((await readOptions()).configPath);
     },
 
     async forFile(relFile) {

@@ -8,10 +8,9 @@ import { Readable } from 'node:stream';
 import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
 import { z } from 'zod';
-import type { EntrySchemaProvider } from '../src/server/content-config.ts';
 import { createMiddleware } from '../src/server/middleware.ts';
 import type { TextEditOptions } from '../src/server/options.ts';
-import { stubOptions } from './helpers.ts';
+import { stubOptions, stubSchemaProvider } from './helpers.ts';
 
 /**
  * Endpoint tests for the entry editor (/entry, /entry/apply, /entry/create,
@@ -60,7 +59,7 @@ let root: string;
 let handler: Connect.NextHandleFunction;
 const entryRel = 'src/content/blog/hello-world.md';
 
-const provider: EntrySchemaProvider = {
+const provider = stubSchemaProvider({
   async forFile(rel) {
     if (!rel.startsWith('src/content/blog/')) return null;
     return {
@@ -79,7 +78,7 @@ const provider: EntrySchemaProvider = {
       fieldConfig: {},
     };
   },
-};
+});
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'atx-entry-test-'));
@@ -298,7 +297,7 @@ describe('POST /entry/create — extension choice', () => {
 
   // Schemaless collections: 'docs' is all-.mdx (with a nested subdir), 'mixed'
   // holds both extensions, 'notes' is empty but configured extension: '.mdx'.
-  const extProvider: EntrySchemaProvider = {
+  const extProvider = stubSchemaProvider({
     async forFile() {
       return null;
     },
@@ -320,7 +319,7 @@ describe('POST /entry/create — extension choice', () => {
       }
       return null;
     },
-  };
+  });
 
   const deps = (options: TextEditOptions = {}) => ({
     logger,

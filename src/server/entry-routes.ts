@@ -46,7 +46,7 @@ export interface EntryRouteDeps {
 }
 
 /** Extensions the entry editor treats as collection entries. */
-const ENTRY_EXTENSIONS = ['.md', '.mdx'];
+export const ENTRY_EXTENSIONS = ['.md', '.mdx'];
 
 function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');

@@ -49,6 +49,11 @@ Run in this order; each is cheaper than the next.
 | `POST /unsplash/search` — outbound query/paging/orientation + `Client-ID`/`Accept-Version` headers, the reshape (no raw Unsplash field, no download/raw URL crosses the wire), utm params appended with correct separator, perPage/page clamping, blank query 400, disabled 403, unconfigured 403 **with fetch never called**, 401→502 / 403→429 / 5xx→502 / network→502 / `TimeoutError`→504 / malformed JSON→502, TTL cache serving a repeat from one call | `tests/unsplash-routes.test.ts` |
 | `POST /unsplash/import` — bytes land in `uploadDir`, byte URL carries `w`/`fit`/`q`/`fm=jpg` and preserves `ixid`, the `download_location` ping fires authenticated with its `ixid`, a failed ping still succeeds, `assetRef: 'relative'` → `imageUploadDir`, targetDir honoured/ignored-outside/ignored-escaping, hostile description → safe basename, re-import suffixes, unknown id → 409 `expired`, byte-fetch failure / non-image content-type / over-cap body → 502 **with nothing written**, cache eviction 409s the oldest id | `tests/unsplash-routes.test.ts` |
 | `GET`/`POST /settings` **(access-key half)** — write-then-read reports masked and **never the raw key**, fixed root path written `0600` with no temp file left, malformed file degrades to unconfigured, clearing, `config` > `env` > `file` precedence, a config/env key refuses a store (409), disabled 403 touching no filesystem, and a stored key usable by the **next** search with no restart. Deliberately **not** moved to `tests/settings-routes.test.ts` with the option half: these cases run the key through the injected `UnsplashConfig` seam, and the last one asserts it reaches the next *search* — which needs this suite's recording fetch fake | `tests/unsplash-routes.test.ts` |
+| `POST /collections` — the designer's read: fields joined to the config source (derived types plus each field's verbatim zod expression), entry counts, `dirExists`, `registered`, `schemaForm`, the config etag every write needs; `schemaEditor: false` reported without refusing the read; entry editor off → 403 `disabled`; no config → nulls and an empty list; a collection whose directory is missing; `lockedFields` naming the fields whose override the *config* owns (and **not** naming one the panel itself stored); a config that fails to load still listing its collections from the source with `fieldSource: 'source'` | `tests/schema-routes.test.ts` |
+| `POST /collection/schema/apply` — add/update/remove in one etag-guarded write; stale **and missing** etag → 409 with the file byte-identical; `schemaEditor: false` → 403 touching no file; all-or-nothing (one refused edit in a batch writes none); non-identifier field name and unknown field type refused; the two stores staying separate — overrides land in `.astro-text-edit.json` and the config is untouched, overrides still save while `schemaEditor` is off, a cleared override removes the entry rather than storing a no-op, unknown widget refused before any file is written; empty request 400 | `tests/schema-routes.test.ts` |
+| `POST /collection/create` — block appended, name registered, directory made; directory outside `contentRoots` and a traversing directory refused with nothing created; a glob pattern carrying a quote refused (it is written verbatim into generated source); duplicate 409; `schemaEditor: false` 403; a field needing `image()` switching the emitted schema to the function form | `tests/schema-routes.test.ts` |
+| `POST /collection/entries` — the Items listing: newest-first, title-ish frontmatter key, `draft: true` flagged, nested files included, `editableExtensions` honoured, missing directory → empty list, directory outside `contentRoots` refused, entry editor off → 403 | `tests/schema-routes.test.ts` |
+| `POST /collection/open` — `openInEditor: false` → 403 `disabled`. The launch itself is playground-only, like `/open` | `tests/schema-routes.test.ts` |
 | `POST /entry` — schema fields + values + body + etag; inference fallback; path rejection | `tests/middleware-entry.test.ts` |
 | `POST /entry/apply` — atomic frontmatter+body write, stale-etag 409, schema 422 with fieldErrors, date coercion | `tests/middleware-entry.test.ts` |
 | `POST /entry/create` — valid create, slug-clash 409, missing-required 422, unknown collection / empty slug rejection | `tests/middleware-entry.test.ts` |
@@ -93,6 +98,8 @@ behaviour that no Astro 7 consumer executes.
 | `applyAstro` markup — inner-source replacement, plain text gaining its first inline tag, whitespace frame, entities left as typed, `{` neutralised, source-vs-source verify, refusals for non-safelisted tags/`<script>`/event handlers/`javascript:` hrefs/unbalanced and crossed tags, allowed link attributes, self-closing `<br />` | `tests/patcher-apply-markup.test.ts` |
 | `applyAstro` attributes — src/alt replacement, quote escaping, missing-alt insertion (incl. self-closing and expression-attr neighbors), never-insert-src, exact-match verify | `tests/patcher-apply-attrs.test.ts` |
 | `frontmatter.ts` — parse (fences, BOM, CRLF, invalid YAML), surgical apply (comments, key order, quoting, no re-wrap), serialize new entries, refusals | `tests/frontmatter.test.ts` |
+| `content-config.ts` — the content-config patcher. `blankNonCode` (strings/templates/comments/regex blanked, offsets and line count preserved, a division left alone); `readCollectionBlocks` on both schema forms with each field's verbatim expression, braces and colons inside strings and comments not mistaken for structure, helper-built schema and spread-holding field list reported `unrecognized`, unregistered block detected, **and the real playground config parsed as a drift guard**; `addField` inserting one line at the right indentation in both forms (nothing else moves), single-line and empty schemas, a missing trailing comma supplied, `image()` refused on a plain object schema with the fix named, duplicate/unknown-collection/unrecognized refusals; `updateField` replacing only the expression (comments above and same-line comments intact) and rewriting enum options; `removeField` taking only the field's own line, leaving a comment above it, no dangling comma on the last field, emptying to `z.object({})`; `addCollection` appending a block and registering the name (single-line and multiline registries), switching to the function form for `image()`, adding the `glob` import when absent, refusing duplicate/missing-registry/no-imports/non-identifier | `tests/content-config-patch.test.ts` |
+| **`renderZodField` ↔ `schema-introspect.ts::terminalType` round trip** — every `FieldType` rendered, evaluated with the real zod, read back through `zodToFields`, and required to come back as the same type; `.optional()`/`.default(…)` surviving; `json`, an empty select and a date default refused. This is the test that keeps the two halves of the schema vocabulary in step — the same kind of standing invariant `annotate.ts` has against the patcher's loc rules | `tests/content-config-patch.test.ts` |
 
 Use `tests/helpers.ts::locOf` to build classify/apply requests — it mirrors
 the loc rules in `astro.ts`.
@@ -113,6 +120,13 @@ The Settings drawer itself has no unit tests — it is DOM-bound — but it is
 **almost entirely server-driven**: the option list, every label, every control
 type and every `locked` flag come from `/settings`, so `tests/settings-routes.test.ts`
 pins what the drawer will render. What remains manual is the rendering itself.
+
+The same holds for the **Collections tab**: the collection list, each field's
+type, its verbatim expression, which fields' overrides are locked and whether the
+schema is patchable at all come from `/collections`, and every write it can make
+is pinned in `tests/schema-routes.test.ts` against the patcher tests underneath.
+What is manual is the two-store rendering, the Items view and the reopen-after-
+reload behaviour.
 
 **Everything else in `src/client/` has no unit tests** — it is DOM- and
 dev-server-bound and is verified only by the manual checklist below. When
@@ -438,6 +452,60 @@ split.
       "add `unsplash: {}` … then restart the dev server" text. Enabling it makes
       the media picker's Unsplash tab appear. Restore the config line after.
 
+**Collections tab (the designer)**
+
+The playground gives both schema forms — `blog` is a plain `z.object`, `works` a
+function schema with `image()` fields — and its config sets widget overrides on
+`blog.excerpt` and `blog.image`, which makes it a good test of the locked split.
+
+- [ ] The tab lists `blog` (5 entries, 8 fields) and `works` (2 entries, 7
+      fields) with their directories. The drawer's footer **Save** button is
+      hidden here — this tab saves through its own buttons.
+- [ ] Opening `blog` shows the meta line *plain z.object schema*, the two-store
+      legend, and a card per field: a **Schema** group (type / required / default,
+      plus options for a select) and an **Editor** group (widget / label /
+      hidden), with the field's zod expression underneath.
+- [ ] `blog.excerpt` and `blog.image` have their **Editor** group disabled with a
+      padlock (*set in astro.config.mjs*); `blog.title` does not. `works` has none
+      locked.
+- [ ] The **Add field** form offers `image` for `works` and **not** for `blog`,
+      which instead explains that image fields need the function schema form.
+      `textarea` is absent from the type list — it is a widget, offered in the
+      Editor group.
+- [ ] Add `subtitle` (Text, not required) to `blog` and **Save changes**: the page
+      reloads as Astro resyncs, and the drawer **reopens on this tab in `blog`**
+      with `subtitle` showing `z.string().optional()`. `git diff` on
+      `src/content.config.ts` is **one inserted line**, every comment and quote
+      style intact.
+- [ ] The new field appears in the entry drawer for a blog entry — with **no
+      dev-server restart**.
+- [ ] Remove `subtitle` again through the panel (the card dims, the button becomes
+      *Undo remove*) and save: `git diff` on the config is now **empty** — the
+      round trip is byte-for-byte.
+- [ ] Set `works.client`'s **Widget** to *Textarea* and save: the toast says
+      *Saved editor settings*, the config is **untouched**, and
+      `.astro-text-edit.json` holds the override. The entry drawer for a works
+      entry renders that field as a textarea.
+- [ ] **New collection** → name `notes` (the directory prefills to
+      `src/content/notes`), add a `title` field, create: the block is appended,
+      `export const collections` gains `notes`, the directory exists, and the
+      drawer reopens in `notes`. Create an entry in it from the Items view.
+- [ ] Break the config on purpose (`schema: buildSchema()` on a new collection):
+      the list still shows every collection, badged **schema not loaded**, with
+      field names read from the source; the broken one is badged *no readable
+      schema* and adding a field to it is refused as `unrecognized`. Restore.
+- [ ] Forcing an `image` field onto `blog` (devtools) is refused with the
+      convert-the-schema message; a stale etag is refused with *reopen the tab*;
+      both leave the config byte-identical.
+- [ ] Turn **Schema editing** off in the Editing tab: the Collections list carries
+      a padlock note, field Schema groups are disabled, **New collection** is
+      gone, and widget/label/hidden still save.
+- [ ] **Items**: the tab shows all 5 blog entries newest-first, with a **draft**
+      badge on `drafts-live-here-too` — an entry the rendered site hides. Clicking
+      one **closes the Settings drawer** and opens the entry drawer for that file.
+      Do it with a queued field edit pending: the discard confirm appears first,
+      and cancelling keeps you where you were.
+
 **Cleanup**
 
 - [ ] Restore playground fixtures: overlay edits write into
@@ -446,6 +514,9 @@ split.
       `examples/playground/.astro-text-edit.json` if the Settings drawer wrote one
       — every option change lands there, so it is almost always present after a
       settings pass.
+- [ ] After a Collections pass, `git checkout examples/playground/src/content.config.ts`
+      and `rm -rf examples/playground/src/content/notes` — a created collection
+      leaves both a config block and a directory behind.
 
 ## Known deferrals
 

@@ -16,8 +16,12 @@ export interface DrawerShell {
   foot: HTMLElement;
   /** Title-bar action slot. */
   actions: HTMLElement;
-  /** Dirty-checked close — backdrop click, Escape and Cancel all end up here. */
-  close(): void;
+  /**
+   * Dirty-checked close — backdrop click, Escape and Cancel all end up here.
+   * Returns false when the user kept the drawer open at the discard prompt, so a
+   * caller that meant to *hand off* to another surface can stay put.
+   */
+  close(): boolean;
   /** Remove the drawer unconditionally (after a successful save/create). */
   teardown(): void;
 }
@@ -61,14 +65,15 @@ export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell 
     backdrop.remove();
     opts.onClose?.();
   };
-  const close = (): void => {
+  const close = (): boolean => {
     if (opts.isDirty() && !window.confirm(opts.discardMessage)) {
       // The slot may already be cleared (Escape path goes through dismiss);
       // re-claim it so the drawer stays the active interaction.
       token = state.begin({ kind: 'panel', close });
-      return;
+      return false;
     }
     teardown();
+    return true;
   };
   const backdrop = buildBackdrop(close, opts.layer !== undefined ? opts.layer - 1 : undefined);
   let token = state.begin({ kind: 'panel', close });

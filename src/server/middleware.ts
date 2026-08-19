@@ -24,6 +24,7 @@ import {
   validateEditablePath,
 } from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
+import { createSchemaRoutes } from './schema-routes.ts';
 import { createSettingsRoutes } from './settings-routes.ts';
 import { createUnsplashRoutes, type UnsplashConfig } from './unsplash-routes.ts';
 
@@ -404,6 +405,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     ...coreRoutes,
     ...createInspectRoutes({ logger, root, optionsResolver }),
     ...createEntryRoutes({ logger, root, optionsResolver, schemaProvider }),
+    ...createSchemaRoutes({ logger, root, optionsResolver, schemaProvider }),
     ...createSettingsRoutes({ logger, root, optionsResolver, unsplash }),
     ...createUnsplashRoutes({
       logger,

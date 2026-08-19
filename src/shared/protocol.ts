@@ -258,6 +258,35 @@ export interface FieldDescriptor {
   help?: string;
 }
 
+/**
+ * The *editor* half of a field: which control it renders as, what it is called,
+ * whether it shows at all. Stored in `.astro-text-edit.json` (or set in
+ * `astro.config.mjs` under `entryEditor.collections.<name>.fields`) and never in
+ * the collection's zod schema — the collection designer keeps the two halves
+ * visibly apart, because one is committed source and the other is local.
+ */
+export interface FieldOverride {
+  widget?: FieldType;
+  label?: string;
+  hidden?: boolean;
+}
+
+/**
+ * A schema field as the designer *writes* it — the inverse of a
+ * {@link FieldDescriptor}, which is one read out of a live schema.
+ * `patcher/content-config.ts` renders these to zod expressions.
+ */
+export interface SchemaFieldSpec {
+  name: string;
+  type: FieldType;
+  /** False renders `.optional()`; a `defaultValue` implies optional. */
+  required: boolean;
+  /** Renders `.default(…)`. Not supported for `date` or `image`. */
+  defaultValue?: unknown;
+  /** Enum values, for `type: 'select'`. */
+  options?: string[];
+}
+
 // --- POST /entry -------------------------------------------------------------
 export interface EntryRequest {
   /** Repo-relative path from the page-source meta tag. */
@@ -507,4 +536,172 @@ export interface SettingsErrorResponse {
   code?: 'validation' | 'conflict' | 'disabled';
   /** Option key → message. */
   fieldErrors?: Record<string, string>;
+}
+
+// --- The collection designer -------------------------------------------------
+
+/**
+ * A field row in the designer spans **two stores**, and the wire shape keeps
+ * them apart on purpose:
+ *
+ * - the **schema** half (`type`, `required`, `defaultValue`, add, remove) is
+ *   written to the project's own `src/content.config.ts` — committed source that
+ *   changes what `astro build` accepts;
+ * - the **editor** half ({@link FieldOverride}) is written to
+ *   `.astro-text-edit.json` — local, gitignored, and only affects the entry
+ *   drawer.
+ *
+ * A request may carry both; the response says which half landed.
+ */
+
+// --- POST /collections -------------------------------------------------------
+export interface CollectionSummary {
+  name: string;
+  /** Repo-relative directory holding the collection's entries. */
+  dir: string;
+  /** Whether that directory exists yet. A collection declared in the config
+   *  without its directory is a real and common state. */
+  dirExists: boolean;
+  /** Entry files found in it (.md/.mdx, recursive). */
+  entryCount: number;
+  /** The collection's fields — schema-derived when the schema resolved. */
+  fields: FieldDescriptor[];
+  /**
+   * Where {@link fields} came from. `'source'` means the config module didn't
+   * load (usually because it has an error), so the names come from the config
+   * text and the types are unknown — the panel says so rather than showing an
+   * authoritative-looking field table built from a guess.
+   */
+  fieldSource: 'schema' | 'source';
+  /** The zod expression for each field, keyed by name, as it stands in the
+   *  config. Shown for anything the designer can't model. */
+  expressions: Record<string, string>;
+  /** How the `schema:` is written. Null when the designer couldn't read it — the
+   *  panel then offers "open source" instead of controls. */
+  schemaForm: 'object' | 'function' | null;
+  /** Why the schema isn't patchable, when it isn't. */
+  unrecognized?: string;
+  /** Whether the const is registered in `export const collections`. */
+  registered: boolean;
+  /** 1-based line of the collection's block in the config, for "open source". */
+  configLine?: number;
+  /** Editor-only overrides in force for this collection. */
+  overrides: Record<string, FieldOverride>;
+  /**
+   * Fields whose override `astro.config.mjs` owns. Storing one from the panel
+   * would resolve to nothing, so the editor half renders read-only — the same
+   * `locked` honesty {@link OptionDescriptor} has, applied per field.
+   */
+  lockedFields: string[];
+}
+
+export interface CollectionsResponse {
+  /** Repo-relative content config the designer reads and patches, or null when
+   *  the project has none. Discovered server-side; a request never names it. */
+  configPath: string | null;
+  /** sha256 of that file, required by every write below. Null with no config. */
+  etag: string | null;
+  /** False when `schemaEditor` is off: the panel stays read-only for the schema
+   *  half and still saves the editor half. */
+  schemaEditor: boolean;
+  collections: CollectionSummary[];
+}
+
+// --- POST /collection/schema/apply -------------------------------------------
+export interface CollectionSchemaApplyRequest {
+  collection: string;
+  /** {@link CollectionsResponse.etag} as the panel read it. Required whenever
+   *  `schema` is present; a stale one is refused rather than merged. */
+  etag?: string;
+  /** Schema edits. Applied removes → updates → adds, all against one in-memory
+   *  copy, and written once — so a refusal anywhere leaves the file untouched. */
+  schema?: {
+    add?: SchemaFieldSpec[];
+    update?: SchemaFieldSpec[];
+    remove?: string[];
+  };
+  /** Editor-only overrides, merged per field. `null` clears one. */
+  overrides?: Record<string, FieldOverride | null>;
+}
+
+export interface CollectionApplyResponse {
+  /** True when everything asked for landed. */
+  ok: boolean;
+  /** Whether the config file was rewritten. */
+  schemaWritten: boolean;
+  /** Whether the settings file was rewritten. */
+  overridesWritten: boolean;
+  /** Fresh config etag after a schema write. */
+  etag?: string;
+  /** Why a half didn't land. */
+  error?: string;
+  code?: CollectionRefusal;
+}
+
+/** Why a designer write was refused.
+ *  `conflict` — the config changed on disk since the panel read it.
+ *  `disabled` — `schemaEditor: false`.
+ *  `unrecognized` — a schema shape the patcher won't guess at.
+ *  The rest name the collection or field. */
+export type CollectionRefusal =
+  | 'conflict'
+  | 'disabled'
+  | 'unrecognized'
+  | 'missing'
+  | 'exists'
+  | 'unsupported';
+
+// --- POST /collection/entries ------------------------------------------------
+export interface CollectionEntriesRequest {
+  collection: string;
+}
+
+/** One entry as the Items view lists it. Enough to identify and open it, and
+ *  nothing more — the body is never read into this response. */
+export interface CollectionEntryItem {
+  /** Repo-relative path, which is exactly what `POST /entry` takes. */
+  file: string;
+  /** Filename without its extension. */
+  slug: string;
+  /** A title-ish frontmatter value, when the entry has one. */
+  title: string | null;
+  /** Last-modified time, ms since the epoch. */
+  mtime: number;
+  /** `draft: true` in the frontmatter. */
+  draft: boolean;
+}
+
+export interface CollectionEntriesResponse {
+  collection: string;
+  dir: string;
+  entries: CollectionEntryItem[];
+  /** True when the directory held more entries than the endpoint will read. The
+   *  panel says so rather than presenting a partial list as complete. */
+  truncated?: boolean;
+}
+
+// --- POST /collection/open ---------------------------------------------------
+/** Launch the editor on the content config. Carries **no path**: the server
+ *  opens the config it discovered, optionally at a collection's own line. */
+export interface CollectionOpenRequest {
+  collection?: string;
+}
+
+// --- POST /collection/create -------------------------------------------------
+export interface CollectionCreateRequest {
+  /** Identifier-safe; it becomes a `const` name and a registry key. */
+  name: string;
+  /** Repo-relative entry directory. Defaults to `src/content/<name>`. */
+  dir?: string;
+  /** Glob pattern for the loader. Defaults to `**\/*.md`. */
+  pattern?: string;
+  fields: SchemaFieldSpec[];
+  etag?: string;
+}
+
+export interface CollectionCreateResponse {
+  name: string;
+  /** The directory that was created. */
+  dir: string;
+  etag: string;
 }

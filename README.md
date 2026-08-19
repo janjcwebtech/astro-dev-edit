@@ -250,6 +250,7 @@ textEdit({
   cssInspector: true,                     // hover-pill class/ID CSS inspector
   sourceAnnotations: 'auto',              // who emits data-astro-source-*
   entryEditor: {},                        // CMS entry drawer; false disables it
+  schemaEditor: true,                     // let the designer write content.config.ts
   unsplash: false,                        // Unsplash photo source; {} turns it on
 })
 ```
@@ -266,6 +267,7 @@ textEdit({
 | `cssInspector` | `true` | The hover-pill CSS class/ID inspector. `false` hides the chips row entirely. The per-rule open-in-editor jump also honours `openInEditor`. |
 | `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. **Config-only** — it registers a Vite plugin, so changing it needs a restart. |
 | `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
+| `schemaEditor` | `true` | Whether the [collection designer](#collections-tab--the-collection-designer) may write your `src/content.config.ts`. `false` keeps the Collections tab read-only for schema edits — collections and fields still list, and the editor-only overrides (widget, label, hidden) still save, because those go to `.astro-text-edit.json` rather than to committed source. |
 | `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults, or just switch it on in the Settings drawer. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-text-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30). |
 
 Every option except `enabled` and `sourceAnnotations` is editable from the
@@ -275,10 +277,13 @@ read-only and says a restart is needed.
 
 ### Settings drawer
 
-Opened from the admin bar's overflow menu. Four tabs — **General**, **Editing**,
-**Media**, **Unsplash** — with one control per option and a line of prose saying
-what it does. Saving writes only the options you changed into
-`.astro-text-edit.json`, merging with whatever is already there.
+Opened from the admin bar's overflow menu. Five tabs — **General**, **Editing**,
+**Media**, **Collections**, **Unsplash** — the first three, and the last, holding
+one control per option with a line of prose saying what it does. Saving writes
+only the options you changed into `.astro-text-edit.json`, merging with whatever
+is already there. **Collections** is not an options tab: it is the
+[collection designer](#collections-tab--the-collection-designer), and it saves
+through its own buttons.
 
 A few properties worth knowing:
 
@@ -297,6 +302,70 @@ A few properties worth knowing:
 The options the drawer offers come from the server, so it renders whatever your
 installed version declares; an option added in a later release appears without
 any change to the overlay.
+
+### Collections tab — the collection designer
+
+The Collections tab lists every collection your content config declares, opens
+one into its field table, and can append a new one. It is part of the
+[entry editor](#entry-editor-cms-panel-for-content-collections) surface, so
+`entryEditor: false` removes it along with the drawer. Two things it does that the
+rest of the overlay doesn't:
+
+**It writes `src/content.config.ts`.** Adding a field, changing a field's type,
+removing one, creating a collection — all of it patches that file, which is
+committed TypeScript your build reads. The patch is surgical: only the touched
+span changes, so comments, key order and quoting come out exactly as they went in.
+Set `schemaEditor: false` to forbid this outright while keeping the rest of the
+tool.
+
+**Every field row spans two stores, and the row says which is which:**
+
+| Half | Controls | Written to | Effect |
+| --- | --- | --- | --- |
+| **Schema** | type, required, default, add, remove | `src/content.config.ts` | Committed. Changes what `astro build` accepts. |
+| **Editor** | widget, label, hidden | `.astro-text-edit.json` | Local, gitignored. Only the entry drawer reads it. |
+
+A save that touches both does one request and tells you which half landed. A
+widget or label your `astro.config.mjs` sets renders read-only with a padlock,
+for the same reason a config-set option does.
+
+Worth knowing before you use it:
+
+-   **A schema save reloads the page.** Astro resyncs its content layer whenever
+    that file changes. The drawer reopens itself on this tab, in the collection
+    you were editing.
+-   **A retype your existing entries don't satisfy will fail that sync.** Change
+    a field from text to number while entries hold strings and Astro refuses the
+    collection until you update them — it names the first offending file. That is
+    Astro's own validation doing its job, not a bug in the designer; the fix is to
+    update the entries (or change the field back).
+-   **Saving a schema change rewrites that field's expression in canonical form.**
+    `z.string()`, `z.coerce.date()`, `z.enum([…])`, `z.array(z.string())`,
+    `image()`, plus `.optional()` or `.default(…)`. If your field was written some
+    other way that means the same thing, the canonical form replaces it.
+-   **There is no rename.** A schema key is the frontmatter key in every entry
+    file, so renaming it here alone would break the collection. Remove and add
+    instead, and update the entries.
+-   **Long text is a widget, not a schema type.** Set the schema type to *Text*
+    and the widget to *Textarea* — the schema stays `z.string()` and the drawer
+    renders the bigger control.
+-   **`image()` needs the function schema form.** Only
+    `schema: ({ image }) => z.object({ … })` receives Astro's helper, so an image
+    field is offered for collections written that way and refused, with that
+    explanation, for a plain `z.object({ … })`.
+-   **A schema the designer can't prove, it won't touch.** Built by a helper,
+    holding a spread, conditional — the row says so and offers *Open source*
+    instead of controls.
+
+#### Items
+
+Each collection also has an **Items** view: its entry files, newest first, with a
+badge on drafts. This is the way to reach an entry no rendered page links to — a
+draft, or one whose route doesn't exist yet. Clicking an item opens the ordinary
+entry drawer for it (the Settings drawer hands over rather than stacking); **New
+item** opens the ordinary create drawer, built from the collection's schema.
+Deleting is still done from the entry drawer, still etag-guarded, and still has no
+in-app undo.
 
 ## Undo is git — there is no in-app undo
 
@@ -584,6 +653,7 @@ the Unsplash pane's `atx-unsplash-search` / `atx-unsplash-input` /
 `atx-unsplash-orient`, `atx-unsplash-credit` with `atx-unsplash-author` and
 `atx-unsplash-link`, and `atx-unsplash-rate` (the requests-left line);
 the settings drawer's `atx-settings-tabs`, `atx-settings-tab` (plus `atx-settings-tab-<group>`), `atx-settings-tabs-host`, `atx-settings-pane` (plus `atx-settings-pane-<group>`), `atx-settings-lock`, `atx-settings-key-section`, `atx-settings-key-status`, `atx-settings-key-actions`, and the older `atx-settings-heading|blurb|link|status|text|row|key|hint|warning|error`; each option control is a standard `atx-field` (with `atx-field-label`, `atx-field-input`, `atx-field-help`, `atx-field-error`), the same hooks the entry drawer uses;
+the collection designer's `atx-collections` (the pane) with `atx-collections-list` / `atx-collections-row` (plus `atx-collections-row-<name>`) / `atx-collections-row-name|meta`, `atx-collections-detail` (plus `atx-collections-detail-<name>`), `atx-collections-head|title|back|meta|spacer|badge|blurb|note|legend` (`atx-collections-legend-line|word`), `atx-collections-view-tabs` / `atx-collections-view-tab` (`-fields` / `-items`) / `atx-collections-view-host`, `atx-collections-fieldspane`, `atx-collections-fields`, `atx-collections-field` (plus `atx-collections-field-<name>`) with `atx-collections-field-head|name`, `atx-collections-group` (plus `atx-collections-group-schema` / `-editor`), `atx-collections-caption`, `atx-collections-control` / `atx-collections-control-label`, `atx-collections-input|select|checkbox|check|check-hint`, `atx-collections-expr` (the zod expression line), `atx-collections-new` / `atx-collections-new-name|meta` (a queued addition), `atx-collections-addfield`, `atx-collections-pending`, `atx-collections-actions`, `atx-collections-error`, `atx-collections-create` / `atx-collections-newfields`, and the Items view's `atx-collections-items`, `atx-collections-itembar|itemcount`, `atx-collections-item` / `atx-collections-item-title|meta`;
 the swap panel's `atx-image-preview` / `atx-image-preview-img` /
 `atx-image-meta` and its `atx-image-recents` strip
 (`atx-image-recents-label|title`, `atx-image-recent`, `atx-image-recent-thumb`,
@@ -651,6 +721,12 @@ your overrides need `!important`:
   lists, quotes, code, links, images, hr. Anything beyond it (tables, raw
   HTML/MDX, footnotes, nested lists) is still editable, but as markdown
   source. No `astro:assets` `image()` metadata (path strings only).
+- **The collection designer only reads the schema shapes it can prove** —
+  `schema: z.object({ … })` and `schema: ({ image }) => z.object({ … })`, with a
+  plain `name: value` field list. A schema built by a helper, holding a spread, or
+  assembled conditionally is reported unreadable and offers *Open source*; it is
+  never guessed at. Collection and field names must be plain identifiers, and a
+  new collection's directory is confined to `contentRoots` like any other write.
 - **Astro 5.x–7.x.** On 5/6 Astro's compiler provides the source annotations
   (dev toolbar required, above); on ≥7 the integration injects them itself,
   since the Rust compiler no longer emits them

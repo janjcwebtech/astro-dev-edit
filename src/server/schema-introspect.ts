@@ -13,6 +13,23 @@ import { adapterFor, type ZodAdapter, type ZodNode } from './zod-adapt.ts';
 /** Mark used by the schema-function `image()` stub (see content-config.ts). */
 export const IMAGE_STUB_DESCRIPTION = 'atx:image';
 
+/** Every {@link FieldType} as a runtime list — `protocol.ts` stays types-only, so
+ *  the one place that needs to *validate* a widget name gets it from here. The
+ *  `Record` makes it exhaustive: adding a type to the union without adding it
+ *  here fails typecheck. */
+const ALL_FIELD_TYPES: Record<FieldType, true> = {
+  text: true,
+  textarea: true,
+  date: true,
+  number: true,
+  boolean: true,
+  select: true,
+  tags: true,
+  image: true,
+  json: true,
+};
+export const FIELD_TYPES = Object.keys(ALL_FIELD_TYPES) as FieldType[];
+
 interface TerminalDescriptor {
   type: FieldType;
   options?: string[];

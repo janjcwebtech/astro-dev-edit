@@ -79,6 +79,15 @@ export interface TextEditOptions {
    */
   entryEditor?: false | EntryEditorOptions;
   /**
+   * The collection designer's **schema writes**. When true (the default) the
+   * Collections tab can add, retype and remove fields and append collections,
+   * which patches the project's own `src/content.config.ts`. `false` keeps the
+   * tab read-only: collections and their fields are still listed, and the
+   * editor-only overrides (widget, label, hidden) still save, since those go to
+   * `.astro-text-edit.json` rather than to committed source.
+   */
+  schemaEditor?: boolean;
+  /**
    * The Unsplash photo source in the media picker. `unsplash: {}` turns it on
    * with defaults; omitted (the default) leaves it off entirely, and the media
    * modal renders as a single-source project-asset grid.
@@ -145,6 +154,7 @@ export const DEFAULTS: ResolvedOptions = {
   cssInspector: true,
   sourceAnnotations: 'auto',
   entryEditor: {},
+  schemaEditor: true,
   // Off unless asked for: the feature reaches a third-party API and needs a key
   // the user has to supply, so opting in is deliberate.
   unsplash: false,
@@ -263,6 +273,15 @@ const OPTION_SPECS: readonly OptionSpec[] = [
     // toggle on without locking the per-collection detail, which merges.
     read: (o) => (o.entryEditor === undefined ? undefined : o.entryEditor !== false),
     readStored: (o) => o.entryEditorEnabled,
+  },
+  {
+    key: 'schemaEditor',
+    label: 'Schema editing',
+    help: 'Let the Collections tab write your src/content.config.ts — add, retype and remove schema fields, and append collections. Off leaves the tab read-only.',
+    type: 'boolean',
+    group: 'editing',
+    fallback: DEFAULTS.schemaEditor,
+    read: (o) => o.schemaEditor,
   },
   {
     key: 'assetDirs',
@@ -419,6 +438,7 @@ function toResolvedOptions(
     editableExtensions: flat.get('editableExtensions') as string[],
     contentRoots: flat.get('contentRoots') as string[],
     openInEditor: flat.get('openInEditor') === true,
+    schemaEditor: flat.get('schemaEditor') === true,
     cssInspector: flat.get('cssInspector') === true,
     sourceAnnotations: flat.get('sourceAnnotations') as 'auto' | 'force' | 'off',
     entryEditor: flat.get('entryEditor') === true ? entryEditor : false,

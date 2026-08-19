@@ -24,6 +24,7 @@ import { invalidateClassifications } from './classify-cache.ts';
 import { openCopyPanel } from './editors/copy-panel.ts';
 import { openEntryPanel } from './editors/entry.ts';
 import { openPeekPanel } from './editors/peek.ts';
+import { clearPendingCollection, takePendingCollection } from './editors/collections-panel.ts';
 import { openSettingsPanel } from './editors/settings-panel.ts';
 import { collectContext, formatContext } from './element-context.ts';
 import { has, setFeatures } from './features.ts';
@@ -410,6 +411,21 @@ async function boot(): Promise<void> {
     if (sessionStorage.getItem('astroTextEditMode') === '1') setEditMode(true);
   } catch {
     // sessionStorage unavailable — start with edit mode off.
+  }
+
+  // A schema write reloads the page (Astro resyncs its content layer), which
+  // would otherwise close the drawer the user was working in. Reopen it where
+  // they were.
+  const resumeCollection = takePendingCollection();
+  if (resumeCollection) {
+    openSettingsPanel({
+      tab: 'collections',
+      collection: resumeCollection,
+      onClose: () => {
+        clearPendingCollection();
+        bar.refresh();
+      },
+    });
   }
 }
 

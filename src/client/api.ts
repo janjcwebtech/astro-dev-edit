@@ -4,6 +4,14 @@ import type {
   AssetsResponse,
   ClassifyRequest,
   ClassifyResult,
+  CollectionApplyResponse,
+  CollectionCreateRequest,
+  CollectionCreateResponse,
+  CollectionEntriesRequest,
+  CollectionEntriesResponse,
+  CollectionOpenRequest,
+  CollectionSchemaApplyRequest,
+  CollectionsResponse,
   EntryApplyRequest,
   EntryCreateRequest,
   EntryCreateResponse,
@@ -257,4 +265,64 @@ export class SettingsRefusal extends Error {
     super(message);
     this.name = 'SettingsRefusal';
   }
+}
+
+/** A collection-designer refusal, carrying the server's code so the panel can
+ *  tell "reopen the tab" (a conflict) from "this shape can't be patched". */
+export class CollectionRefusalError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | undefined,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'CollectionRefusalError';
+  }
+}
+
+async function collectionPost<T>(path: string, payload: unknown): Promise<T> {
+  const res = await post(path, payload);
+  const body = (await res.json().catch(() => ({}))) as T & { error?: string; code?: string };
+  if (!res.ok) {
+    throw new CollectionRefusalError(
+      body.error ?? `${path} failed (${res.status})`,
+      body.code,
+      res.status,
+    );
+  }
+  return body;
+}
+
+/** Every collection, its fields, and the content-config etag every write needs. */
+export async function listCollections(): Promise<CollectionsResponse> {
+  return collectionPost<CollectionsResponse>('/collections', {});
+}
+
+/** Schema edits and/or editor overrides for one collection. The schema half is
+ *  etag-guarded and all-or-nothing; the response says which half landed. */
+export async function applyCollectionSchema(
+  req: CollectionSchemaApplyRequest,
+): Promise<CollectionApplyResponse> {
+  return collectionPost<CollectionApplyResponse>('/collection/schema/apply', req);
+}
+
+/** One collection's entry files, newest first. Reaches drafts and entries no
+ *  rendered page links to — which is the point of the Items view. */
+export async function listCollectionEntries(
+  req: CollectionEntriesRequest,
+): Promise<CollectionEntriesResponse> {
+  return collectionPost<CollectionEntriesResponse>('/collection/entries', req);
+}
+
+/** Launch the editor on the content config, at a collection's own line when one
+ *  is named. Carries no path — the server opens the config it discovered. */
+export async function openCollectionSource(req: CollectionOpenRequest): Promise<void> {
+  await collectionPost<{ ok: true }>('/collection/open', req);
+}
+
+/** Append a collection to the content config and make its entry directory. */
+export async function createCollection(
+  req: CollectionCreateRequest,
+): Promise<CollectionCreateResponse> {
+  return collectionPost<CollectionCreateResponse>('/collection/create', req);
 }

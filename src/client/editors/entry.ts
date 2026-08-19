@@ -158,8 +158,40 @@ function showEditDrawer(entry: EntryResponse): void {
 // Create drawer
 // ---------------------------------------------------------------------------
 
+/**
+ * Everything the create drawer needs, independent of a loaded entry — so the
+ * collection designer's Items view can open it for a collection the user hasn't
+ * navigated to.
+ */
+export interface EntrySeed {
+  collection: string;
+  /** Repo-relative collection dir; relative asset values resolve against it. */
+  collectionDir: string | null;
+  /** Stand-in path for asset resolution when there is no collection dir. */
+  file: string;
+  /** Only `source: 'schema'` fields are offered — a new entry has no values to
+   *  infer from. */
+  fields: FieldDescriptor[];
+  /**
+   * What to do once the file exists. The default navigates to the sibling
+   * detail route, which is right when the create started from a rendered page
+   * and wrong when it started from the Collections tab — hence the hook.
+   */
+  afterCreate?(file: string, slug: string): void;
+}
+
 function showCreateDrawer(entry: EntryResponse): void {
-  const collection = entry.collection!;
+  openEntryCreatePanel({
+    collection: entry.collection!,
+    collectionDir: entry.collectionDir,
+    file: entry.file,
+    fields: entry.fields,
+  });
+}
+
+/** The create drawer, opened from a seed rather than from a loaded entry. */
+export function openEntryCreatePanel(entry: EntrySeed): void {
+  const collection = entry.collection;
 
   // Slug first: filename of the new entry, auto-suggested from the title
   // while untouched.
@@ -223,9 +255,13 @@ function showCreateDrawer(entry: EntryResponse): void {
       const { file } = await api.createEntry({ collection, slug, frontmatter, body: bodyEditor.value() });
       toast(`Created ${basename(file)}`, 'ok');
       shell.teardown();
-      // Detail routes are conventionally siblings of the current page; the
-      // fresh route 404s until Astro's content layer syncs the new file.
-      void navigateWhenReady(siblingPath(slug));
+      if (entry.afterCreate) {
+        entry.afterCreate(file, slug);
+      } else {
+        // Detail routes are conventionally siblings of the current page; the
+        // fresh route 404s until Astro's content layer syncs the new file.
+        void navigateWhenReady(siblingPath(slug));
+      }
     } catch (err) {
       createBtn.disabled = false;
       createBtn.textContent = 'Create';
