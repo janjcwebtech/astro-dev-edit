@@ -70,6 +70,7 @@ async function mount(
     root,
     optionsResolver: stubOptions(root, options),
     schemaProvider: provider,
+    routeManifest: null,
     unsplash: null,
   });
 }

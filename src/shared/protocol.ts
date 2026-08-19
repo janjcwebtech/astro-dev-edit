@@ -115,6 +115,36 @@ export interface OpenRequest {
   loc?: string;
 }
 
+// --- POST /page-source -------------------------------------------------------
+/**
+ * "Which file is this route written in?" — the admin bar's *Open page source*.
+ *
+ * Answered from Astro's own route manifest, because the DOM cannot answer it:
+ * component tags are never annotated, so counting annotated elements makes a
+ * markup-dense Nav.astro outrank a page that merely composes components.
+ */
+export interface PageSourceRequest {
+  /** `location.pathname` exactly as the browser has it, base prefix included —
+   *  the server strips the configured base itself. */
+  pathname: string;
+}
+/** Why nothing resolved. `no-routes` — the manifest is empty (the routes hook
+ *  never fired); `no-match` — no page route matches the pathname; `not-in-project`
+ *  — the matched route's entrypoint belongs to a package or sits outside the
+ *  root; `missing` — the entrypoint is not on disk (Astro's injected default
+ *  404 page). */
+export type PageSourceRefusal = 'no-routes' | 'no-match' | 'not-in-project' | 'missing';
+export interface PageSourceResponse {
+  /** Root-relative path of the route's entrypoint, or null when unresolved. */
+  file: string | null;
+  /** The route pattern that matched, e.g. "/articles/[...slug]"; null when
+   *  unresolved. */
+  pattern: string | null;
+  /** Null on success. Set means nothing was opened — the panel says so rather
+   *  than guessing at a file. */
+  refusal: PageSourceRefusal | null;
+}
+
 // --- POST /inspect/open ------------------------------------------------------
 /** Open the source of a CSS rule in the editor. The client resolves `file`
  *  from the stylesheet URL; the server best-effort locates `selector` inside it

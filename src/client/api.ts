@@ -23,6 +23,8 @@ import type {
   InspectOpenRequest,
   InspectOpenResponse,
   OpenRequest,
+  PageSourceRequest,
+  PageSourceResponse,
   PeekRequest,
   PeekResponse,
   SettingsErrorResponse,
@@ -96,6 +98,17 @@ export async function upload(req: UploadRequest): Promise<UploadResponse> {
 export async function open(req: OpenRequest): Promise<void> {
   const res = await post('/open', req);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `open failed (${res.status})`);
+}
+
+/** Which source file the route serving `pathname` is written in — the admin
+ *  bar's *Open page source*. Answered from Astro's route manifest, so it is the
+ *  page's own template rather than whichever component filled the most of the
+ *  DOM; `refusal` set means nothing could be identified. Named apart from
+ *  `page-source.ts::pageSource`, which reads the backing-content `<meta>`. */
+export async function resolvePageSource(req: PageSourceRequest): Promise<PageSourceResponse> {
+  const res = await post('/page-source', req);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `page-source failed (${res.status})`);
+  return (await res.json()) as PageSourceResponse;
 }
 
 /** Open a CSS rule's source in the editor: the server best-effort locates the

@@ -74,6 +74,7 @@ beforeAll(async () => {
     root,
     optionsResolver: stubOptions(root, { openInEditor: false }),
     schemaProvider: null,
+    routeManifest: null,
     unsplash: null,
   };
   handler = createMiddleware(deps);

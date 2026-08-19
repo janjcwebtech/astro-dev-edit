@@ -61,6 +61,7 @@ function mount(configOptions: TextEditOptions = {}): Connect.NextHandleFunction 
     root,
     optionsResolver: stubOptions(root, configOptions),
     schemaProvider: null,
+    routeManifest: null,
     unsplash,
   });
 }

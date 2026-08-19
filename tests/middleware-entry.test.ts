@@ -92,6 +92,7 @@ beforeAll(async () => {
     root,
     optionsResolver: stubOptions(root, { assetDirs: ['public'], openInEditor: false }),
     schemaProvider: provider,
+    routeManifest: null,
     unsplash: null,
   });
 });
@@ -330,6 +331,7 @@ describe('POST /entry/create — extension choice', () => {
       ...options,
     }),
     schemaProvider: extProvider,
+    routeManifest: null,
     unsplash: null,
   });
 
@@ -413,6 +415,7 @@ describe('disabled entry editor', () => {
       root,
       optionsResolver: stubOptions(root, { entryEditor: false }),
       schemaProvider: null,
+      routeManifest: null,
       unsplash: null,
     });
     const r = await new Promise<{ status: number }>((resolve) => {

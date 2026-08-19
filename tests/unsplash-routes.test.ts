@@ -153,6 +153,7 @@ function mount(
       ...options,
     }),
     schemaProvider: null,
+    routeManifest: null,
     unsplash,
   });
 }

@@ -42,6 +42,7 @@ Run in this order; each is cheaper than the next.
 | `listAssets` — `AssetInfo` shape (`path`/`size`/`mtime`), mtime ordering for the newest-first sort, extension filter, dedupe across nested asset dirs, escaping/nonexistent dirs skipped | `tests/assets.test.ts` |
 | `POST /upload` — data-URL write into the configured `uploadDir`, clash suffixing, traversal sanitising, mime/payload rejection (the `saveBuffer`/`resolveAssetTarget` extractions are pinned by these passing unedited) | `tests/middleware.test.ts` |
 | `POST /open` — disabled-by-config 403; path gate matches `/classify`/`/apply` (out-of-content-roots, out-resolving symlink, bad extension, nonexistent, missing field → 400) | `tests/middleware.test.ts` |
+| `POST /page-source` + `route-manifest.ts` — route-manifest lookup: static and dynamic (`[slug]`, `[...slug]`) routes, index-beats-catch-all priority (first hit in Astro's own sorted order), both trailing-slash styles via the slash-flip variant and the variants-outer ordering, `base` stripped incl. unnormalized `docs` / `/docs/` and a lookalike prefix, percent-encoded non-ASCII, non-`page` types skipped, package-owned / outside-root / absent entrypoints refused by kind, junk normalized, a live routes thunk seeing a page added mid-session; route gating (`openInEditor: false` → 403), missing `pathname` → 400, and each refusal answered 200 with `file: null` | `tests/page-source.test.ts` |
 | `POST /peek` — whole-file lines + focus/total metadata, ±1000-line huge-file cap, no-loc default, out-of-range clamp, path rejection; out-of-root/package-owned paths refuse softly (200 + `refused`, no source) | `tests/middleware.test.ts` |
 | `POST /classify` — literal text, dynamic for non-`.astro`, nonexistent rejection; out-of-root, `node_modules`, and out-resolving symlinks answer 200 `dynamic` instead of throwing | `tests/middleware.test.ts` |
 | Read/write asymmetry of the path gate — `/classify` and `/peek` soften for package-owned paths, while `/open` and `/apply` still refuse them with 400 and leave the file byte-identical | `tests/middleware.test.ts` |
@@ -161,6 +162,14 @@ whichever sections your change touches; run the whole list before a release.
       Neither edge lets the bar overlap the tree, pinned or not.
 - [ ] The mark opens the overflow menu; Escape and an outside click close it,
       and the bar cannot retract while it is open.
+- [ ] Overflow menu → *Open page source*: on `/` it opens
+      **`src/pages/index.astro`** — not `Nav.astro` or `Base.astro` — with a
+      toast naming the pattern `/`; on `/articles/` it opens
+      `src/pages/articles/index.astro`, and on an article
+      `src/pages/articles/[...slug].astro`. Browse to a URL with no route → the
+      toast says no route matched and **nothing opens**. Add a page while the
+      dev server runs and visit it → it resolves with no restart (the routes
+      hook re-fired). With `openInEditor` off, the item is gone.
 - [ ] Edit mode persists across a reload (`sessionStorage.astroTextEditMode`).
 
 **Save state & leaving edit mode** (the bar's exit button)

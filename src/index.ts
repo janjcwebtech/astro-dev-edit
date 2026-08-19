@@ -4,6 +4,7 @@ import { join, relative, resolve, sep } from 'node:path';
 import { createAnnotatePlugin } from './server/annotate.ts';
 import { createSchemaProvider } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
+import { createRouteManifest, type ResolvedRouteLike } from './server/route-manifest.ts';
 import {
   createOptionsResolver,
   DEFAULTS,
@@ -60,6 +61,12 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
   // actually running in dev with the integration enabled.
   let active = false;
   let projectRoot = '';
+  let base = '/';
+  /** Astro's own route table, for "which file is this page written in". Replaced
+   *  wholesale on every `astro:routes:resolved` and read through a thunk, never
+   *  captured: the hook re-fires on any change under `srcDir`, so a page added
+   *  mid-session has to be visible without a restart. */
+  let resolvedRoutes: readonly ResolvedRouteLike[] = [];
 
   return {
     name: 'astro-text-edit',
@@ -74,6 +81,9 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
         }
         active = true;
         projectRoot = fileURLToPath(config.root);
+        // Not normalized by Astro's schema — 'docs', '/docs' and '/docs/' are
+        // all possible, and route-manifest.ts tolerates all three.
+        base = config.base ?? '/';
 
         // Upload-directory preflight. Only warns about what the *config* says:
         // the panel enforces the same two rules on the value it stores, and a
@@ -124,6 +134,16 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
         logger.info('edit mode available — toggle it from the admin bar at the top of the page');
       },
 
+      // Astro's answer to "which file is this route written in", which the DOM
+      // cannot give: component tags carry no source annotation. This fires on
+      // every add/unlink/change under srcDir, so the body is an assignment and
+      // nothing else — no logging, no work per fire. The `active` guard is what
+      // keeps the integration dev-only: it is set only by a dev config:setup.
+      'astro:routes:resolved': ({ routes }: { routes: readonly ResolvedRouteLike[] }) => {
+        if (!active) return;
+        resolvedRoutes = routes;
+      },
+
       'astro:server:setup': ({ server, logger }) => {
         if (!active) return;
 
@@ -147,6 +167,14 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
             schemaProvider: createSchemaProvider(server, projectRoot, async () => {
               const { options } = await optionsResolver.resolve();
               return options.entryEditor === false ? {} : options.entryEditor;
+            }),
+            // Always constructed, like schemaProvider: the array is simply
+            // empty until the routes hook has fired, and the route then answers
+            // an explicit refusal rather than guessing at a file.
+            routeManifest: createRouteManifest({
+              root: projectRoot,
+              base,
+              routes: () => resolvedRoutes,
             }),
             unsplash: {
               // Thunks, not values: both the key and the sub-options resolve

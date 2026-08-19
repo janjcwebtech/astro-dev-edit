@@ -16,6 +16,7 @@ import { launchInEditor } from './editor.ts';
 import { createEntryRoutes } from './entry-routes.ts';
 import { createInspectRoutes } from './inspect-routes.ts';
 import type { OptionsResolver, ResolvedOptions } from './options.ts';
+import { createPageSourceRoutes } from './page-source-routes.ts';
 import {
   atomicWrite,
   checkEditablePath,
@@ -24,6 +25,7 @@ import {
   validateEditablePath,
 } from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
+import type { RouteManifest } from './route-manifest.ts';
 import { createSchemaRoutes } from './schema-routes.ts';
 import { createSettingsRoutes } from './settings-routes.ts';
 import { createUnsplashRoutes, type UnsplashConfig } from './unsplash-routes.ts';
@@ -32,7 +34,8 @@ import { createUnsplashRoutes, type UnsplashConfig } from './unsplash-routes.ts'
  * Dev-server middleware for astro-text-edit — the composition point for every
  * /__text-edit route group. This file owns the core loc-based editing routes
  * (health, assets, upload, open, peek, classify, apply) and the localhost gate;
- * feature route groups (the /entry* CMS endpoints in entry-routes.ts) export
+ * feature route groups (the /entry* CMS endpoints in entry-routes.ts, the
+ * page-source lookup in page-source-routes.ts, and the rest) export
  * their own `Route[]` and are concatenated here. Every endpoint rejects
  * non-localhost requests — this API is strictly for the developer's own
  * machine. (spec §8)
@@ -59,6 +62,10 @@ interface MiddlewareDeps {
   optionsResolver: OptionsResolver;
   /** Collection/schema lookup for the entry editor; null → inference only. */
   schemaProvider: EntrySchemaProvider | null;
+  /** Astro's route manifest, for "which file is this page written in"; null
+   *  when none is available (an Astro that never fired the routes hook, or a
+   *  test) → the page-source route refuses rather than guessing. */
+  routeManifest: RouteManifest | null;
   /** Unsplash photo source. Its access key and its per-page/appName settings
    *  both resolve lazily, per request; null → no key resolver is available at
    *  all (the feature can still be switched on from the panel). */
@@ -126,7 +133,7 @@ function isLocalRequest(req: Connect.IncomingMessage): boolean {
 }
 
 export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFunction {
-  const { logger, root, optionsResolver, schemaProvider, unsplash } = deps;
+  const { logger, root, optionsResolver, routeManifest, schemaProvider, unsplash } = deps;
 
   /** The effective options for the request in hand. Every handler starts here
    *  rather than closing over values captured at setup time. */
@@ -404,6 +411,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
   const routes: Route[] = [
     ...coreRoutes,
     ...createInspectRoutes({ logger, root, optionsResolver }),
+    ...createPageSourceRoutes({ logger, optionsResolver, routeManifest }),
     ...createEntryRoutes({ logger, root, optionsResolver, schemaProvider }),
     ...createSchemaRoutes({ logger, root, optionsResolver, schemaProvider }),
     ...createSettingsRoutes({ logger, root, optionsResolver, unsplash }),

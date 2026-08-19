@@ -17,7 +17,7 @@
  * no dependencies. (spec §4.2)
  */
 
-import type { SourceLoc } from '../shared/protocol.ts';
+import type { PageSourceResponse, SourceLoc } from '../shared/protocol.ts';
 import { initAdminBar } from './admin-bar.ts';
 import * as api from './api.ts';
 import { invalidateClassifications } from './classify-cache.ts';
@@ -35,7 +35,7 @@ import { has, setFeatures } from './features.ts';
 import { clearHighlight, initHover } from './hover.ts';
 import { pageSource } from './page-source.ts';
 import { initRouter } from './router.ts';
-import { annotatedElements, cacheSourceMappings, sourceFor, startCapture } from './source-map.ts';
+import { cacheSourceMappings, sourceFor, startCapture } from './source-map.ts';
 import { initTree } from './tree.ts';
 import * as state from './state.ts';
 import { basename, toast } from './ui.ts';
@@ -212,40 +212,49 @@ async function openSource(src: SourceLoc): Promise<void> {
   }
 }
 
-/**
- * The file this page is written in, for the bar menu's "Open page source".
- *
- * There is no annotation for "the page" — only per-element ones — so this takes
- * the source file that renders the most annotated elements on the page. That is
- * the page's own template in every ordinary case, and a component only when it
- * really does contribute most of the markup (in which case it is the file you'd
- * want anyway).
- */
-function pageSourceFile(): string | null {
-  const counts = new Map<string, number>();
-  for (const el of annotatedElements()) {
-    const src = sourceFor(el);
-    if (!src) continue;
-    counts.set(src.file, (counts.get(src.file) ?? 0) + 1);
-  }
-  let best: string | null = null;
-  let bestCount = 0;
-  for (const [file, count] of counts) {
-    if (count > bestCount) {
-      best = file;
-      bestCount = count;
-    }
-  }
-  return best;
-}
+/** What each refusal means in the one sentence the user sees. */
+const PAGE_SOURCE_REFUSALS: Record<
+  NonNullable<PageSourceResponse['refusal']>,
+  (pathname: string) => string
+> = {
+  'no-routes': () => 'Astro reported no routes — cannot tell which file this page is',
+  'no-match': (p) => `No route matches ${p} — cannot tell which file this page is`,
+  'not-in-project': (p) => `The route for ${p} is not a file in this project`,
+  missing: (p) => `The route for ${p} has no source file on disk`,
+};
 
-function openPageSource(): void {
-  const file = pageSourceFile();
-  if (!file) {
-    toast('No source-annotated elements on this page to locate it by', 'err');
+/**
+ * Open the file this page is written in — the bar menu's "Open page source".
+ *
+ * The server answers from Astro's route manifest, because the DOM cannot: only
+ * elements are annotated, never component tags, so the old approach of opening
+ * whichever file rendered the most annotated elements landed on a markup-dense
+ * Nav.astro instead of a page that mostly composes components. When no route
+ * matches, we say so and open nothing rather than guess.
+ */
+async function openPageSource(): Promise<void> {
+  const pathname = location.pathname;
+  let answer: PageSourceResponse;
+  try {
+    answer = await api.resolvePageSource({ pathname });
+  } catch (err) {
+    toast(`Could not locate this page — ${err instanceof Error ? err.message : 'unknown'}`, 'err');
     return;
   }
-  void openSource({ file, loc: '1:1' });
+  if (!answer.file) {
+    toast(PAGE_SOURCE_REFUSALS[answer.refusal ?? 'no-match'](pathname), 'err');
+    return;
+  }
+  try {
+    await api.open({ file: answer.file, loc: '1:1' });
+  } catch (err) {
+    toast(`Could not open source — ${err instanceof Error ? err.message : 'unknown'}`, 'err');
+    return;
+  }
+  // The whole root-relative path, not just the basename: half a project's pages
+  // are called index.astro, and this is the one toast whose job is to say which.
+  const where = answer.pattern ? ` — the template for ${answer.pattern}` : '';
+  toast(`Opened ${answer.file}${where}`, 'ok');
 }
 
 /** Open a CSS rule's source in the editor (hover-pill inspector), reporting the
@@ -364,7 +373,7 @@ const bar = initAdminBar({
     const file = pageSource();
     if (file) void openEntryPanel(file);
   },
-  openPageSource,
+  openPageSource: () => void openPageSource(),
   openCollections: () => openCollectionsPanel({ onClose: () => bar.refresh() }),
   // Saving settings changes what the bar should show (the entry button, the
   // page-source item, Collections itself), so the bar re-evaluates its specs

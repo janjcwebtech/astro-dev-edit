@@ -137,7 +137,10 @@ Every global control lives in a slim bar across the top of the page:
 - **The dock button** — moves the bar to the **bottom** of the viewport, for
   sites whose own chrome lives at the top.
 - **The purple mark** — the overflow menu plus the dev-server status. It holds
-  *Open page source*, which opens the file this page is written in;
+  *Open page source*, which opens **the file the page itself is written in** —
+  resolved from Astro's own route manifest, so a page that mostly composes
+  components opens the page rather than the busiest component, and a URL that
+  matches no route says so instead of guessing;
   *Collections*, the [collection and field designer](#collections--the-collection-designer);
   and *Settings*, where [every integration option](#settings-drawer) — including the
   [Unsplash access key](#unsplash-photo-picker) — is editable.
@@ -770,7 +773,10 @@ server to classify the target from the **`.astro` source AST** (the DOM can't
 tell a resolved `{expression}` from literal text), and only literal text / static
 image attributes are offered for editing. Saves POST to a localhost-only
 endpoint that re-resolves the element, verifies the source still matches, and
-writes atomically.
+writes atomically. "Which file is this whole *page*?" is a different question
+with a different answer: only elements are annotated, never component tags, so
+the DOM cannot be counted for it — that one comes from Astro's route manifest
+(`astro:routes:resolved`), matched the way Astro matches a request.
 
 ## Credits
 
