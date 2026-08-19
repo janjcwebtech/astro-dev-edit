@@ -17,13 +17,27 @@ interface Features {
   /** The Unsplash photo source is enabled AND the server holds a usable key.
    *  False means the media modal renders single-source, with no tab strip. */
   unsplash: boolean;
+  /** The hover pill's class/ID chips and their CSS rules. */
+  cssInspector: boolean;
+  /** The "Open source" buttons and jump-to-file links. */
+  openInEditor: boolean;
+  /** The CMS entry drawer and the admin bar's entry button. */
+  entryEditor: boolean;
 }
 
-const features: Features = { unsplash: false };
+const features: Features = {
+  unsplash: false,
+  cssInspector: false,
+  openInEditor: false,
+  entryEditor: false,
+};
 
 /** Called once from `overlay.ts`'s boot, with the /health payload. */
 export function setFeatures(info: HealthResponse): void {
   features.unsplash = info.unsplash === true;
+  features.cssInspector = info.cssInspector === true;
+  features.openInEditor = info.openInEditor === true;
+  features.entryEditor = info.entryEditor === true;
 }
 
 /** Re-read a single flag — used after the Settings panel stores a key, so the
@@ -34,4 +48,8 @@ export function updateFeature<K extends keyof Features>(key: K, value: Features[
 
 export function hasUnsplash(): boolean {
   return features.unsplash;
+}
+
+export function has<K extends keyof Features>(key: K): boolean {
+  return features[key];
 }

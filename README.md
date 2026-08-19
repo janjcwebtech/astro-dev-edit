@@ -137,8 +137,9 @@ Every global control lives in a slim bar across the top of the page:
 - **The dock button** — moves the bar to the **bottom** of the viewport, for
   sites whose own chrome lives at the top.
 - **The purple mark** — the overflow menu (*Open page source*, which opens the
-  file this page is written in, and *Settings*, which holds the
-  [Unsplash access key](#unsplash-photo-picker)) plus the dev-server status.
+  file this page is written in, and *Settings*, where [every integration
+  option](#settings-drawer) — including the [Unsplash access
+  key](#unsplash-photo-picker) — is editable) plus the dev-server status.
 
 The bar **overlays** the page rather than pushing it down: the top edge is where
 sticky site headers live, and reflowing the page would change the very layout
@@ -217,12 +218,25 @@ The feature depends on `data-astro-source-*` attributes on every element:
     toolbar is enabled**. With it off, the integration finds nothing to edit
     and logs a preflight warning. Keep `devToolbar.enabled` on in dev (or set
     `sourceAnnotations: 'force'`).
--   **Astro ≥7** — the new Rust compiler doesn't emit them at all
-    ([details](docs/ASTRO-COMPAT.md)), so the integration **injects them
-    itself** via a pre-compiler transform. Automatic; the dev toolbar is no
-    longer required for locating elements on 7.
+-   **Astro ≥7** — the new Rust compiler accepts Astro's `annotateSourceFile`
+    option but doesn't emit the attributes
+    ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)),
+    so the integration **injects them itself** via a pre-compiler transform.
+    Automatic; the dev toolbar is no longer required for locating elements on 7.
 
 ## Options
+
+**You do not have to edit this file.** Every option below is also editable from
+the overlay's own **Settings** drawer (admin bar → the purple mark → *Settings*),
+which stores your choices in `.astro-text-edit.json` at the project root and
+applies them to the next request — no dev-server restart. Setting an option here
+in `astro.config.mjs` still wins: this file is code you wrote deliberately, it is
+committed, and it is read by `astro build`. An option set here therefore renders
+**read-only** in the drawer, with a note saying where the value came from, rather
+than accepting input that resolution would quietly discard.
+
+Precedence, highest first: **`astro.config.mjs` → `.astro-text-edit.json` → the
+defaults below.** See [Settings drawer](#settings-drawer) for the whole picture.
 
 ```js
 textEdit({
@@ -242,7 +256,7 @@ textEdit({
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `enabled` | `true` | `false` disables the integration entirely. |
+| `enabled` | `true` | `false` disables the integration entirely. **Config-only** — read before the dev server exists, and storing `false` elsewhere would remove the UI that turns it back on. |
 | `assetDirs` | `['src/assets', 'public']` | Dirs scanned for the swap panel's replacement-image list. |
 | `uploadDir` | `'public'` | Where new uploads are written. Must be under `public/` — files here become a plain `<img src>`, so a `src/`-relative dir works in dev but 404s in a production build (a preflight warning fires if it isn't web-servable). |
 | `imageUploadDir` | `'src/assets'` | Fallback for uploads backing an [`image()` schema field](#image-fields-are-relative-to-the-entry-file). The mirror-image rule: these assets are *imported* by Astro, so they must be under `src/` — `public/` files can't be imported (a preflight warning fires if it isn't). Only used when the field is empty; otherwise the upload lands in the field's existing asset directory. |
@@ -250,9 +264,39 @@ textEdit({
 | `contentRoots` | `['src', 'public']` | Writes are confined to these (resolved, symlinks included). |
 | `openInEditor` | `true` | Expose the "Open source" / jump-to-file behaviour. |
 | `cssInspector` | `true` | The hover-pill CSS class/ID inspector. `false` hides the chips row entirely. The per-rule open-in-editor jump also honours `openInEditor`. |
-| `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. |
+| `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. **Config-only** — it registers a Vite plugin, so changing it needs a restart. |
 | `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
-| `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-text-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30). |
+| `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults, or just switch it on in the Settings drawer. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-text-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30). |
+
+Every option except `enabled` and `sourceAnnotations` is editable from the
+Settings drawer. Those two are consumed during `astro:config:setup`, before a dev
+server exists, so they can only come from this file — the drawer shows them
+read-only and says a restart is needed.
+
+### Settings drawer
+
+Opened from the admin bar's overflow menu. Four tabs — **General**, **Editing**,
+**Media**, **Unsplash** — with one control per option and a line of prose saying
+what it does. Saving writes only the options you changed into
+`.astro-text-edit.json`, merging with whatever is already there.
+
+A few properties worth knowing:
+
+-   **Changes bite immediately**, including the ones that *restrict* the editor.
+    Narrowing `contentRoots` takes effect on the very next write attempt, not
+    after a restart.
+-   **A save is all-or-nothing.** If any option in the patch is unknown,
+    config-only, locked, or the wrong shape, the whole save is refused with a
+    message against each offending control, and nothing is written.
+-   **Turning a feature off keeps its configuration.** Switching the entry editor
+    or the Unsplash source off and back on restores its per-collection widget
+    overrides and its app name.
+-   `.astro-text-edit.json` **should be gitignored** — it is also where the
+    Unsplash access key is stored. The drawer warns when it isn't.
+
+The options the drawer offers come from the server, so it renders whatever your
+installed version declares; an option added in a later release appears without
+any change to the overlay.
 
 ## Undo is git — there is no in-app undo
 
@@ -320,7 +364,7 @@ application for production (then 1000). Resolution order, highest first:
 | --- | --- |
 | `unsplash.accessKey` in `astro.config.mjs` | An escape hatch for programmatic config, **not recommended**: that file is committed *and* is read by `astro build`, so the key travels with the repo. |
 | `UNSPLASH_ACCESS_KEY` in the environment | For teams and CI. Read through Vite's own env loader, so a `.env` file works — note that `astro dev` does **not** copy `.env` into `process.env` itself. |
-| The **Settings** panel (admin bar → the purple mark → *Settings*) | The recommended path. Writes `.astro-text-edit.json` at your project root, `0600`. |
+| The **Settings** drawer (admin bar → the purple mark → *Settings* → *Unsplash*) | The recommended path. Writes `.astro-text-edit.json` at your project root, `0600`. |
 
 **Gitignore `.astro-text-edit.json` and your `.env`.** The Settings panel warns
 if the first isn't covered, but this integration cannot edit your ignore rules
@@ -539,7 +583,7 @@ caption, a *sibling* of the button), `atx-media-rail` with
 the Unsplash pane's `atx-unsplash-search` / `atx-unsplash-input` /
 `atx-unsplash-orient`, `atx-unsplash-credit` with `atx-unsplash-author` and
 `atx-unsplash-link`, and `atx-unsplash-rate` (the requests-left line);
-the settings panel's `atx-settings-heading|blurb|link|status|text|label|row|key|hint|warning|error`;
+the settings drawer's `atx-settings-tabs`, `atx-settings-tab` (plus `atx-settings-tab-<group>`), `atx-settings-tabs-host`, `atx-settings-pane` (plus `atx-settings-pane-<group>`), `atx-settings-lock`, `atx-settings-key-section`, `atx-settings-key-status`, `atx-settings-key-actions`, and the older `atx-settings-heading|blurb|link|status|text|row|key|hint|warning|error`; each option control is a standard `atx-field` (with `atx-field-label`, `atx-field-input`, `atx-field-help`, `atx-field-error`), the same hooks the entry drawer uses;
 the swap panel's `atx-image-preview` / `atx-image-preview-img` /
 `atx-image-meta` and its `atx-image-recents` strip
 (`atx-image-recents-label|title`, `atx-image-recent`, `atx-image-recent-thumb`,
@@ -609,8 +653,8 @@ your overrides need `!important`:
   source. No `astro:assets` `image()` metadata (path strings only).
 - **Astro 5.x–7.x.** On 5/6 Astro's compiler provides the source annotations
   (dev toolbar required, above); on ≥7 the integration injects them itself,
-  since the Rust compiler no longer emits them. See
-  [docs/ASTRO-COMPAT.md](docs/ASTRO-COMPAT.md).
+  since the Rust compiler no longer emits them
+  ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)).
 - **Unsplash is the only photo source**, and only its free tier. Unsplash+ is a
   consumer subscription with no API surface, so premium content cannot be
   offered by a package many people install.

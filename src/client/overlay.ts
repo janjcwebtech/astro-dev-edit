@@ -26,7 +26,7 @@ import { openEntryPanel } from './editors/entry.ts';
 import { openPeekPanel } from './editors/peek.ts';
 import { openSettingsPanel } from './editors/settings-panel.ts';
 import { collectContext, formatContext } from './element-context.ts';
-import { setFeatures } from './features.ts';
+import { has, setFeatures } from './features.ts';
 import { clearHighlight, initHover } from './hover.ts';
 import { pageSource } from './page-source.ts';
 import { initRouter } from './router.ts';
@@ -56,9 +56,7 @@ let editMode = false;
 // you came to edit. The choice does survive the full-page reload that follows
 // every save, like edit mode itself.
 let treeWanted = false;
-// Set from the server's /health payload at boot. Gates the hover-pill chips row.
-let cssInspectorEnabled = false;
-// Also from /health: the absolute project root, so copied source paths come out
+// From /health: the absolute project root, so copied source paths come out
 // repo-relative (Astro's annotations are absolute). Null until boot completes.
 let projectRoot: string | null = null;
 
@@ -300,7 +298,7 @@ const hover = initHover({
   isEditMode: () => editMode && !navigating,
   openSource: (src) => void openSource(src),
   openPeek,
-  cssInspector: () => cssInspectorEnabled,
+  cssInspector: () => has('cssInspector'),
   openRule: (file, selector) => void openRule(file, selector),
   copyContext,
   onTarget: (el) => tree.syncActive(el),
@@ -353,13 +351,18 @@ const bar = initAdminBar({
     bar.refresh();
   },
   isTreeOpen: () => tree.isOpen(),
-  hasEntry: () => pageSource() !== null,
+  // Both halves are live: the page must declare a backing entry, *and* the
+  // entry editor must be switched on — which the Settings drawer can change
+  // without a reload.
+  hasEntry: () => has('entryEditor') && pageSource() !== null,
   openEntry: () => {
     const file = pageSource();
     if (file) void openEntryPanel(file);
   },
   openPageSource,
-  openSettings: openSettingsPanel,
+  // Saving settings changes what the bar should show (the entry button, the
+  // page-source item), so the bar re-evaluates its specs once the drawer is gone.
+  openSettings: () => openSettingsPanel({ onClose: () => bar.refresh() }),
 });
 
 // After an HMR update: drop stale hover state, and re-snapshot source
@@ -386,10 +389,10 @@ async function boot(): Promise<void> {
   // check fails the overlay stays out of the way entirely.
   const info = await api.health();
   if (!info) return;
-  cssInspectorEnabled = info.cssInspector;
   projectRoot = info.root ?? null; // older servers don't send it — paths stay absolute
-  // Read through features.ts rather than a local, so the media modal can see
-  // this without importing the composition root. (see features.ts)
+  // Every option-derived flag is read through features.ts rather than a local,
+  // so the media modal can see them without importing the composition root and
+  // so a Settings save updates them in place. (see features.ts)
   setFeatures(info);
   document.body.append(
     ...hover.elements,

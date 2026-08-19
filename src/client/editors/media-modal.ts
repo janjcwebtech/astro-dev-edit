@@ -11,6 +11,7 @@ import {
   basename,
   buildBackdrop,
   buildPanel,
+  buildTabs,
   footButton,
   setFreshSrc,
   setButtonEnabled,
@@ -150,9 +151,6 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     window.addEventListener('keydown', onKey, true);
 
     // --- tabs + upload -------------------------------------------------------
-    const tabsRow = styled('div', 'atx-media-tabs', {
-      display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto',
-    });
     const uploadBtn = styled('button', 'atx-btn atx-media-upload', {
       marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px',
       padding: '6px 12px', borderRadius: '6px', border: '1px solid #555',
@@ -175,8 +173,6 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       flex: '1 1 auto', minWidth: '0', minHeight: '0',
       display: 'flex', flexDirection: 'column', gap: '10px',
     });
-    // Swapped on tab change; the grid below it stays put.
-    const toolbarHost = styled('div', 'atx-media-toolbars', { flex: '0 0 auto' });
     const rail = styled('div', 'atx-media-rail', {
       flex: `0 0 ${RAIL_WIDTH}`, width: RAIL_WIDTH, borderLeft: `1px solid ${COLOR.panelDivider}`,
       paddingLeft: '14px', marginLeft: '14px', overflowY: 'auto',
@@ -190,7 +186,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       flex: '0 0 auto', font: `11px ${FONT.mono}`, color: COLOR.muted, textAlign: 'center',
     });
 
-    body.append(tabsRow, content, dropStrip, fileInput);
+    // `tabsRow` and `toolbarHost` come from buildTabs, below.
 
     // --- footer --------------------------------------------------------------
     const status = styled('span', 'atx-media-status', {
@@ -223,56 +219,31 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       ...(unsplashPane ? [{ id: 'unsplash', label: 'Unsplash', pane: unsplashPane }] : []),
     ];
 
+    const byId = new Map(panes.map((p) => [p.id, p.pane]));
+    const tabs = buildTabs(
+      panes.map(({ id, label, pane }) => ({ id, label, pane: pane.el })),
+      {
+        classPrefix: 'media',
+        // A source's first activation is what runs its initial search, so it is
+        // deferred until the user actually asks for that tab.
+        onActivate: (id: string) => byId.get(id)?.activate(),
+        onChange: (id: string) => {
+          active = panes.find((p) => p.id === id) ?? active;
+          // A selection in one source means nothing in another.
+          grid.select(null);
+          refresh();
+        },
+      },
+    );
+    // The strip's own host is the toolbar slot: only the source's toolbar swaps,
+    // while the grid below it stays put.
+    tabs.host.style.flex = '0 0 auto';
+    tabs.strip.append(uploadBtn);
     let active = panes[0];
-    const activated = new Set<string>();
-    const tabButtons = new Map<string, HTMLButtonElement>();
+    tabs.host.classList.add('atx-media-toolbars');
 
-    const showTab = (id: string): void => {
-      const next = panes.find((p) => p.id === id);
-      if (!next || next === active) return;
-      active = next;
-      toolbarHost.textContent = '';
-      toolbarHost.append(next.pane.el);
-      grid.select(null);
-      paintTabs();
-      if (!activated.has(id)) {
-        activated.add(id);
-        next.pane.activate();
-      }
-      refresh();
-    };
-
-    const paintTabs = (): void => {
-      for (const [id, btn] of tabButtons) {
-        const on = id === active.id;
-        // Inline, not a state class — the house rule, since there is no CSS.
-        btn.style.background = on ? COLOR.accent : 'transparent';
-        btn.style.color = on ? '#fff' : '#bbb';
-        btn.setAttribute('aria-selected', on ? 'true' : 'false');
-      }
-    };
-
-    // Only render the tab strip when there is a choice to make.
-    if (panes.length > 1) {
-      for (const { id, label } of panes) {
-        const btn = styled('button', `atx-media-tab atx-media-tab-${id}`, {
-          padding: '6px 14px', borderRadius: '6px', border: '1px solid transparent',
-          cursor: 'pointer', font: '600 12px system-ui',
-        });
-        btn.type = 'button';
-        btn.role = 'tab';
-        btn.textContent = label;
-        btn.addEventListener('click', () => showTab(id));
-        tabButtons.set(id, btn);
-        tabsRow.append(btn);
-      }
-      paintTabs();
-    }
-    tabsRow.append(uploadBtn);
-
-    toolbarHost.append(active.pane.el);
-    paneHost.append(toolbarHost, grid.el);
-    activated.add(active.id);
+    body.append(tabs.strip, content, dropStrip, fileInput);
+    paneHost.append(tabs.host, grid.el);
 
     /** Repaint everything that depends on pane state or selection. */
     function refresh(): void {
@@ -283,8 +254,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       rail.textContent = '';
       active.pane.renderRail(rail, key);
       // The project tab's count is the only place the tab label can carry one.
-      const projectTab = tabButtons.get('project');
-      if (projectTab) projectTab.textContent = projectCount === null ? 'Project' : `Project · ${projectCount}`;
+      tabs.setLabel('project', projectCount === null ? 'Project' : `Project · ${projectCount}`);
       dropStrip.textContent = opts.targetDir
         ? `Drop an image anywhere to upload it to ${opts.targetDir}`
         : 'Drop an image anywhere to upload it';
@@ -352,7 +322,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
         toast(`Uploaded ${basename(webPath)}`, 'ok');
         // Show it immediately, staged and first under Newest — but still only
         // *staged*: the user still has to commit.
-        showTab('project');
+        tabs.show('project');
         await projectPane.reload();
         grid.select(webPath);
       } catch (err) {

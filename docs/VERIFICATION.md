@@ -34,7 +34,10 @@ Run in this order; each is cheaper than the next.
 | Route dispatch: base-path passthrough, exact-path matching, query strings, 404s | `tests/middleware.test.ts` (routing & guards) |
 | Security gate: non-localhost 403, foreign-Origin 403, localhost Origin accepted | `tests/middleware.test.ts` (routing & guards) |
 | Request hygiene: body size caps, malformed JSON, missing/mistyped fields → 400 | `tests/middleware.test.ts` (per-route cases) |
-| `GET /health` — config flags; `unsplash` true only when enabled *and* a key resolves, false when disabled / empty key / resolution throws | `tests/middleware.test.ts`, `tests/unsplash-routes.test.ts` |
+| `GET /health` — option-derived flags (`cssInspector`, `openInEditor`, `entryEditor`); `unsplash` true only when enabled *and* a key resolves, false when disabled / empty key / resolution throws | `tests/middleware.test.ts`, `tests/unsplash-routes.test.ts` |
+| **Option resolution** (`options.ts`) — precedence `astro.config.mjs` > settings file > `DEFAULTS`; a config `false` reads as *set* rather than absent (what `locked` rests on); an option the config is silent about stays writable; `enabled`/`sourceAnnotations` never taken from the file and absent from the writable-key list; malformed or wrong-shaped settings file degrades to config + defaults; `entryEditor` deep-merged per collection *per field* with the config leaf winning | `tests/options-resolve.test.ts` |
+| **Option patching** (`options.ts`) — type coercion and refusals per option kind (unknown / config-only / mistyped / empty string / empty list), patch ordered by the option table so a feature toggle precedes the sub-options it gates, merge-not-replace, a feature's detail surviving an off/on cycle, the access key never persisted through the option path, and the caller's document never mutated | `tests/options-resolve.test.ts` |
+| `GET`/`POST /settings` **(options half)** — every option described well enough to render a control (label/help/type/group/value/source/locked, `choices` for a select), config-set marked locked and config-only marked restart-requiring, a read touching no filesystem; a sparse patch stored and answered with full new state, visible to the very next request with no restart, biting on the gate it controls (`/inspect/open` 403) and on write confinement (`contentRoots` narrowing → `/apply` refused), merge-not-replace, fixed root path `0600` with no temp file, locked/config-only/unknown/mistyped keys refused **whole** with `fieldErrors` and nothing written, empty body 400, and the fresh-project case: the Unsplash source switched on from the panel with no config edit | `tests/settings-routes.test.ts` |
 | `GET /assets` — asset dirs listed as sorted web paths, `public/` mapped to `/` | `tests/middleware.test.ts` |
 | `listAssets` — `AssetInfo` shape (`path`/`size`/`mtime`), mtime ordering for the newest-first sort, extension filter, dedupe across nested asset dirs, escaping/nonexistent dirs skipped | `tests/assets.test.ts` |
 | `POST /upload` — data-URL write into the configured `uploadDir`, clash suffixing, traversal sanitising, mime/payload rejection (the `saveBuffer`/`resolveAssetTarget` extractions are pinned by these passing unedited) | `tests/middleware.test.ts` |
@@ -45,7 +48,7 @@ Run in this order; each is cheaper than the next.
 | `POST /apply` — atomic on-disk patch, multi-op batch (verify-all-then-write-once; a refused op writes nothing), unsupported/refusal 422s, empty-ops/validation 400s | `tests/middleware.test.ts` |
 | `POST /unsplash/search` — outbound query/paging/orientation + `Client-ID`/`Accept-Version` headers, the reshape (no raw Unsplash field, no download/raw URL crosses the wire), utm params appended with correct separator, perPage/page clamping, blank query 400, disabled 403, unconfigured 403 **with fetch never called**, 401→502 / 403→429 / 5xx→502 / network→502 / `TimeoutError`→504 / malformed JSON→502, TTL cache serving a repeat from one call | `tests/unsplash-routes.test.ts` |
 | `POST /unsplash/import` — bytes land in `uploadDir`, byte URL carries `w`/`fit`/`q`/`fm=jpg` and preserves `ixid`, the `download_location` ping fires authenticated with its `ixid`, a failed ping still succeeds, `assetRef: 'relative'` → `imageUploadDir`, targetDir honoured/ignored-outside/ignored-escaping, hostile description → safe basename, re-import suffixes, unknown id → 409 `expired`, byte-fetch failure / non-image content-type / over-cap body → 502 **with nothing written**, cache eviction 409s the oldest id | `tests/unsplash-routes.test.ts` |
-| `GET`/`POST /settings` — write-then-read reports masked and **never the raw key**, fixed root path written `0600` with no temp file left, malformed file degrades to unconfigured, clearing, `config` > `env` > `file` precedence, a config/env key refuses a store (409), disabled 403 touching no filesystem, and a stored key usable by the **next** search with no restart | `tests/unsplash-routes.test.ts` |
+| `GET`/`POST /settings` **(access-key half)** — write-then-read reports masked and **never the raw key**, fixed root path written `0600` with no temp file left, malformed file degrades to unconfigured, clearing, `config` > `env` > `file` precedence, a config/env key refuses a store (409), disabled 403 touching no filesystem, and a stored key usable by the **next** search with no restart. Deliberately **not** moved to `tests/settings-routes.test.ts` with the option half: these cases run the key through the injected `UnsplashConfig` seam, and the last one asserts it reaches the next *search* — which needs this suite's recording fetch fake | `tests/unsplash-routes.test.ts` |
 | `POST /entry` — schema fields + values + body + etag; inference fallback; path rejection | `tests/middleware-entry.test.ts` |
 | `POST /entry/apply` — atomic frontmatter+body write, stale-etag 409, schema 422 with fieldErrors, date coercion | `tests/middleware-entry.test.ts` |
 | `POST /entry/create` — valid create, slug-clash 409, missing-required 422, unknown collection / empty slug rejection | `tests/middleware-entry.test.ts` |
@@ -105,6 +108,11 @@ the loc rules in `astro.ts`.
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 | `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
 | `element-context.ts` — `formatContext` clipboard payload: section order and omission (absent verdict/entry/box), `>` focus-line gutter marking, quoted-range wording, fence language per extension, refused-source sentence, empty-CSS note, rule blocks with/without a source comment, both truncation notices; `relativize` root stripping (trailing slash, outside-root, already-relative, unknown root, Windows separators); `windowAround` 1-based slicing (clamped both ends, whole file, pre-windowed response) | `tests/element-context.test.ts` |
+
+The Settings drawer itself has no unit tests — it is DOM-bound — but it is
+**almost entirely server-driven**: the option list, every label, every control
+type and every `locked` flag come from `/settings`, so `tests/settings-routes.test.ts`
+pins what the drawer will render. What remains manual is the rendering itself.
 
 **Everything else in `src/client/` has no unit tests** — it is DOM- and
 dev-server-bound and is verified only by the manual checklist below. When
@@ -392,18 +400,52 @@ into a nested asset dir. `/works/ledger` leaves `thumbnail` unset.)
 - [ ] After an import, `git status` shows a new `.jpg` plus the `src` change, and
       **no `images.unsplash.com` anywhere in the source**.
 - [ ] With no key, the pane shows an *Add an Unsplash access key* card whose
-      button opens Settings **above** the modal; entering a key re-runs the
-      search.
+      button opens the Settings drawer **above** the modal, **on its Unsplash
+      tab**; entering a key re-runs the search, and closing the drawer leaves the
+      modal owning Escape and the backdrop again.
 - [ ] A bad key shows an error naming the setting with **no** Retry; offline
       shows the reach/timeout error **with** Retry.
 - [ ] The requests-left line appears at the foot of the rail.
+
+**Settings drawer**
+
+The playground's config sets `contentRoots`, `assetDirs`, `uploadDir`,
+`entryEditor` and `unsplash`, which makes it a good test of the locked/editable
+split.
+
+- [ ] Admin bar → the purple mark → *Settings* opens a **drawer** with General /
+      Editing / Media / Unsplash tabs. Every control has a label and a line of
+      help.
+- [ ] `contentRoots`, `assetDirs`, `uploadDir`, `entryEditor` and *Unsplash photo
+      source* render **disabled with a padlock note**; `editableExtensions`,
+      `openInEditor`, `cssInspector`, `imageUploadDir`, *Application name* and
+      *Results per page* are editable.
+- [ ] `enabled` and `sourceAnnotations` are disabled and say a **restart** is
+      needed, whether or not the config mentions them.
+- [ ] Locked notes are **muted grey with a padlock**, not amber — amber is
+      reserved for the gitignore warning.
+- [ ] Turn *CSS inspector* off, **Save** (toast: *Settings saved*), close, hover an
+      element **with a class** (e.g. the header's `.brand`): no chips row, **with
+      no reload**. Turn it back on and the chips return.
+- [ ] Editing a locked control is impossible; forcing one through (devtools) is
+      refused with a per-control message and `.astro-text-edit.json` is unchanged.
+- [ ] Close with an unsaved change: a discard confirm appears; cancelling keeps
+      the drawer, confirming drops the change.
+- [ ] `.astro-text-edit.json` holds **only** the options you changed, and is
+      `-rw-------`.
+- [ ] With `unsplash: {}` commented out of the playground config and the server
+      restarted, the Unsplash tab offers an **enable toggle** — *not* the old
+      "add `unsplash: {}` … then restart the dev server" text. Enabling it makes
+      the media picker's Unsplash tab appear. Restore the config line after.
 
 **Cleanup**
 
 - [ ] Restore playground fixtures: overlay edits write into
       `examples/playground/src/` — check `git status` and revert.
 - [ ] Delete imported photos from `examples/playground/public/images/` and remove
-      `examples/playground/.astro-text-edit.json` if the Settings panel wrote one.
+      `examples/playground/.astro-text-edit.json` if the Settings drawer wrote one
+      — every option change lands there, so it is almost always present after a
+      settings pass.
 
 ## Known deferrals
 

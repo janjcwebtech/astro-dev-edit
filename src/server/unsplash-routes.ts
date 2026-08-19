@@ -1,7 +1,5 @@
 import type { AstroIntegrationLogger } from 'astro';
 import type {
-  SettingsResponse,
-  SettingsUpdateRequest,
   UnsplashErrorCode,
   UnsplashImportRequest,
   UnsplashPhoto,
@@ -12,7 +10,7 @@ import { slugify } from '../shared/slug.ts';
 import { saveBuffer } from './assets.ts';
 import { resolveAssetTarget } from './paths.ts';
 import type { Route, RouteResult } from './router.ts';
-import { checkGitignored, maskKey, saveUnsplashKey, type ResolvedKey } from './settings.ts';
+import type { ResolvedKey } from './settings.ts';
 
 /**
  * The `/unsplash*` route group — search a third-party photo library and
@@ -25,6 +23,10 @@ import { checkGitignored, maskKey, saveUnsplashKey, type ResolvedKey } from './s
  * `{ status, body: { error, code } }` result with an accurate status, and
  * `onError` exists only to turn a genuinely unanticipated throw into a 500.
  * This is an intentional divergence from every other route group.
+ *
+ * The Settings panel's own `/settings` endpoints used to live here, because the
+ * only setting was this feature's access key. They now have their own group in
+ * `settings-routes.ts` — the split this file's comment always called for.
  *
  * Security notes:
  * - The access key is resolved lazily per request (a thunk, not a value
@@ -73,10 +75,14 @@ export interface UnsplashConfig {
    *  design — a key entered through the Settings panel must work without a
    *  dev-server restart. `key` is `''` when nothing is configured anywhere. */
   resolve: () => Promise<ResolvedKey>;
+  /** Whether the feature is switched on at all. A thunk for the same reason
+   *  `resolve` is one: the Settings panel can turn the source on without a
+   *  dev-server restart, so a value captured at setup time would be stale. */
+  enabled: () => Promise<boolean>;
   /** Sent as `utm_source` on credit links, per the API guidelines. */
-  appName: string;
-  /** Results per page; already clamped to Unsplash's maximum. */
-  perPage: number;
+  appName: () => Promise<string>;
+  /** Default results per page; already clamped to Unsplash's maximum. */
+  perPage: () => Promise<number>;
   /** Injected so tests can stub Unsplash without touching globals — unlike a
    *  global stub this cannot leak across suites. Defaults to `globalThis.fetch`. */
   fetchImpl?: typeof fetch;
@@ -86,8 +92,10 @@ export interface UnsplashRouteDeps {
   logger: AstroIntegrationLogger;
   /** Project root (fsPath). Downloads are confined to it. */
   root: string;
-  /** Where an imported photo may land — the same rule `/upload` uses. */
-  dirs: { uploadDir: string; imageUploadDir: string; allowedDirs: string[] };
+  /** Where an imported photo may land — the same rule `/upload` uses. A thunk,
+   *  because the directories come from options the Settings panel can change
+   *  without a dev-server restart. */
+  dirs: () => Promise<{ uploadDir: string; imageUploadDir: string; allowedDirs: string[] }>;
   /** null when the feature is disabled in config. */
   unsplash: UnsplashConfig | null;
 }
@@ -145,11 +153,11 @@ const UNCONFIGURED = fail(
  */
 async function requireKey(
   cfg: UnsplashConfig | null,
-): Promise<{ ok: true; key: string } | { ok: false; result: RouteResult }> {
-  if (!cfg) return { ok: false, result: DISABLED };
+): Promise<{ ok: true; key: string; appName: string } | { ok: false; result: RouteResult }> {
+  if (!cfg || !(await cfg.enabled())) return { ok: false, result: DISABLED };
   const { key } = await cfg.resolve();
   if (!key.trim()) return { ok: false, result: UNCONFIGURED };
-  return { ok: true, key: key.trim() };
+  return { ok: true, key: key.trim(), appName: await cfg.appName() };
 }
 
 /**
@@ -265,10 +273,13 @@ export function createUnsplashRoutes(deps: UnsplashRouteDeps): Route[] {
         if (!query) return { status: 400, body: { error: 'query is required' } };
 
         const page = Math.max(1, Math.trunc(Number(req.page) || 1));
-        const perPage = Math.min(30, Math.max(1, Math.trunc(Number(req.perPage) || cfg.perPage)));
+        const perPage = Math.min(
+          30,
+          Math.max(1, Math.trunc(Number(req.perPage) || (await cfg.perPage()))),
+        );
         const orientation = req.orientation && req.orientation !== 'any' ? req.orientation : '';
 
-        const cacheKey = `${query} ${page} ${perPage} ${orientation}`;
+        const cacheKey = `${query}\0${page}\0${perPage}\0${orientation}`;
         const hit = searches.get(cacheKey);
         let raw: RawSearch;
         let remaining: number | undefined;
@@ -314,7 +325,7 @@ export function createUnsplashRoutes(deps: UnsplashRouteDeps): Route[] {
         for (const photo of results) rememberPhoto(photo);
 
         const response: UnsplashSearchResponse = {
-          photos: results.map((photo) => reshape(photo, cfg.appName)),
+          photos: results.map((photo) => reshape(photo, guard.appName)),
           total: Number(raw.total) || 0,
           totalPages: Number(raw.total_pages) || 0,
           page,
@@ -413,7 +424,7 @@ export function createUnsplashRoutes(deps: UnsplashRouteDeps): Route[] {
         // Same target rule as /upload: an image() field's asset must be
         // importable, and a requested targetDir is honoured only inside a
         // configured asset directory.
-        const { dir, redirected } = resolveAssetTarget(root, dirs, req);
+        const { dir, redirected } = resolveAssetTarget(root, await dirs(), req);
         if (redirected) {
           logger.warn(
             `unsplash targetDir "${req.targetDir}" is not inside a configured asset ` +
@@ -433,79 +444,7 @@ export function createUnsplashRoutes(deps: UnsplashRouteDeps): Route[] {
       onError: () =>
         fail(500, 'upstream', 'The Unsplash import failed unexpectedly. See the dev-server log.'),
     },
-
-    // The Settings panel's two endpoints. They live in this group because the
-    // only setting today *is* the Unsplash key; a second, unrelated setting
-    // would be the moment to split them into their own createSettingsRoutes.
-    //
-    // The key is never in a response. Only whether one resolved, where from,
-    // and a masked fragment for recognition.
-    {
-      method: 'GET',
-      path: '/settings',
-      label: 'settings read',
-      handler: async () => ({ status: 200, body: await settingsBody() }),
-      onError: () => ({ status: 500, body: { error: 'could not read settings' } }),
-    },
-
-    {
-      method: 'POST',
-      path: '/settings',
-      maxBytes: 4 * 1024,
-      label: 'settings write',
-      handler: async (body) => {
-        const req = (body ?? {}) as SettingsUpdateRequest;
-        if (!unsplash) return DISABLED;
-        if (typeof req.unsplash?.accessKey !== 'string') {
-          return { status: 400, body: { error: 'unsplash.accessKey is required' } };
-        }
-        // A config or env key wins at resolve time, so storing one here would
-        // be a value that silently does nothing. Refuse and say why.
-        const { source } = await unsplash.resolve();
-        if (source === 'config' || source === 'env') {
-          return {
-            status: 409,
-            body: {
-              error:
-                source === 'config'
-                  ? 'An access key is set in your Astro config, which takes precedence. ' +
-                    'Remove `unsplash.accessKey` from astro.config.mjs first.'
-                  : 'UNSPLASH_ACCESS_KEY is set in the environment, which takes ' +
-                    'precedence. Unset it (or clear it from .env) first.',
-            },
-          };
-        }
-        // Fixed path, never client-supplied — the one capability the loc-based
-        // routes deliberately refuse to hand out.
-        await saveUnsplashKey(root, req.unsplash.accessKey);
-        logger.info(
-          req.unsplash.accessKey.trim()
-            ? 'stored an Unsplash access key in .astro-text-edit.json'
-            : 'cleared the stored Unsplash access key',
-        );
-        return { status: 200, body: await settingsBody() };
-      },
-      onError: () => ({ status: 500, body: { error: 'could not save settings' } }),
-    },
   ];
-
-  /** Shared by both settings routes so a save answers with the same shape a
-   *  read would — the panel needs no second request to refresh. */
-  async function settingsBody(): Promise<SettingsResponse> {
-    if (!unsplash) {
-      return { unsplash: { enabled: false, configured: false, source: null } };
-    }
-    const { key, source } = await unsplash.resolve();
-    return {
-      unsplash: {
-        enabled: true,
-        configured: Boolean(key),
-        source,
-        ...(key ? { hint: maskKey(key) } : {}),
-        ...((await checkGitignored(root)) ? {} : { gitignoreWarning: true }),
-      },
-    };
-  }
 }
 
 /** Thrown by {@link readCapped}; distinguishes "too big" from a transport fault. */

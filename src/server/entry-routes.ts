@@ -13,6 +13,7 @@ import type {
 } from '../shared/protocol.ts';
 import { slugify } from '../shared/slug.ts';
 import type { EntryCollectionInfo, EntrySchemaProvider } from './content-config.ts';
+import type { OptionsResolver } from './options.ts';
 import { atomicWrite, validateEditablePath } from './paths.ts';
 import type { Route } from './router.ts';
 import {
@@ -35,12 +36,11 @@ export interface EntryRouteDeps {
   logger: AstroIntegrationLogger;
   /** Project root (fsPath). Every served path is confined to this. */
   root: string;
-  /** Directories writes are confined to, relative to root. (spec §8) */
-  contentRoots: string[];
-  /** Extensions the patcher may write; intersected with md/mdx here. */
-  editableExtensions: string[];
-  /** When false every entry route refuses. */
-  enabled: boolean;
+  /** Live options — `entryEditor` gates the group, and `contentRoots` /
+   *  `editableExtensions` are the confinement every path here passes through.
+   *  Resolved per request so a change from the Settings panel applies without a
+   *  dev-server restart. */
+  optionsResolver: OptionsResolver;
   /** Collection/schema lookup; null → inference only. */
   schemaProvider: EntrySchemaProvider | null;
 }
@@ -99,13 +99,26 @@ function assembleFields(
 }
 
 export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
-  const { logger, root, contentRoots, editableExtensions, enabled, schemaProvider } = deps;
+  const { logger, root, optionsResolver, schemaProvider } = deps;
 
-  /** Path validation for entry endpoints: same confinement as edits, but only
-   *  markdown-family files are collection entries. */
-  const entryExtensions = ENTRY_EXTENSIONS.filter((e) => editableExtensions.includes(e));
+  /** The effective options, plus the entry-specific extension allowlist derived
+   *  from them: same confinement as edits, but only markdown-family files are
+   *  collection entries. */
+  async function gate(): Promise<{
+    contentRoots: string[];
+    entryExtensions: string[];
+    enabled: boolean;
+  }> {
+    const { options } = await optionsResolver.resolve();
+    return {
+      contentRoots: options.contentRoots,
+      entryExtensions: ENTRY_EXTENSIONS.filter((e) => options.editableExtensions.includes(e)),
+      enabled: options.entryEditor !== false,
+    };
+  }
 
   async function validateEntryPath(file: string): Promise<string> {
+    const { contentRoots, entryExtensions, enabled } = await gate();
     if (!enabled) throw new Error('the entry editor is disabled by configuration');
     if (typeof file !== 'string' || !file) throw new Error('file is required');
     return validateEditablePath(root, contentRoots, entryExtensions, file);
@@ -205,6 +218,7 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
       maxBytes: 1024 * 1024,
       label: 'entry create',
       handler: async (body) => {
+        const { contentRoots, entryExtensions, enabled } = await gate();
         if (!enabled) throw new Error('the entry editor is disabled by configuration');
         const { collection, slug, frontmatter, body: entryBody } = body as EntryCreateRequest;
         if (!collection || typeof collection !== 'string') throw new Error('collection is required');

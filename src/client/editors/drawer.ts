@@ -22,23 +22,44 @@ export interface DrawerShell {
   teardown(): void;
 }
 
-export function openDrawer(
-  title: string,
-  opts: {
-    isDirty(): boolean;
-    /** window.confirm prompt shown when closing dirty. */
-    discardMessage: string;
-  },
-): DrawerShell {
-  const drawer = buildDrawer(title);
+export interface DrawerOpenOptions {
+  isDirty(): boolean;
+  /** window.confirm prompt shown when closing dirty. */
+  discardMessage: string;
+  /** CSS width override; see `ui.ts::DrawerOptions`. */
+  width?: string;
+  /** Stacking layer. Needed when a drawer opens above something already
+   *  raised — the Settings drawer reached from the media modal's "no key
+   *  configured" card. */
+  layer?: number;
+  /** Run after the drawer is gone, however it closed. Lets the caller that
+   *  raised it resume — the Unsplash pane re-runs its search once a key
+   *  exists. */
+  onClose?(): void;
+  /**
+   * Hand the interaction slot back to whatever held it, instead of clearing it.
+   * Required when this drawer opened above another modal surface, which would
+   * otherwise stop owning the page's clicks once this one closes.
+   */
+  restoreState?: boolean;
+}
+
+export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell {
+  const drawer = buildDrawer(title, {
+    ...(opts.width ? { width: opts.width } : {}),
+    ...(opts.layer !== undefined ? { layer: opts.layer } : {}),
+  });
   const body = drawer.querySelector('[data-body]') as HTMLElement;
   const foot = drawer.querySelector('[data-foot]') as HTMLElement;
   const actions = drawer.querySelector('[data-actions]') as HTMLElement;
 
+  const heldBefore = opts.restoreState ? state.get() : null;
   const teardown = (): void => {
-    state.releaseIf(token);
+    if (heldBefore) state.releaseTo(token, heldBefore);
+    else state.releaseIf(token);
     drawer.remove();
     backdrop.remove();
+    opts.onClose?.();
   };
   const close = (): void => {
     if (opts.isDirty() && !window.confirm(opts.discardMessage)) {
@@ -49,7 +70,7 @@ export function openDrawer(
     }
     teardown();
   };
-  const backdrop = buildBackdrop(close);
+  const backdrop = buildBackdrop(close, opts.layer !== undefined ? opts.layer - 1 : undefined);
   let token = state.begin({ kind: 'panel', close });
 
   document.body.append(backdrop, drawer);

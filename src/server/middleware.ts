@@ -15,6 +15,7 @@ import type { EntrySchemaProvider } from './content-config.ts';
 import { launchInEditor } from './editor.ts';
 import { createEntryRoutes } from './entry-routes.ts';
 import { createInspectRoutes } from './inspect-routes.ts';
+import type { OptionsResolver, ResolvedOptions } from './options.ts';
 import {
   atomicWrite,
   checkEditablePath,
@@ -23,6 +24,7 @@ import {
   validateEditablePath,
 } from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
+import { createSettingsRoutes } from './settings-routes.ts';
 import { createUnsplashRoutes, type UnsplashConfig } from './unsplash-routes.ts';
 
 /**
@@ -39,28 +41,26 @@ interface MiddlewareDeps {
   logger: AstroIntegrationLogger;
   /** Project root (fsPath). Every served path is confined to this. */
   root: string;
-  /** Directories the asset listing may read from, relative to root. */
-  assetDirs: string[];
-  /** Directory new uploads are written to, relative to root. */
-  uploadDir: string;
-  /** Directory uploads for `assetRef: 'relative'` image() fields fall back to,
-   *  relative to root. Those assets are imported by Astro, so they belong under
-   *  `src/`, not in the web-servable uploadDir. */
-  imageUploadDir: string;
-  /** Directories writes are confined to, relative to root. (spec §8) */
-  contentRoots: string[];
-  /** Extensions the patcher may write. (spec §8) */
-  editableExtensions: string[];
-  /** Expose the open-in-editor endpoint. */
-  openInEditor: boolean;
-  /** Expose the hover-pill CSS class/ID inspector (/inspect*). */
-  cssInspector: boolean;
-  /** Expose the entry-editor endpoints (/entry*). */
-  entryEditorEnabled: boolean;
+  /**
+   * The live option resolver. **A thunk, not the values** — options come from
+   * `astro.config.mjs`, the settings file the Settings panel writes, and the
+   * defaults, in that order, and the panel can change the middle layer at any
+   * time. Resolving per request is what lets a saved option take effect without
+   * a dev-server restart; it is the same shape, for the same reason, as
+   * `unsplash.resolve`.
+   *
+   * The consequence for this table: a feature gate can no longer decide whether
+   * a route group is *registered*, so every group is registered unconditionally
+   * and each handler checks its own gate. That was already the pattern the
+   * Unsplash group used, so clients get an explicit `disabled` code rather than
+   * a 404 they would have to guess the meaning of.
+   */
+  optionsResolver: OptionsResolver;
   /** Collection/schema lookup for the entry editor; null → inference only. */
   schemaProvider: EntrySchemaProvider | null;
-  /** Unsplash photo source; null → the feature is off and /unsplash* answers
-   *  `disabled`. Its access key resolves lazily, per request. */
+  /** Unsplash photo source. Its access key and its per-page/appName settings
+   *  both resolve lazily, per request; null → no key resolver is available at
+   *  all (the feature can still be switched on from the panel). */
   unsplash: UnsplashConfig | null;
 }
 
@@ -125,50 +125,50 @@ function isLocalRequest(req: Connect.IncomingMessage): boolean {
 }
 
 export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFunction {
-  const {
-    logger,
-    root,
-    assetDirs,
-    uploadDir,
-    imageUploadDir,
-    contentRoots,
-    editableExtensions,
-    openInEditor,
-    cssInspector,
-    entryEditorEnabled,
-    schemaProvider,
-    unsplash,
-  } = deps;
+  const { logger, root, optionsResolver, schemaProvider, unsplash } = deps;
 
-  // The only directories an asset write may be steered into. Without this, a
-  // client-supplied targetDir would be a "write a file anywhere in the project"
-  // capability rather than "put this image beside its siblings". (spec §8)
-  const assetTargetDirs = {
-    uploadDir,
-    imageUploadDir,
-    allowedDirs: [...assetDirs, uploadDir, imageUploadDir],
-  };
+  /** The effective options for the request in hand. Every handler starts here
+   *  rather than closing over values captured at setup time. */
+  const opts = (): Promise<ResolvedOptions> =>
+    optionsResolver.resolve().then((r) => r.options);
+
+  /** The only directories an asset write may be steered into. Without this, a
+   *  client-supplied targetDir would be a "write a file anywhere in the project"
+   *  capability rather than "put this image beside its siblings". (spec §8)
+   *
+   *  Derived per request now, so widening `assetDirs` from the panel takes
+   *  effect immediately — and, more importantly, so *narrowing* it does. */
+  const assetTargetDirs = (o: ResolvedOptions) => ({
+    uploadDir: o.uploadDir,
+    imageUploadDir: o.imageUploadDir,
+    allowedDirs: [...o.assetDirs, o.uploadDir, o.imageUploadDir],
+  });
 
   const coreRoutes: Route[] = [
     {
       method: 'GET',
       path: '/health',
       label: 'health',
-      handler: async () => ({
-        status: 200,
-        body: {
-          ok: true,
-          name: 'astro-text-edit',
-          milestone: 1,
-          cssInspector,
-          root,
-          // Enabled *and* holding a usable key — the overlay uses this to
-          // decide whether to render the Unsplash tab at all, and a tab that
-          // errors on click is worse than no tab. Resolved here rather than
-          // cached so a key entered through Settings shows up on the next poll.
-          unsplash: await hasUnsplashKey(unsplash),
-        },
-      }),
+      handler: async () => {
+        const o = await opts();
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            name: 'astro-text-edit',
+            milestone: 1,
+            cssInspector: o.cssInspector,
+            openInEditor: o.openInEditor,
+            entryEditor: o.entryEditor !== false,
+            root,
+            // Enabled *and* holding a usable key — the overlay uses this to
+            // decide whether to render the Unsplash tab at all, and a tab that
+            // errors on click is worse than no tab. Resolved here rather than
+            // cached so a key entered through Settings shows up on the next poll.
+            unsplash: o.unsplash !== false && (await hasUnsplashKey(unsplash)),
+          },
+        };
+      },
     },
 
     // Read-only listing for the image-swap panel. No writes anywhere. (spec §6.3)
@@ -178,7 +178,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       label: 'asset listing',
       handler: async () => ({
         status: 200,
-        body: { files: await listAssets(root, assetDirs) },
+        body: { files: await listAssets(root, (await opts()).assetDirs) },
       }),
       onError: () => ({ status: 500, body: { error: 'could not list assets' } }),
     },
@@ -205,7 +205,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
         }
         // Relative fields fall back to the src-side dir; a requested target is
         // honoured only if it sits inside a configured asset directory.
-        const { dir, redirected } = resolveAssetTarget(root, assetTargetDirs, req);
+        const { dir, redirected } = resolveAssetTarget(root, assetTargetDirs(await opts()), req);
         if (redirected) {
           logger.warn(
             `upload targetDir "${req.targetDir}" is not inside a configured asset ` +
@@ -227,7 +227,8 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       label: 'open-in-editor',
       fallback: 'open failed',
       handler: async (body) => {
-        if (!openInEditor) {
+        const o = await opts();
+        if (!o.openInEditor) {
           return { status: 403, body: { error: 'open-in-editor is disabled by configuration' } };
         }
         const { file, loc } = body as OpenRequest;
@@ -236,7 +237,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
         // allowed extension. /open only spawns an editor, but it takes the
         // same client-supplied paths, and every legitimate caller targets a
         // file that already passed this gate. (spec §8)
-        const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
+        const abs = await validateEditablePath(root, o.contentRoots, o.editableExtensions, file);
         const [line, col] = (loc ?? '').split(':');
         const spec = line ? `${abs}:${line}${col ? ':' + col : ''}` : abs;
         await launchInEditor(spec);
@@ -254,12 +255,13 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       maxBytes: 64 * 1024,
       label: 'peek',
       handler: async (body) => {
+        const o = await opts();
         const { file, loc } = body as PeekRequest;
         if (!file) throw new Error('file is required');
         // Clicking the hover pill's file:loc label on an <Image> lands here
         // with a package-owned path. Same call as /classify: explain rather
         // than 400, and return no source — the point is that it isn't ours.
-        const check = await checkEditablePath(root, contentRoots, editableExtensions, file);
+        const check = await checkEditablePath(root, o.contentRoots, o.editableExtensions, file);
         if (!check.ok) {
           if (check.code !== 'outside-roots') throw new Error(check.reason);
           return {
@@ -308,13 +310,14 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       maxBytes: 64 * 1024,
       label: 'classify',
       handler: async (body) => {
+        const o = await opts();
         const { file, loc, tag } = body as ClassifyRequest;
         if (!file || !loc || !tag) throw new Error('file, loc and tag are required');
         // Advisory and read-only — the hover tooltip calls this too, so a file
         // that simply isn't ours to edit must answer with a verdict, not a
         // thrown 400. Genuine anomalies (missing, escaping the root, wrong
         // extension) still throw.
-        const check = await checkEditablePath(root, contentRoots, editableExtensions, file);
+        const check = await checkEditablePath(root, o.contentRoots, o.editableExtensions, file);
         if (!check.ok) {
           if (check.code !== 'outside-roots') throw new Error(check.reason);
           return {
@@ -360,7 +363,8 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
             throw new Error('original and newText must be strings');
           }
         }
-        const abs = await validateEditablePath(root, contentRoots, editableExtensions, file);
+        const o = await opts();
+        const abs = await validateEditablePath(root, o.contentRoots, o.editableExtensions, file);
         const patcher = patcherFor(extname(abs).toLowerCase());
         if (!patcher) {
           return { status: 422, body: { error: NO_PATCHER_REASON, code: 'unsupported' } };
@@ -392,27 +396,21 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     },
   ];
 
+  // Every group is registered unconditionally and gates inside its handlers —
+  // see `MiddlewareDeps.optionsResolver`. A client that asks about a disabled
+  // feature gets an explicit `disabled` refusal rather than a 404 it would have
+  // to guess the meaning of.
   const routes: Route[] = [
     ...coreRoutes,
-    ...createInspectRoutes({
+    ...createInspectRoutes({ logger, root, optionsResolver }),
+    ...createEntryRoutes({ logger, root, optionsResolver, schemaProvider }),
+    ...createSettingsRoutes({ logger, root, optionsResolver, unsplash }),
+    ...createUnsplashRoutes({
       logger,
       root,
-      contentRoots,
-      editableExtensions,
-      openInEditor,
-      enabled: cssInspector,
+      dirs: async () => assetTargetDirs(await opts()),
+      unsplash,
     }),
-    ...createEntryRoutes({
-      logger,
-      root,
-      contentRoots,
-      editableExtensions,
-      enabled: entryEditorEnabled,
-      schemaProvider,
-    }),
-    // Registered even when disabled, so a client that asks gets an explicit
-    // `disabled` code rather than a 404 it would have to guess the meaning of.
-    ...createUnsplashRoutes({ logger, root, dirs: assetTargetDirs, unsplash }),
   ];
 
   return (req, res, next) => {

@@ -35,6 +35,7 @@ export type IconName =
   | 'code'
   | 'external'
   | 'settings'
+  | 'lock'
   | 'image'
   | 'search'
   | 'upload';
@@ -70,6 +71,9 @@ const PATHS: Record<IconName, string> = {
   // it matches the 24-box, 1.6-stroke geometry of everything above.
   settings:
     '<path d="M12 2.6l1.5 2.2 2.6-.6.6 2.6 2.2 1.5-1.2 2.4 1.2 2.4-2.2 1.5-.6 2.6-2.6-.6L12 21.4l-1.5-2.2-2.6.6-.6-2.6-2.2-1.5 1.2-2.4-1.2-2.4 2.2-1.5.6-2.6 2.6.6z"/><circle cx="12" cy="12" r="3.2"/>',
+  // A closed padlock — marks a setting the project's own config owns.
+  lock:
+    '<rect x="4.5" y="10.5" width="15" height="10.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
   // Picture frame with a sun and a hill — the media/asset glyph.
   image:
     '<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.5" cy="10" r="1.8"/><path d="m3.5 17.5 5-5 4.5 4.5 3-2.5 4.5 4"/>',

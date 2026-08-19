@@ -9,7 +9,11 @@
  * (which need !important against the inline baseline), never as styling.
  */
 
-export const Z = 2147483000; // above Astro's dev toolbar, below nothing that matters
+// Base layer for every overlay surface; individual layers sit at Z+1..Z+10
+// (the deepest is the Unsplash settings panel). Deliberately *below* Astro's
+// dev toolbar, which pins itself at 2000000010 — the toolbar is the source of
+// the source annotations this whole feature reads, so it stays reachable.
+export const Z = 1999999000;
 
 export const COLOR = {
   /** Brand / editable-text accent. */
@@ -262,15 +266,24 @@ export function buildPanel(
   return panel;
 }
 
-/** A right-side drawer shell (entry editor): title bar with an action slot,
- *  scrollable body, sticky footer. Same [data-body]/[data-foot] contract as
- *  buildPanel, so wirePanelButtons works unchanged. */
-export function buildDrawer(title: string): HTMLElement {
+/** A right-side drawer shell (entry editor, settings): title bar with an action
+ *  slot, scrollable body, sticky footer. Same [data-body]/[data-foot] contract
+ *  as buildPanel, so wirePanelButtons works unchanged. */
+export interface DrawerOptions {
+  /** CSS width; defaults to `min(max(440px, 50vw), 94vw)`. */
+  width?: string;
+  /** Offset added to the base `Z`. Defaults to 6, the standard panel layer.
+   *  The settings drawer can open *above* the media modal (which sits at 8),
+   *  so it needs to ask for a higher one. */
+  layer?: number;
+}
+export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElement {
   const drawer = styled('div', 'atx-drawer', {
-    position: 'fixed', zIndex: String(Z + 6), right: '0', top: '0',
+    position: 'fixed', zIndex: String(Z + (opts.layer ?? 6)), right: '0', top: '0',
     // Half the screen, but never narrower than the classic 440px drawer and
     // never wider than the viewport allows on small screens.
-    height: '100vh', width: 'min(max(440px, 50vw), 94vw)', display: 'flex', flexDirection: 'column',
+    height: '100vh', width: opts.width ?? 'min(max(440px, 50vw), 94vw)',
+    display: 'flex', flexDirection: 'column',
     background: COLOR.panelBg, color: '#eee',
     boxShadow: '-8px 0 40px rgba(0,0,0,0.45)', borderLeft: `1px solid ${COLOR.panelBorder}`,
     font: '13px system-ui', boxSizing: 'border-box',
@@ -308,6 +321,125 @@ export function buildDrawer(title: string): HTMLElement {
 
   drawer.append(bar, body, foot);
   return drawer;
+}
+
+/**
+ * A tab strip and the single host its active pane is mounted into.
+ *
+ * Lifted out of the media modal, which grew the first one for its
+ * Project/Unsplash sources, when the Settings drawer needed a second. The
+ * behaviours worth keeping are both non-obvious:
+ *
+ * - **The strip is not rendered when there is only one tab.** A lone tab is not
+ *   a choice, and drawing it implies there are others.
+ * - **`onActivate` fires once per tab, the first time it is shown.** Panes whose
+ *   setup costs something (a network search) should not pay it until the user
+ *   asks for them, and should not pay it twice.
+ *
+ * Selected state is inline rather than a class, the house rule here — there is
+ * no stylesheet to hang a `.is-active` off.
+ */
+export interface TabSpec {
+  /** Stable id; also the `atx-<prefix>-tab-<id>` class suffix. */
+  id: string;
+  label: string;
+  /** Shown in {@link TabStrip.host} while this tab is active. */
+  pane: HTMLElement;
+}
+
+export interface TabStrip {
+  /** The row of tab buttons. Empty when there is only one tab. */
+  strip: HTMLElement;
+  /** Where the active pane lives. Mount it wherever the content belongs. */
+  host: HTMLElement;
+  /** Switch tabs. A no-op for an unknown id or the current one. */
+  show(id: string): void;
+  activeId(): string;
+  /** Retitle a tab in place — for a label that carries a live count. No-op
+   *  when the strip is unrendered (a single tab). */
+  setLabel(id: string, text: string): void;
+}
+
+export interface TabsOptions {
+  /** `atx-<prefix>-tabs` / `atx-<prefix>-tab` class stem. Defaults to `tabs`. */
+  classPrefix?: string;
+  /** Once per tab, the first time it becomes active. */
+  onActivate?(id: string): void;
+  /** Every time the active tab changes, after the swap. */
+  onChange?(id: string): void;
+}
+
+export function buildTabs(tabs: readonly TabSpec[], opts: TabsOptions = {}): TabStrip {
+  const prefix = opts.classPrefix ?? 'tabs';
+  const strip = styled('div', `atx-${prefix}-tabs`, {
+    display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto',
+  });
+  strip.role = 'tablist';
+  const host = styled('div', `atx-${prefix}-host`, {
+    flex: '1 1 auto', minWidth: '0', minHeight: '0',
+  });
+
+  const buttons = new Map<string, HTMLButtonElement>();
+  const activated = new Set<string>();
+  let active = tabs[0];
+
+  const paint = (): void => {
+    for (const [id, btn] of buttons) {
+      const on = id === active?.id;
+      btn.style.background = on ? COLOR.accent : 'transparent';
+      btn.style.color = on ? '#fff' : '#bbb';
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+  };
+
+  const show = (id: string): void => {
+    const next = tabs.find((t) => t.id === id);
+    if (!next || next === active) return;
+    active = next;
+    host.textContent = '';
+    host.append(next.pane);
+    paint();
+    if (!activated.has(id)) {
+      activated.add(id);
+      opts.onActivate?.(id);
+    }
+    opts.onChange?.(id);
+  };
+
+  // Only render the strip when there is a choice to make.
+  if (tabs.length > 1) {
+    for (const { id, label } of tabs) {
+      const btn = styled('button', `atx-${prefix}-tab atx-${prefix}-tab-${id}`, {
+        padding: '6px 14px', borderRadius: '6px', border: '1px solid transparent',
+        cursor: 'pointer', font: '600 12px system-ui',
+      });
+      btn.type = 'button';
+      btn.role = 'tab';
+      btn.textContent = label;
+      btn.addEventListener('click', () => show(id));
+      buttons.set(id, btn);
+      strip.append(btn);
+    }
+    paint();
+  }
+
+  if (active) {
+    host.append(active.pane);
+    // The first tab is active from the start, so it counts as activated without
+    // firing the callback — its caller has already built it.
+    activated.add(active.id);
+  }
+
+  return {
+    strip,
+    host,
+    show,
+    activeId: () => active?.id ?? '',
+    setLabel: (id, text) => {
+      const btn = buttons.get(id);
+      if (btn) btn.textContent = text;
+    },
+  };
 }
 
 /**

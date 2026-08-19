@@ -1,14 +1,21 @@
 import type { FieldDescriptor, FieldType } from '../../shared/protocol.ts';
-import { FONT, INPUT_STYLE, styled } from '../ui.ts';
+import { COLOR, FONT, INPUT_STYLE, styled } from '../ui.ts';
 import { buildImageField } from './asset-picker.ts';
 
 /**
- * Field controls for the entry drawer: one builder per FieldType, looked up
- * through a registry (mirroring src/patcher/registry.ts). Adding a widget =
- * add the FieldType to protocol.ts, register a builder here, and (if it should
- * be schema-derived rather than config-forced) map it in
+ * Field controls for the entry drawer *and* the Settings drawer: one builder per
+ * FieldType, looked up through a registry (mirroring src/patcher/registry.ts).
+ * Adding a widget = add the FieldType to protocol.ts, register a builder here,
+ * and (if it should be schema-derived rather than config-forced) map it in
  * server/schema-introspect.ts. Unknown types degrade to the read-only `json`
  * builder, so a stale client never crashes on a new wire value.
+ *
+ * The Settings drawer describes each integration option as a synthesized
+ * {@link FieldDescriptor} and comes through here too, rather than growing a
+ * parallel control system. That is what `readOnly` and `help` on the descriptor
+ * are for: an option `astro.config.mjs` owns must render disabled (accepting
+ * input for a value resolution would discard is a lie), and an option needs a
+ * line of prose next to it far more often than a frontmatter key does.
  */
 
 export interface FieldControl {
@@ -19,6 +26,16 @@ export interface FieldControl {
   /** Whether the user changed it from its initial state. */
   dirty(): boolean;
   setError(message: string | null): void;
+}
+
+/** Grey out and block input on every control a builder mounted. Applied after
+ *  the builder runs, so no builder has to know about `readOnly` — including the
+ *  image picker, whose button is not an input at all. */
+function lockControls(root: HTMLElement): void {
+  for (const el of root.querySelectorAll('input, textarea, select, button')) {
+    (el as HTMLInputElement | HTMLButtonElement).disabled = true;
+  }
+  root.style.opacity = '0.55';
 }
 
 /** What a builder must supply; buildControl adds the label/error chrome. */
@@ -92,9 +109,13 @@ const checkbox: ControlBuilder = ({ field, raw, root }) => {
   const input = styled('input', 'atx-field-input', { cursor: 'pointer' });
   input.type = 'checkbox';
   input.checked = raw === true;
+  // A bare checkbox reads as unfinished UI, so the box is always accompanied by
+  // words: "not set" while the key is absent from the file (the state the entry
+  // drawer has to distinguish), and the plain on/off state once it is not.
   const hint = styled('span', 'atx-field-check-hint', { opacity: '0.7' });
-  hint.textContent = field.present ? '' : 'not set';
-  input.addEventListener('change', () => (hint.textContent = ''));
+  const stateWord = (): string => (input.checked ? 'On' : 'Off');
+  hint.textContent = field.present ? stateWord() : 'not set';
+  input.addEventListener('change', () => (hint.textContent = stateWord()));
   wrap.append(input, hint);
   root.append(wrap);
   return {
@@ -203,10 +224,25 @@ export function buildControl(
       : '';
 
   const builder = CONTROL_BUILDERS[field.type] ?? json;
-  const { value, dirty } = builder({ field, raw, initial, placeholder, root, entryFile });
+  const parts = builder({ field, raw, initial, placeholder, root, entryFile });
+
+  if (field.help) {
+    const help = styled('div', 'atx-field-help', {
+      marginTop: '4px', font: '11px/1.45 system-ui', color: COLOR.muted,
+    });
+    help.textContent = field.help;
+    root.append(help);
+  }
 
   root.append(error);
-  return { field, root, value, dirty, setError };
+
+  if (field.readOnly) {
+    lockControls(root);
+    // Reported clean regardless of what the control holds: a locked field can
+    // never contribute to a save, so `collectChanges` must not see it.
+    return { field, root, value: parts.value, dirty: () => false, setError };
+  }
+  return { field, root, value: parts.value, dirty: parts.dirty, setError };
 }
 
 /** The frontmatter payload for changed fields only. Clearing an optional

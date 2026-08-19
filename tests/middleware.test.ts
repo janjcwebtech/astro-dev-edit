@@ -7,7 +7,7 @@ import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
 import type { AssetInfo } from '../src/shared/protocol.ts';
 import { createMiddleware } from '../src/server/middleware.ts';
-import { locOf } from './helpers.ts';
+import { locOf, stubOptions } from './helpers.ts';
 
 /**
  * Characterization tests for the /__text-edit middleware: every endpoint's
@@ -72,19 +72,15 @@ beforeAll(async () => {
   const deps = {
     logger,
     root,
-    assetDirs: ['src/assets', 'public'],
-    uploadDir: 'public',
-    imageUploadDir: 'src/assets',
-    contentRoots: ['src', 'public'],
-    editableExtensions: ['.astro', '.md', '.mdx'],
-    openInEditor: false,
-    cssInspector: true,
-    entryEditorEnabled: true,
+    optionsResolver: stubOptions(root, { openInEditor: false }),
     schemaProvider: null,
     unsplash: null,
   };
   handler = createMiddleware(deps);
-  openHandler = createMiddleware({ ...deps, openInEditor: true });
+  openHandler = createMiddleware({
+    ...deps,
+    optionsResolver: stubOptions(root, { openInEditor: true }),
+  });
 });
 
 afterAll(async () => {

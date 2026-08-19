@@ -47,6 +47,12 @@ export interface HealthResponse {
   /** Whether the hover-pill CSS class/ID inspector is enabled. The overlay
    *  reads this at boot and skips rendering the chips row when false. */
   cssInspector: boolean;
+  /** Whether the "Open source" buttons and jump-to-file links should render.
+   *  Absent from a server that predates the option editor. */
+  openInEditor?: boolean;
+  /** Whether the CMS entry drawer is enabled. Absent from a server that
+   *  predates the option editor. */
+  entryEditor?: boolean;
   /** Absolute project root. Astro's source annotations are absolute fsPaths,
    *  which the overlay only ever showed a basename of; the copied element
    *  context needs them repo-relative to be worth pasting anywhere, and this
@@ -245,6 +251,11 @@ export interface FieldDescriptor {
   /** Whether the key exists in the file's frontmatter. */
   present: boolean;
   source: 'schema' | 'inferred';
+  /** Render the control disabled. Used by the Settings panel for an option
+   *  `astro.config.mjs` owns, where accepting input would be a lie. */
+  readOnly?: boolean;
+  /** One-line prose shown under the control. */
+  help?: string;
 }
 
 // --- POST /entry -------------------------------------------------------------
@@ -415,11 +426,50 @@ export interface UnsplashErrorResponse {
  *  silently accepting a value that does nothing is worse than saying so. */
 export type SettingsSource = 'config' | 'env' | 'file';
 
+/** Which Settings tab an option is grouped under. */
+export type OptionGroup = 'general' | 'editing' | 'media' | 'unsplash';
+
 /**
- * The key itself is **never** in this shape. Only whether one resolved, where
- * from, and a masked fragment for recognition.
+ * One integration option, described well enough for the panel to render a
+ * control for it without knowing the option exists.
+ *
+ * That genericity is the point: options are declared once in the server's
+ * `OPTION_SPECS` table, and adding one needs no client change. `type` reuses
+ * {@link FieldType} so the panel can build the control through the entry
+ * editor's own `buildControl` registry rather than a parallel one.
+ */
+export interface OptionDescriptor {
+  /** Flat wire key — what a {@link SettingsUpdateRequest} patch is keyed by. */
+  key: string;
+  label: string;
+  /** One-line prose shown under the control. */
+  help: string;
+  type: FieldType;
+  group: OptionGroup;
+  /** Enum values, for `type: 'select'`. */
+  choices?: string[];
+  /** The effective value, after precedence. */
+  value: unknown;
+  /** Which layer supplied it. */
+  source: 'default' | 'file' | 'config';
+  /**
+   * `astro.config.mjs` sets it, so storing a value here would do nothing — the
+   * panel renders the control read-only and says why. Also true for options
+   * consumed before the dev server exists, which can only come from the config.
+   */
+  locked: boolean;
+  /** Changing it needs a dev-server restart. */
+  restartRequired?: boolean;
+}
+
+/**
+ * The access key itself is **never** in this shape. Only whether one resolved,
+ * where from, and a masked fragment.
  */
 export interface SettingsResponse {
+  /** Every option, in the order the panel should render them. Absent from a
+   *  server that predates the option editor, so the panel must tolerate it. */
+  options?: OptionDescriptor[];
   unsplash: {
     /** Whether the option is enabled at all, independent of a key. */
     enabled: boolean;
@@ -433,9 +483,28 @@ export interface SettingsResponse {
     gitignoreWarning?: boolean;
   };
 }
+
 export interface SettingsUpdateRequest {
   unsplash?: {
     /** The access key to store. An empty string clears it. */
     accessKey: string;
   };
+  /**
+   * Sparse option patch — **only** the keys the panel changed, keyed by
+   * {@link OptionDescriptor.key}, mirroring `EntryApplyRequest.changes`. Values
+   * are `unknown` because the option set is server-declared; the server checks
+   * each one against its spec's type and refuses unknown, config-only and
+   * locked keys by name.
+   */
+  options?: Record<string, unknown>;
+}
+
+/** 422 from `POST /settings`: which keys were refused and why. Nothing is
+ *  written when this comes back — the patch is all-or-nothing, so a rejected
+ *  key cannot leave the file half-updated. */
+export interface SettingsErrorResponse {
+  error: string;
+  code?: 'validation' | 'conflict' | 'disabled';
+  /** Option key → message. */
+  fieldErrors?: Record<string, string>;
 }

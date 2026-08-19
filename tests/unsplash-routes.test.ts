@@ -7,6 +7,8 @@ import { Readable } from 'node:stream';
 import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
 import { createMiddleware } from '../src/server/middleware.ts';
+import type { TextEditOptions } from '../src/server/options.ts';
+import { stubOptions } from './helpers.ts';
 import { resolveUnsplashKey, SETTINGS_FILE } from '../src/server/settings.ts';
 import type { UnsplashConfig } from '../src/server/unsplash-routes.ts';
 
@@ -135,18 +137,21 @@ let stub: Stub;
 let handler: Connect.NextHandleFunction;
 
 /** Build a middleware over the temp project with the given Unsplash config. */
-function mount(unsplash: UnsplashConfig | null): Connect.NextHandleFunction {
+function mount(
+  unsplash: UnsplashConfig | null,
+  options: TextEditOptions = {},
+): Connect.NextHandleFunction {
   return createMiddleware({
     logger,
     root,
-    assetDirs: ['src/assets', 'public'],
-    uploadDir: 'public',
-    imageUploadDir: 'src/assets',
-    contentRoots: ['src', 'public'],
-    editableExtensions: ['.astro', '.md', '.mdx'],
-    openInEditor: false,
-    cssInspector: true,
-    entryEditorEnabled: false,
+    optionsResolver: stubOptions(root, {
+      openInEditor: false,
+      entryEditor: false,
+      // Passing a config turns the option on, mirroring production: the config
+      // object supplies the key resolver, the option decides on/off.
+      unsplash: unsplash ? {} : false,
+      ...options,
+    }),
     schemaProvider: null,
     unsplash,
   });
@@ -155,8 +160,9 @@ function mount(unsplash: UnsplashConfig | null): Connect.NextHandleFunction {
 function config(over: Partial<UnsplashConfig> = {}): UnsplashConfig {
   return {
     resolve: async () => ({ key: 'test-key', source: 'file' }),
-    appName: 'my app',
-    perPage: 20,
+    enabled: async () => true,
+    appName: async () => 'my app',
+    perPage: async () => 20,
     fetchImpl: stub.fetch,
     ...over,
   };

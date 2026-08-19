@@ -6,6 +6,7 @@ dist/
 .playwright-mcp/
 CLAUDE.md
 notes/
+docs/ASTRO-COMPAT.md
 
 # Secrets — never commit. .astro-text-edit.json is written by the Settings panel;
 # .*.text-edit-tmp-* is atomicWrite's mid-write sibling.

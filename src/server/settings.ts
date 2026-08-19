@@ -1,11 +1,20 @@
 import { chmod, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SettingsSource } from '../shared/protocol.ts';
+import type { StoredOptions } from './options.ts';
 import { atomicWrite } from './paths.ts';
 
 /**
- * User settings that live outside the Astro config — currently just the
- * Unsplash access key, entered through the overlay's Settings panel.
+ * User settings that live outside the Astro config: the Unsplash access key and
+ * the option document the overlay's Settings panel writes.
+ *
+ * Two deliberately separate compartments in one file. `unsplash.accessKey` is a
+ * **secret** — never returned to the browser, masked on read, chmod'ed 0600.
+ * `options` is an ordinary `Partial<TextEditOptions>`, the same vocabulary
+ * `astro.config.mjs` uses, so the file reads like the config it supplements and
+ * `options.ts` can apply one `read` per option to either source. The key is
+ * stripped from `options.unsplash` on every write, so the secret has exactly one
+ * home.
  *
  * **A new class of write.** This is neither a source patch nor an asset upload,
  * so it cannot go through `paths.ts::validateEditablePath`, which would block it
@@ -28,7 +37,10 @@ import { atomicWrite } from './paths.ts';
 export const SETTINGS_FILE = '.astro-text-edit.json';
 
 interface StoredSettings {
+  /** The secret compartment. Read only by `resolveUnsplashKey`. */
   unsplash?: { accessKey?: string };
+  /** What the Settings panel writes — see `options.ts::StoredOptions`. */
+  options?: StoredOptions;
 }
 
 /** Read the settings file. Every failure — absent, unreadable, malformed JSON,
@@ -131,6 +143,25 @@ export async function saveUnsplashKey(root: string, accessKey: string): Promise<
     next.unsplash = rest;
   }
   await writeSettingsFile(root, next);
+}
+
+/**
+ * The stored option document, or `{}` when nothing is stored. Degrades on every
+ * failure path exactly as {@link readSettingsFile} does, so a corrupt file makes
+ * the panel's changes vanish rather than breaking every endpoint that resolves
+ * options.
+ */
+export async function readStoredOptions(root: string): Promise<StoredOptions> {
+  const stored = (await readSettingsFile(root)).options;
+  return stored && typeof stored === 'object' ? stored : {};
+}
+
+/** Replace the stored option document, leaving the secret compartment alone.
+ *  The caller has already merged the panel's sparse patch into `next` — see
+ *  `options.ts::applyOptionPatch`. */
+export async function saveStoredOptions(root: string, next: StoredOptions): Promise<void> {
+  const current = await readSettingsFile(root);
+  await writeSettingsFile(root, { ...current, options: next });
 }
 
 /** A fragment of the key, for recognition only — never enough to use. Eight

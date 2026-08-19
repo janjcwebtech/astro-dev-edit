@@ -8,7 +8,7 @@ import type { Plugin as VitePlugin } from 'vite';
  * Astro 5/6 (WASM Go compiler) annotate every element in dev when the toolbar
  * is on; the whole feature rides on those attributes. Astro 7's Rust compiler
  * (@astrojs/compiler-rs) accepts the `annotateSourceFile` flag but emits
- * nothing (withastro/compiler-rs#96, docs/ASTRO-COMPAT.md). So on 7 we run a
+ * nothing (withastro/compiler-rs#96). So on 7 we run a
  * Vite `enforce: 'pre'` transform that annotates the raw `.astro` source
  * BEFORE Astro's compiler sees it.
  *

@@ -69,20 +69,26 @@ const CONFIG_CANDIDATES = [
 export function createSchemaProvider(
   server: ViteDevServer,
   root: string,
-  options: EntryEditorOptions,
+  /**
+   * The entry-editor options, **as a thunk**. Collection dirs and per-field
+   * widget overrides can now come from the Settings panel as well as from
+   * `astro.config.mjs`, so reading them once at construction would freeze the
+   * panel's changes out until the next dev-server restart.
+   */
+  readOptions: () => Promise<EntryEditorOptions>,
 ): EntrySchemaProvider {
-  const explicit = options.collections ?? {};
-
-  function collectionDir(name: string): string {
+  function collectionDir(explicit: Explicit, name: string): string {
     return normalizeDir(explicit[name]?.dir ?? `src/content/${name}`);
   }
 
   /** Load `collections` from the project's content config; null on any failure.
    *  ssrLoadModule is cached by Vite and invalidated when the config changes,
    *  so calling per-request stays cheap and always fresh. */
-  async function loadCollections(): Promise<Record<string, { schema?: unknown }> | null> {
+  async function loadCollections(
+    configPath: string | undefined,
+  ): Promise<Record<string, { schema?: unknown }> | null> {
     try {
-      const candidates = options.configPath ? [options.configPath] : CONFIG_CANDIDATES;
+      const candidates = configPath ? [configPath] : CONFIG_CANDIDATES;
       const rel = candidates.find((c) => existsSync(join(root, c)));
       if (!rel) return null;
       const mod = (await server.ssrLoadModule('/' + rel.replace(/\\/g, '/'))) as {
@@ -114,14 +120,16 @@ export function createSchemaProvider(
   }
 
   async function info(name: string): Promise<EntryCollectionInfo | null> {
-    const collections = await loadCollections();
+    const options = await readOptions();
+    const explicit = options.collections ?? {};
+    const collections = await loadCollections(options.configPath);
     const entry = collections?.[name];
     // A collection configured explicitly is usable even without a config module
     // (dir + overrides still apply; fields fall back to inference).
     if (!entry && !explicit[name]) return null;
     return {
       collection: name,
-      dir: collectionDir(name),
+      dir: collectionDir(explicit, name),
       schema: entry ? await resolveSchema(entry.schema) : null,
       extension: explicit[name]?.extension,
       fieldConfig: explicit[name]?.fields ?? {},
@@ -134,16 +142,21 @@ export function createSchemaProvider(
     },
 
     async forFile(relFile) {
+      const options = await readOptions();
+      const explicit = options.collections ?? {};
       const posix = relFile.replace(/\\/g, '/');
       // Explicit dirs win, then the src/content/<name>/ convention.
       for (const name of Object.keys(explicit)) {
-        if (posix.startsWith(collectionDir(name) + '/')) return info(name);
+        if (posix.startsWith(collectionDir(explicit, name) + '/')) return info(name);
       }
       const m = posix.match(/^src\/content\/([^/]+)\//);
       return m ? info(m[1]) : null;
     },
   };
 }
+
+/** The `collections` map from {@link EntryEditorOptions}, non-optional. */
+type Explicit = NonNullable<EntryEditorOptions['collections']>;
 
 function normalizeDir(dir: string): string {
   return dir.replace(/\\/g, '/').replace(/\/+$/, '');

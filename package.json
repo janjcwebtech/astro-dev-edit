@@ -3,6 +3,15 @@
   "version": "0.7.1",
   "description": "In-browser visual content editing for the Astro dev server — click text or images in the rendered page, writes straight to source. Dev-only.",
   "type": "module",
+  "author": "Jan Cerny (https://github.com/janjcwebtech)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/janjcwebtech/astro-text-edit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/janjcwebtech/astro-text-edit/issues"
+  },
+  "homepage": "https://github.com/janjcwebtech/astro-text-edit#readme",
   "exports": {
     ".": "./src/index.ts"
   },

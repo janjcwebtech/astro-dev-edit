@@ -1,3 +1,5 @@
+import { createOptionsResolver, type OptionsResolver, type TextEditOptions } from '../src/server/options.ts';
+
 /**
  * Shared test helpers.
  *
@@ -16,4 +18,21 @@ export function locOf(source: string, needle: string): string {
   const line = before.split('\n').length;
   const col = i - lastNl; // lastNl === -1 → i + 1, both 1-based
   return `${line}:${col}`;
+}
+
+/**
+ * An {@link OptionsResolver} for a test's temp project.
+ *
+ * Deliberately the **real** resolver rather than a hand-written stub: options
+ * now decide write confinement and feature gating, so a suite that asserts a
+ * refusal must exercise the same precedence chain production does. Anything
+ * passed here arrives as config-level, which is also what makes it `locked` —
+ * so a test that wants the *file* layer writes `.astro-text-edit.json` into
+ * `root` and passes nothing here.
+ */
+export function stubOptions(
+  root: string,
+  configOptions: TextEditOptions = {},
+): OptionsResolver {
+  return createOptionsResolver({ root, configOptions });
 }

@@ -17,6 +17,7 @@ import type {
   OpenRequest,
   PeekRequest,
   PeekResponse,
+  SettingsErrorResponse,
   SettingsResponse,
   SettingsUpdateRequest,
   UnsplashErrorCode,
@@ -219,18 +220,41 @@ export async function unsplashImport(
   return unsplashPost<UnsplashImportResponse>('/unsplash/import', req);
 }
 
-/** Read the settings status. Never returns the access key itself — only
- *  whether one resolved, from where, and a masked hint. */
+/** Read every integration option plus the access-key status. Never returns the
+ *  key itself — only whether one resolved, from where, and a masked hint. */
 export async function getSettings(): Promise<SettingsResponse> {
   const res = await fetch(`${API}/settings`);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `settings failed (${res.status})`);
   return (await res.json()) as SettingsResponse;
 }
 
-/** Store (or, with an empty string, clear) the Unsplash access key. Resolves to
- *  the same shape a read would, so the panel needs no follow-up request. */
+/**
+ * Save a sparse option patch and/or the Unsplash access key. Resolves to the
+ * same shape a read would, so the panel needs no follow-up request.
+ *
+ * A 422 carries per-option messages, so the rejection is thrown as a
+ * {@link SettingsRefusal} the drawer can paint onto individual controls rather
+ * than as a single opaque message. Nothing was written when this throws — the
+ * server refuses a patch whole.
+ */
 export async function saveSettings(req: SettingsUpdateRequest): Promise<SettingsResponse> {
   const res = await post('/settings', req);
-  if (!res.ok) throw new Error((await errorMessage(res)) ?? `settings save failed (${res.status})`);
-  return (await res.json()) as SettingsResponse;
+  if (res.ok) return (await res.json()) as SettingsResponse;
+
+  const body = (await res.json().catch(() => null)) as SettingsErrorResponse | null;
+  if (body?.fieldErrors) {
+    throw new SettingsRefusal(body.error || 'some options were refused', body.fieldErrors);
+  }
+  throw new Error(body?.error ?? `settings save failed (${res.status})`);
+}
+
+/** A refusal that names the options at fault. */
+export class SettingsRefusal extends Error {
+  constructor(
+    message: string,
+    readonly fieldErrors: Record<string, string>,
+  ) {
+    super(message);
+    this.name = 'SettingsRefusal';
+  }
 }

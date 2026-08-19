@@ -1,3 +1,4 @@
+import { has } from './features.ts';
 import { type IconName, icon, setIcon } from './icons.ts';
 import * as state from './state.ts';
 import { COLOR, FONT, Z, setChromeInset, styled } from './ui.ts';
@@ -78,8 +79,8 @@ export interface AdminBarDeps {
   openEntry(): void;
   /** Open the file this page is written in, in the user's editor. */
   openPageSource(): void;
-  /** Open the integration settings panel (currently: the Unsplash access key).
-   *  Injected because admin-bar.ts imports nothing from `editors/`. */
+  /** Open the integration settings drawer. Injected because admin-bar.ts
+   *  imports nothing from `editors/`. */
   openSettings(): void;
 }
 
@@ -743,6 +744,8 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     label: 'Open page source',
     icon: 'code',
     title: 'Open the file this page is written in, in your editor',
+    // The whole item is a launch-my-editor action, so it goes when that is off.
+    visible: () => has('openInEditor'),
     onSelect: () => deps.openPageSource(),
   });
 
@@ -751,7 +754,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     place: 'menu',
     label: 'Settings',
     icon: 'settings',
-    title: 'Integration settings — Unsplash access key',
+    title: 'Integration settings — every option, editable here',
     onSelect: () => deps.openSettings(),
   });
 

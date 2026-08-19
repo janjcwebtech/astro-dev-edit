@@ -180,7 +180,9 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
       // Opened above the modal (which is Z+8), and re-runs the search on close
       // so entering a key here lands you straight back in results.
       const open = footButton('Open Settings', 'primary', () =>
-        openSettingsPanel({ layer: 10, onClose: () => controller.retry() }),
+        // Straight to the Unsplash tab: the user clicked a card about a
+        // missing key, so landing them on General would be a detour.
+        openSettingsPanel({ tab: 'unsplash', layer: 10, onClose: () => controller.retry() }),
       );
       open.style.margin = '0 auto';
       box.append(title, detail, open);

@@ -1,128 +1,38 @@
 import type { AstroIntegration } from 'astro';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createAnnotatePlugin } from './server/annotate.ts';
-import { createSchemaProvider, type EntryEditorOptions } from './server/content-config.ts';
+import { createSchemaProvider } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
+import {
+  createOptionsResolver,
+  DEFAULTS,
+  UNSPLASH_MAX_PER_PAGE,
+  type TextEditOptions,
+} from './server/options.ts';
 import { resolveUnsplashKey } from './server/settings.ts';
+import { fileURLToPath } from 'node:url';
 
 /**
  * astro-text-edit — in-browser visual content editing for the local dev server.
  *
  * Click-to-edit for literal text and static img src/alt in .astro templates:
  * the client confirms each target against the server-side AST classification,
- * and commits patch the source file directly (verified, atomic). Markdown/MDX
- * body editing and expression-following are not built yet (spec §16.4/§16.5).
+ * and commits patch the source file directly (verified, atomic).
  *
  * Dev-only. The integration registers nothing for builds, so it can never reach
- * the Netlify production bundle. See spec §8.
+ * a production bundle. See spec §8.
+ *
+ * **The option vocabulary lives in `server/options.ts`,** not here — the
+ * Settings panel resolves options per request against the settings file, so the
+ * table that declares them has to sit where both the resolver and the routes can
+ * read it. This file passes what the project actually wrote to `textEdit()`
+ * through **unmerged**: `key in userOptions` is what tells the panel an option is
+ * config-owned, and collapsing it into `DEFAULTS` here would erase exactly that.
  */
 
-export interface TextEditOptions {
-  /** Kill switch. When false the integration does nothing at all. */
-  enabled?: boolean;
-  /** Directories scanned for replacement images offered in the swap panel. */
-  assetDirs?: string[];
-  /**
-   * Directory new image uploads are written to, relative to the project root.
-   * Must be a web-servable location — files here become a plain `<img src>` in
-   * the source, so anything outside `public/` works in dev but 404s in a
-   * production build. Defaults to `public`.
-   */
-  uploadDir?: string;
-  /**
-   * Fallback directory for uploads that back an `image()` schema field, relative
-   * to the project root. Those assets are *imported* by Astro rather than served
-   * verbatim, so they must live under `src/` — `public/` files can't be
-   * imported. Only used when the field has no existing value to sit beside;
-   * otherwise the upload lands in that value's own directory. Defaults to
-   * `src/assets`.
-   */
-  imageUploadDir?: string;
-  /** Extensions the patcher is allowed to write. */
-  editableExtensions?: string[];
-  /** Directories that writes are confined to. */
-  contentRoots?: string[];
-  /** Expose the click-to-source fallback. */
-  openInEditor?: boolean;
-  /**
-   * The hover-pill CSS inspector: on hover, list an element's classes and ID,
-   * and reveal the CSS rules each one applies (read from the browser, no server
-   * round-trip) with a link to open the defining file at the rule. The
-   * open-at-rule jump additionally requires `openInEditor`. `false` disables the
-   * whole surface (no chips render).
-   */
-  cssInspector?: boolean;
-  /**
-   * Who emits the `data-astro-source-*` attributes the feature rides on.
-   * `'auto'` (default): Astro's own compiler on Astro 5/6; injected by this
-   * integration on Astro ≥7, whose Rust compiler doesn't emit them
-   * (docs/ASTRO-COMPAT.md). `'force'` always injects (also lifts the
-   * dev-toolbar requirement on 5/6); `'off'` never injects.
-   */
-  sourceAnnotations?: 'auto' | 'force' | 'off';
-  /**
-   * The CMS-style entry panel for content-collection pages that emit the
-   * `astro-text-edit:page-source` meta tag. Zero-config for conventional
-   * `src/content/<name>/` layouts; `false` disables the whole surface.
-   */
-  entryEditor?: false | EntryEditorOptions;
-  /**
-   * The Unsplash photo source in the media picker. `unsplash: {}` turns it on
-   * with defaults; omitted (the default) leaves it off entirely, and the media
-   * modal renders as a single-source project-asset grid.
-   *
-   * Every user brings their own access key. The recommended way to give one is
-   * the overlay's own Settings panel (admin bar → ⚙ Settings), which stores it
-   * outside the repo — see `accessKey` for why not here.
-   */
-  unsplash?: false | UnsplashOptions;
-}
-
-/** Options for the Unsplash photo source. See `TextEditOptions.unsplash`. */
-export interface UnsplashOptions {
-  /**
-   * Access key, as an escape hatch for programmatic config. **Not the
-   * recommended path:** `astro.config.mjs` is committed *and* is read by
-   * `astro build`, so a key here travels with the repo. Prefer the Settings
-   * panel, or `UNSPLASH_ACCESS_KEY` in the environment. When set, it wins over
-   * both and the Settings panel says so rather than accepting a value that
-   * would do nothing.
-   */
-  accessKey?: string;
-  /**
-   * Application name sent as `utm_source` on every photographer credit link,
-   * as the Unsplash API guidelines require. Should match the application name
-   * registered at unsplash.com/oauth/applications. Defaults to
-   * `astro-text-edit`.
-   */
-  appName?: string;
-  /** Results per search page. Clamped to Unsplash's own maximum of 30.
-   *  Defaults to 20. */
-  perPage?: number;
-}
-
+export type { TextEditOptions, UnsplashOptions, ResolvedOptions } from './server/options.ts';
 export type { EntryEditorOptions, EntryFieldOverride } from './server/content-config.ts';
-
-const DEFAULTS: Required<TextEditOptions> = {
-  enabled: true,
-  assetDirs: ['src/assets', 'public'],
-  uploadDir: 'public',
-  imageUploadDir: 'src/assets',
-  editableExtensions: ['.astro', '.md', '.mdx'],
-  contentRoots: ['src', 'public'],
-  openInEditor: true,
-  cssInspector: true,
-  sourceAnnotations: 'auto',
-  entryEditor: {},
-  // Off unless asked for: the feature reaches a third-party API and needs a key
-  // the user has to supply, so opting in is deliberate.
-  unsplash: false,
-};
-
-/** Unsplash's own ceiling on `per_page`. */
-const UNSPLASH_MAX_PER_PAGE = 30;
 
 /** The project's installed Astro major, resolved from the project root (the
  *  integration's own tree has no astro). null when resolution fails. */
@@ -138,7 +48,13 @@ function detectAstroMajor(projectRoot: string): number | null {
 }
 
 export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegration {
-  const options = { ...DEFAULTS, ...userOptions };
+  // Config-setup-time options only. Both are consumed before any dev server
+  // exists — `sourceAnnotations` registers a Vite plugin — so neither can come
+  // from the settings file, and both are reported to the panel as read-only.
+  // `enabled` is additionally config-only because storing `false` there would
+  // lock the user out of the UI that set it.
+  const enabled = userOptions.enabled ?? DEFAULTS.enabled;
+  const sourceAnnotations = userOptions.sourceAnnotations ?? DEFAULTS.sourceAnnotations;
 
   // Captured in config:setup, consumed in server:setup. Only set when we're
   // actually running in dev with the integration enabled.
@@ -152,63 +68,35 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
         // Dev server only. Bail for `astro build` / `astro preview` so nothing
         // ships to production. (spec §4.1, §8)
         if (command !== 'dev') return;
-        if (!options.enabled) {
+        if (!enabled) {
           logger.info('disabled via options.enabled — skipping');
           return;
         }
         active = true;
         projectRoot = fileURLToPath(config.root);
 
-        // Uploads become a literal `<img src>` in the source. Anything outside
-        // `public/` is served by Vite in dev but absent from a production
-        // build, so the reference would 404 once deployed. Warn rather than
-        // silently produce dev-only paths. (matches the swap panel, which
-        // never offers `/src/` assets for the same reason)
-        const uploadRel = relative(projectRoot, resolve(projectRoot, options.uploadDir));
-        const uploadServable =
-          uploadRel === 'public' || uploadRel.startsWith('public' + sep);
-        if (!uploadServable) {
-          logger.warn(
-            `uploadDir "${options.uploadDir}" is not under public/ — uploaded ` +
-              'images are served in dev but will 404 in a production build. ' +
-              'Point uploadDir at a folder under public/.',
-          );
-        }
-
-        // The mirror-image rule for image() fields: Astro imports those assets
-        // through Vite, and files in public/ are copied verbatim rather than
-        // importable, so a public/ target would fail the collection's own schema.
-        const imageUploadRel = relative(
-          projectRoot,
-          resolve(projectRoot, options.imageUploadDir),
-        );
-        const imageUploadImportable =
-          imageUploadRel === 'src' || imageUploadRel.startsWith('src' + sep);
-        if (!imageUploadImportable) {
-          logger.warn(
-            `imageUploadDir "${options.imageUploadDir}" is not under src/ — Astro ` +
-              'cannot import assets from there for an image() schema field, so ' +
-              'uploads to it will fail the collection schema. Point ' +
-              'imageUploadDir at a folder under src/.',
-          );
-        }
+        // Upload-directory preflight. Only warns about what the *config* says:
+        // the panel enforces the same two rules on the value it stores, and a
+        // startup warning about a value the user is about to change from the UI
+        // would be noise.
+        warnAboutUploadDirs(projectRoot, userOptions, logger);
 
         // The whole feature rides on `data-astro-source-file` / `-loc`
         // attributes. On Astro 5/6 the compiler emits them (dev toolbar on);
-        // on Astro ≥7 the Rust compiler doesn't (docs/ASTRO-COMPAT.md,
-        // withastro/compiler-rs#96), so we inject them ourselves with a
+        // on Astro ≥7 the Rust compiler doesn't
+        // (withastro/compiler-rs#96), so we inject them ourselves with a
         // pre-compiler Vite transform. Unresolvable version → inject too:
         // double annotation is harmless (identical values, browsers keep the
         // first), while missing annotation kills the feature.
         const astroMajor = detectAstroMajor(projectRoot);
         const selfAnnotate =
-          options.sourceAnnotations === 'force' ||
-          (options.sourceAnnotations === 'auto' && (astroMajor === null || astroMajor >= 7));
+          sourceAnnotations === 'force' ||
+          (sourceAnnotations === 'auto' && (astroMajor === null || astroMajor >= 7));
         if (selfAnnotate) {
           updateConfig({ vite: { plugins: [createAnnotatePlugin()] } });
           logger.info(
             `injecting data-astro-source-* annotations (` +
-              (options.sourceAnnotations === 'force'
+              (sourceAnnotations === 'force'
                 ? 'sourceAnnotations: "force"'
                 : `Astro ${astroMajor ?? 'unknown'} — its compiler does not emit them`) +
               ')',
@@ -231,50 +119,67 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
         // Injected on every page. `overlay.ts` is compiled by Vite because the
         // injected code imports it by absolute path. (spec §4.1)
         const overlayUrl = new URL('./client/overlay.ts', import.meta.url);
-        injectScript(
-          'page',
-          `import ${JSON.stringify(fileURLToPath(overlayUrl))};`,
-        );
+        injectScript('page', `import ${JSON.stringify(fileURLToPath(overlayUrl))};`);
 
         logger.info('edit mode available — toggle it from the admin bar at the top of the page');
       },
 
       'astro:server:setup': ({ server, logger }) => {
         if (!active) return;
-        const entryEditorEnabled = options.entryEditor !== false;
-        const unsplashOptions = options.unsplash === false ? null : options.unsplash;
+
+        // The one seam every route reads options through. Per-request, so an
+        // option changed in the Settings panel applies to the very next call.
+        const optionsResolver = createOptionsResolver({
+          root: projectRoot,
+          configOptions: userOptions,
+        });
+
         // Vite dev middleware exposes the edit API under /__text-edit/. (spec §4.3)
         server.middlewares.use(
           createMiddleware({
             logger,
             root: projectRoot,
-            assetDirs: options.assetDirs,
-            uploadDir: options.uploadDir,
-            imageUploadDir: options.imageUploadDir,
-            contentRoots: options.contentRoots,
-            editableExtensions: options.editableExtensions,
-            openInEditor: options.openInEditor,
-            cssInspector: options.cssInspector,
-            entryEditorEnabled,
-            schemaProvider: entryEditorEnabled
-              ? createSchemaProvider(server, projectRoot, options.entryEditor || {})
-              : null,
-            unsplash: unsplashOptions && {
-              // A thunk, not a value: resolution happens per request, so a key
-              // entered through the Settings panel takes effect without a
-              // dev-server restart and nothing depends on hook ordering.
-              resolve: () => resolveUnsplashKey(projectRoot, unsplashOptions.accessKey),
-              appName: unsplashOptions.appName || 'astro-text-edit',
-              perPage: Math.min(
-                Math.max(1, Math.trunc(unsplashOptions.perPage ?? 20)),
-                UNSPLASH_MAX_PER_PAGE,
-              ),
+            optionsResolver,
+            // Always constructed: the entry editor can now be switched on from
+            // the panel, so a provider built only when it started enabled would
+            // leave the feature schema-less until the next restart. The routes
+            // check the live gate themselves.
+            schemaProvider: createSchemaProvider(server, projectRoot, async () => {
+              const { options } = await optionsResolver.resolve();
+              return options.entryEditor === false ? {} : options.entryEditor;
+            }),
+            unsplash: {
+              // Thunks, not values: both the key and the sub-options resolve
+              // per request, so anything entered through the Settings panel
+              // takes effect without a dev-server restart and nothing depends
+              // on hook ordering.
+              resolve: async () => {
+                const { options } = await optionsResolver.resolve();
+                const configKey =
+                  options.unsplash === false ? undefined : options.unsplash.accessKey;
+                return resolveUnsplashKey(projectRoot, configKey);
+              },
+              appName: async () => {
+                const { options } = await optionsResolver.resolve();
+                const o = options.unsplash;
+                return (o === false ? '' : o.appName) || 'astro-text-edit';
+              },
+              perPage: async () => {
+                const { options } = await optionsResolver.resolve();
+                const o = options.unsplash;
+                const raw = (o === false ? undefined : o.perPage) ?? 20;
+                return Math.min(Math.max(1, Math.trunc(raw)), UNSPLASH_MAX_PER_PAGE);
+              },
+              enabled: async () => {
+                const { options } = await optionsResolver.resolve();
+                return options.unsplash !== false;
+              },
             },
           }),
         );
 
-        if (unsplashOptions) {
-          if (unsplashOptions.accessKey) {
+        if (userOptions.unsplash) {
+          if (userOptions.unsplash.accessKey) {
             logger.warn(
               'unsplash.accessKey is set in your Astro config. That file is ' +
                 'committed and is read by `astro build`, so the key travels ' +
@@ -284,10 +189,54 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
           }
           logger.info(
             'Unsplash photo source enabled' +
-              (unsplashOptions.accessKey ? '' : ' — add an access key from the admin bar’s Settings panel'),
+              (userOptions.unsplash.accessKey
+                ? ''
+                : ' — add an access key from the admin bar’s Settings panel'),
           );
         }
       },
     },
   };
+}
+
+/**
+ * Warn when a *configured* upload directory cannot work, at startup where the
+ * user will see it.
+ *
+ * Uploads become a literal `<img src>` in the source, so anything outside
+ * `public/` is served by Vite in dev but absent from a production build and the
+ * reference 404s once deployed. The mirror-image rule holds for `image()`
+ * fields: Astro imports those assets through Vite, and `public/` files are
+ * copied verbatim rather than importable, so a `public/` target fails the
+ * collection's own schema.
+ */
+function warnAboutUploadDirs(
+  projectRoot: string,
+  userOptions: TextEditOptions,
+  logger: { warn(message: string): void },
+): void {
+  const uploadDir = userOptions.uploadDir;
+  if (uploadDir !== undefined) {
+    const rel = relative(projectRoot, resolve(projectRoot, uploadDir));
+    if (!(rel === 'public' || rel.startsWith('public' + sep))) {
+      logger.warn(
+        `uploadDir "${uploadDir}" is not under public/ — uploaded images are ` +
+          'served in dev but will 404 in a production build. Point uploadDir ' +
+          'at a folder under public/.',
+      );
+    }
+  }
+
+  const imageUploadDir = userOptions.imageUploadDir;
+  if (imageUploadDir !== undefined) {
+    const rel = relative(projectRoot, resolve(projectRoot, imageUploadDir));
+    if (!(rel === 'src' || rel.startsWith('src' + sep))) {
+      logger.warn(
+        `imageUploadDir "${imageUploadDir}" is not under src/ — Astro cannot ` +
+          'import assets from there for an image() schema field, so uploads to ' +
+          'it will fail the collection schema. Point imageUploadDir at a folder ' +
+          'under src/.',
+      );
+    }
+  }
 }

@@ -10,6 +10,8 @@ import type { Connect } from 'vite';
 import { z } from 'zod';
 import type { EntrySchemaProvider } from '../src/server/content-config.ts';
 import { createMiddleware } from '../src/server/middleware.ts';
+import type { TextEditOptions } from '../src/server/options.ts';
+import { stubOptions } from './helpers.ts';
 
 /**
  * Endpoint tests for the entry editor (/entry, /entry/apply, /entry/create,
@@ -89,14 +91,7 @@ beforeAll(async () => {
   handler = createMiddleware({
     logger,
     root,
-    assetDirs: ['public'],
-    uploadDir: 'public',
-    imageUploadDir: 'src/assets',
-    contentRoots: ['src', 'public'],
-    editableExtensions: ['.astro', '.md', '.mdx'],
-    openInEditor: false,
-    cssInspector: true,
-    entryEditorEnabled: true,
+    optionsResolver: stubOptions(root, { assetDirs: ['public'], openInEditor: false }),
     schemaProvider: provider,
     unsplash: null,
   });
@@ -327,17 +322,14 @@ describe('POST /entry/create — extension choice', () => {
     },
   };
 
-  const deps = () => ({
+  const deps = (options: TextEditOptions = {}) => ({
     logger,
     root: extRoot,
-    assetDirs: ['public'],
-    uploadDir: 'public',
-    imageUploadDir: 'src/assets',
-    contentRoots: ['src', 'public'],
-    editableExtensions: ['.astro', '.md', '.mdx'],
-    openInEditor: false,
-    cssInspector: true,
-    entryEditorEnabled: true,
+    optionsResolver: stubOptions(extRoot, {
+      assetDirs: ['public'],
+      openInEditor: false,
+      ...options,
+    }),
     schemaProvider: extProvider,
     unsplash: null,
   });
@@ -386,7 +378,7 @@ describe('POST /entry/create — extension choice', () => {
   });
 
   it('422s when the chosen extension is not editable by configuration', async () => {
-    const noMdx = createMiddleware({ ...deps(), editableExtensions: ['.astro', '.md'] });
+    const noMdx = createMiddleware(deps({ editableExtensions: ['.astro', '.md'] }));
     const r = await create('notes', 'blocked', noMdx);
     expect(r.status).toBe(422);
     expect(r.body.error).toContain('.mdx');
@@ -420,14 +412,7 @@ describe('disabled entry editor', () => {
     const off = createMiddleware({
       logger,
       root,
-      assetDirs: ['public'],
-      uploadDir: 'public',
-      imageUploadDir: 'src/assets',
-      contentRoots: ['src', 'public'],
-      editableExtensions: ['.astro', '.md', '.mdx'],
-      openInEditor: false,
-      cssInspector: true,
-      entryEditorEnabled: false,
+      optionsResolver: stubOptions(root, { entryEditor: false }),
       schemaProvider: null,
       unsplash: null,
     });
