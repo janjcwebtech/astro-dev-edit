@@ -6,7 +6,7 @@ import { Readable } from 'node:stream';
 import type { Connect } from 'vite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createMiddleware } from '../src/server/middleware.ts';
-import type { TextEditOptions } from '../src/server/options.ts';
+import type { DevEditOptions } from '../src/server/options.ts';
 import { createRouteManifest, type ResolvedRouteLike } from '../src/server/route-manifest.ts';
 import { stubOptions } from './helpers.ts';
 
@@ -229,7 +229,7 @@ describe('createRouteManifest().forPathname', () => {
 
 describe('POST /page-source', () => {
   function mount(
-    options: TextEditOptions = {},
+    options: DevEditOptions = {},
     routes: readonly ResolvedRouteLike[] | null = ROUTES,
   ): Connect.NextHandleFunction {
     return createMiddleware({
@@ -248,7 +248,7 @@ describe('POST /page-source', () => {
   ): Promise<{ status: number; body: any }> {
     const req = Readable.from([Buffer.from(JSON.stringify(body))]) as any;
     req.method = 'POST';
-    req.url = '/__text-edit/page-source';
+    req.url = '/__dev-edit/page-source';
     req.headers = {};
     req.socket = { remoteAddress: '127.0.0.1' };
     return new Promise((resolve, reject) => {

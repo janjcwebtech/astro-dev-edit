@@ -16,7 +16,7 @@ export function beginTextEdit(el: HTMLElement, src: SourceLoc): void {
   const original = el.textContent ?? '';
 
   el.setAttribute('contenteditable', 'plaintext-only');
-  el.dataset.astroTextEditActive = '1';
+  el.dataset.astroDevEditActive = '1';
   el.style.outline = `2px solid ${COLOR.accent}`;
   el.style.outlineOffset = '2px';
   el.style.borderRadius = '2px';
@@ -35,7 +35,7 @@ export function beginTextEdit(el: HTMLElement, src: SourceLoc): void {
     el.removeEventListener('blur', onBlur);
     el.removeEventListener('input', onInput);
     el.removeAttribute('contenteditable');
-    delete el.dataset.astroTextEditActive;
+    delete el.dataset.astroDevEditActive;
     el.style.outline = '';
     el.style.outlineOffset = '';
 

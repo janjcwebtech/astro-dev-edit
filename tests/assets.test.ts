@@ -13,7 +13,7 @@ import { listAssets } from '../src/server/assets.ts';
 let root: string;
 
 beforeAll(async () => {
-  root = await mkdtemp(join(tmpdir(), 'text-edit-assets-'));
+  root = await mkdtemp(join(tmpdir(), 'dev-edit-assets-'));
   await mkdir(join(root, 'public/photos'), { recursive: true });
   await mkdir(join(root, 'src/assets'), { recursive: true });
 

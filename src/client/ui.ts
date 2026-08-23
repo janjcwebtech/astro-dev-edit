@@ -84,7 +84,7 @@ export function styled<K extends keyof HTMLElementTagNameMap>(
   id?: string,
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
-  el.dataset.astroTextEditUi = '1';
+  el.dataset.astroDevEditUi = '1';
   if (className) el.className = className;
   if (id) el.id = id;
   Object.assign(el.style, style);

@@ -146,7 +146,7 @@ export async function annotateAstroSource(source: string, file: string): Promise
  */
 export function createAnnotatePlugin(): VitePlugin {
   return {
-    name: 'astro-text-edit:annotate',
+    name: 'astro-dev-edit:annotate',
     enforce: 'pre',
     transform: {
       order: 'pre',

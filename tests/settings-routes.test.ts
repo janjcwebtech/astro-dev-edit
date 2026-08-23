@@ -7,7 +7,7 @@ import { Readable } from 'node:stream';
 import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
 import { createMiddleware } from '../src/server/middleware.ts';
-import type { TextEditOptions } from '../src/server/options.ts';
+import type { DevEditOptions } from '../src/server/options.ts';
 import { SETTINGS_FILE } from '../src/server/settings.ts';
 import type { UnsplashConfig } from '../src/server/unsplash-routes.ts';
 import { stubOptions } from './helpers.ts';
@@ -49,7 +49,7 @@ afterEach(async () => {
 
 /** A middleware whose options resolve for real against `root`, so a write is
  *  visible to the next read without a restart — the property the drawer needs. */
-function mount(configOptions: TextEditOptions = {}): Connect.NextHandleFunction {
+function mount(configOptions: DevEditOptions = {}): Connect.NextHandleFunction {
   const unsplash: UnsplashConfig = {
     resolve: async () => ({ key: '', source: null }),
     enabled: async () => true,
@@ -94,9 +94,9 @@ function request(opts: {
 }
 
 const get = (via: Connect.NextHandleFunction) =>
-  request({ method: 'GET', url: '/__text-edit/settings', via });
+  request({ method: 'GET', url: '/__dev-edit/settings', via });
 const put = (options: Record<string, unknown>, via: Connect.NextHandleFunction) =>
-  request({ url: '/__text-edit/settings', body: { options }, via });
+  request({ url: '/__dev-edit/settings', body: { options }, via });
 
 const opt = (body: any, key: string) =>
   (body.options as any[]).find((o) => o.key === key);
@@ -162,7 +162,7 @@ describe('POST /settings', () => {
     const via = mount();
     await put({ cssInspector: false }, via);
     // /health is what the overlay reads to decide whether to render the chips.
-    const health = await request({ method: 'GET', url: '/__text-edit/health', via });
+    const health = await request({ method: 'GET', url: '/__dev-edit/health', via });
     expect(health.body.cssInspector).toBe(false);
   });
 
@@ -170,7 +170,7 @@ describe('POST /settings', () => {
     const via = mount();
     const inspect = () =>
       request({
-        url: '/__text-edit/inspect/open',
+        url: '/__dev-edit/inspect/open',
         body: { file: 'src/x.css', selector: '.a' },
         via,
       });
@@ -197,7 +197,7 @@ describe('POST /settings', () => {
     if (process.platform !== 'win32') {
       expect((await stat(target)).mode & 0o777).toBe(0o600);
     }
-    expect((await readdir(root)).filter((f) => f.includes('text-edit-tmp'))).toEqual([]);
+    expect((await readdir(root)).filter((f) => f.includes('dev-edit-tmp'))).toEqual([]);
   });
 
   it('refuses a locked option and writes nothing', async () => {
@@ -232,7 +232,7 @@ describe('POST /settings', () => {
   });
 
   it('400s a body with nothing to save', async () => {
-    const r = await request({ url: '/__text-edit/settings', body: {}, via: mount() });
+    const r = await request({ url: '/__dev-edit/settings', body: {}, via: mount() });
     expect(r.status).toBe(400);
   });
 
@@ -242,7 +242,7 @@ describe('POST /settings', () => {
     const via = mount();
     const apply = () =>
       request({
-        url: '/__text-edit/apply',
+        url: '/__dev-edit/apply',
         body: {
           file: 'public/x.astro',
           loc: '1:1',

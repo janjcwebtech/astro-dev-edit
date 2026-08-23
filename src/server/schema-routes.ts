@@ -69,7 +69,7 @@ import { readStoredOptions, saveStoredOptions } from './settings.ts';
  *    project can keep the rest of the tool and forbid schema writes outright.
  *
  * The editor half of a field (widget, label, hidden) is not a schema write at
- * all: it goes to `.astro-text-edit.json` through `saveStoredOptions`. The two
+ * all: it goes to `.astro-dev-edit.json` through `saveStoredOptions`. The two
  * stores are deliberately visible as two in the response, because one is
  * committed source and the other is local.
  */

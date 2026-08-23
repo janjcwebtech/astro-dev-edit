@@ -1,5 +1,5 @@
 import type { EntrySchemaProvider } from '../src/server/content-config.ts';
-import { createOptionsResolver, type OptionsResolver, type TextEditOptions } from '../src/server/options.ts';
+import { createOptionsResolver, type OptionsResolver, type DevEditOptions } from '../src/server/options.ts';
 
 /**
  * Shared test helpers.
@@ -28,12 +28,12 @@ export function locOf(source: string, needle: string): string {
  * now decide write confinement and feature gating, so a suite that asserts a
  * refusal must exercise the same precedence chain production does. Anything
  * passed here arrives as config-level, which is also what makes it `locked` —
- * so a test that wants the *file* layer writes `.astro-text-edit.json` into
+ * so a test that wants the *file* layer writes `.astro-dev-edit.json` into
  * `root` and passes nothing here.
  */
 export function stubOptions(
   root: string,
-  configOptions: TextEditOptions = {},
+  configOptions: DevEditOptions = {},
 ): OptionsResolver {
   return createOptionsResolver({ root, configOptions });
 }

@@ -157,7 +157,7 @@ export async function validateEditablePath(
 
 /** Write atomically: temp file in the same directory, then rename. (spec §10) */
 export async function atomicWrite(target: string, content: string): Promise<void> {
-  const tmp = join(dirname(target), `.${basename(target)}.text-edit-tmp-${process.pid}`);
+  const tmp = join(dirname(target), `.${basename(target)}.dev-edit-tmp-${process.pid}`);
   await writeFile(tmp, content, 'utf8');
   await rename(tmp, target);
 }

@@ -9,7 +9,7 @@ import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
 import { z } from 'zod';
 import { createMiddleware } from '../src/server/middleware.ts';
-import type { TextEditOptions } from '../src/server/options.ts';
+import type { DevEditOptions } from '../src/server/options.ts';
 import { stubOptions, stubSchemaProvider } from './helpers.ts';
 
 /**
@@ -135,7 +135,7 @@ const etagOf = (source: string) => createHash('sha256').update(source, 'utf8').d
 
 describe('POST /entry', () => {
   it('returns schema fields, values, body, and a matching etag', async () => {
-    const r = await request({ url: '/__text-edit/entry', body: { file: entryRel } });
+    const r = await request({ url: '/__dev-edit/entry', body: { file: entryRel } });
     expect(r.status).toBe(200);
     expect(r.body.collection).toBe('blog');
     expect(r.body.etag).toBe(etagOf(ENTRY));
@@ -154,7 +154,7 @@ describe('POST /entry', () => {
   });
 
   it('falls back to inferred fields when no collection matches', async () => {
-    const r = await request({ url: '/__text-edit/entry', body: { file: 'src/content/loose.md' } });
+    const r = await request({ url: '/__dev-edit/entry', body: { file: 'src/content/loose.md' } });
     expect(r.status).toBe(200);
     expect(r.body.collection).toBeNull();
     const byName = (n: string) => r.body.fields.find((f: any) => f.name === n);
@@ -163,9 +163,9 @@ describe('POST /entry', () => {
   });
 
   it('rejects non-markdown and out-of-root paths', async () => {
-    const astro = await request({ url: '/__text-edit/entry', body: { file: 'src/pages/index.astro' } });
+    const astro = await request({ url: '/__dev-edit/entry', body: { file: 'src/pages/index.astro' } });
     expect(astro.status).toBe(400);
-    const escape = await request({ url: '/__text-edit/entry', body: { file: '../outside.md' } });
+    const escape = await request({ url: '/__dev-edit/entry', body: { file: '../outside.md' } });
     expect(escape.status).toBe(400);
   });
 });
@@ -173,7 +173,7 @@ describe('POST /entry', () => {
 describe('POST /entry/apply', () => {
   it('applies frontmatter + body changes atomically, preserving comments', async () => {
     const r = await request({
-      url: '/__text-edit/entry/apply',
+      url: '/__dev-edit/entry/apply',
       body: {
         file: entryRel,
         etag: etagOf(ENTRY),
@@ -190,7 +190,7 @@ describe('POST /entry/apply', () => {
 
   it('409s on a stale etag without touching the file', async () => {
     const r = await request({
-      url: '/__text-edit/entry/apply',
+      url: '/__dev-edit/entry/apply',
       body: { file: entryRel, etag: 'stale', changes: { frontmatter: { title: 'X' } } },
     });
     expect(r.status).toBe(409);
@@ -200,7 +200,7 @@ describe('POST /entry/apply', () => {
 
   it('422s with fieldErrors on schema violations, file untouched', async () => {
     const r = await request({
-      url: '/__text-edit/entry/apply',
+      url: '/__dev-edit/entry/apply',
       body: {
         file: entryRel,
         etag: etagOf(ENTRY),
@@ -216,7 +216,7 @@ describe('POST /entry/apply', () => {
 
   it('accepts a valid date string against z.coerce.date()', async () => {
     const r = await request({
-      url: '/__text-edit/entry/apply',
+      url: '/__dev-edit/entry/apply',
       body: {
         file: entryRel,
         etag: etagOf(ENTRY),
@@ -231,7 +231,7 @@ describe('POST /entry/apply', () => {
 describe('POST /entry/create', () => {
   it('creates a new entry with valid frontmatter', async () => {
     const r = await request({
-      url: '/__text-edit/entry/create',
+      url: '/__dev-edit/entry/create',
       body: {
         collection: 'blog',
         slug: 'Fresh Post!',
@@ -253,7 +253,7 @@ describe('POST /entry/create', () => {
 
   it('409s when the slug already exists', async () => {
     const r = await request({
-      url: '/__text-edit/entry/create',
+      url: '/__dev-edit/entry/create',
       body: {
         collection: 'blog',
         slug: 'hello-world',
@@ -267,7 +267,7 @@ describe('POST /entry/create', () => {
 
   it('422s when required fields are missing', async () => {
     const r = await request({
-      url: '/__text-edit/entry/create',
+      url: '/__dev-edit/entry/create',
       body: { collection: 'blog', slug: 'incomplete', frontmatter: { title: 'Only title' }, body: '' },
     });
     expect(r.status).toBe(422);
@@ -280,12 +280,12 @@ describe('POST /entry/create', () => {
 
   it('rejects unknown collections and empty slugs', async () => {
     const unknown = await request({
-      url: '/__text-edit/entry/create',
+      url: '/__dev-edit/entry/create',
       body: { collection: 'nope', slug: 'a', frontmatter: {}, body: '' },
     });
     expect(unknown.status).toBe(422);
     const empty = await request({
-      url: '/__text-edit/entry/create',
+      url: '/__dev-edit/entry/create',
       body: { collection: 'blog', slug: '///', frontmatter: {}, body: '' },
     });
     expect(empty.status).toBe(400);
@@ -322,7 +322,7 @@ describe('POST /entry/create — extension choice', () => {
     },
   });
 
-  const deps = (options: TextEditOptions = {}) => ({
+  const deps = (options: DevEditOptions = {}) => ({
     logger,
     root: extRoot,
     optionsResolver: stubOptions(extRoot, {
@@ -354,7 +354,7 @@ describe('POST /entry/create — extension choice', () => {
   const create = (collection: string, slug: string, h?: Connect.NextHandleFunction) =>
     request(
       {
-        url: '/__text-edit/entry/create',
+        url: '/__dev-edit/entry/create',
         body: { collection, slug, frontmatter: { title: 'New' }, body: '' },
       },
       h ?? extHandler,
@@ -391,7 +391,7 @@ describe('POST /entry/create — extension choice', () => {
 describe('POST /entry/delete', () => {
   it('deletes with a fresh etag', async () => {
     const r = await request({
-      url: '/__text-edit/entry/delete',
+      url: '/__dev-edit/entry/delete',
       body: { file: entryRel, etag: etagOf(ENTRY) },
     });
     expect(r.status).toBe(200);
@@ -400,7 +400,7 @@ describe('POST /entry/delete', () => {
 
   it('409s on a stale etag and keeps the file', async () => {
     const r = await request({
-      url: '/__text-edit/entry/delete',
+      url: '/__dev-edit/entry/delete',
       body: { file: entryRel, etag: 'stale' },
     });
     expect(r.status).toBe(409);
@@ -422,7 +422,7 @@ describe('disabled entry editor', () => {
       const payload = Buffer.from(JSON.stringify({ file: entryRel }));
       const req = Readable.from([payload]) as any;
       req.method = 'POST';
-      req.url = '/__text-edit/entry';
+      req.url = '/__dev-edit/entry';
       req.headers = {};
       req.socket = { remoteAddress: '127.0.0.1' };
       const res: any = {

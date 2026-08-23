@@ -6,7 +6,7 @@
  * `.md`/`.mdx` file, not in the `.astro` the source loc points at. Editing that
  * text in place needs expression-following (spec §16.3), which isn't built. As
  * a fast interim (§16.2), a page can opt in by emitting
- *   <meta name="astro-text-edit:page-source" content="src/content/…/x.mdx">
+ *   <meta name="astro-dev-edit:page-source" content="src/content/…/x.mdx">
  * and we surface an "Edit page content" jump-to-source button on the refusal
  * notice, the entry pill, and the copied element context.
  *
@@ -16,7 +16,7 @@
  */
 export function pageSource(): string | null {
   const meta = document.querySelector<HTMLMetaElement>(
-    'meta[name="astro-text-edit:page-source"]',
+    'meta[name="astro-dev-edit:page-source"]',
   );
   const content = meta?.content?.trim();
   return content ? content : null;

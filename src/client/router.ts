@@ -19,7 +19,7 @@ import { toast } from './ui.ts';
 export function isOwnUi(e: Event): boolean {
   return e
     .composedPath()
-    .some((n) => n instanceof HTMLElement && n.dataset?.astroTextEditUi === '1');
+    .some((n) => n instanceof HTMLElement && n.dataset?.astroDevEditUi === '1');
 }
 
 export interface RouterDeps {
@@ -123,7 +123,7 @@ export function initRouter(deps: RouterDeps): RouterHandle {
     // SAME gesture, rather than only dismissing and forcing a second click. (#1)
     const interaction = state.get();
     if (interaction?.kind === 'text') {
-      const active = document.querySelector('[data-astro-text-edit-active="1"]');
+      const active = document.querySelector('[data-astro-dev-edit-active="1"]');
       if (el && el === active) return; // clicking within the edit: leave it be
       e.preventDefault();
       e.stopPropagation();
@@ -156,7 +156,7 @@ export function initRouter(deps: RouterDeps): RouterHandle {
     if (el && sourceFor(el)) {
       // Don't preventDefault when the mousedown is inside the active edit, or
       // the caret won't move where the user clicked.
-      if (el.dataset.astroTextEditActive === '1') return;
+      if (el.dataset.astroDevEditActive === '1') return;
       e.preventDefault();
       e.stopPropagation();
     }

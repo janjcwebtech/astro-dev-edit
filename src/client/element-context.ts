@@ -231,7 +231,7 @@ function openTagOf(el: HTMLElement): string {
  *  element-tree outline must never end up in the pasted markup — and capped. */
 function renderedHtml(el: HTMLElement): { html: string; dropped: number } {
   const clone = el.cloneNode(true) as HTMLElement;
-  for (const own of clone.querySelectorAll('[data-astro-text-edit-ui]')) own.remove();
+  for (const own of clone.querySelectorAll('[data-astro-dev-edit-ui]')) own.remove();
   const full = clone.outerHTML;
   if (full.length <= HTML_MAX) return { html: full, dropped: 0 };
   return { html: full.slice(0, HTML_MAX), dropped: full.length - HTML_MAX };

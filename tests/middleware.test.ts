@@ -10,7 +10,7 @@ import { createMiddleware } from '../src/server/middleware.ts';
 import { locOf, stubOptions } from './helpers.ts';
 
 /**
- * Characterization tests for the /__text-edit middleware: every endpoint's
+ * Characterization tests for the /__dev-edit middleware: every endpoint's
  * status codes, response shapes, and guards, pinned before the refactor.
  * The middleware is invoked directly with mocked req/res against a scaffolded
  * temp project tree — no HTTP server, no Vite.
@@ -140,51 +140,51 @@ function request(opts: {
 }
 
 describe('routing & guards', () => {
-  it('passes non-/__text-edit requests through to next()', async () => {
+  it('passes non-/__dev-edit requests through to next()', async () => {
     const r = await request({ method: 'GET', url: '/some/page' });
     expect(r.nextCalled).toBe(true);
   });
 
   it('rejects non-localhost remote addresses with 403', async () => {
-    const r = await request({ method: 'GET', url: '/__text-edit/health', remoteAddress: '192.168.1.50' });
+    const r = await request({ method: 'GET', url: '/__dev-edit/health', remoteAddress: '192.168.1.50' });
     expect(r.status).toBe(403);
   });
 
   it('rejects a foreign Origin header with 403', async () => {
-    const r = await request({ method: 'GET', url: '/__text-edit/health', origin: 'https://evil.example' });
+    const r = await request({ method: 'GET', url: '/__dev-edit/health', origin: 'https://evil.example' });
     expect(r.status).toBe(403);
   });
 
   it('accepts a localhost Origin header', async () => {
-    const r = await request({ method: 'GET', url: '/__text-edit/health', origin: 'http://localhost:4321' });
+    const r = await request({ method: 'GET', url: '/__dev-edit/health', origin: 'http://localhost:4321' });
     expect(r.status).toBe(200);
   });
 
   it('GET /health returns ok', async () => {
-    const r = await request({ method: 'GET', url: '/__text-edit/health' });
+    const r = await request({ method: 'GET', url: '/__dev-edit/health' });
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ ok: true, name: 'astro-text-edit' });
+    expect(r.body).toMatchObject({ ok: true, name: 'astro-dev-edit' });
   });
 
   it('GET /health reports the project root, so the overlay can relativize the absolute source annotations', async () => {
-    const r = await request({ method: 'GET', url: '/__text-edit/health' });
+    const r = await request({ method: 'GET', url: '/__dev-edit/health' });
     expect(r.body).toMatchObject({ root, cssInspector: true });
   });
 
   it('GET /healthX no longer matches /health — routes are exact-path (intentional tightening)', async () => {
     // Pre-refactor this returned 200 via prefix matching; the route table
     // matches exact pathnames. The client only ever calls exact paths.
-    const r = await request({ method: 'GET', url: '/__text-edit/healthX' });
+    const r = await request({ method: 'GET', url: '/__dev-edit/healthX' });
     expect(r.status).toBe(404);
   });
 
   it('matches routes with a query string appended', async () => {
-    const r = await request({ method: 'GET', url: '/__text-edit/health?x=1' });
+    const r = await request({ method: 'GET', url: '/__dev-edit/health?x=1' });
     expect(r.status).toBe(200);
   });
 
   it('unknown route under the base returns 404', async () => {
-    const r = await request({ method: 'POST', url: '/__text-edit/nope' });
+    const r = await request({ method: 'POST', url: '/__dev-edit/nope' });
     expect(r.status).toBe(404);
     expect(r.body).toMatchObject({ error: 'not implemented' });
   });
@@ -192,7 +192,7 @@ describe('routing & guards', () => {
 
 describe('GET /assets', () => {
   it('lists images from asset dirs as sorted web paths, public/ mapped to /', async () => {
-    const r = await request({ method: 'GET', url: '/__text-edit/assets' });
+    const r = await request({ method: 'GET', url: '/__dev-edit/assets' });
     expect(r.status).toBe(200);
     expect(r.body.files.map((f: AssetInfo) => f.path)).toEqual([
       '/a.jpg',
@@ -208,7 +208,7 @@ describe('POST /upload', () => {
   it('writes a base64 data-URL into the upload dir and returns its web path', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/upload',
+      url: '/__dev-edit/upload',
       body: { dataUrl: `data:image/png;base64,${PNG_B64}`, filename: 'shot.png' },
     });
     expect(r.status).toBe(200);
@@ -219,7 +219,7 @@ describe('POST /upload', () => {
   it('suffixes on a name clash instead of overwriting', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/upload',
+      url: '/__dev-edit/upload',
       body: { dataUrl: `data:image/png;base64,${PNG_B64}`, filename: 'shot.png' },
     });
     expect(r.status).toBe(200);
@@ -229,7 +229,7 @@ describe('POST /upload', () => {
   it('sanitises path-traversal filenames to a safe basename', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/upload',
+      url: '/__dev-edit/upload',
       body: { dataUrl: `data:image/png;base64,${PNG_B64}`, filename: '../../etc/passwd' },
     });
     expect(r.status).toBe(200);
@@ -239,7 +239,7 @@ describe('POST /upload', () => {
   it('rejects unsupported mime types with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/upload',
+      url: '/__dev-edit/upload',
       body: { dataUrl: 'data:text/plain;base64,aGk=', filename: 'x.txt' },
     });
     expect(r.status).toBe(400);
@@ -249,7 +249,7 @@ describe('POST /upload', () => {
   it('rejects a non-data-URL payload with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/upload',
+      url: '/__dev-edit/upload',
       body: { dataUrl: 'https://example.com/x.png', filename: 'x.png' },
     });
     expect(r.status).toBe(400);
@@ -262,7 +262,7 @@ describe('POST /upload', () => {
     it('falls back to imageUploadDir when no target is given', async () => {
       const r = await request({
         method: 'POST',
-        url: '/__text-edit/upload',
+        url: '/__dev-edit/upload',
         body: {
           dataUrl: `data:image/png;base64,${PNG_B64}`,
           filename: 'cover.png',
@@ -276,7 +276,7 @@ describe('POST /upload', () => {
     it('honours a target directory inside a configured asset dir', async () => {
       const r = await request({
         method: 'POST',
-        url: '/__text-edit/upload',
+        url: '/__dev-edit/upload',
         body: {
           dataUrl: `data:image/png;base64,${PNG_B64}`,
           filename: 'hero.png',
@@ -292,7 +292,7 @@ describe('POST /upload', () => {
     it('ignores a target outside the configured asset dirs', async () => {
       const r = await request({
         method: 'POST',
-        url: '/__text-edit/upload',
+        url: '/__dev-edit/upload',
         body: {
           dataUrl: `data:image/png;base64,${PNG_B64}`,
           filename: 'sneaky.png',
@@ -309,7 +309,7 @@ describe('POST /upload', () => {
     it('ignores a target that escapes the project root', async () => {
       const r = await request({
         method: 'POST',
-        url: '/__text-edit/upload',
+        url: '/__dev-edit/upload',
         body: {
           dataUrl: `data:image/png;base64,${PNG_B64}`,
           filename: 'escape.png',
@@ -325,7 +325,7 @@ describe('POST /upload', () => {
       const gif = Buffer.from('fake-gif-bytes').toString('base64');
       const r = await request({
         method: 'POST',
-        url: '/__text-edit/upload',
+        url: '/__dev-edit/upload',
         body: {
           dataUrl: `data:image/gif;base64,${gif}`,
           filename: 'spin.gif',
@@ -341,7 +341,7 @@ describe('POST /upload', () => {
       const gif = Buffer.from('fake-gif-bytes').toString('base64');
       const r = await request({
         method: 'POST',
-        url: '/__text-edit/upload',
+        url: '/__dev-edit/upload',
         body: { dataUrl: `data:image/gif;base64,${gif}`, filename: 'spin.gif' },
       });
       expect(r.status).toBe(200);
@@ -351,7 +351,7 @@ describe('POST /upload', () => {
     it('honours a target for a plain web-path upload too', async () => {
       const r = await request({
         method: 'POST',
-        url: '/__text-edit/upload',
+        url: '/__dev-edit/upload',
         body: {
           dataUrl: `data:image/png;base64,${PNG_B64}`,
           filename: 'in-sub.png',
@@ -368,7 +368,7 @@ describe('POST /open', () => {
   it('returns 403 when open-in-editor is disabled by configuration', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/open',
+      url: '/__dev-edit/open',
       body: { file: 'src/pages/index.astro' },
     });
     expect(r.status).toBe(403);
@@ -379,7 +379,7 @@ describe('POST /open', () => {
   it('rejects files outside the content roots with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/open',
+      url: '/__dev-edit/open',
       body: { file: 'outside.astro' },
       via: openHandler,
     });
@@ -390,7 +390,7 @@ describe('POST /open', () => {
   it('rejects a symlink that resolves outside the content roots with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/open',
+      url: '/__dev-edit/open',
       body: { file: 'src/pages/link.astro' },
       via: openHandler,
     });
@@ -403,7 +403,7 @@ describe('POST /open', () => {
   it('still rejects a package-owned node_modules path with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/open',
+      url: '/__dev-edit/open',
       body: { file: 'node_modules/astro/components/Image.astro' },
       via: openHandler,
     });
@@ -414,7 +414,7 @@ describe('POST /open', () => {
   it('rejects disallowed extensions with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/open',
+      url: '/__dev-edit/open',
       body: { file: 'public/readme.txt' },
       via: openHandler,
     });
@@ -425,7 +425,7 @@ describe('POST /open', () => {
   it('rejects nonexistent files with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/open',
+      url: '/__dev-edit/open',
       body: { file: 'src/pages/missing.astro' },
       via: openHandler,
     });
@@ -435,7 +435,7 @@ describe('POST /open', () => {
   it('rejects a missing file field with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/open',
+      url: '/__dev-edit/open',
       body: {},
       via: openHandler,
     });
@@ -448,7 +448,7 @@ describe('POST /peek', () => {
   it('returns the line window around the focus line with metadata', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/peek',
+      url: '/__dev-edit/peek',
       body: { file: 'src/pages/index.astro', loc: '5:3' },
     });
     expect(r.status).toBe(200);
@@ -467,7 +467,7 @@ describe('POST /peek', () => {
     await writeFile(join(root, 'src/content/long.md'), lines.join('\n') + '\n');
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/peek',
+      url: '/__dev-edit/peek',
       body: { file: 'src/content/long.md', loc: '50:1' },
     });
     expect(r.status).toBe(200);
@@ -482,7 +482,7 @@ describe('POST /peek', () => {
     await writeFile(join(root, 'src/content/huge.md'), lines.join('\n') + '\n');
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/peek',
+      url: '/__dev-edit/peek',
       body: { file: 'src/content/huge.md', loc: '1500:1' },
     });
     expect(r.status).toBe(200);
@@ -495,14 +495,14 @@ describe('POST /peek', () => {
   it('defaults to the top without a loc and clamps an out-of-range line', async () => {
     const top = await request({
       method: 'POST',
-      url: '/__text-edit/peek',
+      url: '/__dev-edit/peek',
       body: { file: 'src/pages/index.astro' },
     });
     expect(top.status).toBe(200);
     expect(top.body.focusLine).toBe(1);
     const beyond = await request({
       method: 'POST',
-      url: '/__text-edit/peek',
+      url: '/__dev-edit/peek',
       body: { file: 'src/pages/index.astro', loc: '999:1' },
     });
     expect(beyond.status).toBe(200);
@@ -514,7 +514,7 @@ describe('POST /peek', () => {
   it('refuses files outside the content roots with 200 and no source', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/peek',
+      url: '/__dev-edit/peek',
       body: { file: 'outside.astro', loc: '1:1' },
     });
     expect(r.status).toBe(200);
@@ -525,7 +525,7 @@ describe('POST /peek', () => {
   it('names the package when refusing a node_modules path', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/peek',
+      url: '/__dev-edit/peek',
       body: { file: 'node_modules/astro/components/Image.astro', loc: '1:1' },
     });
     expect(r.status).toBe(200);
@@ -536,14 +536,14 @@ describe('POST /peek', () => {
   it('rejects nonexistent files with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/peek',
+      url: '/__dev-edit/peek',
       body: { file: 'src/pages/missing.astro', loc: '1:1' },
     });
     expect(r.status).toBe(400);
   });
 
   it('rejects a missing file field with 400', async () => {
-    const r = await request({ method: 'POST', url: '/__text-edit/peek', body: {} });
+    const r = await request({ method: 'POST', url: '/__dev-edit/peek', body: {} });
     expect(r.status).toBe(400);
     expect(r.body.error).toContain('required');
   });
@@ -553,7 +553,7 @@ describe('POST /classify', () => {
   it('classifies literal text in a real .astro file', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/classify',
+      url: '/__dev-edit/classify',
       body: { file: 'src/pages/index.astro', loc: locOf(PAGE_ASTRO, 'Editable text'), tag: 'p' },
     });
     expect(r.status).toBe(200);
@@ -563,7 +563,7 @@ describe('POST /classify', () => {
   it('classifies text carrying an inline tag as markup, with the inner source', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/classify',
+      url: '/__dev-edit/classify',
       body: { file: 'src/pages/markup.astro', loc: locOf(MARKUP_ASTRO, 'Two<br>'), tag: 'h2' },
     });
     expect(r.status).toBe(200);
@@ -574,7 +574,7 @@ describe('POST /classify', () => {
   it('answers 200 dynamic for editable non-.astro files (.md)', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/classify',
+      url: '/__dev-edit/classify',
       body: { file: 'src/content/note.md', loc: '1:1', tag: 'h1' },
     });
     expect(r.status).toBe(200);
@@ -590,7 +590,7 @@ describe('POST /classify', () => {
   it('answers 200 dynamic for files outside the content roots', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/classify',
+      url: '/__dev-edit/classify',
       body: { file: 'outside.astro', loc: '1:1', tag: 'p' },
     });
     expect(r.status).toBe(200);
@@ -601,7 +601,7 @@ describe('POST /classify', () => {
   it('answers 200 dynamic naming the package for a node_modules path', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/classify',
+      url: '/__dev-edit/classify',
       body: { file: 'node_modules/astro/components/Image.astro', loc: '1:1', tag: 'img' },
     });
     expect(r.status).toBe(200);
@@ -612,7 +612,7 @@ describe('POST /classify', () => {
   it('still answers 200 dynamic for a symlink resolving outside the roots', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/classify',
+      url: '/__dev-edit/classify',
       body: { file: 'src/pages/link.astro', loc: '1:1', tag: 'p' },
     });
     expect(r.status).toBe(200);
@@ -622,7 +622,7 @@ describe('POST /classify', () => {
   it('rejects nonexistent files with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/classify',
+      url: '/__dev-edit/classify',
       body: { file: 'src/pages/missing.astro', loc: '1:1', tag: 'p' },
     });
     expect(r.status).toBe(400);
@@ -631,7 +631,7 @@ describe('POST /classify', () => {
   it('rejects missing fields with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/classify',
+      url: '/__dev-edit/classify',
       body: { file: 'src/pages/index.astro' },
     });
     expect(r.status).toBe(400);
@@ -643,7 +643,7 @@ describe('POST /apply', () => {
   it('patches the file on disk atomically and returns ok', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/pages/index.astro',
         loc: locOf(PAGE_ASTRO, 'Editable text'),
@@ -656,7 +656,7 @@ describe('POST /apply', () => {
     const after = String(await readFile(join(root, 'src/pages/index.astro')));
     expect(after).toContain('<p>Patched text</p>');
     // atomic write leaves no temp file behind
-    const leftovers = (await readdir(join(root, 'src/pages'))).filter((f) => f.includes('text-edit-tmp'));
+    const leftovers = (await readdir(join(root, 'src/pages'))).filter((f) => f.includes('dev-edit-tmp'));
     expect(leftovers).toEqual([]);
     // restore for other tests
     await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
@@ -666,7 +666,7 @@ describe('POST /apply', () => {
   it('accepts a markup op and writes the inline tags through unescaped', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/pages/markup.astro',
         loc: locOf(MARKUP_ASTRO, 'Two<br>'),
@@ -684,7 +684,7 @@ describe('POST /apply', () => {
   it('answers 422 unsupported when a markup op carries a tag outside the safelist', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/pages/markup.astro',
         loc: locOf(MARKUP_ASTRO, 'Two<br>'),
@@ -700,7 +700,7 @@ describe('POST /apply', () => {
   it('answers 422 unsupported for editable non-.astro files (.md)', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/content/note.md',
         loc: '1:1',
@@ -718,7 +718,7 @@ describe('POST /apply', () => {
   it('answers 422 with the refusal code when the patcher refuses (mismatch)', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/pages/index.astro',
         loc: locOf(PAGE_ASTRO, 'Editable text'),
@@ -737,7 +737,7 @@ describe('POST /apply', () => {
     const before = String(await readFile(target));
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'node_modules/astro/components/Image.astro',
         loc: '1:1',
@@ -753,7 +753,7 @@ describe('POST /apply', () => {
   it('batches multiple ops into a single atomic write (img src + alt)', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/pages/index.astro',
         loc: locOf(PAGE_ASTRO, 'img src='),
@@ -779,7 +779,7 @@ describe('POST /apply', () => {
     const before = String(await readFile(join(root, 'src/pages/index.astro')));
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/pages/index.astro',
         loc: locOf(PAGE_ASTRO, 'img src='),
@@ -802,7 +802,7 @@ describe('POST /apply', () => {
   it('rejects an empty ops array with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: { file: 'src/pages/index.astro', loc: '1:1', tag: 'p', ops: [] },
     });
     expect(r.status).toBe(400);
@@ -812,7 +812,7 @@ describe('POST /apply', () => {
   it('rejects a bad targetType with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/pages/index.astro',
         loc: '1:1',
@@ -827,7 +827,7 @@ describe('POST /apply', () => {
   it('rejects non-string original/newText with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       body: {
         file: 'src/pages/index.astro',
         loc: '1:1',
@@ -841,14 +841,14 @@ describe('POST /apply', () => {
   it('rejects an oversized body with 400', async () => {
     const r = await request({
       method: 'POST',
-      url: '/__text-edit/apply',
+      url: '/__dev-edit/apply',
       rawBody: 'x'.repeat(256 * 1024 + 1),
     });
     expect(r.status).toBe(400);
   });
 
   it('rejects malformed JSON with 400', async () => {
-    const r = await request({ method: 'POST', url: '/__text-edit/apply', rawBody: '{not json' });
+    const r = await request({ method: 'POST', url: '/__dev-edit/apply', rawBody: '{not json' });
     expect(r.status).toBe(400);
   });
 });

@@ -1,7 +1,7 @@
 import { defineConfig } from 'astro/config';
-import textEdit from 'astro-text-edit';
+import devEdit from 'astro-dev-edit';
 
-// Minimal dev harness for the astro-text-edit integration.
+// Minimal dev harness for the astro-dev-edit integration.
 //
 // The integration is dev-only and rides on the data-astro-source-* attributes
 // that Astro emits only when the dev toolbar is enabled — so devToolbar stays
@@ -9,7 +9,7 @@ import textEdit from 'astro-text-edit';
 export default defineConfig({
   devToolbar: { enabled: true },
   integrations: [
-    textEdit({
+    devEdit({
       // Confine writes to this playground's own source. Defaults would also
       // work, but being explicit documents what the integration touches.
       contentRoots: ['src', 'public'],

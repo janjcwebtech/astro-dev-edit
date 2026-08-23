@@ -1,4 +1,4 @@
-# astro-text-edit
+# astro-dev-edit
 
 In-browser visual content editing for the Astro **dev server**. Turn on edit
 mode, click text or an image in the rendered page, and the change is written
@@ -193,20 +193,20 @@ the way you left it.
 Install from git (shipping TypeScript source — no build step):
 
 ```bash
-npm install --save-dev "github:janjcwebtech/astro-text-edit"
+npm install --save-dev "github:janjcwebtech/astro-dev-edit"
 # or from a local checkout during development:
-npm install --save-dev "file:../astro-text-edit"
+npm install --save-dev "file:../astro-dev-edit"
 ```
 
 Add it to `astro.config.mjs`:
 
 ```js
 import { defineConfig } from 'astro/config';
-import textEdit from 'astro-text-edit';
+import devEdit from 'astro-dev-edit';
 
 export default defineConfig({
   integrations: [
-    textEdit(),
+    devEdit(),
   ],
 });
 ```
@@ -232,18 +232,18 @@ The feature depends on `data-astro-source-*` attributes on every element:
 
 **You do not have to edit this file.** Every option below is also editable from
 the overlay's own **Settings** drawer (admin bar → the purple mark → *Settings*),
-which stores your choices in `.astro-text-edit.json` at the project root and
+which stores your choices in `.astro-dev-edit.json` at the project root and
 applies them to the next request — no dev-server restart. Setting an option here
 in `astro.config.mjs` still wins: this file is code you wrote deliberately, it is
 committed, and it is read by `astro build`. An option set here therefore renders
 **read-only** in the drawer, with a note saying where the value came from, rather
 than accepting input that resolution would quietly discard.
 
-Precedence, highest first: **`astro.config.mjs` → `.astro-text-edit.json` → the
+Precedence, highest first: **`astro.config.mjs` → `.astro-dev-edit.json` → the
 defaults below.** See [Settings drawer](#settings-drawer) for the whole picture.
 
 ```js
-textEdit({
+devEdit({
   enabled: true,                          // kill switch
   assetDirs: ['src/assets', 'public'],    // scanned for swappable images
   uploadDir: 'public',                    // where new uploads are written
@@ -271,8 +271,8 @@ textEdit({
 | `cssInspector` | `true` | The hover-pill CSS class/ID inspector. `false` hides the chips row entirely. The per-rule open-in-editor jump also honours `openInEditor`. |
 | `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. **Config-only** — it registers a Vite plugin, so changing it needs a restart. |
 | `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
-| `schemaEditor` | `true` | Whether the [collection designer](#collections--the-collection-designer) may write your `src/content.config.ts`. `false` keeps the designer read-only for schema edits — collections and fields still list, and the editor-only overrides (widget, label, hidden) still save, because those go to `.astro-text-edit.json` rather than to committed source. |
-| `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults, or just switch it on in the Settings drawer. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-text-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30). |
+| `schemaEditor` | `true` | Whether the [collection designer](#collections--the-collection-designer) may write your `src/content.config.ts`. `false` keeps the designer read-only for schema edits — collections and fields still list, and the editor-only overrides (widget, label, hidden) still save, because those go to `.astro-dev-edit.json` rather than to committed source. |
+| `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults, or just switch it on in the Settings drawer. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-dev-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30). |
 
 Every option except `enabled` and `sourceAnnotations` is editable from the
 Settings drawer. Those two are consumed during `astro:config:setup`, before a dev
@@ -284,7 +284,7 @@ read-only and says a restart is needed.
 Opened from the admin bar's overflow menu. Four tabs — **General**, **Editing**,
 **Media**, **Unsplash** — each holding one control per option with a line of prose
 saying what it does. Saving writes only the options you changed into
-`.astro-text-edit.json`, merging with whatever is already there. Collections are
+`.astro-dev-edit.json`, merging with whatever is already there. Collections are
 not settings: they have their own
 [drawer](#collections--the-collection-designer), alongside this one in the same
 menu.
@@ -300,7 +300,7 @@ A few properties worth knowing:
 -   **Turning a feature off keeps its configuration.** Switching the entry editor
     or the Unsplash source off and back on restores its per-collection widget
     overrides and its app name.
--   `.astro-text-edit.json` **should be gitignored** — it is also where the
+-   `.astro-dev-edit.json` **should be gitignored** — it is also where the
     Unsplash access key is stored. The drawer warns when it isn't.
 
 The options the drawer offers come from the server, so it renders whatever your
@@ -329,7 +329,7 @@ tool.
 | Half | Controls | Written to | Effect |
 | --- | --- | --- | --- |
 | **Schema** | type, required, default, add, remove | `src/content.config.ts` | Committed. Changes what `astro build` accepts. |
-| **Editor** | widget, label, hidden | `.astro-text-edit.json` | Local, gitignored. Only the entry drawer reads it. |
+| **Editor** | widget, label, hidden | `.astro-dev-edit.json` | Local, gitignored. Only the entry drawer reads it. |
 
 A save that touches both does one request and tells you which half landed. A
 widget or label your `astro.config.mjs` sets renders read-only with a padlock,
@@ -421,7 +421,7 @@ source: search Unsplash from inside the overlay, pick a photo, and the dev
 server **downloads it into your project** like any other upload.
 
 ```js
-textEdit({ unsplash: {} })
+devEdit({ unsplash: {} })
 ```
 
 The photo is a normal file in your repo afterwards. Nothing but the local path
@@ -439,9 +439,9 @@ application for production (then 1000). Resolution order, highest first:
 | --- | --- |
 | `unsplash.accessKey` in `astro.config.mjs` | An escape hatch for programmatic config, **not recommended**: that file is committed *and* is read by `astro build`, so the key travels with the repo. |
 | `UNSPLASH_ACCESS_KEY` in the environment | For teams and CI. Read through Vite's own env loader, so a `.env` file works — note that `astro dev` does **not** copy `.env` into `process.env` itself. |
-| The **Settings** drawer (admin bar → the purple mark → *Settings* → *Unsplash*) | The recommended path. Writes `.astro-text-edit.json` at your project root, `0600`. |
+| The **Settings** drawer (admin bar → the purple mark → *Settings* → *Unsplash*) | The recommended path. Writes `.astro-dev-edit.json` at your project root, `0600`. |
 
-**Gitignore `.astro-text-edit.json` and your `.env`.** The Settings panel warns
+**Gitignore `.astro-dev-edit.json` and your `.env`.** The Settings panel warns
 if the first isn't covered, but this integration cannot edit your ignore rules
 for you. The key is never sent back to the browser: a read reports only whether
 one resolved, from where, and a masked fragment like `••••••••Ab3d`. When a key
@@ -514,7 +514,7 @@ The file→collection mapping follows the `src/content/<name>/` convention.
 Unconventional layouts and field tweaks go in the options:
 
 ```js
-textEdit({
+devEdit({
   entryEditor: {
     // configPath: 'src/content.config.ts',      // auto-detected normally
     collections: {
@@ -575,7 +575,7 @@ const { entry } = Astro.props as { entry: CollectionEntry<'posts'> };
 <head>
   {import.meta.env.DEV && (
     <meta
-      name="astro-text-edit:page-source"
+      name="astro-dev-edit:page-source"
       content={entry.filePath}
     />
   )}

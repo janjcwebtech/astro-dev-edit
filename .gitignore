@@ -8,9 +8,9 @@ CLAUDE.md
 notes/
 docs/ASTRO-COMPAT.md
 
-# Secrets — never commit. .astro-text-edit.json is written by the Settings panel;
-# .*.text-edit-tmp-* is atomicWrite's mid-write sibling.
+# Secrets — never commit. .astro-dev-edit.json is written by the Settings panel;
+# .*.dev-edit-tmp-* is atomicWrite's mid-write sibling.
 .env
 .env.*
-.astro-text-edit.json
-.*.text-edit-tmp-*
+.astro-dev-edit.json
+.*.dev-edit-tmp-*

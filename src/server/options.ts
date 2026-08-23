@@ -28,8 +28,8 @@ import { readStoredOptions } from './settings.ts';
  * with no client change at all.
  */
 
-/** Options a consuming project passes to `textEdit()`. */
-export interface TextEditOptions {
+/** Options a consuming project passes to `devEdit()`. */
+export interface DevEditOptions {
   /** Kill switch. When false the integration does nothing at all. */
   enabled?: boolean;
   /** Directories scanned for replacement images offered in the swap panel. */
@@ -74,7 +74,7 @@ export interface TextEditOptions {
   sourceAnnotations?: 'auto' | 'force' | 'off';
   /**
    * The CMS-style entry panel for content-collection pages that emit the
-   * `astro-text-edit:page-source` meta tag. Zero-config for conventional
+   * `astro-dev-edit:page-source` meta tag. Zero-config for conventional
    * `src/content/<name>/` layouts; `false` disables the whole surface.
    */
   entryEditor?: false | EntryEditorOptions;
@@ -84,7 +84,7 @@ export interface TextEditOptions {
    * which patches the project's own `src/content.config.ts`. `false` keeps the
    * tab read-only: collections and their fields are still listed, and the
    * editor-only overrides (widget, label, hidden) still save, since those go to
-   * `.astro-text-edit.json` rather than to committed source.
+   * `.astro-dev-edit.json` rather than to committed source.
    */
   schemaEditor?: boolean;
   /**
@@ -99,7 +99,7 @@ export interface TextEditOptions {
   unsplash?: false | UnsplashOptions;
 }
 
-/** Options for the Unsplash photo source. See `TextEditOptions.unsplash`. */
+/** Options for the Unsplash photo source. See `DevEditOptions.unsplash`. */
 export interface UnsplashOptions {
   /**
    * Access key, as an escape hatch for programmatic config. **Not the
@@ -114,7 +114,7 @@ export interface UnsplashOptions {
    * Application name sent as `utm_source` on every photographer credit link,
    * as the Unsplash API guidelines require. Should match the application name
    * registered at unsplash.com/oauth/applications. Defaults to
-   * `astro-text-edit`.
+   * `astro-dev-edit`.
    */
   appName?: string;
   /** Results per search page. Clamped to Unsplash's own maximum of 30.
@@ -123,13 +123,13 @@ export interface UnsplashOptions {
 }
 
 /** Every option's effective value for one request — no optionals left. */
-export type ResolvedOptions = Required<TextEditOptions>;
+export type ResolvedOptions = Required<DevEditOptions>;
 
 /**
- * What the Settings panel stores. `Partial<TextEditOptions>` for every option
+ * What the Settings panel stores. `Partial<DevEditOptions>` for every option
  * with a single value, plus explicit on/off flags for the two *features*.
  *
- * The flags exist because `TextEditOptions` encodes a feature as
+ * The flags exist because `DevEditOptions` encodes a feature as
  * `false | { …detail }`, which cannot hold "switched off" and "configured like
  * this" at the same time. In a config file that is fine — the user retypes the
  * object. In a store the panel writes, switching a feature off would silently
@@ -138,7 +138,7 @@ export type ResolvedOptions = Required<TextEditOptions>;
  * detail under `entryEditor` / `unsplash` unconditionally and the on/off bit
  * beside it.
  */
-export interface StoredOptions extends Partial<TextEditOptions> {
+export interface StoredOptions extends Partial<DevEditOptions> {
   entryEditorEnabled?: boolean;
   unsplashEnabled?: boolean;
 }
@@ -192,7 +192,7 @@ interface OptionSpec {
   configOnly?: boolean;
   fallback: unknown;
   /** Read from the config layer. `undefined` = this layer is silent. */
-  read(o: Partial<TextEditOptions>): unknown;
+  read(o: Partial<DevEditOptions>): unknown;
   /**
    * Read from the stored layer, when it encodes the option differently — only
    * the two feature toggles do, and only because the store separates a toggle
@@ -326,7 +326,7 @@ const OPTION_SPECS: readonly OptionSpec[] = [
     help: 'Sent as utm_source on every photographer credit link, as the Unsplash API guidelines require. Should match the name you registered.',
     type: 'text',
     group: 'unsplash',
-    fallback: 'astro-text-edit',
+    fallback: 'astro-dev-edit',
     read: (o) => (o.unsplash ? o.unsplash.appName : undefined),
   },
   {
@@ -374,9 +374,9 @@ export interface OptionsResolution {
 export interface OptionsResolverDeps {
   /** Project root (fsPath) — where the settings file lives. */
   root: string;
-  /** Exactly what the project passed to `textEdit()`, **not** merged with
+  /** Exactly what the project passed to `devEdit()`, **not** merged with
    *  DEFAULTS: `key in configOptions` is what makes an option `locked`. */
-  configOptions: Partial<TextEditOptions>;
+  configOptions: Partial<DevEditOptions>;
 }
 
 export interface OptionsResolver {

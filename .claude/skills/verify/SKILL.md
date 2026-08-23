@@ -1,9 +1,9 @@
 ---
 name: verify
-description: Full verification workflow for astro-text-edit changes — typecheck + vitest gates, then the launch/drive recipe for runtime checks in the playground.
+description: Full verification workflow for astro-dev-edit changes — typecheck + vitest gates, then the launch/drive recipe for runtime checks in the playground.
 ---
 
-# Verifying astro-text-edit changes
+# Verifying astro-dev-edit changes
 
 The complete map of what is verified where — feature → test file, plus the
 manual checklist for everything client-side — lives in `docs/VERIFICATION.md`.
@@ -63,7 +63,7 @@ Gotchas:
   still renders — exercises the boolean widget).
 - Overlay singletons: `#atx-controls` (button group wrapper), `#atx-toggle`,
   `#atx-entry`, `#atx-hide`, `#atx-toggle-hint`. Drawer: `.atx-drawer`.
-- Edit-mode persistence: `sessionStorage.astroTextEditMode` (`'1'`/`'0'`).
+- Edit-mode persistence: `sessionStorage.astroDevEditMode` (`'1'`/`'0'`).
 - Hover states are JS-driven (mouseenter/leave on `#atx-controls`), so
   `browser_hover` + `getComputedStyle` via `browser_evaluate` observes them.
 

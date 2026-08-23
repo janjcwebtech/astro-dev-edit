@@ -8,13 +8,13 @@ interface Props {
   /**
    * Repo-relative path to the markdown/MDX file backing this page, e.g.
    * `src/content/blog/post.md`. When set, we emit the
-   * `astro-text-edit:page-source` meta tag the integration reads to offer an
+   * `astro-dev-edit:page-source` meta tag the integration reads to offer an
    * "Edit page content" jump on detail pages whose text lives in markdown
    * rather than the .astro template. (integration spec §16.2)
    */
   pageSource?: string;
 }
-const { title, description = 'A fictional demo site about visual editing, the astro-text-edit playground.', pageSource } = Astro.props;
+const { title, description = 'A fictional demo site about visual editing, the astro-dev-edit playground.', pageSource } = Astro.props;
 ---
 <!doctype html>
 <html lang="en">
@@ -25,7 +25,7 @@ const { title, description = 'A fictional demo site about visual editing, the as
     <link rel="stylesheet" href="/styles/global.css" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    {pageSource && <meta name="astro-text-edit:page-source" content={pageSource} />}
+    {pageSource && <meta name="astro-dev-edit:page-source" content={pageSource} />}
   </head>
   <body>
     <Nav />

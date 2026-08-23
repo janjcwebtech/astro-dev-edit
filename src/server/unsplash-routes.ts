@@ -136,7 +136,7 @@ const DISABLED = fail(
   403,
   'disabled',
   'The Unsplash photo source is not enabled. Add `unsplash: {}` to the ' +
-    'astro-text-edit integration options.',
+    'astro-dev-edit integration options.',
 );
 
 const UNCONFIGURED = fail(

@@ -10,7 +10,7 @@ import {
   DEFAULTS,
   WRITABLE_OPTION_KEYS,
   type StoredOptions,
-  type TextEditOptions,
+  type DevEditOptions,
 } from '../src/server/options.ts';
 import { readStoredOptions, saveStoredOptions, SETTINGS_FILE } from '../src/server/settings.ts';
 
@@ -37,7 +37,7 @@ afterEach(async () => {
 });
 
 /** Resolve with the given config, after optionally storing a file layer. */
-async function resolve(configOptions: TextEditOptions = {}, stored?: StoredOptions) {
+async function resolve(configOptions: DevEditOptions = {}, stored?: StoredOptions) {
   if (stored) await saveStoredOptions(root, stored);
   return createOptionsResolver({ root, configOptions }).resolve();
 }

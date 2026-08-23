@@ -161,7 +161,7 @@ interface BarPrefs {
   pinned: boolean;
 }
 
-const PREFS_KEY = 'astroTextEditBar';
+const PREFS_KEY = 'astroDevEditBar';
 const DEFAULT_PREFS: BarPrefs = { edge: 'top', pinned: true };
 
 function loadPrefs(): BarPrefs {
@@ -299,7 +299,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     'atx-bar-brand',
   );
   brand.type = 'button';
-  brand.title = 'astro-text-edit — menu';
+  brand.title = 'astro-dev-edit — menu';
   brand.setAttribute('aria-haspopup', 'menu');
   brand.append(icon('cursor', 15));
   brand.addEventListener('mouseenter', () => (brand.style.background = lift(COLOR.accent)));

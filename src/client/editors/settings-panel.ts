@@ -47,7 +47,7 @@ const UNSPLASH_APPS_URL = 'https://unsplash.com/oauth/applications';
 const SOURCE_LABEL: Record<string, string> = {
   config: 'astro.config.mjs',
   env: 'the environment (.env or a shell variable)',
-  file: '.astro-text-edit.json',
+  file: '.astro-dev-edit.json',
 };
 
 /** Tabs, in render order. A group with no options is dropped, so a server that
@@ -268,13 +268,13 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     keyHint.textContent = overridden
       ? `A key from ${SOURCE_LABEL[u.source!]} takes precedence over anything stored here. ` +
         'Remove it to manage the key from this panel.'
-      : 'Stored in .astro-text-edit.json at the project root, readable only by you (0600). ' +
+      : 'Stored in .astro-dev-edit.json at the project root, readable only by you (0600). ' +
         'It is never sent back to the browser.';
     clearKeyBtn.style.display = u.configured && u.source === 'file' ? '' : 'none';
 
     if (u.gitignoreWarning) {
       warning.textContent =
-        '.astro-text-edit.json is not listed in this project’s .gitignore. Add it before ' +
+        '.astro-dev-edit.json is not listed in this project’s .gitignore. Add it before ' +
         'saving a key, or the key can be committed. (This integration cannot edit your ' +
         'ignore rules for you.)';
       warning.style.display = '';
@@ -356,7 +356,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
       // the page's affordances without a reload.
       setFeatures({
         ok: true,
-        name: 'astro-text-edit',
+        name: 'astro-dev-edit',
         milestone: 1,
         root: '',
         cssInspector: valueOf(next, 'cssInspector') === true,

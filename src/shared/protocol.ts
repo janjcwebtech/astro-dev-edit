@@ -1,5 +1,5 @@
 /**
- * Wire protocol for the /__text-edit endpoints — the single source of truth
+ * Wire protocol for the /__dev-edit endpoints — the single source of truth
  * for every request/response shape exchanged between the browser overlay and
  * the dev-server middleware.
  *
@@ -290,7 +290,7 @@ export interface FieldDescriptor {
 
 /**
  * The *editor* half of a field: which control it renders as, what it is called,
- * whether it shows at all. Stored in `.astro-text-edit.json` (or set in
+ * whether it shows at all. Stored in `.astro-dev-edit.json` (or set in
  * `astro.config.mjs` under `entryEditor.collections.<name>.fields`) and never in
  * the collection's zod schema — the collection designer keeps the two halves
  * visibly apart, because one is committed source and the other is local.
@@ -578,7 +578,7 @@ export interface SettingsErrorResponse {
  *   written to the project's own `src/content.config.ts` — committed source that
  *   changes what `astro build` accepts;
  * - the **editor** half ({@link FieldOverride}) is written to
- *   `.astro-text-edit.json` — local, gitignored, and only affects the entry
+ *   `.astro-dev-edit.json` — local, gitignored, and only affects the entry
  *   drawer.
  *
  * A request may carry both; the response says which half landed.

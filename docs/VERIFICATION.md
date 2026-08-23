@@ -51,7 +51,7 @@ Run in this order; each is cheaper than the next.
 | `POST /unsplash/import` — bytes land in `uploadDir`, byte URL carries `w`/`fit`/`q`/`fm=jpg` and preserves `ixid`, the `download_location` ping fires authenticated with its `ixid`, a failed ping still succeeds, `assetRef: 'relative'` → `imageUploadDir`, targetDir honoured/ignored-outside/ignored-escaping, hostile description → safe basename, re-import suffixes, unknown id → 409 `expired`, byte-fetch failure / non-image content-type / over-cap body → 502 **with nothing written**, cache eviction 409s the oldest id | `tests/unsplash-routes.test.ts` |
 | `GET`/`POST /settings` **(access-key half)** — write-then-read reports masked and **never the raw key**, fixed root path written `0600` with no temp file left, malformed file degrades to unconfigured, clearing, `config` > `env` > `file` precedence, a config/env key refuses a store (409), disabled 403 touching no filesystem, and a stored key usable by the **next** search with no restart. Deliberately **not** moved to `tests/settings-routes.test.ts` with the option half: these cases run the key through the injected `UnsplashConfig` seam, and the last one asserts it reaches the next *search* — which needs this suite's recording fetch fake | `tests/unsplash-routes.test.ts` |
 | `POST /collections` — the designer's read: fields joined to the config source (derived types plus each field's verbatim zod expression), entry counts, `dirExists`, `registered`, `schemaForm`, the config etag every write needs; `schemaEditor: false` reported without refusing the read; entry editor off → 403 `disabled`; no config → nulls and an empty list; a collection whose directory is missing; `lockedFields` naming the fields whose override the *config* owns (and **not** naming one the panel itself stored); a config that fails to load still listing its collections from the source with `fieldSource: 'source'` | `tests/schema-routes.test.ts` |
-| `POST /collection/schema/apply` — add/update/remove in one etag-guarded write; stale **and missing** etag → 409 with the file byte-identical; `schemaEditor: false` → 403 touching no file; all-or-nothing (one refused edit in a batch writes none); non-identifier field name and unknown field type refused; the two stores staying separate — overrides land in `.astro-text-edit.json` and the config is untouched, overrides still save while `schemaEditor` is off, a cleared override removes the entry rather than storing a no-op, unknown widget refused before any file is written; empty request 400 | `tests/schema-routes.test.ts` |
+| `POST /collection/schema/apply` — add/update/remove in one etag-guarded write; stale **and missing** etag → 409 with the file byte-identical; `schemaEditor: false` → 403 touching no file; all-or-nothing (one refused edit in a batch writes none); non-identifier field name and unknown field type refused; the two stores staying separate — overrides land in `.astro-dev-edit.json` and the config is untouched, overrides still save while `schemaEditor` is off, a cleared override removes the entry rather than storing a no-op, unknown widget refused before any file is written; empty request 400 | `tests/schema-routes.test.ts` |
 | `POST /collection/create` — block appended, name registered, directory made; directory outside `contentRoots` and a traversing directory refused with nothing created; a glob pattern carrying a quote refused (it is written verbatim into generated source); duplicate 409; `schemaEditor: false` 403; a field needing `image()` switching the emitted schema to the function form | `tests/schema-routes.test.ts` |
 | `POST /collection/entries` — the Items listing: newest-first, title-ish frontmatter key, `draft: true` flagged, nested files included, `editableExtensions` honoured, missing directory → empty list, directory outside `contentRoots` refused, entry editor off → 403 | `tests/schema-routes.test.ts` |
 | `POST /collection/open` — `openInEditor: false` → 403 `disabled`. The launch itself is playground-only, like `/open` | `tests/schema-routes.test.ts` |
@@ -151,7 +151,7 @@ whichever sections your change touches; run the whole list before a release.
       the edge and leaves the hairline (`#atx-hairline`); moving the pointer to
       that edge brings it back, moving away retracts it again; a retracted bar
       swallows no clicks. Pinned/unpinned survives a reload
-      (`localStorage.astroTextEditBar`).
+      (`localStorage.astroDevEditBar`).
 - [ ] Unpinned **in edit mode** the bar never retracts: it stays on the edge
       (translucent at rest, opaque on approach) with no hairline, so the exit
       button and save state are always on screen. Unpin mid-edit → nothing
@@ -170,7 +170,7 @@ whichever sections your change touches; run the whole list before a release.
       toast says no route matched and **nothing opens**. Add a page while the
       dev server runs and visit it → it resolves with no restart (the routes
       hook re-fired). With `openInEditor` off, the item is gone.
-- [ ] Edit mode persists across a reload (`sessionStorage.astroTextEditMode`).
+- [ ] Edit mode persists across a reload (`sessionStorage.astroDevEditMode`).
 
 **Save state & leaving edit mode** (the bar's exit button)
 
@@ -263,7 +263,7 @@ whichever sections your change touches; run the whole list before a release.
       page without the meta tag it is absent.
 - [ ] An `astro:assets` `<Image>`: the Source section reads "Not available —
       rendered by a package component" and everything else still copies.
-- [ ] The copied HTML contains no `data-astro-text-edit-ui` node and no
+- [ ] The copied HTML contains no `data-astro-dev-edit-ui` node and no
       `atx-*` class, on a page where an overlay panel was open at copy time.
 - [ ] An element over the caps (>4 000 characters of markup, or >40 matching
       rules) ends its section with the `_Truncated — …_` notice. No playground
@@ -409,7 +409,7 @@ into a nested asset dir. `/works/ledger` leaves `thumbnail` unset.)
 - [ ] Settings opens from the admin bar's overflow menu, accepts a key, and
       reports it configured with a masked hint; reload keeps it; the raw key is
       **not** in any response (check the Network tab).
-- [ ] `.astro-text-edit.json` appears at the project root, is `0600`, and
+- [ ] `.astro-dev-edit.json` appears at the project root, is `0600`, and
       `git status` does **not** list it. **Clear** removes the key.
 - [ ] With a key in `.env` or the config, the Settings field is **disabled** and
       names which one takes precedence; the Save button is visibly disabled.
@@ -452,10 +452,10 @@ split.
       element **with a class** (e.g. the header's `.brand`): no chips row, **with
       no reload**. Turn it back on and the chips return.
 - [ ] Editing a locked control is impossible; forcing one through (devtools) is
-      refused with a per-control message and `.astro-text-edit.json` is unchanged.
+      refused with a per-control message and `.astro-dev-edit.json` is unchanged.
 - [ ] Close with an unsaved change: a discard confirm appears; cancelling keeps
       the drawer, confirming drops the change.
-- [ ] `.astro-text-edit.json` holds **only** the options you changed, and is
+- [ ] `.astro-dev-edit.json` holds **only** the options you changed, and is
       `-rw-------`.
 - [ ] With `unsplash: {}` commented out of the playground config and the server
       restarted, the Unsplash tab offers an **enable toggle** — *not* the old
@@ -498,7 +498,7 @@ function schema with `image()` fields — and its config sets widget overrides o
       round trip is byte-for-byte.
 - [ ] Set `works.client`'s **Widget** to *Textarea* and save: the toast says
       *Saved editor settings*, the config is **untouched**, and
-      `.astro-text-edit.json` holds the override. The entry drawer for a works
+      `.astro-dev-edit.json` holds the override. The entry drawer for a works
       entry renders that field as a textarea.
 - [ ] **New collection** → name `notes` (the directory prefills to
       `src/content/notes`), add a `title` field, create: the block is appended,
@@ -531,8 +531,8 @@ function schema with `image()` fields — and its config sets widget overrides o
       nothing. If it names an element, that element needs its own inline colour:
 
       ```js
-      [...document.querySelectorAll('[data-astro-text-edit-ui="1"]')]
-        .filter(el => !el.style.color && el.parentElement?.closest('[data-astro-text-edit-ui="1"]')
+      [...document.querySelectorAll('[data-astro-dev-edit-ui="1"]')]
+        .filter(el => !el.style.color && el.parentElement?.closest('[data-astro-dev-edit-ui="1"]')
           && getComputedStyle(el).color !== getComputedStyle(el.parentElement).color
           && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))
         .map(el => el.className + ' → ' + getComputedStyle(el).color)
@@ -548,7 +548,7 @@ function schema with `image()` fields — and its config sets widget overrides o
 - [ ] Restore playground fixtures: overlay edits write into
       `examples/playground/src/` — check `git status` and revert.
 - [ ] Delete imported photos from `examples/playground/public/images/` and remove
-      `examples/playground/.astro-text-edit.json` if the Settings drawer wrote one
+      `examples/playground/.astro-dev-edit.json` if the Settings drawer wrote one
       — every option change lands there, so it is almost always present after a
       settings pass.
 - [ ] After a Collections pass, `git checkout examples/playground/src/content.config.ts`

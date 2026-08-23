@@ -7,7 +7,7 @@ import { Readable } from 'node:stream';
 import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
 import { createMiddleware } from '../src/server/middleware.ts';
-import type { TextEditOptions } from '../src/server/options.ts';
+import type { DevEditOptions } from '../src/server/options.ts';
 import { stubOptions } from './helpers.ts';
 import { resolveUnsplashKey, SETTINGS_FILE } from '../src/server/settings.ts';
 import type { UnsplashConfig } from '../src/server/unsplash-routes.ts';
@@ -139,7 +139,7 @@ let handler: Connect.NextHandleFunction;
 /** Build a middleware over the temp project with the given Unsplash config. */
 function mount(
   unsplash: UnsplashConfig | null,
-  options: TextEditOptions = {},
+  options: DevEditOptions = {},
 ): Connect.NextHandleFunction {
   return createMiddleware({
     logger,
@@ -205,9 +205,9 @@ function request(opts: {
 }
 
 const search = (body: unknown, via?: Connect.NextHandleFunction) =>
-  request({ url: '/__text-edit/unsplash/search', body, via });
+  request({ url: '/__dev-edit/unsplash/search', body, via });
 const doImport = (body: unknown, via?: Connect.NextHandleFunction) =>
-  request({ url: '/__text-edit/unsplash/import', body, via });
+  request({ url: '/__dev-edit/unsplash/import', body, via });
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'atx-unsplash-'));
@@ -573,9 +573,9 @@ describe('POST /unsplash/import', () => {
 // -----------------------------------------------------------------------------
 describe('/settings', () => {
   const get = (via?: Connect.NextHandleFunction) =>
-    request({ method: 'GET', url: '/__text-edit/settings', via });
+    request({ method: 'GET', url: '/__dev-edit/settings', via });
   const put = (accessKey: string, via?: Connect.NextHandleFunction) =>
-    request({ url: '/__text-edit/settings', body: { unsplash: { accessKey } }, via });
+    request({ url: '/__dev-edit/settings', body: { unsplash: { accessKey } }, via });
 
   /** A middleware whose key resolution is the real one, so a write is visible
    *  to the next read without a restart. */
@@ -621,7 +621,7 @@ describe('/settings', () => {
 
   it('leaves no temp file behind', async () => {
     await put('abcd1234', live());
-    expect((await readdir(root)).filter((f) => f.includes('text-edit-tmp'))).toEqual([]);
+    expect((await readdir(root)).filter((f) => f.includes('dev-edit-tmp'))).toEqual([]);
   });
 
   it('clears the key with an empty string', async () => {
@@ -669,7 +669,7 @@ describe('/settings', () => {
   it('warns when the settings file is not gitignored, and stops once it is', async () => {
     const via = live();
     expect((await get(via)).body.unsplash.gitignoreWarning).toBe(true);
-    await writeFile(join(root, '.gitignore'), 'node_modules/\n.astro-text-edit.json\n');
+    await writeFile(join(root, '.gitignore'), 'node_modules/\n.astro-dev-edit.json\n');
     expect((await get(via)).body.unsplash.gitignoreWarning).toBeUndefined();
   });
 
@@ -700,7 +700,7 @@ describe('/settings', () => {
 // -----------------------------------------------------------------------------
 describe('GET /health', () => {
   const health = (via?: Connect.NextHandleFunction) =>
-    request({ method: 'GET', url: '/__text-edit/health', via });
+    request({ method: 'GET', url: '/__dev-edit/health', via });
 
   it('reports unsplash: true when enabled with a key', async () => {
     expect((await health()).body.unsplash).toBe(true);

@@ -511,7 +511,7 @@ export function initHover(deps: HoverDeps): HoverHandle {
     // element-tree panel driving highlights of its own — must NOT count as
     // leaving the element, and wins over any pending retarget. (The tree hovers
     // a row to highlight an element; that move must not then hide the pill.)
-    if (e.target instanceof Element && e.target.closest('[data-astro-text-edit-ui="1"]')) {
+    if (e.target instanceof Element && e.target.closest('[data-astro-dev-edit-ui="1"]')) {
       cancelHide();
       cancelCardHide();
       cancelSwitch();

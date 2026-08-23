@@ -3,13 +3,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Connect } from 'vite';
 
 /**
- * Minimal route table + dispatcher for the /__text-edit endpoints. Routes are
+ * Minimal route table + dispatcher for the /__dev-edit endpoints. Routes are
  * matched on exact method + pathname (query stripped) — adding an endpoint is
  * one entry in the middleware's table, with body reading, JSON parsing, and
  * error mapping handled once, here.
  */
 
-export const BASE = '/__text-edit';
+export const BASE = '/__dev-edit';
 
 export interface RouteResult {
   status: number;

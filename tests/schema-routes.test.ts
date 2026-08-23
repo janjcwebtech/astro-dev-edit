@@ -9,7 +9,7 @@ import type { Connect } from 'vite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createMiddleware } from '../src/server/middleware.ts';
-import type { TextEditOptions } from '../src/server/options.ts';
+import type { DevEditOptions } from '../src/server/options.ts';
 import { stubOptions, stubSchemaProvider } from './helpers.ts';
 
 /**
@@ -19,7 +19,7 @@ import { stubOptions, stubSchemaProvider } from './helpers.ts';
  * The patcher itself is pinned in `content-config-patch.test.ts`; what matters
  * here is everything around it — the etag guard, the `schemaEditor` gate
  * refusing before any filesystem work, the two stores staying separate (schema →
- * `content.config.ts`, overrides → `.astro-text-edit.json`), and the fact that a
+ * `content.config.ts`, overrides → `.astro-dev-edit.json`), and the fact that a
  * request can only ever name a *collection*, never a path.
  */
 
@@ -53,7 +53,7 @@ const blogSchema = z.object({ title: z.string(), excerpt: z.string() });
 let root: string;
 
 async function mount(
-  options: TextEditOptions = {},
+  options: DevEditOptions = {},
   provider = stubSchemaProvider({
     async listCollections() {
       return [
@@ -120,7 +120,7 @@ const readConfig = () => readFile(join(root, 'src/content.config.ts'), 'utf8');
 describe('POST /collections', () => {
   it('lists collections with fields, entry counts and the config etag', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collections');
+    const r = await request(h, '/__dev-edit/collections');
     expect(r.status).toBe(200);
     expect(r.body.configPath).toBe('src/content.config.ts');
     expect(r.body.etag).toBe(etagOf(CONFIG));
@@ -140,7 +140,7 @@ describe('POST /collections', () => {
 
   it('reports schemaEditor: false without refusing the read', async () => {
     const h = await mount({ schemaEditor: false });
-    const r = await request(h, '/__text-edit/collections');
+    const r = await request(h, '/__dev-edit/collections');
     expect(r.status).toBe(200);
     expect(r.body.schemaEditor).toBe(false);
     expect(r.body.collections).toHaveLength(1);
@@ -148,14 +148,14 @@ describe('POST /collections', () => {
 
   it('refuses when the entry editor is off', async () => {
     const h = await mount({ entryEditor: false });
-    const r = await request(h, '/__text-edit/collections');
+    const r = await request(h, '/__dev-edit/collections');
     expect(r.status).toBe(403);
     expect(r.body.code).toBe('disabled');
   });
 
   it('answers with a null config when the project has none', async () => {
     const h = await mount({}, stubSchemaProvider());
-    const r = await request(h, '/__text-edit/collections');
+    const r = await request(h, '/__dev-edit/collections');
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ configPath: null, etag: null, collections: [] });
   });
@@ -182,13 +182,13 @@ describe('POST /collections', () => {
         },
       }),
     );
-    const r = await request(h, '/__text-edit/collections');
+    const r = await request(h, '/__dev-edit/collections');
     expect(r.body.collections[0].lockedFields).toEqual(['excerpt']);
   });
 
   it('does not lock an override the panel itself stored', async () => {
     await writeFile(
-      join(root, '.astro-text-edit.json'),
+      join(root, '.astro-dev-edit.json'),
       JSON.stringify({
         options: {
           entryEditor: { collections: { blog: { fields: { excerpt: { widget: 'textarea' } } } } },
@@ -213,7 +213,7 @@ describe('POST /collections', () => {
         },
       }),
     );
-    const r = await request(h, '/__text-edit/collections');
+    const r = await request(h, '/__dev-edit/collections');
     expect(r.body.collections[0].lockedFields).toEqual([]);
   });
 
@@ -231,7 +231,7 @@ describe('POST /collections', () => {
         },
       }),
     );
-    const r = await request(h, '/__text-edit/collections');
+    const r = await request(h, '/__dev-edit/collections');
     expect(r.body.collections[0]).toMatchObject({
       dirExists: false,
       entryCount: 0,
@@ -247,7 +247,7 @@ describe('POST /collections', () => {
 describe('POST /collection/schema/apply', () => {
   it('adds a field, leaving every other byte alone', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       etag: etagOf(CONFIG),
       schema: { add: [{ name: 'subtitle', type: 'text', required: false }] },
@@ -262,7 +262,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('refuses a stale etag and writes nothing', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       etag: 'stale',
       schema: { remove: ['excerpt'] },
@@ -274,7 +274,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('refuses a missing etag', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       schema: { remove: ['excerpt'] },
     });
@@ -284,7 +284,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('refuses every schema edit when schemaEditor is off, touching no file', async () => {
     const h = await mount({ schemaEditor: false });
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       etag: etagOf(CONFIG),
       schema: { add: [{ name: 'subtitle', type: 'text', required: false }] },
@@ -296,7 +296,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('is all-or-nothing: one bad edit in a batch writes none of them', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       etag: etagOf(CONFIG),
       schema: {
@@ -314,7 +314,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('rejects a field name that is not an identifier', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       etag: etagOf(CONFIG),
       schema: { add: [{ name: "x'); rm -rf /; ('", type: 'text', required: false }] },
@@ -325,7 +325,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('rejects an unknown field type', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       etag: etagOf(CONFIG),
       schema: { add: [{ name: 'x', type: 'colour', required: false }] },
@@ -336,7 +336,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('applies removes, updates and adds in one write', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       etag: etagOf(CONFIG),
       schema: {
@@ -356,7 +356,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('writes editor overrides to the settings file, not to the config', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       overrides: { excerpt: { widget: 'textarea' } },
     });
@@ -364,7 +364,7 @@ describe('POST /collection/schema/apply', () => {
     expect(r.body).toMatchObject({ ok: true, schemaWritten: false, overridesWritten: true });
     expect(await readConfig()).toBe(CONFIG);
 
-    const stored = JSON.parse(await readFile(join(root, '.astro-text-edit.json'), 'utf8'));
+    const stored = JSON.parse(await readFile(join(root, '.astro-dev-edit.json'), 'utf8'));
     expect(stored.options.entryEditor.collections.blog.fields.excerpt).toEqual({
       widget: 'textarea',
     });
@@ -372,32 +372,32 @@ describe('POST /collection/schema/apply', () => {
 
   it('clears an override rather than storing a no-op', async () => {
     const h = await mount();
-    await request(h, '/__text-edit/collection/schema/apply', {
+    await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       overrides: { excerpt: { widget: 'textarea', hidden: true } },
     });
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       overrides: { excerpt: null },
     });
     expect(r.body.overridesWritten).toBe(true);
-    const stored = JSON.parse(await readFile(join(root, '.astro-text-edit.json'), 'utf8'));
+    const stored = JSON.parse(await readFile(join(root, '.astro-dev-edit.json'), 'utf8'));
     expect(stored.options.entryEditor?.collections?.blog).toBeUndefined();
   });
 
   it('rejects an unknown widget', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       overrides: { excerpt: { widget: 'colour' } },
     });
     expect(r.status).toBe(422);
-    expect(existsSync(join(root, '.astro-text-edit.json'))).toBe(false);
+    expect(existsSync(join(root, '.astro-dev-edit.json'))).toBe(false);
   });
 
   it('saves overrides while schemaEditor is off', async () => {
     const h = await mount({ schemaEditor: false });
-    const r = await request(h, '/__text-edit/collection/schema/apply', {
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
       collection: 'blog',
       overrides: { excerpt: { widget: 'textarea' } },
     });
@@ -407,7 +407,7 @@ describe('POST /collection/schema/apply', () => {
 
   it('refuses an empty request', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/schema/apply', { collection: 'blog' });
+    const r = await request(h, '/__dev-edit/collection/schema/apply', { collection: 'blog' });
     expect(r.status).toBe(400);
   });
 });
@@ -426,7 +426,7 @@ describe('POST /collection/entries', () => {
         },
       }),
     );
-    const r = await request(h, '/__text-edit/collection/entries', { collection: 'blog' });
+    const r = await request(h, '/__dev-edit/collection/entries', { collection: 'blog' });
     expect(r.status).toBe(200);
     expect(r.body.dir).toBe('src/content/blog');
     const byFile = Object.fromEntries(r.body.entries.map((e: any) => [e.slug, e]));
@@ -442,7 +442,7 @@ describe('POST /collection/entries', () => {
 
   it('answers empty for a directory that does not exist', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/entries', { collection: 'ghosts' });
+    const r = await request(h, '/__dev-edit/collection/entries', { collection: 'ghosts' });
     expect(r.status).toBe(200);
     expect(r.body.entries).toEqual([]);
   });
@@ -456,13 +456,13 @@ describe('POST /collection/entries', () => {
         },
       }),
     );
-    const r = await request(h, '/__text-edit/collection/entries', { collection: 'x' });
+    const r = await request(h, '/__dev-edit/collection/entries', { collection: 'x' });
     expect(r.status).toBe(422);
   });
 
   it('refuses when the entry editor is off', async () => {
     const h = await mount({ entryEditor: false });
-    const r = await request(h, '/__text-edit/collection/entries', { collection: 'blog' });
+    const r = await request(h, '/__dev-edit/collection/entries', { collection: 'blog' });
     expect(r.status).toBe(403);
   });
 
@@ -476,7 +476,7 @@ describe('POST /collection/entries', () => {
         },
       }),
     );
-    const r = await request(h, '/__text-edit/collection/entries', { collection: 'blog' });
+    const r = await request(h, '/__dev-edit/collection/entries', { collection: 'blog' });
     expect(r.body.entries.map((e: any) => e.slug).sort()).toEqual(['one', 'two']);
   });
 });
@@ -484,7 +484,7 @@ describe('POST /collection/entries', () => {
 describe('POST /collection/open', () => {
   it('refuses when open-in-editor is off, without naming a path', async () => {
     const h = await mount({ openInEditor: false });
-    const r = await request(h, '/__text-edit/collection/open', { collection: 'blog' });
+    const r = await request(h, '/__dev-edit/collection/open', { collection: 'blog' });
     expect(r.status).toBe(403);
     expect(r.body.code).toBe('disabled');
   });
@@ -493,7 +493,7 @@ describe('POST /collection/open', () => {
 describe('POST /collection/create', () => {
   it('appends a block, registers the name and makes the directory', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/create', {
+    const r = await request(h, '/__dev-edit/collection/create', {
       name: 'notes',
       etag: etagOf(CONFIG),
       fields: [{ name: 'title', type: 'text', required: true }],
@@ -509,7 +509,7 @@ describe('POST /collection/create', () => {
 
   it('refuses a directory outside the content roots, creating nothing', async () => {
     const h = await mount({ contentRoots: ['src'] });
-    const r = await request(h, '/__text-edit/collection/create', {
+    const r = await request(h, '/__dev-edit/collection/create', {
       name: 'notes',
       dir: 'public/notes',
       etag: etagOf(CONFIG),
@@ -522,7 +522,7 @@ describe('POST /collection/create', () => {
 
   it('refuses a traversing directory', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/create', {
+    const r = await request(h, '/__dev-edit/collection/create', {
       name: 'notes',
       dir: 'src/content/../../../escape',
       etag: etagOf(CONFIG),
@@ -534,7 +534,7 @@ describe('POST /collection/create', () => {
 
   it('refuses a glob pattern carrying a quote', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/create', {
+    const r = await request(h, '/__dev-edit/collection/create', {
       name: 'notes',
       pattern: "**/*.md', evil: '",
       etag: etagOf(CONFIG),
@@ -546,7 +546,7 @@ describe('POST /collection/create', () => {
 
   it('refuses a duplicate collection', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/create', {
+    const r = await request(h, '/__dev-edit/collection/create', {
       name: 'blog',
       etag: etagOf(CONFIG),
       fields: [],
@@ -557,7 +557,7 @@ describe('POST /collection/create', () => {
 
   it('refuses when schemaEditor is off', async () => {
     const h = await mount({ schemaEditor: false });
-    const r = await request(h, '/__text-edit/collection/create', {
+    const r = await request(h, '/__dev-edit/collection/create', {
       name: 'notes',
       etag: etagOf(CONFIG),
       fields: [],
@@ -568,7 +568,7 @@ describe('POST /collection/create', () => {
 
   it('uses the function schema form when a field needs image()', async () => {
     const h = await mount();
-    const r = await request(h, '/__text-edit/collection/create', {
+    const r = await request(h, '/__dev-edit/collection/create', {
       name: 'gallery',
       etag: etagOf(CONFIG),
       fields: [{ name: 'cover', type: 'image', required: true }],

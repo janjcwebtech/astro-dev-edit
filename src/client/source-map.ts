@@ -31,7 +31,7 @@ import type { SourceLoc } from '../shared/protocol.ts';
  * win the race against the toolbar's stripping.
  */
 
-const PROP = '__astroTextEditSrc' as const;
+const PROP = '__astroDevEditSrc' as const;
 
 interface Stamped extends HTMLElement {
   [PROP]?: SourceLoc;

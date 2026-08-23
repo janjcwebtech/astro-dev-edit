@@ -1,5 +1,5 @@
 /**
- * astro-text-edit overlay — injected browser client (composition root).
+ * astro-dev-edit overlay — injected browser client (composition root).
  *
  * Edit mode gives you a hover highlight, and clicking routes by classification.
  * The DOM-side guess is only a hover hint: every click is confirmed against the
@@ -114,7 +114,7 @@ document.addEventListener('mousemove', (e) => {
 function rememberTree(open: boolean): void {
   treeWanted = open;
   try {
-    sessionStorage.setItem('astroTextEditTree', open ? '1' : '0');
+    sessionStorage.setItem('astroDevEditTree', open ? '1' : '0');
   } catch {
     // sessionStorage unavailable (rare) — the choice just won't persist.
   }
@@ -126,7 +126,7 @@ function setEditMode(on: boolean): void {
   refreshCursor();
   // Survive the full-page reload that follows every successful save.
   try {
-    sessionStorage.setItem('astroTextEditMode', on ? '1' : '0');
+    sessionStorage.setItem('astroDevEditMode', on ? '1' : '0');
   } catch {
     // sessionStorage unavailable (rare) — edit mode just won't persist.
   }
@@ -422,8 +422,8 @@ async function boot(): Promise<void> {
   // Restore edit mode — and whether the tree was open with it — across the
   // full-page reload that follows every save.
   try {
-    treeWanted = sessionStorage.getItem('astroTextEditTree') === '1';
-    if (sessionStorage.getItem('astroTextEditMode') === '1') setEditMode(true);
+    treeWanted = sessionStorage.getItem('astroDevEditTree') === '1';
+    if (sessionStorage.getItem('astroDevEditMode') === '1') setEditMode(true);
   } catch {
     // sessionStorage unavailable — start with edit mode off.
   }

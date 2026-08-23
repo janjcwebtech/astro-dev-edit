@@ -40,7 +40,7 @@ import type { UnsplashConfig } from './unsplash-routes.ts';
  * disk — so a partly-valid patch can never leave the file half-updated. This is
  * the same property `/apply`'s verify-all-then-write-once loop has.
  *
- * Both endpoints write a **fixed path** (`.astro-text-edit.json` at the project
+ * Both endpoints write a **fixed path** (`.astro-dev-edit.json` at the project
  * root, never client-supplied), which is why they bypass
  * `paths.ts::validateEditablePath` — see the header of `settings.ts` for the
  * full rationale.
@@ -196,7 +196,7 @@ export function createSettingsRoutes(deps: SettingsRouteDeps): Route[] {
     await saveUnsplashKey(root, accessKey);
     logger.info(
       accessKey.trim()
-        ? 'stored an Unsplash access key in .astro-text-edit.json'
+        ? 'stored an Unsplash access key in .astro-dev-edit.json'
         : 'cleared the stored Unsplash access key',
     );
     return null;

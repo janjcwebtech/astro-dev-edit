@@ -31,8 +31,8 @@ import { createSettingsRoutes } from './settings-routes.ts';
 import { createUnsplashRoutes, type UnsplashConfig } from './unsplash-routes.ts';
 
 /**
- * Dev-server middleware for astro-text-edit — the composition point for every
- * /__text-edit route group. This file owns the core loc-based editing routes
+ * Dev-server middleware for astro-dev-edit — the composition point for every
+ * /__dev-edit route group. This file owns the core loc-based editing routes
  * (health, assets, upload, open, peek, classify, apply) and the localhost gate;
  * feature route groups (the /entry* CMS endpoints in entry-routes.ts, the
  * page-source lookup in page-source-routes.ts, and the rest) export
@@ -163,7 +163,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
           status: 200,
           body: {
             ok: true,
-            name: 'astro-text-edit',
+            name: 'astro-dev-edit',
             milestone: 1,
             cssInspector: o.cssInspector,
             openInEditor: o.openInEditor,

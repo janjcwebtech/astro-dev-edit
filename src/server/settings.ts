@@ -10,7 +10,7 @@ import { atomicWrite } from './paths.ts';
  *
  * Two deliberately separate compartments in one file. `unsplash.accessKey` is a
  * **secret** — never returned to the browser, masked on read, chmod'ed 0600.
- * `options` is an ordinary `Partial<TextEditOptions>`, the same vocabulary
+ * `options` is an ordinary `Partial<DevEditOptions>`, the same vocabulary
  * `astro.config.mjs` uses, so the file reads like the config it supplements and
  * `options.ts` can apply one `read` per option to either source. The key is
  * stripped from `options.unsplash` on every write, so the secret has exactly one
@@ -34,7 +34,7 @@ import { atomicWrite } from './paths.ts';
  */
 
 /** Fixed, never client-supplied. */
-export const SETTINGS_FILE = '.astro-text-edit.json';
+export const SETTINGS_FILE = '.astro-dev-edit.json';
 
 interface StoredSettings {
   /** The secret compartment. Read only by `resolveUnsplashKey`. */

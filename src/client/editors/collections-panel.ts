@@ -41,7 +41,7 @@ import { openEntryCreatePanel, openEntryPanel } from './entry.ts';
  * - **Schema** (type, required, default, add, remove) → `src/content.config.ts`.
  *   Committed source. It changes what `astro build` accepts, and it is the half
  *   `schemaEditor: false` switches off.
- * - **Editor** (widget, label, hidden) → `.astro-text-edit.json`. Local,
+ * - **Editor** (widget, label, hidden) → `.astro-dev-edit.json`. Local,
  *   gitignored, and only the entry drawer reads it.
  *
  * Every field row carries both halves under those two words, and the legend at
@@ -103,7 +103,7 @@ const TYPE_LABEL: Record<string, string> = {
  * where the user was is the same trick, in the same store, that already carries
  * edit mode across the reload every text save causes.
  */
-const RESUME_KEY = 'astroTextEditCollection';
+const RESUME_KEY = 'astroDevEditCollection';
 
 /** How long a remembered collection stays valid. Long enough to survive the
  *  reload (Astro emits more than one while it resyncs, so the key must outlive
@@ -1088,7 +1088,7 @@ function legend(): HTMLElement {
   };
   wrap.append(
     line('Schema', 'writes your content config — committed source, and it changes what builds.'),
-    line('Editor', 'writes .astro-text-edit.json — local, and only this drawer reads it.'),
+    line('Editor', 'writes .astro-dev-edit.json — local, and only this drawer reads it.'),
     line(
       '',
       'Saving a schema change rewrites that field’s expression in canonical form, and reloads ' +

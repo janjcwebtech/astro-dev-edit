@@ -9,13 +9,13 @@ import {
   createOptionsResolver,
   DEFAULTS,
   UNSPLASH_MAX_PER_PAGE,
-  type TextEditOptions,
+  type DevEditOptions,
 } from './server/options.ts';
 import { resolveUnsplashKey } from './server/settings.ts';
 import { fileURLToPath } from 'node:url';
 
 /**
- * astro-text-edit — in-browser visual content editing for the local dev server.
+ * astro-dev-edit — in-browser visual content editing for the local dev server.
  *
  * Click-to-edit for literal text and static img src/alt in .astro templates:
  * the client confirms each target against the server-side AST classification,
@@ -27,12 +27,12 @@ import { fileURLToPath } from 'node:url';
  * **The option vocabulary lives in `server/options.ts`,** not here — the
  * Settings panel resolves options per request against the settings file, so the
  * table that declares them has to sit where both the resolver and the routes can
- * read it. This file passes what the project actually wrote to `textEdit()`
+ * read it. This file passes what the project actually wrote to `devEdit()`
  * through **unmerged**: `key in userOptions` is what tells the panel an option is
  * config-owned, and collapsing it into `DEFAULTS` here would erase exactly that.
  */
 
-export type { TextEditOptions, UnsplashOptions, ResolvedOptions } from './server/options.ts';
+export type { DevEditOptions, UnsplashOptions, ResolvedOptions } from './server/options.ts';
 export type { EntryEditorOptions, EntryFieldOverride } from './server/content-config.ts';
 
 /** The project's installed Astro major, resolved from the project root (the
@@ -48,7 +48,7 @@ function detectAstroMajor(projectRoot: string): number | null {
   }
 }
 
-export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegration {
+export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegration {
   // Config-setup-time options only. Both are consumed before any dev server
   // exists — `sourceAnnotations` registers a Vite plugin — so neither can come
   // from the settings file, and both are reported to the panel as read-only.
@@ -69,7 +69,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
   let resolvedRoutes: readonly ResolvedRouteLike[] = [];
 
   return {
-    name: 'astro-text-edit',
+    name: 'astro-dev-edit',
     hooks: {
       'astro:config:setup': ({ command, config, injectScript, logger, updateConfig }) => {
         // Dev server only. Bail for `astro build` / `astro preview` so nothing
@@ -120,7 +120,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
         if (!toolbarEnabled && !selfAnnotate) {
           logger.warn(
             'the Astro dev toolbar is DISABLED, so no data-astro-source-* ' +
-              'attributes are emitted. astro-text-edit needs them to locate ' +
+              'attributes are emitted. astro-dev-edit needs them to locate ' +
               'editable elements and will find nothing. Re-enable the dev ' +
               'toolbar (devToolbar.enabled) or set sourceAnnotations: "force".',
           );
@@ -154,7 +154,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
           configOptions: userOptions,
         });
 
-        // Vite dev middleware exposes the edit API under /__text-edit/. (spec §4.3)
+        // Vite dev middleware exposes the edit API under /__dev-edit/. (spec §4.3)
         server.middlewares.use(
           createMiddleware({
             logger,
@@ -190,7 +190,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
               appName: async () => {
                 const { options } = await optionsResolver.resolve();
                 const o = options.unsplash;
-                return (o === false ? '' : o.appName) || 'astro-text-edit';
+                return (o === false ? '' : o.appName) || 'astro-dev-edit';
               },
               perPage: async () => {
                 const { options } = await optionsResolver.resolve();
@@ -240,7 +240,7 @@ export default function textEdit(userOptions: TextEditOptions = {}): AstroIntegr
  */
 function warnAboutUploadDirs(
   projectRoot: string,
-  userOptions: TextEditOptions,
+  userOptions: DevEditOptions,
   logger: { warn(message: string): void },
 ): void {
   const uploadDir = userOptions.uploadDir;

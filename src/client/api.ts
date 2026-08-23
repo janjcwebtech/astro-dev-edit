@@ -41,13 +41,13 @@ import type {
 } from '../shared/protocol.ts';
 
 /**
- * Typed fetch client for the /__text-edit endpoints — the only place the
+ * Typed fetch client for the /__dev-edit endpoints — the only place the
  * overlay talks to the dev server. Pure I/O: no DOM, no toasts; callers
  * present errors. Every function throws the server's `error` message (or a
  * "<what> failed (<status>)" fallback) on a non-OK response.
  */
 
-const API = '/__text-edit';
+const API = '/__dev-edit';
 
 async function errorMessage(res: Response): Promise<string | undefined> {
   const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -141,7 +141,7 @@ export async function apply(req: ApplyRequestWire): Promise<void> {
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `save failed (${res.status})`);
 }
 
-/** Probe a page route (NOT a /__text-edit endpoint): true once the dev server
+/** Probe a page route (NOT a /__dev-edit endpoint): true once the dev server
  *  answers it with something other than a 404. Used after entry create to
  *  wait out the content-layer sync before navigating to the new page. */
 export async function routeExists(url: string): Promise<boolean> {
