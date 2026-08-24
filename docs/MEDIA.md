@@ -30,7 +30,11 @@ Two things about how it behaves:
 
 Uploading works from the **Upload file…** button or by dropping a file anywhere
 on the modal. Uploads land in `uploadDir` — or, for an `image()` field, beside
-the field's existing asset.
+the field's existing asset. `uploadDir` has to be somewhere the browser can
+fetch from, which in practice means under `public/`: a file there becomes a
+plain `<img src>`, so a `src/`-relative directory works in dev and 404s in a
+production build. A preflight warning fires at startup if the configured
+directory isn't web-servable.
 
 The swap panel keeps a shortcut for the common case: a preview of the image you
 are editing, and a strip of the **six most recently added** images, with
@@ -49,6 +53,17 @@ devEdit({ unsplash: {} })
 The photo is a normal file in your repo afterwards. Nothing but the local path
 is written into your source, so your published site never depends on Unsplash
 being up — and an `image()` field can use it, which a remote URL cannot.
+
+Two things bound the feature:
+
+- **A photo is importable only while the dev server that searched for it is
+  running.** The server keeps the download URLs in memory rather than letting
+  the browser supply them, so the browser can name a photo but cannot point the
+  dev server at an arbitrary host. After a restart, an import answers "search
+  again" instead.
+- **A strict `img-src` CSP on your dev page blocks the thumbnails.** The grid
+  stays usable — credits still read and photos still import — but the tiles
+  show a placeholder.
 
 ### Your access key
 

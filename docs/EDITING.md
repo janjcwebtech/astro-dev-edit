@@ -141,7 +141,7 @@ Every global control lives in a slim bar across the top of the page:
   components opens the page rather than the busiest component, and a URL that
   matches no route says so instead of guessing;
   *Collections*, the [collection and field designer](ENTRY-EDITOR.md#collections--the-collection-designer);
-  and *Settings*, where [every integration option](../README.md#settings-drawer) — including the
+  and *Settings*, where [every integration option](../README.md#options) — including the
   [Unsplash access key](MEDIA.md#unsplash-photo-picker) — is editable.
 
 The bar **overlays** the page rather than pushing it down: the top edge is where

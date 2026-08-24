@@ -96,7 +96,9 @@ treats them accordingly:
   the field's own asset directory with a text filter and a "Show all" toggle
 - **picking** writes the value back relative to the entry, never as a web path
 - **uploads** land in the field's existing asset directory, falling back to
-  `imageUploadDir`
+  `imageUploadDir` — which has to be under `src/`, because Astro *imports*
+  these assets and `public/` files cannot be imported (a preflight warning
+  fires if it isn't)
 
 Animated GIFs are refused for these fields: Astro optimises `image()` assets,
 which flattens the animation. Keep those in `public/` and reference them from a
@@ -206,6 +208,11 @@ Worth knowing before you use it:
 -   **A schema the designer can't prove, it won't touch.** Built by a helper,
     holding a spread, conditional — the row says so and offers *Open source*
     instead of controls.
+-   **Names are validated, not escaped.** A collection or field name has to be a
+    plain identifier, and a new collection's directory is confined to
+    `contentRoots` like any other write. A value that would need quoting to be
+    written safely is refused rather than quoted, which keeps every expression
+    the patcher writes a shape it can read back.
 
 ### Items
 
