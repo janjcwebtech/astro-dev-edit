@@ -2,11 +2,13 @@ import type { AstroIntegrationLogger } from 'astro';
 import type {
   UnsplashErrorCode,
   UnsplashImportRequest,
+  UnsplashImportWidth,
   UnsplashPhoto,
   UnsplashSearchRequest,
   UnsplashSearchResponse,
 } from '../shared/protocol.ts';
 import { slugify } from '../shared/slug.ts';
+import { UNSPLASH_IMPORT_WIDTHS, coerceImportWidth } from '../shared/unsplash.ts';
 import { saveBuffer } from './assets.ts';
 import { resolveAssetTarget } from './paths.ts';
 import type { Route, RouteResult } from './router.ts';
@@ -54,9 +56,6 @@ const DOWNLOAD_TIMEOUT_MS = 30_000;
 /** Same cap `/upload` enforces, so the two write paths agree. */
 const MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024;
 
-/** Long edge requested from Unsplash's image CDN. Comfortably above any
- *  reasonable display size while staying far below the byte cap. */
-const IMPORT_WIDTH = 2400;
 
 /** How long an identical search is served from memory. The demo tier allows
  *  only 50 API requests/hour, and iterating on one query must not burn them. */
@@ -83,6 +82,9 @@ export interface UnsplashConfig {
   appName: () => Promise<string>;
   /** Default results per page; already clamped to Unsplash's maximum. */
   perPage: () => Promise<number>;
+  /** Width to fetch when a request does not name one. A thunk like the rest:
+   *  the Settings drawer can change it without a dev-server restart. */
+  importWidth: () => Promise<UnsplashImportWidth>;
   /** Injected so tests can stub Unsplash without touching globals — unlike a
    *  global stub this cannot leak across suites. Defaults to `globalThis.fetch`. */
   fetchImpl?: typeof fetch;
@@ -352,6 +354,28 @@ export function createUnsplashRoutes(deps: UnsplashRouteDeps): Route[] {
         const id = (req.id ?? '').trim();
         if (!id) return { status: 400, body: { error: 'id is required' } };
 
+        // A client-supplied width reaches the URL the dev server fetches, so it
+        // is checked against the safelist and **refused** when it misses —
+        // clamping would hide the bug and quietly import the wrong size. An
+        // absent width falls back to the resolved project-wide option.
+        let width: UnsplashImportWidth;
+        if (req.width === undefined) {
+          width = await unsplash!.importWidth(); // non-null past requireKey, as in /search
+        } else {
+          const asked = coerceImportWidth(req.width);
+          if (asked === null) {
+            return {
+              status: 400,
+              body: {
+                error:
+                  `width must be one of ${UNSPLASH_IMPORT_WIDTHS.join(', ')} ` +
+                  `— got ${JSON.stringify(req.width)}`,
+              },
+            };
+          }
+          width = asked;
+        }
+
         const photo = photos.get(id);
         if (!photo || !photo.rawUrl) {
           return fail(
@@ -366,8 +390,15 @@ export function createUnsplashRoutes(deps: UnsplashRouteDeps): Route[] {
         // fm=jpg makes the content type deterministic, which keeps the
         // extension lookup honest. (There is no animated-GIF refusal to mirror
         // from /upload here: every import is a JPEG by construction.)
+        //
+        // `fit=max` only ever shrinks, so a smaller `w` is pure saving; a width
+        // of 'original' omits the parameter altogether and MAX_DOWNLOAD_BYTES
+        // is then the only bound.
         const byteUrl = new URL(photo.rawUrl);
-        byteUrl.searchParams.set('w', String(IMPORT_WIDTH));
+        // `delete`, not just "don't set": Unsplash's raw URL can already carry
+        // sizing parameters of its own, and 'original' must mean the full file.
+        if (width === 'original') byteUrl.searchParams.delete('w');
+        else byteUrl.searchParams.set('w', String(width));
         byteUrl.searchParams.set('fit', 'max');
         byteUrl.searchParams.set('q', '80');
         byteUrl.searchParams.set('fm', 'jpg');

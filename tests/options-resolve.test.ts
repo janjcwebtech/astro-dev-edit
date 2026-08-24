@@ -168,6 +168,58 @@ describe('entryEditor merging', () => {
   });
 });
 
+describe('unsplash import width', () => {
+  // The option is a `select`, so its wire and stored form is text while the
+  // config accepts a plain number — this is where the two meet.
+  it('defaults to 2400, the width every import used before it was choosable', async () => {
+    const { options, described } = await resolve({ unsplash: {} });
+    expect(options.unsplash && options.unsplash.importWidth).toBe(2400);
+    const d = describedBy(described, 'unsplashImportWidth');
+    expect(d.value).toBe('2400');
+    expect(d.choices).toEqual(['800', '1600', '2400', 'original']);
+    expect(d.source).toBe('default');
+  });
+
+  it('takes a numeric config value and reports it as the matching choice', async () => {
+    const { options, described } = await resolve({ unsplash: { importWidth: 800 } });
+    expect(options.unsplash && options.unsplash.importWidth).toBe(800);
+    const d = describedBy(described, 'unsplashImportWidth');
+    // Stringified by `read`, or the panel's select would match no option and
+    // render as if the value were unset.
+    expect(d.value).toBe('800');
+    expect(d.locked).toBe(true);
+  });
+
+  it("carries 'original' through both layers", async () => {
+    const fromFile = await resolve({ unsplash: {} }, { unsplash: { importWidth: 'original' } });
+    expect(fromFile.options.unsplash && fromFile.options.unsplash.importWidth).toBe('original');
+    const fromConfig = await resolve({ unsplash: { importWidth: 'original' } });
+    expect(fromConfig.options.unsplash && fromConfig.options.unsplash.importWidth).toBe('original');
+  });
+
+  it('falls back rather than resolving to a width the import route would refuse', async () => {
+    // Only reachable by hand-editing the settings file; resolving it would send
+    // the picker a default its own import would 400 on.
+    const { options } = await resolve(
+      { unsplash: {} },
+      { unsplash: { importWidth: 4321 as unknown as 800 } },
+    );
+    expect(options.unsplash && options.unsplash.importWidth).toBe(2400);
+  });
+
+  it('stores a saved width parsed, not stringly-typed', async () => {
+    const { values, errors } = coerceOptionPatch({ unsplashImportWidth: '800' });
+    expect(errors).toEqual({});
+    const next = applyOptionPatch({}, values);
+    expect(next.unsplash).toEqual({ importWidth: 800 });
+  });
+
+  it('refuses a width that is not one of the offered choices', () => {
+    const { errors } = coerceOptionPatch({ unsplashImportWidth: '12000' });
+    expect(errors.unsplashImportWidth).toContain('expected one of');
+  });
+});
+
 describe('coerceOptionPatch', () => {
   it('accepts well-typed values', () => {
     const { values, errors } = coerceOptionPatch({
@@ -261,7 +313,7 @@ describe('applyOptionPatch', () => {
       unsplashAppName: 'round trip',
     }).values));
     const { options } = await resolve();
-    expect(options.unsplash).toEqual({ appName: 'round trip', perPage: 20 });
+    expect(options.unsplash).toEqual({ appName: 'round trip', perPage: 20, importWidth: 2400 });
   });
 
   it('never persists the access key through the option path', () => {

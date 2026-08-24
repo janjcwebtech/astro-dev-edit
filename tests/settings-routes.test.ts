@@ -55,6 +55,7 @@ function mount(configOptions: DevEditOptions = {}): Connect.NextHandleFunction {
     enabled: async () => true,
     appName: async () => 'test',
     perPage: async () => 20,
+    importWidth: async () => 2400,
   };
   return createMiddleware({
     logger,

@@ -1,6 +1,17 @@
-import type { MediaPick, UnsplashOrientation, UnsplashPhoto } from '../../shared/protocol.ts';
+import type {
+  MediaPick,
+  UnsplashImportWidth,
+  UnsplashOrientation,
+  UnsplashPhoto,
+} from '../../shared/protocol.ts';
+import {
+  UNSPLASH_IMPORT_WIDTHS,
+  coerceImportWidth,
+  importWidthLabel,
+} from '../../shared/unsplash.ts';
 import * as api from '../api.ts';
 import { UnsplashError } from '../api.ts';
+import { unsplashImportWidth } from '../features.ts';
 import { icon } from '../icons.ts';
 import { createSearchController, type SearchError, type SearchState } from '../unsplash-search.ts';
 import { COLOR, FONT, INPUT_STYLE, footButton, styled, toast } from '../ui.ts';
@@ -52,6 +63,10 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
   let photos: UnsplashPhoto[] = [];
   let remaining: number | undefined;
   let importing: string | null = null;
+  // Starts at the resolved project-wide option and is then this pane's own
+  // choice, because the right size belongs to the slot the image goes in, not
+  // to the project. Not persisted: the next slot is a different size.
+  let width: UnsplashImportWidth = unsplashImportWidth();
 
   // The pane contributes its toolbar only; the shared grid is placed by the
   // shell (see MediaPane.el).
@@ -83,7 +98,25 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
     orientSelect.append(option);
   }
 
-  el.append(searchWrap, orientSelect);
+  // Width, next to shape: both narrow what a pick will produce, and both are
+  // the pane's own state rather than the modal's.
+  const widthSelect = styled('select', 'atx-unsplash-width', {
+    ...INPUT_STYLE, flex: '0 0 auto', width: 'auto', font: '12px system-ui',
+  });
+  for (const value of UNSPLASH_IMPORT_WIDTHS) {
+    const option = document.createElement('option');
+    option.value = String(value);
+    option.textContent = importWidthLabel(value);
+    widthSelect.append(option);
+  }
+  widthSelect.value = String(width);
+  widthSelect.title = 'Width the chosen photo is downloaded at';
+  widthSelect.addEventListener('change', () => {
+    width = coerceImportWidth(widthSelect.value) ?? width;
+    deps.refresh(); // the rail states the width, so it repaints with it
+  });
+
+  el.append(searchWrap, orientSelect, widthSelect);
 
   // --- the controller --------------------------------------------------------
   const controller = createSearchController({
@@ -226,6 +259,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
           railLink('Photographer', photo.photographer, photo.photographerUrl),
           railLink('Source', 'View on Unsplash', photo.pageUrl),
           railLine('Dimensions', `${photo.width} × ${photo.height}`),
+          railLine('Downloads at', downloadsAt(photo, width)),
           railLine('Saves as', importFilename(photo)),
         );
       }
@@ -247,6 +281,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
       try {
         const res = await api.unsplashImport({
           id: key,
+          width,
           ...(deps.assetRef ? { assetRef: deps.assetRef } : {}),
           ...(deps.targetDir ? { targetDir: deps.targetDir } : {}),
         });
@@ -269,6 +304,15 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
       controller.dispose();
     },
   };
+}
+
+/** What the chosen width actually means for this photo. `fit=max` only shrinks,
+ *  so a photo narrower than the request comes back at its own size — saying
+ *  "2400 px" there would be a promise the CDN does not keep. */
+function downloadsAt(photo: UnsplashPhoto, width: UnsplashImportWidth): string {
+  if (width === 'original') return `${photo.width} px wide (original)`;
+  if (photo.width <= width) return `${photo.width} px wide (already smaller)`;
+  return `${width} px wide`;
 }
 
 /** Mirrors the server's naming so the rail can promise what will land. The

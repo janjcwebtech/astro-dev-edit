@@ -164,6 +164,7 @@ function config(over: Partial<UnsplashConfig> = {}): UnsplashConfig {
     enabled: async () => true,
     appName: async () => 'my app',
     perPage: async () => 20,
+    importWidth: async () => 2400,
     fetchImpl: stub.fetch,
     ...over,
   };
@@ -417,6 +418,52 @@ describe('POST /unsplash/import', () => {
     expect(url.searchParams.get('q')).toBe('80');
     expect(url.searchParams.get('fm')).toBe('jpg');
     expect(url.searchParams.get('ixid')).toBe('abc123');
+  });
+
+  it('honours a per-import width, and asks for nothing wider than requested', async () => {
+    await seed();
+    await doImport({ id: 'abc', width: 800 });
+    const byteCall = stub.calls.find((c) => c.url.startsWith('https://images.unsplash.com'))!;
+    expect(new URL(byteCall.url).searchParams.get('w')).toBe('800');
+  });
+
+  it("drops the width parameter entirely for 'original'", async () => {
+    // The raw URL Unsplash hands back can carry sizing of its own, so
+    // 'original' has to remove `w`, not merely decline to add one.
+    await seed();
+    await doImport({ id: 'abc', width: 'original' });
+    const byteCall = stub.calls.find((c) => c.url.startsWith('https://images.unsplash.com'))!;
+    const url = new URL(byteCall.url);
+    expect(url.searchParams.has('w')).toBe(false);
+    expect(url.searchParams.get('fit')).toBe('max');
+    expect(url.searchParams.get('ixid')).toBe('abc123');
+  });
+
+  it('falls back to the resolved option when the request names no width', async () => {
+    handler = mount(config({ importWidth: async () => 1600 }));
+    await seed();
+    await doImport({ id: 'abc' });
+    const byteCall = stub.calls.find((c) => c.url.startsWith('https://images.unsplash.com'))!;
+    expect(new URL(byteCall.url).searchParams.get('w')).toBe('1600');
+  });
+
+  it('refuses an off-safelist width rather than clamping it, and downloads nothing', async () => {
+    // The width lands in a URL the dev server fetches. Clamping would hide a
+    // client bug and quietly import the wrong size, so it is a 400.
+    await seed();
+    const before = stub.calls.length;
+    const r = await doImport({ id: 'abc', width: 12000 });
+    expect(r.status).toBe(400);
+    expect(String(r.body.error)).toContain('width must be one of');
+    expect(stub.calls.length).toBe(before);
+    expect(await readdir(join(root, 'public'))).toEqual([]);
+  });
+
+  it('refuses a width that is a string of something else', async () => {
+    await seed();
+    const r = await doImport({ id: 'abc', width: '2400&fm=png' });
+    expect(r.status).toBe(400);
+    expect(await readdir(join(root, 'public'))).toEqual([]);
   });
 
   it('fires the download_location ping, authenticated and with its ixid intact', async () => {
@@ -708,6 +755,15 @@ describe('GET /health', () => {
 
   it('reports false when the feature is disabled', async () => {
     expect((await health(mount(null))).body.unsplash).toBe(false);
+  });
+
+  it('reports the resolved import width, so the picker select starts there', async () => {
+    const via = mount(config(), { unsplash: { importWidth: 800 } });
+    expect((await health(via)).body.unsplashImportWidth).toBe(800);
+  });
+
+  it('omits the import width when the feature is off', async () => {
+    expect((await health(mount(null))).body.unsplashImportWidth).toBeUndefined();
   });
 
   it('reports false when enabled but the key resolves empty', async () => {

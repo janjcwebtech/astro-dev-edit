@@ -1,4 +1,9 @@
-import type { FieldType } from '../shared/protocol.ts';
+import type { FieldType, UnsplashImportWidth } from '../shared/protocol.ts';
+import {
+  UNSPLASH_DEFAULT_IMPORT_WIDTH,
+  UNSPLASH_IMPORT_WIDTH_CHOICES,
+  coerceImportWidth,
+} from '../shared/unsplash.ts';
 import type { EntryEditorOptions } from './content-config.ts';
 import { readStoredOptions } from './settings.ts';
 
@@ -120,6 +125,16 @@ export interface UnsplashOptions {
   /** Results per search page. Clamped to Unsplash's own maximum of 30.
    *  Defaults to 20. */
   perPage?: number;
+  /**
+   * How wide an imported photo is fetched from Unsplash's CDN. `'original'`
+   * asks for the raw file at full resolution; every other value only ever
+   * shrinks, since the request carries `fit=max`. Defaults to `2400`.
+   *
+   * Project-wide, and overridable per import from the picker's size select —
+   * the right size is a property of the slot the image goes in, not of the
+   * project. See `shared/unsplash.ts` for the safelist.
+   */
+  importWidth?: UnsplashImportWidth;
 }
 
 /** Every option's effective value for one request — no optionals left. */
@@ -338,6 +353,23 @@ const OPTION_SPECS: readonly OptionSpec[] = [
     fallback: 20,
     read: (o) => (o.unsplash ? o.unsplash.perPage : undefined),
   },
+  {
+    key: 'unsplashImportWidth',
+    label: 'Import width',
+    help: 'How wide an imported photo is downloaded. Where the picker\u2019s size select starts \u2014 change it there for one import. "original" asks for the full-resolution file; the others only ever shrink, never upscale.',
+    type: 'select',
+    group: 'unsplash',
+    // A select's values are strings, and the settings file is JSON a human may
+    // hand-edit, so a width travels as text and is parsed once, by
+    // `coerceImportWidth`. `read` stringifies so a numeric config value still
+    // matches a choice.
+    choices: [...UNSPLASH_IMPORT_WIDTH_CHOICES],
+    fallback: String(UNSPLASH_DEFAULT_IMPORT_WIDTH),
+    read: (o) =>
+      o.unsplash && o.unsplash.importWidth !== undefined
+        ? String(o.unsplash.importWidth)
+        : undefined,
+  },
 ];
 
 /** Keys the Settings panel may write — everything the config does not own
@@ -449,6 +481,10 @@ function toResolvedOptions(
           ...(accessKeyFromConfig ? { accessKey: accessKeyFromConfig } : {}),
           appName: flat.get('unsplashAppName') as string,
           perPage: flat.get('unsplashPerPage') as number,
+          // Off-safelist can only mean a hand-edited settings file; fall back
+          // rather than resolve to a width the import route would refuse.
+          importWidth:
+            coerceImportWidth(flat.get('unsplashImportWidth')) ?? UNSPLASH_DEFAULT_IMPORT_WIDTH,
         }
       : false,
   };
@@ -658,13 +694,17 @@ export function applyOptionPatch(
         break;
       }
       case 'unsplashAppName':
-      case 'unsplashPerPage': {
+      case 'unsplashPerPage':
+      case 'unsplashImportWidth': {
         // Stored whether or not the feature is on: in this document the object
         // is detail, not the on/off bit, so writing it enables nothing.
         const base = next.unsplash === false || next.unsplash === undefined ? {} : next.unsplash;
         const merged: UnsplashOptions = { ...base };
         if (key === 'unsplashAppName') merged.appName = value as string;
-        else merged.perPage = value as number;
+        else if (key === 'unsplashPerPage') merged.perPage = value as number;
+        // Stored parsed, so the file reads `"importWidth": 800` rather than a
+        // stringly-typed `"800"`; `read` stringifies it back for the wire.
+        else merged.importWidth = coerceImportWidth(value) ?? UNSPLASH_DEFAULT_IMPORT_WIDTH;
         next.unsplash = merged;
         break;
       }

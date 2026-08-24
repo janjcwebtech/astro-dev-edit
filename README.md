@@ -272,7 +272,7 @@ devEdit({
 | `sourceAnnotations` | `'auto'` | Who emits the `data-astro-source-*` attributes. `'auto'`: Astro's compiler on 5/6, injected by the integration on ≥7. `'force'`: always inject (also lifts the dev-toolbar requirement on 5/6). `'off'`: never inject. **Config-only** — it registers a Vite plugin, so changing it needs a restart. |
 | `entryEditor` | `{}` | The [entry editor](#entry-editor-cms-panel-for-content-collections); `false` disables all `/entry*` endpoints and UI. |
 | `schemaEditor` | `true` | Whether the [collection designer](#collections--the-collection-designer) may write your `src/content.config.ts`. `false` keeps the designer read-only for schema edits — collections and fields still list, and the editor-only overrides (widget, label, hidden) still save, because those go to `.astro-dev-edit.json` rather than to committed source. |
-| `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults, or just switch it on in the Settings drawer. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-dev-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30). |
+| `unsplash` | `false` | The [Unsplash photo source](#unsplash-photo-picker) in the media picker. `{}` turns it on with defaults, or just switch it on in the Settings drawer. Sub-options: `accessKey` (discouraged — see below), `appName` (`'astro-dev-edit'`, sent as `utm_source` on credit links), `perPage` (`20`, capped at Unsplash's own 30), `importWidth` (`2400`; one of `800`, `1600`, `2400`, `'original'` — see [Import size](#import-size)). |
 
 Every option except `enabled` and `sourceAnnotations` is editable from the
 Settings drawer. Those two are consumed during `astro:config:setup`, before a dev
@@ -447,6 +447,26 @@ for you. The key is never sent back to the browser: a read reports only whether
 one resolved, from where, and a masked fragment like `••••••••Ab3d`. When a key
 comes from the config or the environment the panel's field is disabled and says
 so, rather than accepting a value that would be ignored.
+
+### Import size
+
+Every import used to fetch a 2400px-wide JPEG, whatever the slot it was going
+into — bytes committed to your repo that a 480px card thumbnail will never
+serve. The width is now yours to choose, in two places:
+
+- **Project-wide** — `importWidth` in the config, or *Settings → Unsplash →
+  Import width*. One of `800`, `1600`, `2400` (the default, so nothing changes
+  unless you say so) or `'original'`.
+- **Per import** — the size select in the Unsplash pane's toolbar, next to the
+  shape filter. It starts at the project-wide value and applies to the next
+  import only, because the right size belongs to the slot, not to the project.
+  The details rail states what the pick will actually download.
+
+Requests carry `fit=max`, so a width only ever **shrinks** a photo — asking for
+2400px from a 1600px original gets you 1600px, and the rail says so.
+`'original'` asks for the raw file at full resolution, bounded only by the
+25 MB import cap. A width that is not one of the four is **refused**, not
+rounded to the nearest one.
 
 ### Attribution
 
@@ -656,7 +676,7 @@ caption, a *sibling* of the button), `atx-media-rail` with
 `atx-media-more` (the Load more footer), `atx-media-drop` /
 `atx-media-dropzone` (the drag overlay) and `atx-media-error`;
 the Unsplash pane's `atx-unsplash-search` / `atx-unsplash-input` /
-`atx-unsplash-orient`, `atx-unsplash-credit` with `atx-unsplash-author` and
+`atx-unsplash-orient` / `atx-unsplash-width`, `atx-unsplash-credit` with `atx-unsplash-author` and
 `atx-unsplash-link`, and `atx-unsplash-rate` (the requests-left line);
 the settings drawer's `atx-settings-tabs`, `atx-settings-tab` (plus `atx-settings-tab-<group>`), `atx-settings-tabs-host`, `atx-settings-pane` (plus `atx-settings-pane-<group>`), `atx-settings-lock`, `atx-settings-key-section`, `atx-settings-key-status`, `atx-settings-key-actions`, and the older `atx-settings-heading|blurb|link|status|text|row|key|hint|warning|error`; each option control is a standard `atx-field` (with `atx-field-label`, `atx-field-input`, `atx-field-help`, `atx-field-error`), the same hooks the entry drawer uses;
 the collection designer's `atx-collections` (the pane) with `atx-collections-list` / `atx-collections-row` (plus `atx-collections-row-<name>`) / `atx-collections-row-name|meta`, `atx-collections-detail` (plus `atx-collections-detail-<name>`), `atx-collections-head|title|back|meta|spacer|badge|blurb|note|legend` (`atx-collections-legend-line|word`), `atx-collections-view-tabs` / `atx-collections-view-tab` (`-fields` / `-items`) / `atx-collections-view-host`, `atx-collections-fieldspane`, `atx-collections-fields`, `atx-collections-field` (plus `atx-collections-field-<name>`) with `atx-collections-field-head|name`, `atx-collections-group` (plus `atx-collections-group-schema` / `-editor`), `atx-collections-caption`, `atx-collections-control` / `atx-collections-control-label`, `atx-collections-input|select|checkbox|check|check-hint`, `atx-collections-expr` (the zod expression line), `atx-collections-new` / `atx-collections-new-name|meta` (a queued addition), `atx-collections-addfield`, `atx-collections-pending`, `atx-collections-actions`, `atx-collections-error`, `atx-collections-create` / `atx-collections-newfields`, and the Items view's `atx-collections-items`, `atx-collections-itembar|itemcount`, `atx-collections-item` / `atx-collections-item-title|meta`;

@@ -174,6 +174,9 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
             // errors on click is worse than no tab. Resolved here rather than
             // cached so a key entered through Settings shows up on the next poll.
             unsplash: o.unsplash !== false && (await hasUnsplashKey(unsplash)),
+            // Where the picker's size select starts. Read live like the rest,
+            // so changing it in Settings moves the select without a reload.
+            ...(o.unsplash === false ? {} : { unsplashImportWidth: o.unsplash.importWidth }),
           },
         };
       },

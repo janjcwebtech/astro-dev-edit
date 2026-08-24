@@ -1,6 +1,7 @@
 import type { AstroIntegration } from 'astro';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
+import { UNSPLASH_DEFAULT_IMPORT_WIDTH } from './shared/unsplash.ts';
 import { createAnnotatePlugin } from './server/annotate.ts';
 import { createSchemaProvider } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
@@ -197,6 +198,13 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
                 const o = options.unsplash;
                 const raw = (o === false ? undefined : o.perPage) ?? 20;
                 return Math.min(Math.max(1, Math.trunc(raw)), UNSPLASH_MAX_PER_PAGE);
+              },
+              importWidth: async () => {
+                const { options } = await optionsResolver.resolve();
+                const o = options.unsplash;
+                // Already safelisted by the resolver; the fallback is only for
+                // the feature-off shape, which never reaches an import anyway.
+                return (o === false ? undefined : o.importWidth) ?? UNSPLASH_DEFAULT_IMPORT_WIDTH;
               },
               enabled: async () => {
                 const { options } = await optionsResolver.resolve();

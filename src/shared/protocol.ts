@@ -64,6 +64,10 @@ export interface HealthResponse {
    *  its source tabs at all — a project that never opts in gets a single-source
    *  modal, not a tab that errors when clicked. */
   unsplash: boolean;
+  /** The resolved `unsplash.importWidth` — where the picker's size select
+   *  starts, so the project-wide setting is what you get unless you change it
+   *  for one import. Absent from a server that predates the option. */
+  unsplashImportWidth?: UnsplashImportWidth;
 }
 
 // --- GET /assets -------------------------------------------------------------
@@ -442,9 +446,25 @@ export interface UnsplashSearchResponse {
 }
 
 // --- POST /unsplash/import ---------------------------------------------------
+/**
+ * How wide an imported photo is fetched. A closed set, not a number: the value
+ * reaches the URL the dev server fetches from Unsplash's CDN, so the server
+ * refuses anything off the list rather than clamping it. `'original'` sends no
+ * width at all — the raw file, bounded only by the 25 MB import cap.
+ *
+ * The runtime list lives in `shared/unsplash.ts`, since `protocol.ts` stays
+ * types-only — the same split `FIELD_TYPES` has.
+ */
+export type UnsplashImportWidth = 800 | 1600 | 2400 | 'original';
+
 export interface UnsplashImportRequest {
   /** An id from a search in this dev-server process; see UnsplashPhoto. */
   id: string;
+  /** Fetch this width instead of the resolved `unsplash.importWidth` — the
+   *  right size is per-slot (a card thumbnail, an avatar), not per-project.
+   *  Validated against the safelist server-side; an unknown value is refused,
+   *  so the import fails loudly rather than landing the wrong size. */
+  width?: UnsplashImportWidth;
   /** Same semantics as UploadRequest: marks an `image()`-backed field, so the
    *  bytes land in an importable `src/` dir rather than the web-servable one. */
   assetRef?: 'relative';

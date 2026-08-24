@@ -1,6 +1,7 @@
 import type { FieldDescriptor, OptionDescriptor, SettingsResponse } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { setFeatures } from '../features.ts';
+import { coerceImportWidth } from '../../shared/unsplash.ts';
 import { clearHighlight } from '../hover.ts';
 import { icon } from '../icons.ts';
 import {
@@ -363,6 +364,11 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
         openInEditor: valueOf(next, 'openInEditor') === true,
         entryEditor: valueOf(next, 'entryEditor') === true,
         unsplash: next.unsplash.configured,
+        // A `select`'s value is a string on the wire; setFeatures parses it, so
+        // the picker's size select moves with a saved default. `?? undefined`
+        // because a null here would read as "the server has no such option".
+        unsplashImportWidth:
+          coerceImportWidth(valueOf(next, 'unsplashImportWidth')) ?? undefined,
       });
       keyInput.value = '';
       keyInput.type = 'password';
