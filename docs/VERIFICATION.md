@@ -553,6 +553,15 @@ function schema with `image()` fields — and its config sets widget overrides o
       is behind it. On a white section of the playground, the resting bar's
       labels and its `#atx-bar-hint` are readable without hovering.
 
+      Measured on the playground's `rgb(253,252,255)` body: a bar label on the
+      bare surface is 5.3:1, one inside a button chip **4.31:1**, and the whole
+      bar 9.5:1 the moment it is approached or edit mode is on (`#atx-bar-hint`
+      12.6:1, the exit button 5.4:1 — both only ever shown at opacity 1). The
+      sub-AA resting figure is a **deliberate deferral**, not a regression:
+      recessive-until-touched is what the surface is for. See `REST_OPACITY` in
+      `admin-bar.ts` and the board. Re-flag it only if the *approached* bar or
+      any other surface drops below 4.5.
+
 **Cleanup**
 
 - [ ] Restore playground fixtures: overlay edits write into

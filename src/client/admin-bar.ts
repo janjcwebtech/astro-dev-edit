@@ -106,9 +106,21 @@ const HOT_ZONE = 4;
 /** Grace period before an unpinned bar slides away again. */
 const RETRACT_DELAY = 350;
 /** Opacity while pinned but not approached — visible, never in the way, but
- *  still *readable*: at 0.5 the bar's own labels composited down to 2.8:1
+ *  still readable: at 0.5 the bar's own labels composited down to 2.8:1
  *  against a white page, so the resting bar was the least legible thing the
- *  overlay drew. 0.72 keeps it recessive and clears AA (5.3:1). */
+ *  overlay drew. 0.72 keeps it recessive without going back there.
+ *
+ *  **The resting bar is deliberately below AA, and only the resting bar.**
+ *  Measured over the playground's near-white page (rgb(253,252,255)): a label
+ *  sitting straight on the bar surface comes to 5.3:1, but the three that live
+ *  inside a {@link BTN_BG} chip come to **4.31:1** — the chip's white tint
+ *  lifts the surface under the ink. Approaching the bar or entering edit mode
+ *  takes it to opacity 1 and 9.5:1, which is every state a user reads it in
+ *  for longer than a glance. Recessive-until-touched is the point of the
+ *  surface, so this stays; raising the number would mean a bar that never
+ *  recedes. Tracked as a `deferral` on the roadmap board, not a bug — and it
+ *  is why `tests/contrast.test.ts` pins the *tokens* rather than this
+ *  composite, which depends on the host page. */
 const REST_OPACITY = '0.72';
 
 const BTN_BG = 'rgba(255,255,255,0.09)';
