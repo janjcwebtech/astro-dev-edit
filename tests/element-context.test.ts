@@ -60,7 +60,6 @@ describe('formatContext', () => {
     const out = formatContext(FULL);
     expect(out).toContain('# Element context — src/pages/index.astro:12:3');
     expect(out).toContain('- **Element** `<h1 class="hero-title">`');
-    expect(out).toContain('- **Editability** editable text — literal text');
     expect(out).toContain('- **Page** http://localhost:4321/');
     expect(out).toContain('- **DOM path** body > main > section.hero > h1.hero-title');
     const order = ['## Rendered HTML', '## Source —', '## CSS that applies', '## Rendered box & type'];
@@ -98,9 +97,16 @@ describe('formatContext', () => {
   });
 
   it('omits the optional facts that are absent', () => {
-    const out = formatContext({ ...FULL, verdict: null, entryFile: null });
-    expect(out).not.toContain('**Editability**');
+    const out = formatContext({ ...FULL, entryFile: null });
     expect(out).not.toContain('**Content entry**');
+  });
+
+  // The verdict says what *this overlay* can edit, not what the element is, and
+  // an LLM handed the context reads it as a constraint. It is collected but
+  // never formatted, so a populated verdict must still not appear.
+  it('never renders the editability verdict, even when one was classified', () => {
+    expect(FULL.verdict).not.toBeNull();
+    expect(formatContext(FULL)).not.toContain('**Editability**');
   });
 
   it('names the backing content entry when the page declares one', () => {

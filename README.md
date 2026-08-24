@@ -89,8 +89,8 @@ overlay knows about that element on your clipboard as one markdown block,
 shaped for pasting into an assistant along with what you want changed:
 
 - the element's **source location**, repo-relative (`src/pages/index.astro:12:3`),
-  its **editability verdict** with the reason, the **page URL**, its **DOM
-  path**, and the page's **content entry** when it declares one;
+  the **page URL**, its **DOM path**, and the page's **content entry** when it
+  declares one;
 - the **rendered HTML** of the element (the overlay's own nodes stripped out);
 - the **source lines** around it — 30 either side, with `>` marking the
   element's own line — read through the same `/peek` endpoint the source peek

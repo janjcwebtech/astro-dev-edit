@@ -57,7 +57,9 @@ export interface ElementContext {
   /** Short label for toasts/titles, e.g. `h1.hero-title`. */
   label: string;
   /** What a click would do, per the server's AST classification; null when it
-   *  couldn't be determined. */
+   *  couldn't be determined. Deliberately *not* rendered into the copied
+   *  markdown: it describes what this overlay can edit, not the element, and
+   *  an LLM reads it as a constraint on what it may change. */
   verdict: string | null;
   pageUrl: string;
   /** Content-collection file backing the page, when it declares one. */
@@ -120,7 +122,6 @@ export function formatContext(ctx: ElementContext): string {
   const out: string[] = [`# Element context — ${where}`, ''];
 
   out.push(`- **Element** \`${ctx.openTag}\``);
-  if (ctx.verdict) out.push(`- **Editability** ${ctx.verdict}`);
   out.push(`- **Source** ${where}`);
   out.push(`- **Page** ${ctx.pageUrl}`);
   if (ctx.entryFile) out.push(`- **Content entry** ${ctx.entryFile}`);
