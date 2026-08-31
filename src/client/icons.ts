@@ -97,14 +97,14 @@ function svgMarkup(name: IconName, size: number): string {
 }
 
 /** An icon element, ready to append into a button, row or label. */
-export function icon(name: IconName, size = 14): HTMLElement {
+export function icon(name: IconName, size = 16): HTMLElement {
   const host = styled('span', 'atx-ico');
   paint(host, name, size);
   return host;
 }
 
 /** Swap an existing icon element's glyph in place (same node, same styling). */
-export function setIcon(host: HTMLElement, name: IconName, size = 14): void {
+export function setIcon(host: HTMLElement, name: IconName, size = 16): void {
   if (host.dataset.icon === name) return;
   paint(host, name, size);
 }

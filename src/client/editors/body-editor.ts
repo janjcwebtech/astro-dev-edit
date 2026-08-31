@@ -48,12 +48,12 @@ const CONTENT_CSS = `
   box-sizing: border-box;
   width: 100%;
   min-height: 40vh;
-  padding: 10px 14px;
-  border: 1px solid ${COLOR.input};
-  border-radius: ${RADIUS.sm};
+  padding: 16px 20px;
+  border: none;
+  border-radius: ${RADIUS['2xl']};
   background: ${PAPER.bg};
   color: ${PAPER.fg};
-  font: 13px/1.6 ${FONT.ui};
+  font: 15px/1.65 ${FONT.ui};
   color-scheme: light;
   outline: none;
   overflow-y: auto;

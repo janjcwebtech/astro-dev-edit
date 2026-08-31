@@ -75,9 +75,14 @@ export const COLOR = {
   background: '#0a0a0a',
   /** The standard overlay surface: panels, drawers, popovers. oklch(0.205 0 0) */
   card: '#171717',
-  /** Raised or hovered surface — list rows, secondary buttons, the admin bar's
-   *  own chrome. shadcn's `secondary`/`muted`/`accent` surface. oklch(0.269 0 0) */
+  /** Raised surface — list rows, secondary buttons, the admin bar's own
+   *  chrome. shadcn's `secondary`/`muted`. oklch(0.269 0 0) */
   elevated: '#262626',
+  /** The **hover** surface, one step above `elevated`. A separate token because
+   *  hovering is a state, not a depth: a menu item at rest sits on `card` and a
+   *  secondary button on `elevated`, and both go here when the pointer is over
+   *  them. shadcn's `accent`. oklch(0.371 0 0) */
+  accent: '#404040',
 
   // --- Lines and control edges ---------------------------------------------
   /** Divider and panel edge. **Translucent white, so one value is correct on
@@ -86,22 +91,30 @@ export const COLOR = {
    *  Separators are decorative, so this sits below the 3:1 non-text floor
    *  deliberately — an outline a user must *see* to operate is `input`. */
   border: 'rgb(255 255 255 / 0.10)',
-  /** Boundary of an interactive control — input/textarea/select borders and
-   *  outline buttons. shadcn's own dark `--input` is white at 15%, which
-   *  composites to 1.6:1 on `card` and **fails WCAG 1.4.11 outright**; 40%
-   *  keeps the same translucent-white idiom and clears 3:1 on all three
-   *  surfaces (3.84 / 3.77 / 3.68). Do not "restore" the upstream value. */
-  input: 'rgb(255 255 255 / 0.40)',
-  /** A field's interior. Fields sit one step **lighter** than the panel they
-   *  are on, not darker — that is what makes a form read as a set of containers
-   *  rather than as holes punched in the surface.
+  /**
+   * The material a control is made of. shadcn's `--input`, white at 15%.
    *
-   *  Deliberately *not* derived from `input` the way shadcn derives it
-   *  (`dark:bg-input/30`): at our 40% border that formula gives white at 12%,
-   *  which reads as a second panel. Declared outright instead. */
-  inputBg: 'rgb(255 255 255 / 0.04)',
+   * **A form control here has no visible border**: its boundary is the fill,
+   * and the border stays transparent until focus or an error paints it. That
+   * is the single biggest thing separating this look from a conventional dark
+   * form, and it is worth stating plainly because a solid outline is the
+   * obvious "fix" for it.
+   *
+   * The consequence is a deliberate deviation from WCAG 1.4.11, which asks 3:1
+   * of a control boundary: a 7.5% fill reaches ~1.5:1 on `card`. What carries
+   * the weight instead is `ring` — 3px, high contrast, and always painted on
+   * keyboard focus. Text inside a field still clears AA, which is pinned.
+   */
+  input: 'rgb(255 255 255 / 0.15)',
+  /** A field's resting interior — `input` at half strength, which is shadcn's
+   *  `bg-input/50`. The small controls (checkbox, switch) use full-strength
+   *  `input` instead: a 16px box needs more fill than a 300px one to read at
+   *  all. */
+  inputBg: 'rgb(255 255 255 / 0.075)',
   /** Focus ring. Neutral, because focus is chrome — the overlay talking about
-   *  itself. Clears 3:1 on every surface (3.2–4.6). oklch(0.556 0 0) */
+   *  itself. Clears 3:1 on every surface (3.2–4.6), which matters more here
+   *  than it would elsewhere: with control borders transparent at rest, this
+   *  is the indicator that has to carry the weight. oklch(0.556 0 0) */
   ring: '#737373',
 
   // --- Ink ------------------------------------------------------------------
@@ -242,14 +255,24 @@ export const PAPER = {
 
 /**
  * Corner radii, on shadcn's single-knob scheme: `lg` is the base `--radius`
- * (0.625rem) and the others step ±4px from it. Pick by element size — `sm` for
- * a tag or swatch, `md` for a control, `lg` for a panel, `full` for a pill.
+ * (0.625rem = 10px) and the rest step ±4px from it.
+ *
+ * Pick by element, not by taste — the ladder only reads as one family if the
+ * same kind of thing always takes the same rung. `sm` a tag or swatch, `md` a
+ * checkbox or toolbar button, `xl` a menu item, `2xl` a form control, `3xl` a
+ * panel, `full` a button or pill.
+ *
+ * The upper rungs are where the current shadcn look actually lives: a 32px
+ * control at `2xl` reads as a capsule rather than a box, and that one choice
+ * places the design more than any value in `COLOR` does.
  */
 export const RADIUS = {
   sm: '6px',
   md: '8px',
   lg: '10px',
   xl: '14px',
+  '2xl': '18px',
+  '3xl': '24px',
   full: '999px',
 } as const;
 

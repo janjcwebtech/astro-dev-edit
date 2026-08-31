@@ -216,7 +216,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   brand.type = 'button';
   brand.title = 'astro-dev-edit — menu';
   brand.setAttribute('aria-haspopup', 'menu');
-  brand.append(icon('cursor', 15));
+  brand.append(icon('cursor', 16));
 
   const separator = styled('div', 'atx-bar-sep');
 

@@ -210,7 +210,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
       // astro.config.mjs, then restart the dev server". The toggle above is now
       // the answer, so point at it instead.
       keyStatus.append(
-        icon('dot', 13),
+        icon('dot', 16),
         text('Turn the photo source on above to add a key', 'muted'),
       );
       keySection.toggleAttribute('data-off', true);
@@ -225,12 +225,12 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
 
     if (u.configured) {
       keyStatus.append(
-        icon('check', 13),
+        icon('check', 16),
         text(`Configured via ${SOURCE_LABEL[u.source ?? ''] ?? 'stored settings'}`, 'ok'),
       );
       if (u.hint) keyStatus.append(text(u.hint, 'muted', true));
     } else {
-      keyStatus.append(icon('dot', 13), text('Not configured', 'muted'));
+      keyStatus.append(icon('dot', 16), text('Not configured', 'muted'));
     }
 
     // Config and env win at resolve time, so storing a key here would do
@@ -275,7 +275,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     // is the uncommitted-secret warning at the bottom.
     const note = styled('p', 'atx-settings-lock');
     note.append(
-      icon('lock', 11),
+      icon('lock', 12),
       document.createTextNode(
         o.restartRequired
           ? 'Read before the dev server starts, so it lives in astro.config.mjs and changing it needs a restart.'
@@ -367,7 +367,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   foot.append(closeBtn, saveBtn);
 
   // --- boot ------------------------------------------------------------------
-  status.append(icon('spinner', 13), text('Reading settings…', 'muted'));
+  status.append(icon('spinner', 16), text('Reading settings…', 'muted'));
   setButtonEnabled(saveBtn, false);
   clearKeyBtn.toggleAttribute('data-hidden', true);
 
@@ -378,7 +378,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     },
     (err: unknown) => {
       status.textContent = '';
-      status.append(icon('alert', 13), text('Could not read settings', 'warn'));
+      status.append(icon('alert', 16), text('Could not read settings', 'warn'));
       showError(err instanceof Error ? err.message : 'The dev server did not answer.');
     },
   );

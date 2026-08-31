@@ -200,7 +200,7 @@ function openButton(onClick: () => void): HTMLButtonElement {
     'open',
     'Open this rule in your editor',
     { font: `600 10.5px ${FONT.ui}`, flex: '0 0 auto' },
-    icon('external', 11),
+    icon('external', 12),
   );
   btn.addEventListener('click', onClick);
   return btn;

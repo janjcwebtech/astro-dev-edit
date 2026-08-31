@@ -39,6 +39,13 @@ function vars(prefix: string, tokens: Record<string, string>): string {
  *  same number to setChromeInset so docked surfaces keep clear of it. */
 const BAR_H = 36;
 
+/** The checkbox tick, as a mask rather than a glyph: the shape comes from here
+ *  and the colour from whatever `background` the rule sets, so the tick tracks
+ *  `primaryFg` without a second copy of the path living in CSS. Lucide's
+ *  `check`, at the stroke weight a 12px box needs to stay crisp. */
+const CHECK_MASK =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E\") center / contain no-repeat";
+
 export function overlayCss(): string {
   return `
 :host {
@@ -78,14 +85,15 @@ ${vars('font-', FONT)}
   width: min(420px, 92vw);
   box-sizing: border-box;
   overflow: hidden;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-xl);
+  border: 1px solid transparent;
+  border-radius: var(--atx-radius-3xl);
   background: var(--atx-card);
   color: var(--atx-foreground);
-  /* A hairline separates the surfaces; the shadow only lifts the panel off the
-     page behind it. A heavy drop shadow doing the separating is the single
-     most un-shadcn thing an overlay can do. */
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+  /* A ring separates the surfaces; the shadow only lifts the panel off the
+     page behind it. Two layers rather than one border, because this floats
+     over content the overlay does not control and a hairline alone would
+     disappear against a light page. */
+  box-shadow: 0 0 0 1px var(--atx-border), 0 8px 28px rgba(0, 0, 0, 0.4);
   font: 400 14px var(--atx-font-ui);
   /* Edit mode sets a crosshair cursor on the whole page; our UI is not a
      click-to-edit surface, so restore normal per-element cursors. */
@@ -223,21 +231,22 @@ ${vars('font-', FONT)}
   gap: 2px;
   flex: 0 0 auto;
   padding: 3px;
-  border-radius: var(--atx-radius-lg);
-  background: rgb(255 255 255 / 0.06);
+  border-radius: var(--atx-radius-2xl);
+  background: var(--atx-input-bg);
 }
 
 [role='tab'] {
-  height: 28px;
+  height: 26px;
   padding: 0 12px;
-  border: none;
-  border-radius: 7px;
+  border: 1px solid transparent;
+  border-radius: var(--atx-radius-full);
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 500 14px var(--atx-font-ui);
+  font: 500 13px var(--atx-font-ui);
   white-space: nowrap;
+  outline: none;
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition: background 150ms, color 150ms;
 }
 
 [role='tab']:hover {
@@ -245,9 +254,8 @@ ${vars('font-', FONT)}
 }
 
 [role='tab'][aria-selected='true'] {
-  background: var(--atx-card);
+  background: var(--atx-accent);
   color: var(--atx-foreground);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 [data-tabhost] {
@@ -267,7 +275,12 @@ ${vars('font-', FONT)}
 /* Every button in the overlay, keyed off the five variant classes. A bare
    .atx-btn rule cannot be the base: four leaves borrow the atx-btn hook
    without a variant and carry their own box, and handing them this padding
-   and radius would resize them. */
+   and radius would resize them.
+
+   32px and fully rounded, matching the height of a form control so a button
+   beside a field lines up without either being nudged. The pill is not
+   decoration -- at this size it is what tells a button from an input at a
+   glance, now that neither of them carries a visible outline. */
 .atx-btn-default,
 .atx-btn-secondary,
 .atx-btn-outline,
@@ -276,27 +289,36 @@ ${vars('font-', FONT)}
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 16px;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
   box-sizing: border-box;
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-full);
   font: 500 14px/1 var(--atx-font-ui);
   white-space: nowrap;
   outline: none;
-  transition: background 120ms, border-color 120ms, color 120ms, box-shadow 120ms;
+  transition: background 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
   cursor: pointer;
 }
 
-/* An icon inside a button is sized to the type, not to the button. */
-.atx-btn-default > svg,
-.atx-btn-secondary > svg,
-.atx-btn-outline > svg,
-.atx-btn-ghost > svg,
-.atx-btn-destructive > svg {
+/* An icon inside a button is sized to the type, not to the button, and sits
+   6px from its label -- the gap above. */
+.atx-btn-default > .atx-ico,
+.atx-btn-secondary > .atx-ico,
+.atx-btn-outline > .atx-ico,
+.atx-btn-ghost > .atx-ico,
+.atx-btn-destructive > .atx-ico {
   width: 16px;
   height: 16px;
-  flex: 0 0 auto;
+}
+
+/* The press. Cheap, and it is most of what makes a button feel like one. */
+.atx-btn-default:active:not(:disabled),
+.atx-btn-secondary:active:not(:disabled),
+.atx-btn-outline:active:not(:disabled),
+.atx-btn-ghost:active:not(:disabled),
+.atx-btn-destructive:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 /* The one emphatic fill. Near-white with dark ink, because on a near-black
@@ -305,7 +327,6 @@ ${vars('font-', FONT)}
   border: 1px solid transparent;
   background: var(--atx-primary);
   color: var(--atx-primary-fg);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .atx-btn-default:hover:not(:disabled) {
@@ -319,18 +340,19 @@ ${vars('font-', FONT)}
 }
 
 .atx-btn-secondary:hover:not(:disabled) {
-  background: ${lift(COLOR.elevated, 14)};
+  background: ${lift(COLOR.elevated, 10)};
 }
 
+/* A hairline, not a control outline: the border token at 10%, where this used
+   the 40% input token and read as a boxed-in field. */
 .atx-btn-outline {
-  border: 1px solid var(--atx-input);
+  border: 1px solid var(--atx-border);
   background: transparent;
   color: var(--atx-foreground);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .atx-btn-outline:hover:not(:disabled) {
-  background: var(--atx-elevated);
+  background: var(--atx-accent);
 }
 
 .atx-btn-ghost {
@@ -340,7 +362,7 @@ ${vars('font-', FONT)}
 }
 
 .atx-btn-ghost:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.06);
+  background: var(--atx-accent);
   color: var(--atx-foreground);
 }
 
@@ -349,16 +371,18 @@ ${vars('font-', FONT)}
 
    Deliberately an outline where shadcn fills it: a footer that puts a solid
    red beside the solid confirm button reads as two equal calls to action when
-   only one of them is the thing the user came to do. */
+   only one of them is the thing the user came to do. The edge is the danger
+   colour at 40%, so it states itself without shouting. */
 .atx-btn-destructive {
   margin-right: auto;
-  border: 1px solid var(--atx-destructive);
+  border: 1px solid ${hexToRgba(COLOR.destructive, 0.4)};
   background: transparent;
   color: var(--atx-destructive);
 }
 
 .atx-btn-destructive:hover:not(:disabled) {
-  background: ${hexToRgba(COLOR.destructive, 0.12)};
+  border-color: ${hexToRgba(COLOR.destructive, 0.7)};
+  background: ${hexToRgba(COLOR.destructive, 0.1)};
 }
 
 /* One dimmed population, not two. setButtonEnabled dims through [data-dimmed]
@@ -371,11 +395,15 @@ button:disabled,
   cursor: not-allowed;
 }
 
-/* ── Focus ──────────────────────────────────────────────────────────────────
-   :focus-visible, never :focus — the ring is for the keyboard, and painting it
-   on every mouse click is what makes people turn focus indicators off. The
-   overlay had no focus indicator at all; this is it, and it is the same ring
-   on a button, a field and a tab so there is one thing to recognise. */
+/* -- Focus -----------------------------------------------------------------
+   :focus-visible, never :focus -- the ring is for the keyboard, and painting
+   it on every mouse click is what makes people turn focus indicators off.
+
+   It carries more weight here than in most designs. A control's resting border
+   is transparent, so the ring is not a nicety on top of an outline that is
+   already there: it *is* the non-text indication. That is why it is 3px, why
+   the ring token is held to 3:1 on every surface, and why the border it paints
+   belongs to the same rule. */
 .atx-btn-default:focus-visible,
 .atx-btn-secondary:focus-visible,
 .atx-btn-outline:focus-visible,
@@ -384,7 +412,7 @@ button:disabled,
 [data-input]:focus-visible,
 [role='tab']:focus-visible {
   border-color: var(--atx-ring);
-  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.5)};
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
 }
 
 .atx-btn-destructive:focus-visible {
@@ -392,46 +420,55 @@ button:disabled,
   box-shadow: 0 0 0 3px ${hexToRgba(COLOR.destructive, 0.4)};
 }
 
-/* ── Form controls ──────────────────────────────────────────────────────────
+/* -- Form controls ---------------------------------------------------------
    Inputs, textareas and selects, keyed off [data-input] rather than a class
    because every caller names its own (atx-field-input, atx-collections-input,
-   atx-settings-key …) and there is no shared class to match.
+   atx-settings-key ...) and there is no shared class to match.
 
-   A field sits one step *lighter* than the panel it is on. Punching a darker
-   hole in the surface reads as an absence; a lighter box reads as a container
-   you can put something in. color-scheme: dark keeps the browser's own chrome
-   — the date picker's calendar popup, number spinners — light rather than a
-   near-invisible dark glyph on a dark field. */
+   **A control has no border at rest.** Its edge is where the fill stops, and
+   the 1px border is transparent, held in reserve for focus and for an invalid
+   value -- which is why those two states read as strongly as they do. Adding a
+   solid resting outline is the obvious change to make here, and it is the one
+   that would undo the look; see COLOR.input for the trade that buys.
+
+   color-scheme: dark keeps the browser's own chrome -- the date picker's
+   calendar popup, number spinners -- light rather than a near-invisible dark
+   glyph on a dark field. */
 [data-input] {
   width: 100%;
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 32px;
+  padding: 4px 10px;
   box-sizing: border-box;
-  border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-md);
+  border: 1px solid transparent;
+  border-radius: var(--atx-radius-2xl);
   background: var(--atx-input-bg);
   color: var(--atx-foreground);
-  font: 400 14px/1.4 var(--atx-font-ui);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  font: 400 14px/1.45 var(--atx-font-ui);
   outline: none;
-  transition: border-color 120ms, box-shadow 120ms;
+  transition: color 200ms, background 200ms, border-color 200ms, box-shadow 200ms;
   color-scheme: dark;
 }
 
+/* field-sizing grows the box with the prose in it; min-height is the floor for
+   browsers without it, so the fallback is a fixed textarea rather than a
+   collapsed one. The extra horizontal padding keeps the text clear of the
+   corner curve, which a 64px-tall box has plenty of. */
 textarea[data-input] {
   min-height: 64px;
   padding: 8px 12px;
-  line-height: 1.5;
+  line-height: 1.55;
   resize: vertical;
 }
 
 select[data-input] {
-  height: 36px;
+  height: 32px;
+  padding-right: 8px;
   cursor: pointer;
 }
 
-select[data-input]:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.08);
+/* The fill is the control, so the fill is what lifts under the pointer. */
+[data-input]:hover:not(:disabled):not(:focus) {
+  background: rgb(255 255 255 / 0.11);
 }
 
 [data-input]::placeholder {
@@ -446,8 +483,9 @@ select[data-input]:hover:not(:disabled) {
 }
 
 /* Set by fields.ts alongside the error line, so the boundary and the message
-   appear together — and so a screen reader is told, which the red border on
-   its own never did. */
+   appear together -- and so a screen reader is told, which the red border on
+   its own never did. This is one of the two states the reserved border exists
+   for. */
 [data-input][aria-invalid='true'] {
   border-color: var(--atx-destructive);
 }
@@ -457,25 +495,56 @@ select[data-input]:hover:not(:disabled) {
   box-shadow: 0 0 0 3px ${hexToRgba(COLOR.destructive, 0.4)};
 }
 
-/* Native checkbox, restyled through accent-color rather than rebuilt: the
-   browser draws a near-white box with a dark tick, which is exactly the
-   shadcn checked state, and keeps every keyboard and assistive behaviour. */
+/* -- Checkbox --------------------------------------------------------------
+   Drawn rather than tinted. accent-color can only recolour the browser's own
+   box, and the browser's box is a 2px-radius outlined square: the wrong shape
+   whatever colour it is. appearance:none takes the painting and leaves every
+   keyboard and assistive behaviour exactly where it was.
+
+   Unchecked it is the full-strength input fill with no border, matching the
+   larger controls; checked it is the same near-white as the confirm button,
+   with the tick masked out of it. */
 input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
   width: 16px;
   height: 16px;
   margin: 0;
   flex: 0 0 auto;
-  /* accent-color paints the *checked* box; color-scheme is what makes the
-     unchecked one dark. Without it the browser draws its light default and an
-     unticked box is a white square sitting in a dark panel. */
-  color-scheme: dark;
-  accent-color: var(--atx-primary);
-  outline-offset: 2px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: var(--atx-input);
+  outline: none;
+  transition: background 150ms, border-color 150ms, box-shadow 150ms;
   cursor: pointer;
 }
 
+input[type='checkbox']::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  background: var(--atx-primary-fg);
+  transform: scale(0);
+  transition: transform 120ms ease-out;
+  -webkit-mask: ${CHECK_MASK};
+  mask: ${CHECK_MASK};
+}
+
+input[type='checkbox']:checked {
+  border-color: var(--atx-primary);
+  background: var(--atx-primary);
+}
+
+input[type='checkbox']:checked::before {
+  transform: scale(1);
+}
+
 input[type='checkbox']:focus-visible {
-  outline: 2px solid var(--atx-ring);
+  border-color: var(--atx-ring);
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
 }
 
 [data-pill] {
@@ -508,8 +577,8 @@ input[type='checkbox']:focus-visible {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  padding: 10px 16px;
-  border-radius: var(--atx-radius-md);
+  padding: 10px 18px;
+  border-radius: var(--atx-radius-full);
   font: 500 14px var(--atx-font-ui);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
   opacity: 0;
@@ -671,10 +740,10 @@ input[type='checkbox']:focus-visible {
   width: min(320px, 90vw);
   box-sizing: border-box;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
+  border-radius: var(--atx-radius-2xl);
   background: rgba(0, 0, 0, 0.9);
   color: var(--atx-muted-fg);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
   font: 400 12px/1.5 var(--atx-font-mono);
   /* Edit mode sets a page-wide crosshair; the panel is not click-to-edit. */
   cursor: auto;
@@ -708,14 +777,14 @@ input[type='checkbox']:focus-visible {
   height: 24px;
   padding: 0;
   border: none;
-  border-radius: var(--atx-radius-sm);
+  border-radius: var(--atx-radius-full);
   background: transparent;
   color: var(--atx-muted-fg);
   cursor: pointer;
 }
 
 .atx-tree-close:hover {
-  background: rgb(255 255 255 / 0.08);
+  background: var(--atx-accent);
   color: var(--atx-foreground);
 }
 
@@ -778,7 +847,7 @@ input[type='checkbox']:focus-visible {
   align-items: center;
   gap: 5px;
   padding: 3px 10px 3px 0;
-  border-radius: var(--atx-radius-sm);
+  border-radius: var(--atx-radius-lg);
   background: transparent;
   color: var(--atx-muted-fg);
   outline: none;
@@ -790,7 +859,7 @@ input[type='checkbox']:focus-visible {
 /* Surface shift, not a tint — every colour in the tree means "this is where
    your element is", so hover must not borrow one. */
 .atx-tree-row:hover:not([data-state]) {
-  background: rgb(255 255 255 / 0.06);
+  background: var(--atx-accent);
   color: var(--atx-foreground);
 }
 
@@ -1009,7 +1078,7 @@ input[type='checkbox']:focus-visible {
   height: 24px;
   padding: 0;
   border: none;
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-brand);
   color: var(--atx-foreground);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
@@ -1053,7 +1122,7 @@ input[type='checkbox']:focus-visible {
   width: auto;
   padding: 0 11px;
   border: none;
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-full);
   background: ${BAR_CHIP};
   color: var(--atx-foreground);
   font: 500 13px/1 var(--atx-font-ui);
@@ -1080,15 +1149,15 @@ input[type='checkbox']:focus-visible {
 .atx-menu-item {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
   height: 32px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: none;
-  border-radius: var(--atx-radius-sm);
+  border-radius: var(--atx-radius-xl);
   background: transparent;
   color: var(--atx-foreground);
-  font: 500 13px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
   text-align: left;
   outline: none;
   cursor: pointer;
@@ -1097,7 +1166,7 @@ input[type='checkbox']:focus-visible {
 /* Hover shifts the surface; it does not tint it. A hue on hover competes with
    the one colour that is supposed to mean something. */
 .atx-menu-item:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.08);
+  background: var(--atx-accent);
 }
 
 /* An item whose feature is currently on. Near-white with dark ink — the same
@@ -1128,10 +1197,10 @@ input[type='checkbox']:focus-visible {
   z-index: ${Z + 4};
   display: none;
   flex-direction: column;
-  min-width: 216px;
+  min-width: 220px;
   padding: 6px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
+  border-radius: var(--atx-radius-2xl);
   background: ${hexToRgba(COLOR.glassRaised, 0.97)};
   backdrop-filter: blur(14px);
   color: var(--atx-foreground);
@@ -1176,7 +1245,7 @@ input[type='checkbox']:focus-visible {
    part of the stack that is conditionally present. */
 
 .atx-field {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 /* A field the project's own config owns. The dim lands on the control, not on
@@ -1196,15 +1265,18 @@ input[type='checkbox']:focus-visible {
    doing the job that a second ink tier does properly. */
 .atx-field-label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   color: var(--atx-foreground);
-  font: 500 14px/1 var(--atx-font-ui);
+  font: 500 14px/1.4 var(--atx-font-ui);
 }
 
+/* 14px, not a size down. shadcn's field description is the same size as the
+   label and separated by colour alone, which is what keeps a form of mostly
+   help text readable rather than a wall of small print. */
 .atx-field-help {
   margin-top: 6px;
   color: var(--atx-muted-fg);
-  font: 400 12px/1.45 var(--atx-font-ui);
+  font: 400 14px/1.45 var(--atx-font-ui);
 }
 
 .atx-field-error {
@@ -1260,7 +1332,7 @@ input[type='checkbox']:focus-visible {
 .atx-entry-new {
   height: 28px;
   padding: 0 12px;
-  font: 500 13px var(--atx-font-ui);
+  font: 500 13px/1 var(--atx-font-ui);
 }
 
 /* The rule between groups of fields in the entry drawer. */
@@ -1444,7 +1516,7 @@ input[type='checkbox']:focus-visible {
   display: block;
   width: 100%;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-xl);
   background: var(--atx-card);
   color: var(--atx-foreground);
   text-align: left;
@@ -1578,7 +1650,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 8px;
   padding: 10px 12px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-xl);
   background: var(--atx-card);
 }
 
@@ -1613,7 +1685,7 @@ input[type='checkbox']:focus-visible {
   margin-top: 10px;
   padding: 10px 12px;
   border: 1px dashed var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-xl);
 }
 
 .atx-collections-addfield > .atx-btn-outline {
@@ -1624,7 +1696,7 @@ input[type='checkbox']:focus-visible {
 .atx-collections-legend {
   padding: 9px 11px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-full);
   background: var(--atx-background);
   color: var(--atx-muted-fg);
   font: 12px/1.55 var(--atx-font-ui);
@@ -1709,7 +1781,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 8px;
   padding: 8px 12px;
   border: 1px solid var(--atx-brand);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-xl);
   background: var(--atx-card);
 }
 
@@ -1792,7 +1864,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 10px;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   background: ${CHECKER(14)};
 }
 
@@ -1831,23 +1903,22 @@ input[type='checkbox']:focus-visible {
    itself. Keep it in step with [data-input]. */
 .atx-alt-input {
   width: 100%;
-  min-height: 36px;
+  min-height: 32px;
   box-sizing: border-box;
   margin-bottom: 16px;
-  padding: 0 12px;
-  border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-md);
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--atx-radius-2xl);
   background: var(--atx-input-bg);
   color: var(--atx-foreground);
-  font: 400 14px/1.4 var(--atx-font-ui);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  font: 400 14px/1.45 var(--atx-font-ui);
   outline: none;
-  transition: border-color 120ms, box-shadow 120ms;
+  transition: background 200ms, border-color 200ms, box-shadow 200ms;
 }
 
 .atx-alt-input:focus-visible {
   border-color: var(--atx-ring);
-  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.5)};
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
 }
 
 /* Alt text that comes from an expression: readable, but not yours to type in. */
@@ -1897,7 +1968,7 @@ input[type='checkbox']:focus-visible {
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   outline: none;
   background: ${CHECKER(10)};
   cursor: pointer;
@@ -1939,7 +2010,7 @@ input[type='checkbox']:focus-visible {
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   background: ${CHECKER(16)};
   cursor: pointer;
 }
@@ -1969,30 +2040,29 @@ input[type='checkbox']:focus-visible {
 }
 
 /* Sits beside the path field in a flex row, so it takes the field's height
-   rather than a button's own. */
+   and shape rather than a button's own. */
 .atx-image-field-browse {
   flex: 0 0 auto;
-  height: 36px;
+  height: 32px;
   padding: 0 14px;
   box-sizing: border-box;
-  border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-md);
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-full);
   background: transparent;
   color: var(--atx-foreground);
   font: 500 14px/1 var(--atx-font-ui);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   outline: none;
-  transition: background 120ms, border-color 120ms, box-shadow 120ms;
+  transition: background 150ms, border-color 150ms, box-shadow 150ms;
   cursor: pointer;
 }
 
 .atx-image-field-browse:hover {
-  background: var(--atx-elevated);
+  background: var(--atx-accent);
 }
 
 .atx-image-field-browse:focus-visible {
   border-color: var(--atx-ring);
-  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.5)};
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
 }
 
 .atx-image-field-hint {
@@ -2039,7 +2109,7 @@ input[type='checkbox']:focus-visible {
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   background: ${CHECKER(12)};
   outline: 2px solid transparent;
   outline-offset: 2px;
@@ -2116,7 +2186,7 @@ input[type='checkbox']:focus-visible {
   width: 100%;
   aspect-ratio: 4 / 3;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   background: var(--atx-elevated);
 }
 
@@ -2141,7 +2211,7 @@ input[type='checkbox']:focus-visible {
   margin: 12px auto 0;
   padding: 5px 12px;
   border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-full);
   background: transparent;
   color: var(--atx-muted-fg);
   font: 500 13px var(--atx-font-ui);
@@ -2196,7 +2266,7 @@ input[type='checkbox']:focus-visible {
   margin-left: auto;
   padding: 6px 12px;
   border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   background: transparent;
   color: var(--atx-muted-fg);
   font: 500 13px var(--atx-font-ui);
@@ -2280,7 +2350,7 @@ input[type='checkbox']:focus-visible {
   display: none;
   padding: 6px 10px;
   border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-full);
   background: transparent;
   color: var(--atx-muted-fg);
   font: 500 13px var(--atx-font-ui);
@@ -2314,7 +2384,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 10px;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   background: ${CHECKER(12)};
 }
 
@@ -2625,7 +2695,7 @@ input[type='checkbox']:focus-visible {
   padding: 8px 10px;
   overflow-y: auto;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-xl);
   background: var(--atx-card);
   color: var(--atx-foreground);
   font: 12px var(--atx-font-mono);
@@ -2710,7 +2780,7 @@ input[type='checkbox']:focus-visible {
   gap: 2px;
   padding: 5px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   background: var(--atx-card);
 }
 
@@ -2722,7 +2792,7 @@ input[type='checkbox']:focus-visible {
   height: 28px;
   padding: 0 8px;
   border: none;
-  border-radius: var(--atx-radius-sm);
+  border-radius: var(--atx-radius-lg);
   background: transparent;
   color: var(--atx-muted-fg);
   font: 500 13px/1 var(--atx-font-ui);
@@ -2793,9 +2863,9 @@ input[type='checkbox']:focus-visible {
   min-width: 150px;
   padding: 4px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
+  border-radius: var(--atx-radius-2xl);
   background: var(--atx-card);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 0 0 1px var(--atx-border), 0 8px 28px rgba(0, 0, 0, 0.4);
 }
 
 .atx-rte-heading-menu[data-on] {
@@ -2807,19 +2877,19 @@ input[type='checkbox']:focus-visible {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border: none;
-  border-radius: var(--atx-radius-sm);
+  border-radius: var(--atx-radius-lg);
   background: transparent;
   color: var(--atx-foreground);
-  font: 12px var(--atx-font-ui);
+  font: 400 13px var(--atx-font-ui);
   text-align: left;
   cursor: pointer;
 }
 
 .atx-rte-btn:hover,
 .atx-rte-heading-item:hover {
-  background: rgb(255 255 255 / 0.08);
+  background: var(--atx-accent);
   color: var(--atx-foreground);
 }
 
@@ -2838,9 +2908,9 @@ input[type='checkbox']:focus-visible {
 .atx-rte-image-panel {
   display: none;
   margin: 6px 0 0;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-2xl);
   background: var(--atx-background);
 }
 
@@ -2864,7 +2934,7 @@ input[type='checkbox']:focus-visible {
 
 /* Smaller than a footer button: these sit inside a panel inside a toolbar. */
 .atx-rte-image-btn {
-  height: 30px;
+  height: 28px;
   padding: 0 12px;
   font: 500 13px/1 var(--atx-font-ui);
 }

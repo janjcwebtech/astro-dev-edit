@@ -77,7 +77,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
   // bare. inputEl() is typed to real form elements, hence the marker by hand.
   const searchWrap = styled('div', 'atx-unsplash-search');
   searchWrap.dataset.input = '';
-  const glass = icon('search', 13);
+  const glass = icon('search', 16);
   const searchInput = styled('input', 'atx-unsplash-input');
   searchInput.type = 'search';
   searchInput.placeholder = 'Search Unsplash…';

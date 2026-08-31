@@ -165,18 +165,22 @@ describe('overlay colours that carry foreground text', () => {
 });
 
 describe('control boundaries', () => {
-  // The guard against "restoring" shadcn's own `--input: oklch(1 0 0 / 15%)`,
-  // which reaches only 1.6:1 on `card` and fails 1.4.11 outright.
-  it('input is visible against every overlay surface', () => {
+  // `input` is a *fill*, not a border: a control's edge is transparent until
+  // focus paints it. So it is not held to 1.4.11 — it could not clear it and
+  // still look like the thing it is copying. What it must do is be *seen*,
+  // which is the floor below.
+  it('input reads as a control against every overlay surface', () => {
     for (const surface of SURFACES) {
-      expect(
-        contrast(COLOR.input, COLOR[surface]),
-        `input on ${surface}`,
-      ).toBeGreaterThanOrEqual(AA_NON_TEXT);
+      const ratio = contrast(COLOR.input, COLOR[surface]);
+      expect(ratio, `input on ${surface}`).toBeGreaterThan(1.15);
+      expect(ratio, `input on ${surface}`).toBeLessThan(AA_NON_TEXT);
     }
   });
 
-  it('ring is visible against every overlay surface', () => {
+  // The deviation above is only acceptable because this is not: with resting
+  // borders transparent, the focus ring is the *whole* of the non-text
+  // indication a keyboard user gets, so it carries the 3:1 on its own.
+  it('ring carries 1.4.11 alone, since the resting border does not', () => {
     for (const surface of SURFACES) {
       expect(contrast(COLOR.ring, COLOR[surface]), `ring on ${surface}`).toBeGreaterThanOrEqual(
         AA_NON_TEXT,
@@ -207,7 +211,7 @@ describe('control boundaries', () => {
   it('inputBg lifts the surface without becoming one', () => {
     for (const surface of SURFACES) {
       const ratio = contrast(COLOR.inputBg, COLOR[surface]);
-      expect(ratio, `inputBg on ${surface}`).toBeGreaterThan(1);
+      expect(ratio, `inputBg on ${surface}`).toBeGreaterThan(1.05);
       expect(ratio, `inputBg on ${surface}`).toBeLessThan(AA_NON_TEXT);
     }
   });
@@ -271,6 +275,7 @@ describe('the neutral ramp is actually neutral', () => {
     'input',
     'inputBg',
     'ring',
+    'accent',
     'foreground',
     'mutedFg',
     'faintFg',

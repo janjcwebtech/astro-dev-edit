@@ -78,7 +78,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
   barText.textContent = 'Elements';
   const closeBtn = styled('button', 'atx-tree-close');
   closeBtn.type = 'button';
-  closeBtn.append(icon('x', 13));
+  closeBtn.append(icon('x', 16));
   closeBtn.title = 'Hide the element tree';
   closeBtn.addEventListener('click', () => {
     hide();
@@ -92,7 +92,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
   const tab = styled('button', 'atx-tree-tab', undefined, 'atx-tree-tab');
   tab.type = 'button';
   tab.title = 'Show the element tree';
-  tab.append(icon('sidebar', 15));
+  tab.append(icon('sidebar', 16));
   tab.addEventListener('click', () => {
     show();
     deps.onToggle?.(true);

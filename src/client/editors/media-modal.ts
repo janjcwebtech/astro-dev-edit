@@ -149,7 +149,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     // --- tabs + upload -------------------------------------------------------
     const uploadBtn = styled('button', 'atx-btn atx-media-upload');
     uploadBtn.type = 'button';
-    uploadBtn.append(icon('upload', 13), document.createTextNode('Upload file…'));
+    uploadBtn.append(icon('upload', 16), document.createTextNode('Upload file…'));
 
     const fileInput = styled('input', 'atx-media-file');
     fileInput.type = 'file';
@@ -306,7 +306,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       } finally {
         setButtonEnabled(uploadBtn, true);
         uploadBtn.textContent = '';
-        uploadBtn.append(icon('upload', 13), document.createTextNode('Upload file…'));
+        uploadBtn.append(icon('upload', 16), document.createTextNode('Upload file…'));
       }
     }
 

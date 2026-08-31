@@ -273,7 +273,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
 
   const load = (): void => {
     root.textContent = '';
-    root.append(note([icon('spinner', 13), textNode('Reading collections…')], 'muted'));
+    root.append(note([icon('spinner', 16), textNode('Reading collections…')], 'muted'));
     void api.listCollections().then(
       (next) => {
         data = next;
@@ -287,7 +287,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         root.textContent = '';
         root.append(
           note(
-            [icon('alert', 13), textNode(err instanceof Error ? err.message : 'Could not read collections.')],
+            [icon('alert', 16), textNode(err instanceof Error ? err.message : 'Could not read collections.')],
             'warn',
           ),
         );
@@ -325,7 +325,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       wrap.append(
         note(
           [
-            icon('lock', 11),
+            icon('lock', 12),
             textNode(
               'Schema editing is off, so fields and collections are read-only here. ' +
                 'Settings → Editing turns it on. Widget, label and hidden still save.',
@@ -406,7 +406,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       fieldsPane.append(
         note(
           [
-            icon('alert', 11),
+            icon('alert', 12),
             textNode(
               `${c.unrecognized}. Fields are read-only here — edit the config directly.`,
             ),
@@ -419,7 +419,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       fieldsPane.append(
         note(
           [
-            icon('alert', 11),
+            icon('alert', 12),
             textNode(
               'Astro could not load this content config, so these field names come from the ' +
                 'config text and their types are unknown. Fix the config error first — the dev ' +
@@ -558,7 +558,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         root.append(
           note(
             [
-              icon('alert', 11),
+              icon('alert', 12),
               textNode(
                 `Only the first ${list.length} entries are listed — this collection has more.`,
               ),
@@ -573,7 +573,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       if (loaded) return;
       loaded = true;
       root.textContent = '';
-      root.append(note([icon('spinner', 13), textNode('Reading entries…')], 'muted'));
+      root.append(note([icon('spinner', 16), textNode('Reading entries…')], 'muted'));
       void api.listCollectionEntries({ collection: c.name }).then(
         (res) => paint(res.entries, res.truncated === true),
         (err: unknown) => {
@@ -581,7 +581,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
           root.append(
             note(
               [
-                icon('alert', 13),
+                icon('alert', 16),
                 textNode(err instanceof Error ? err.message : 'Could not read the entries.'),
               ],
               'warn',
@@ -694,7 +694,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       }
       editorGroup.append(
         note(
-          [icon('lock', 11), textNode('Set in astro.config.mjs, which takes precedence.')],
+          [icon('lock', 12), textNode('Set in astro.config.mjs, which takes precedence.')],
           'muted',
         ),
       );
