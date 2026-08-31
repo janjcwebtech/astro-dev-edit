@@ -299,6 +299,22 @@ export function basename(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
+/** Nudge a hex colour toward white for the hover state of a coloured button. */
+export function lift(hex: string, by = 18): string {
+  const v = Number.parseInt(hex.slice(1), 16);
+  const channels = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map((c) => Math.min(255, c + by));
+  return `rgb(${channels.join(', ')})`;
+}
+
+/**
+ * The admin bar's own chip surfaces — a button on the bar, and that button
+ * hovered. Here rather than in admin-bar.ts because two modules need them:
+ * styles.ts paints the chip, and admin-bar.ts reuses the resting one as the
+ * save button's `saving` background, and the two must not drift.
+ */
+export const BAR_CHIP = 'rgba(255,255,255,0.09)';
+export const BAR_CHIP_HOVER = 'rgba(255,255,255,0.20)';
+
 export function hexToRgba(hex: string, alpha: number): string {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255;

@@ -6,12 +6,9 @@ import { nearestSource, sourceFor } from "./source-map.ts";
 import { isOwnUi, mount } from './shadow.ts';
 import {
   COLOR,
-  FONT,
-  Z,
   basename,
   chromeInset,
   hexToRgba,
-  RADIUS,
   pillButton,
   setPillLabel,
   styled,
@@ -61,73 +58,25 @@ function verdictFor(result: ClassifyResult): Verdict {
 
 // --- Elements (appended to the body by the composition root at boot) --------
 
-const outline = styled(
-  "div",
-  "atx-outline",
-  {
-    position: "fixed",
-    pointerEvents: "none",
-    zIndex: String(Z),
-    border: `2px solid ${COLOR.primary}`,
-    borderRadius: RADIUS.sm,
-    background: hexToRgba(COLOR.primary, 0.08),
-    display: "none",
-    transition: "all 60ms ease-out",
-  },
-  "atx-outline",
-);
+const outline = styled("div", "atx-outline", undefined, "atx-outline");
 
 // The pill is interactive: hovering it keeps it open, and its "open source"
 // button jumps to the element's source in the editor. (#3)
-const tooltip = styled(
-  "div",
-  "atx-tooltip",
-  {
-    position: "fixed",
-    pointerEvents: "auto",
-    zIndex: String(Z + 1),
-    padding: "4px 4px 4px 8px",
-    font: `500 12px/1.4 ${FONT.mono}`,
-    color: COLOR.foreground,
-    background: COLOR.card,
-    borderRadius: RADIUS.sm,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
-    display: "none",
-    // Column so the loc line and the class/ID chips row stack; each row sizes
-    // to its own content (flex-start) rather than stretching to the widest.
-    flexDirection: "column",
-    alignItems: "flex-start",
-    whiteSpace: "nowrap",
-    cursor: "default",
-  },
-  "atx-tooltip",
-);
+const tooltip = styled("div", "atx-tooltip", undefined, "atx-tooltip");
 
 // Row 1: the file:loc · verdict label and the "open ↗" editor jump, kept on one
 // line regardless of the chips row below.
-const tooltipRow = styled("span", "atx-tooltip-row", {
-  display: "flex",
-  alignItems: "center",
-});
+const tooltipRow = styled("span", "atx-tooltip-row");
 
 // The label is clickable too — the whole file:loc line opens the in-browser
 // source peek (the "open ↗" button next to it is the editor jump). (#3)
-const tooltipLabel = styled("span", "atx-tooltip-label", {
-  cursor: "pointer",
-});
-// The label is two spans so the verdict sits in a fixed-width slot: the pill
-// must not resize (distracting) when "loading…" upgrades to the real verdict.
-// 8ch fits the longest words ("editable", "loading…") in the pill's monospace
-// font; shorter verdicts leave a little slack instead of shrinking the pill.
-const tooltipLoc = styled("span", "atx-tooltip-loc", {});
-const tooltipVerdict = styled("span", "atx-tooltip-verdict", {
-  display: "inline-block",
-  width: "8ch",
-});
+const tooltipLabel = styled("span", "atx-tooltip-label");
+// The label is two spans so the verdict can sit in a fixed-width slot — see
+// .atx-tooltip-verdict in styles.ts for why that width exists.
+const tooltipLoc = styled("span", "atx-tooltip-loc");
+const tooltipVerdict = styled("span", "atx-tooltip-verdict");
 tooltipLabel.append(tooltipLoc, tooltipVerdict);
 tooltipLabel.title = "Peek at the source code";
-tooltipLabel.addEventListener("mouseenter", () => (tooltipLabel.style.textDecoration = "underline"));
-tooltipLabel.addEventListener("mouseleave", () => (tooltipLabel.style.textDecoration = "none"));
 const tooltipOpen = pillButton(
   "atx-tooltip-open",
   "open",
@@ -173,16 +122,7 @@ function flashCopy(label: string): void {
 
 // Row 2: one chip per class + the id. Hovering a chip pops a rules card (see
 // css-inspect.ts). Wraps within a cap; hidden when the element has neither.
-const tooltipChips = styled("div", "atx-tooltip-chips", {
-  display: "none",
-  flexWrap: "wrap",
-  gap: "4px",
-  maxWidth: "340px",
-  marginTop: "5px",
-  paddingTop: "5px",
-  whiteSpace: "normal",
-  borderTop: "1px solid rgba(255,255,255,0.10)",
-});
+const tooltipChips = styled("div", "atx-tooltip-chips");
 
 tooltip.append(tooltipRow, tooltipChips);
 
@@ -279,8 +219,8 @@ export function clearHighlight(): void {
   const had = highlighted;
   highlighted = null;
   highlightedSrc = null;
-  outline.style.display = "none";
-  tooltip.style.display = "none";
+  outline.toggleAttribute("data-on", false);
+  tooltip.toggleAttribute("data-on", false);
   if (had) onTargetCb?.(null);
 }
 
@@ -368,12 +308,13 @@ export function initHover(deps: HoverDeps): HoverHandle {
   function render(el: HTMLElement, verdict: Verdict): void {
     const rect = el.getBoundingClientRect();
 
+    outline.toggleAttribute("data-on", true);
     Object.assign(outline.style, {
-      display: "block",
       left: `${rect.left - 2}px`,
       top: `${rect.top - 2}px`,
       width: `${rect.width}px`,
       height: `${rect.height}px`,
+      // The verdict picks the colour, so these two cannot live in the sheet.
       borderColor: verdict.color,
       background: hexToRgba(verdict.color, 0.08),
     } as Partial<CSSStyleDeclaration>);
@@ -383,7 +324,7 @@ export function initHover(deps: HoverDeps): HoverHandle {
     tooltipLoc.textContent = `${basename(file)}:${loc} · `;
     tooltipVerdict.textContent = verdict.word;
     tooltip.style.borderLeft = `3px solid ${verdict.color}`;
-    tooltip.style.display = "flex";
+    tooltip.toggleAttribute("data-on", true);
     positionPill(rect);
   }
 
@@ -435,26 +376,15 @@ export function initHover(deps: HoverDeps): HoverHandle {
   }
 
   function makeChip(label: string, token: string, kind: "class" | "id", el: HTMLElement): HTMLElement {
-    const chip = styled("span", "atx-tooltip-chip", {
-      font: `500 11px ${FONT.mono}`,
-      color: COLOR.mutedFg,
-      background: "rgba(255,255,255,0.09)",
-      border: "1px solid transparent",
-      borderRadius: RADIUS.sm,
-      padding: "1px 6px",
-      cursor: "default",
-    });
+    const chip = styled("span", "atx-tooltip-chip");
     chip.textContent = label;
     chip.title = `Show CSS applied via ${label}`;
+    // The border on hover is CSS; these listeners are here for the card.
     chip.addEventListener("mouseenter", () => {
       cancelHide();
-      chip.style.borderColor = COLOR.primary;
       showCard(chip, token, kind, el);
     });
-    chip.addEventListener("mouseleave", () => {
-      chip.style.borderColor = "transparent";
-      scheduleCardHide();
-    });
+    chip.addEventListener("mouseleave", scheduleCardHide);
     return chip;
   }
 
@@ -463,7 +393,7 @@ export function initHover(deps: HoverDeps): HoverHandle {
   function renderChips(el: HTMLElement): void {
     tooltipChips.replaceChildren();
     if (!deps.cssInspector()) {
-      tooltipChips.style.display = "none";
+      tooltipChips.toggleAttribute("data-on", false);
       return;
     }
     const chips: HTMLElement[] = [];
@@ -473,10 +403,10 @@ export function initHover(deps: HoverDeps): HoverHandle {
     });
     if (el.id) chips.push(makeChip(`#${el.id}`, el.id, "id", el));
     if (chips.length === 0) {
-      tooltipChips.style.display = "none";
+      tooltipChips.toggleAttribute("data-on", false);
       return;
     }
-    tooltipChips.style.display = "flex";
+    tooltipChips.toggleAttribute("data-on", true);
     tooltipChips.append(...chips);
   }
 

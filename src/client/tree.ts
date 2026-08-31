@@ -3,7 +3,7 @@ import { icon } from './icons.ts';
 import { isOwnUi } from './router.ts';
 import { annotatedElements, pathFor, sourceFor } from './source-map.ts';
 import { type TreeNode, buildTreeModel } from './tree-model.ts';
-import { basename, COLOR, FONT, hexToRgba, isolateScroll, onChromeInset, RADIUS, styled, Z } from './ui.ts';
+import { basename, isolateScroll, onChromeInset, styled } from './ui.ts';
 
 /**
  * Element-tree panel: a left-docked, non-modal outline of the page's
@@ -66,66 +66,17 @@ export interface TreeHandle {
   hasSelection(): boolean;
 }
 
-const ROW_INK = COLOR.mutedFg;
-const ACTIVE_BG = hexToRgba(COLOR.primary, 0.16);
 
 export function initTree(deps: TreeDeps): TreeHandle {
   // Panel shell: fixed to the left edge, full height. Below modal panels/drawer
   // (Z+5/6) so an open CMS drawer overlays it, above the hover pill so rows read
   // clearly. Non-modal — no backdrop, never touches state.ts.
-  const root = styled(
-    'div',
-    'atx-tree',
-    {
-      position: 'fixed',
-      left: '5px',
-      // Top/bottom rather than a height: the admin bar reserves a strip of one
-      // edge (onChromeInset below), and the panel must never sit under it.
-      top: '5px',
-      bottom: '5px',
-      borderRadius: RADIUS.md,
-      width: 'min(320px, 90vw)',
-      zIndex: String(Z + 3),
-      display: 'none',
-      flexDirection: 'column',
-      background: 'rgba(0,0,0,0.90)',
-      color: ROW_INK,
-      borderRight: `1px solid ${COLOR.border}`,
-      boxShadow: '8px 0 40px rgba(0,0,0,0.35)',
-      font: `12px ${FONT.mono}`,
-      boxSizing: 'border-box',
-      // Edit mode sets a page-wide crosshair; the panel is not click-to-edit.
-      cursor: 'auto',
-    },
-    'atx-tree',
-  );
+  const root = styled('div', 'atx-tree', undefined, 'atx-tree');
 
-  const bar = styled('div', 'atx-tree-title', {
-    flex: '0 0 auto',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '12px 14px',
-    font: `600 12px ${FONT.ui}`,
-    color: COLOR.foreground,
-    borderBottom: `1px solid ${COLOR.border}`,
-  });
-  const barText = styled('span', 'atx-tree-title-text', { flex: '1 1 auto' });
+  const bar = styled('div', 'atx-tree-title');
+  const barText = styled('span', 'atx-tree-title-text');
   barText.textContent = 'Elements';
-  const closeBtn = styled('button', 'atx-tree-close', {
-    flex: '0 0 auto',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '20px',
-    height: '20px',
-    padding: '0',
-    color: COLOR.foreground,
-    background: 'rgba(255,255,255,0.08)',
-    border: 'none',
-    borderRadius: RADIUS.sm,
-    cursor: 'pointer',
-  });
+  const closeBtn = styled('button', 'atx-tree-close');
   closeBtn.type = 'button';
   closeBtn.append(icon('x', 13));
   closeBtn.title = 'Hide the element tree';
@@ -138,48 +89,16 @@ export function initTree(deps: TreeDeps): TreeHandle {
   // What the panel leaves behind while edit mode is still on: a tab on the left
   // edge that brings it back, so closing the tree is never a one-way door (the
   // bar's Elements button does the same job from the other end).
-  const tab = styled(
-    'button',
-    'atx-tree-tab',
-    {
-      position: 'fixed',
-      left: '0',
-      top: '50%',
-      transform: 'translateY(-50%)',
-      zIndex: String(Z + 3),
-      display: 'none',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: '24px',
-      height: '64px',
-      padding: '0',
-      border: 'none',
-      borderRight: '1px solid rgba(255,255,255,0.10)',
-      borderRadius: '0 7px 7px 0',
-      background: hexToRgba(COLOR.glass, 0.88),
-      backdropFilter: 'blur(10px)',
-      color: COLOR.primaryText,
-      boxShadow: '2px 0 14px rgba(0,0,0,0.3)',
-      cursor: 'pointer',
-    },
-    'atx-tree-tab',
-  );
+  const tab = styled('button', 'atx-tree-tab', undefined, 'atx-tree-tab');
   tab.type = 'button';
   tab.title = 'Show the element tree';
   tab.append(icon('sidebar', 15));
-  tab.addEventListener('mouseenter', () => (tab.style.color = COLOR.foreground));
-  tab.addEventListener('mouseleave', () => (tab.style.color = COLOR.primaryText));
   tab.addEventListener('click', () => {
     show();
     deps.onToggle?.(true);
   });
 
-  const body = styled('div', 'atx-tree-body', {
-    flex: '1 1 auto',
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    padding: '6px 0',
-  });
+  const body = styled('div', 'atx-tree-body');
   isolateScroll(body);
 
   root.append(bar, body);
@@ -193,15 +112,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
 
   // The locked-selection outline — this panel's own, distinct from hover's
   // transient one: solid + glow, no fill, no transition (tracks scroll crisply).
-  const selectionOutline = styled('div', 'atx-tree-selection', {
-    position: 'fixed',
-    pointerEvents: 'none',
-    zIndex: String(Z),
-    border: `2px solid ${COLOR.primary}`,
-    borderRadius: RADIUS.sm,
-    boxShadow: `0 0 0 2px ${COLOR.primary}44, 0 0 12px ${COLOR.primary}66`,
-    display: 'none',
-  });
+  const selectionOutline = styled('div', 'atx-tree-selection');
 
   // --- State ---------------------------------------------------------------
 
@@ -220,12 +131,11 @@ export function initTree(deps: TreeDeps): TreeHandle {
     if (!row) return;
     const selected = el === selectedEl;
     const active = el === activeEl;
-    row.style.background = selected ? COLOR.primary : active ? ACTIVE_BG : 'transparent';
-    row.style.color = selected ? COLOR.foreground : active ? COLOR.primaryText : ROW_INK;
-    // Hover-active reads as a dashed ring so it never looks like the solid
-    // locked selection, even when both land on the same row.
-    row.style.outline = active && !selected ? `1px dashed ${COLOR.primary}` : 'none';
-    row.style.outlineOffset = '-1px';
+    // Selected wins over active, which is what makes the dashed active ring
+    // disappear when the same row is both — see .atx-tree-row in styles.ts.
+    if (selected) row.dataset.state = 'selected';
+    else if (active) row.dataset.state = 'active';
+    else delete row.dataset.state;
   }
 
   // --- Selection (locked) --------------------------------------------------
@@ -237,8 +147,8 @@ export function initTree(deps: TreeDeps): TreeHandle {
       return;
     }
     const r = selectedEl.getBoundingClientRect();
+    selectionOutline.toggleAttribute('data-on', true);
     Object.assign(selectionOutline.style, {
-      display: 'block',
       left: `${r.left - 2}px`,
       top: `${r.top - 2}px`,
       width: `${r.width}px`,
@@ -275,7 +185,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     const prev = selectedEl;
     selectedEl = null;
     selectedPath = null;
-    selectionOutline.style.display = 'none';
+    selectionOutline.toggleAttribute('data-on', false);
     window.removeEventListener('scroll', onReposition);
     window.removeEventListener('resize', onReposition);
     if (prev) paintRow(prev);
@@ -328,28 +238,15 @@ export function initTree(deps: TreeDeps): TreeHandle {
   function makeRow(node: TreeNode, depth: number): HTMLElement {
     const { el, source } = node;
     const row = styled('div', 'atx-tree-row', {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '5px',
-      padding: '2px 10px 2px 0',
+      // The indent is the row's depth, so this one is genuinely per-instance.
       paddingLeft: `${10 + depth * 14}px`,
-      whiteSpace: 'nowrap',
-      cursor: 'pointer',
-      borderRadius: RADIUS.sm,
-      color: ROW_INK,
     });
 
     const hasChildren = node.children.length > 0;
     const path = pathFor(el);
-    const chevron = styled('span', 'atx-tree-chevron', {
-      flex: '0 0 auto',
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: '12px',
-      color: COLOR.mutedFg,
-      cursor: hasChildren ? 'pointer' : 'default',
-    });
+    const chevron = styled('span', 'atx-tree-chevron');
+    // A leaf is not clickable, so it does not offer a pointer.
+    chevron.toggleAttribute('data-leaf', !hasChildren);
     // A leaf gets a small dot in the same slot, so tags stay column-aligned.
     chevron.append(
       hasChildren ? icon(collapsed.has(path) ? 'chevronRight' : 'chevronDown', 12) : icon('dot', 7),
@@ -363,7 +260,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
       });
     }
 
-    const tag = styled('span', 'atx-tree-tag', { flex: '0 0 auto', fontWeight: '600' });
+    const tag = styled('span', 'atx-tree-tag');
     tag.textContent = `<${el.tagName.toLowerCase()}>`;
 
     row.append(chevron, tag);
@@ -372,12 +269,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     if (!hasChildren) {
       const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
       if (text) {
-        const preview = styled('span', 'atx-tree-preview', {
-          flex: '0 1 auto',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          color: COLOR.mutedFg,
-        });
+        const preview = styled('span', 'atx-tree-preview');
         preview.textContent = text.length > 24 ? `${text.slice(0, 24)}…` : text;
         row.append(preview);
       }
@@ -386,26 +278,9 @@ export function initTree(deps: TreeDeps): TreeHandle {
     // The loc doubles as an editor jump: clicking it opens the file at this line
     // in the user's editor (the same /open the hover pill's "open ↗" uses), so it
     // stops the click from also selecting the row.
-    const loc = styled('span', 'atx-tree-loc', {
-      flex: '0 0 auto',
-      marginLeft: 'auto',
-      paddingLeft: '10px',
-      color: COLOR.mutedFg,
-      fontSize: '10px',
-      cursor: 'pointer',
-      textDecoration: 'underline dotted transparent',
-      textUnderlineOffset: '2px',
-    });
+    const loc = styled('span', 'atx-tree-loc');
     loc.textContent = source.loc || '?';
     loc.title = `Open ${basename(source.file)}:${source.loc} in your editor`;
-    loc.addEventListener('mouseenter', () => {
-      loc.style.color = COLOR.primaryText;
-      loc.style.textDecorationColor = COLOR.primaryText;
-    });
-    loc.addEventListener('mouseleave', () => {
-      loc.style.color = COLOR.mutedFg;
-      loc.style.textDecorationColor = 'transparent';
-    });
     loc.addEventListener('click', (e) => {
       e.stopPropagation();
       deps.openSource(source);
@@ -437,11 +312,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     rowFor.clear();
     body.replaceChildren();
     if (model.length === 0) {
-      const empty = styled('div', 'atx-tree-empty', {
-        padding: '14px',
-        color: COLOR.mutedFg,
-        font: `12px ${FONT.ui}`,
-      });
+      const empty = styled('div', 'atx-tree-empty');
       empty.textContent = 'No source-annotated elements on this page.';
       body.append(empty);
       return;
@@ -466,21 +337,21 @@ export function initTree(deps: TreeDeps): TreeHandle {
   }
 
   function show(): void {
-    root.style.display = 'flex';
-    tab.style.display = 'none';
+    root.toggleAttribute('data-on', true);
+    tab.toggleAttribute('data-on', false);
   }
 
   function hide(): void {
-    root.style.display = 'none';
+    root.toggleAttribute('data-on', false);
     // The tab only makes sense while editing — outside edit mode the tree has
     // nothing live to point at, and the bar's Elements button reopens both.
-    tab.style.display = deps.isEditMode() ? 'flex' : 'none';
+    tab.toggleAttribute('data-on', deps.isEditMode());
     syncActive(null);
     clearSelection();
   }
 
   function isOpen(): boolean {
-    return root.style.display !== 'none';
+    return root.hasAttribute('data-on');
   }
 
   return {

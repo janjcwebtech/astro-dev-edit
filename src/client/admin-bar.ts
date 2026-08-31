@@ -1,7 +1,7 @@
 import { has } from './features.ts';
 import { type IconName, icon, setIcon } from './icons.ts';
 import * as state from './state.ts';
-import { COLOR, FONT, hexToRgba, RADIUS, setChromeInset, styled, Z } from './ui.ts';
+import { BAR_CHIP, BAR_CHIP_HOVER, COLOR, lift, setChromeInset, styled } from './ui.ts';
 import { overlayActiveElement } from './shadow.ts';
 
 /**
@@ -106,33 +106,6 @@ const BAR_H = 36;
 const HOT_ZONE = 4;
 /** Grace period before an unpinned bar slides away again. */
 const RETRACT_DELAY = 350;
-/** Opacity while pinned but not approached — visible, never in the way, but
- *  still readable: at 0.5 the bar's own labels composited down to 2.8:1
- *  against a white page, so the resting bar was the least legible thing the
- *  overlay drew. 0.72 keeps it recessive without going back there.
- *
- *  **The resting bar sits near the AA line, and only the resting bar.** Over
- *  the playground's near-white page (rgb(253,252,255)) a label straight on the
- *  bar surface computes to ~5.9:1, and the three that live inside a
- *  {@link BTN_BG} chip to ~4.8:1 — the chip's white tint lifts the surface
- *  under the ink, which is what makes those three the worst case. Approaching
- *  the bar or entering edit mode takes it to opacity 1 and 11:1 or better,
- *  which is every state a user reads it in for longer than a glance.
- *
- *  Those are computed figures, not instrument readings: they model `opacity`
- *  as the group buffer it is, but not `backdropFilter`'s saturate pass, so
- *  treat them as ±0.3 and re-measure in the browser before relying on the
- *  chip case either way — `docs/VERIFICATION.md` carries that check.
- *  Recessive-until-touched is the point of the surface, so the number stays
- *  where it is; raising it would mean a bar that never recedes. Tracked as a
- *  `deferral` on the roadmap board, not a bug — and it is why
- *  `tests/contrast.test.ts` pins the *tokens* rather than this composite,
- *  which depends on the host page. */
-const REST_OPACITY = '0.72';
-
-const BTN_BG = 'rgba(255,255,255,0.09)';
-const BTN_BG_HOVER = 'rgba(255,255,255,0.20)';
-const BTN_INK = COLOR.foreground;
 /** The save button's label while writing — reads as busy without dropping below
  *  AA on the button's own hover background (white at 0.20 over the bar). */
 const SAVING_INK = COLOR.mutedFg;
@@ -161,17 +134,10 @@ const PHASE_TITLE: Record<state.SavePhase, string> = {
 const PHASE_BG: Record<state.SavePhase, string> = {
   clean: COLOR.success,
   dirty: COLOR.primary,
-  saving: BTN_BG,
+  saving: BAR_CHIP,
   saved: COLOR.success,
   error: COLOR.destructive,
 };
-
-/** Nudge a hex colour toward white for the hover state of a coloured button. */
-function lift(hex: string, by = 18): string {
-  const v = Number.parseInt(hex.slice(1), 16);
-  const channels = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map((c) => Math.min(255, c + by));
-  return `rgb(${channels.join(', ')})`;
-}
 
 // --- Persisted preferences ---------------------------------------------------
 
@@ -215,6 +181,9 @@ interface BarNode {
   label: HTMLElement | null;
   bg: string;
   bgHover: string;
+  /** Whether `spec.paint` supplied this node's colours — the only nodes whose
+   *  background is written from JS rather than matched in styles.ts. */
+  painted: boolean;
 }
 
 export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
@@ -224,174 +193,39 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
 
   // Z+4: above the element tree (Z+3) and the hover pill, below the modal
   // backdrop (Z+5) — an open drawer covers the bar, as it should.
-  const bar = styled(
-    'div',
-    'atx-bar',
-    {
-      position: 'fixed',
-      left: '0',
-      right: '0',
-      height: `${BAR_H}px`,
-      zIndex: String(Z + 4),
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '0 8px',
-      boxSizing: 'border-box',
-      // Opaque enough to guarantee the bar's own contrast. At 0.78 a white page
-      // showed through to an effective #494853, which dropped the hint and menu
-      // inks to ~3:1; the blur still reads as glass at 0.94, and over a dark
-      // page (the common case) the two are indistinguishable.
-      background: hexToRgba(COLOR.glass, 0.94),
-      backdropFilter: 'blur(12px) saturate(1.3)',
-      color: COLOR.foreground,
-      font: `500 12px ${FONT.ui}`,
-      opacity: REST_OPACITY,
-      transition: 'opacity 140ms ease, transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
-      // Edit mode sets a page-wide crosshair; the bar is not click-to-edit.
-      cursor: 'auto',
-    },
-    'atx-bar',
-  );
+  const bar = styled('div', 'atx-bar', undefined, 'atx-bar');
 
   // What an unpinned bar leaves behind: a 3px accent line with a wider nub in
   // the middle, so the bar is discoverable once it has slid away.
-  const hairline = styled(
-    'div',
-    'atx-hairline',
-    {
-      position: 'fixed',
-      left: '0',
-      right: '0',
-      height: '3px',
-      zIndex: String(Z + 3),
-      display: 'none',
-      pointerEvents: 'none',
-      background: `linear-gradient(90deg, transparent, ${COLOR.primary}88, transparent)`,
-    },
-    'atx-hairline',
-  );
-  const nub = styled('div', 'atx-hairline-nub', {
-    position: 'absolute',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    width: '54px',
-    height: '3px',
-    background: COLOR.primary,
-  });
+  const hairline = styled('div', 'atx-hairline', undefined, 'atx-hairline');
+  const nub = styled('div', 'atx-hairline-nub');
   hairline.append(nub);
 
-  const leftGroup = styled('div', 'atx-bar-group', {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    minWidth: '0',
-  });
-  const rightGroup = styled('div', 'atx-bar-group atx-bar-group-right', {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    marginLeft: 'auto',
-  });
+  const leftGroup = styled('div', 'atx-bar-group');
+  const rightGroup = styled('div', 'atx-bar-group atx-bar-group-right');
 
   // The brand mark is also the overflow menu's anchor: as the item registry
   // grows past the width of the bar, items land in the menu instead of
   // squeezing the row.
-  const brand = styled(
-    'button',
-    'atx-bar-brand',
-    {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flex: '0 0 auto',
-      width: '24px',
-      height: '24px',
-      padding: '0',
-      border: 'none',
-      borderRadius: RADIUS.md,
-      background: COLOR.primary,
-      color: COLOR.foreground,
-      cursor: 'pointer',
-      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.10)',
-    },
-    'atx-bar-brand',
-  );
+  const brand = styled('button', 'atx-bar-brand', undefined, 'atx-bar-brand');
   brand.type = 'button';
   brand.title = 'astro-dev-edit — menu';
   brand.setAttribute('aria-haspopup', 'menu');
   brand.append(icon('cursor', 15));
-  brand.addEventListener('mouseenter', () => (brand.style.background = lift(COLOR.primary)));
-  brand.addEventListener('mouseleave', () => (brand.style.background = COLOR.primary));
 
-  const separator = styled('div', 'atx-bar-sep', {
-    flex: '0 0 auto',
-    width: '1px',
-    height: '18px',
-    margin: '0 3px',
-    background: 'rgba(255,255,255,0.14)',
-  });
+  const separator = styled('div', 'atx-bar-sep');
 
-  const hint = styled(
-    'span',
-    'atx-bar-hint',
-    {
-      // The bar's primary ink rather than `muted`: the resting bar is itself at
-      // REST_OPACITY, which dims whatever ink sits on it, and a hint is a
-      // message to be read. Its 10.5px size is what keeps it secondary.
-      font: `500 10.5px/1 ${FONT.ui}`,
-      color: BTN_INK,
-      paddingRight: '4px',
-      whiteSpace: 'nowrap',
-      display: 'none',
-    },
-    'atx-bar-hint',
-  );
+  const hint = styled('span', 'atx-bar-hint', undefined, 'atx-bar-hint');
 
   leftGroup.append(brand, separator);
   rightGroup.append(hint);
   bar.append(leftGroup, rightGroup);
 
-  const menu = styled(
-    'div',
-    'atx-menu',
-    {
-      position: 'fixed',
-      zIndex: String(Z + 4),
-      minWidth: '208px',
-      padding: '5px',
-      display: 'none',
-      flexDirection: 'column',
-      background: hexToRgba(COLOR.glassRaised, 0.97),
-      backdropFilter: 'blur(14px)',
-      border: `1px solid ${COLOR.border}`,
-      borderRadius: RADIUS.md,
-      boxShadow: '0 16px 44px rgba(0,0,0,0.5)',
-      font: `500 12.5px ${FONT.ui}`,
-      color: COLOR.foreground,
-      cursor: 'auto',
-    },
-    'atx-menu',
-  );
+  const menu = styled('div', 'atx-menu', undefined, 'atx-menu');
   menu.setAttribute('role', 'menu');
-  const menuItems = styled('div', 'atx-menu-items', { display: 'flex', flexDirection: 'column' });
-  const menuFoot = styled('div', 'atx-menu-foot', {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '7px',
-    margin: '5px 4px 0',
-    paddingTop: '7px',
-    borderTop: `1px solid ${COLOR.border}`,
-    font: `500 10.5px ${FONT.mono}`,
-    color: COLOR.faintFg,
-  });
-  const liveDot = styled('span', 'atx-menu-live', {
-    width: '6px',
-    height: '6px',
-    flex: '0 0 auto',
-    borderRadius: '50%',
-    background: COLOR.info,
-  });
+  const menuItems = styled('div', 'atx-menu-items');
+  const menuFoot = styled('div', 'atx-menu-foot');
+  const liveDot = styled('span', 'atx-menu-live');
   menuFoot.append(liveDot);
   menuFoot.append(document.createTextNode('dev server connected'));
   menu.append(menuItems, menuFoot);
@@ -403,7 +237,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   }
 
   function menuOpen(): boolean {
-    return menu.style.display !== 'none';
+    return menu.hasAttribute('data-on');
   }
 
   /** The one place the bar's opacity/transform is decided. Pinned: it stays put
@@ -416,20 +250,14 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     // shadow host for anything focused in here, so the bar would dim while you
     // were typing in it.
     const open = approached || overBar || menuOpen() || bar.contains(overlayActiveElement());
-    if (prefs.pinned || deps.isEditMode()) {
-      bar.style.transform = 'none';
-      bar.style.opacity = open ? '1' : REST_OPACITY;
-      bar.style.pointerEvents = 'auto';
-      hairline.style.display = 'none';
-      return;
-    }
-    bar.style.transform = open
-      ? 'none'
-      : `translateY(${prefs.edge === 'top' ? '-100%' : '100%'})`;
-    bar.style.opacity = open ? '1' : '0';
-    // A retracted bar must not swallow clicks on the strip it used to cover.
-    bar.style.pointerEvents = open ? 'auto' : 'none';
-    hairline.style.display = open ? 'none' : 'block';
+    // Both flags, then let styles.ts decide. Docked means "never retracts", and
+    // the resting opacity, the slide-off, the dead pointer-events on a bar that
+    // is off-screen and the hairline all follow from the pair rather than from
+    // five writes split across two branches here.
+    const docked = prefs.pinned || deps.isEditMode();
+    bar.toggleAttribute('data-docked', docked);
+    bar.toggleAttribute('data-open', open);
+    hairline.toggleAttribute('data-on', !docked && !open);
   }
 
   function reveal(): void {
@@ -480,29 +308,11 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
    *  must not reflow every time the bar slides in, and the bar must never sit
    *  on top of it. */
   function applyEdge(): void {
-    if (prefs.edge === 'top') {
-      bar.style.top = '0';
-      bar.style.bottom = '';
-      bar.style.borderTop = 'none';
-      bar.style.borderBottom = '1px solid rgba(255,255,255,0.09)';
-      bar.style.boxShadow = '0 6px 22px rgba(0,0,0,0.26)';
-      hairline.style.top = '0';
-      hairline.style.bottom = '';
-      nub.style.top = '0';
-      nub.style.bottom = '';
-      nub.style.borderRadius = '0 0 3px 3px';
-    } else {
-      bar.style.top = '';
-      bar.style.bottom = '0';
-      bar.style.borderTop = '1px solid rgba(255,255,255,0.09)';
-      bar.style.borderBottom = 'none';
-      bar.style.boxShadow = '0 -6px 22px rgba(0,0,0,0.26)';
-      hairline.style.top = '';
-      hairline.style.bottom = '0';
-      nub.style.top = '';
-      nub.style.bottom = '0';
-      nub.style.borderRadius = '3px 3px 0 0';
-    }
+    // One flag on each of the two fixed elements; the nub follows its parent.
+    // Which edge a border, a shadow and a corner belong to is layout, and
+    // saying it twice in JS is how the two used to drift.
+    bar.dataset.edge = prefs.edge;
+    hairline.dataset.edge = prefs.edge;
     setChromeInset({
       top: prefs.edge === 'top' ? BAR_H : 0,
       bottom: prefs.edge === 'bottom' ? BAR_H : 0,
@@ -536,7 +346,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   // --- Overflow menu -------------------------------------------------------
 
   function openMenu(): void {
-    menu.style.display = 'flex';
+    menu.toggleAttribute('data-on', true);
     const anchor = brand.getBoundingClientRect();
     menu.style.left = `${Math.max(6, anchor.left)}px`;
     if (prefs.edge === 'top') {
@@ -551,7 +361,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   }
 
   function closeMenu(): void {
-    menu.style.display = 'none';
+    menu.toggleAttribute('data-on', false);
     brand.setAttribute('aria-expanded', 'false');
   }
 
@@ -586,7 +396,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   function paintNode(node: BarNode): void {
     const { spec, btn, ico, label } = node;
     const visible = spec.visible ? spec.visible() : true;
-    btn.style.display = visible ? (spec.place === 'menu' ? 'flex' : 'inline-flex') : 'none';
+    btn.toggleAttribute('data-hidden', !visible);
     if (!visible) return;
 
     const text = typeof spec.label === 'function' ? spec.label() : spec.label;
@@ -596,15 +406,15 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     btn.title = title ?? text;
     btn.setAttribute('aria-label', text);
 
-    const on = spec.active?.() ?? false;
-    node.bg = on ? COLOR.primary : spec.place === 'menu' ? 'transparent' : BTN_BG;
-    node.bgHover = on ? lift(COLOR.primary) : spec.place === 'menu' ? `${COLOR.primary}38` : BTN_BG_HOVER;
-    btn.style.background = node.bg;
-    btn.style.color = on ? COLOR.foreground : spec.place === 'menu' ? COLOR.foreground : BTN_INK;
+    btn.toggleAttribute('data-active', spec.active?.() ?? false);
     const off = spec.disabled?.() ?? false;
     btn.disabled = off;
-    btn.style.cursor = off ? 'default' : 'pointer';
+    btn.toggleAttribute('data-off', off);
+    // `paint` is a caller-supplied hook returning arbitrary colours — the save
+    // button runs its phase through it — so a painted node keeps the JS hover
+    // path and its own inline background. Every other node hovers in CSS.
     const painted = spec.paint?.(btn);
+    node.painted = !!painted;
     if (painted) {
       node.bg = painted.bg;
       node.bgHover = painted.bgHover;
@@ -616,41 +426,9 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     const btn = styled(
       'button',
       inMenu ? 'atx-menu-item' : `atx-bar-btn${spec.compact ? ' atx-bar-btn-icon' : ''}`,
-      inMenu
-        ? {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '9px',
-            width: '100%',
-            padding: '7px 9px',
-            border: 'none',
-            borderRadius: RADIUS.md,
-            background: 'transparent',
-            color: COLOR.foreground,
-            font: `500 12.5px ${FONT.ui}`,
-            textAlign: 'left',
-            cursor: 'pointer',
-            ...spec.extra,
-          }
-        : {
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            flex: '0 0 auto',
-            height: '24px',
-            padding: spec.compact ? '0' : '0 10px',
-            width: spec.compact ? '26px' : 'auto',
-            justifyContent: 'center',
-            border: 'none',
-            borderRadius: RADIUS.md,
-            background: BTN_BG,
-            color: BTN_INK,
-            font: `600 12px/1 ${FONT.ui}`,
-            whiteSpace: 'nowrap',
-            cursor: 'pointer',
-            transition: 'background 120ms, color 120ms',
-            ...spec.extra,
-          },
+      // Only the caller's own trim; the box is .atx-menu-item / .atx-bar-btn,
+      // and a compact button is the -icon modifier rather than two ternaries.
+      spec.extra,
       spec.id,
     );
     btn.type = 'button';
@@ -658,14 +436,16 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     btn.append(ico);
     let label: HTMLElement | null = null;
     if (!spec.compact) {
-      label = styled('span', 'atx-bar-btn-label', {});
+      label = styled('span', 'atx-bar-btn-label');
       btn.append(label);
     }
-    const node: BarNode = { spec, btn, ico, label, bg: BTN_BG, bgHover: BTN_BG_HOVER };
+    const node: BarNode = { spec, btn, ico, label, bg: BAR_CHIP, bgHover: BAR_CHIP_HOVER, painted: false };
     btn.addEventListener('mouseenter', () => {
-      if (!btn.disabled) btn.style.background = node.bgHover;
+      if (node.painted && !btn.disabled) btn.style.background = node.bgHover;
     });
-    btn.addEventListener('mouseleave', () => (btn.style.background = node.bg));
+    btn.addEventListener('mouseleave', () => {
+      if (node.painted) btn.style.background = node.bg;
+    });
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (inMenu) closeMenu();
@@ -824,7 +604,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     syncVisibility,
     setHint(text: string | null): void {
       hint.textContent = text ?? '';
-      hint.style.display = text ? 'inline' : 'none';
+      hint.toggleAttribute('data-on', !!text);
     },
   };
 }
