@@ -1,7 +1,7 @@
 import { has } from './features.ts';
 import { type IconName, icon, setIcon } from './icons.ts';
 import * as state from './state.ts';
-import { COLOR, FONT, Z, setChromeInset, styled } from './ui.ts';
+import { COLOR, FONT, hexToRgba, RADIUS, setChromeInset, styled, Z } from './ui.ts';
 
 /**
  * The admin bar — the overlay's one piece of persistent chrome.
@@ -110,25 +110,31 @@ const RETRACT_DELAY = 350;
  *  against a white page, so the resting bar was the least legible thing the
  *  overlay drew. 0.72 keeps it recessive without going back there.
  *
- *  **The resting bar is deliberately below AA, and only the resting bar.**
- *  Measured over the playground's near-white page (rgb(253,252,255)): a label
- *  sitting straight on the bar surface comes to 5.3:1, but the three that live
- *  inside a {@link BTN_BG} chip come to **4.31:1** — the chip's white tint
- *  lifts the surface under the ink. Approaching the bar or entering edit mode
- *  takes it to opacity 1 and 9.5:1, which is every state a user reads it in
- *  for longer than a glance. Recessive-until-touched is the point of the
- *  surface, so this stays; raising the number would mean a bar that never
- *  recedes. Tracked as a `deferral` on the roadmap board, not a bug — and it
- *  is why `tests/contrast.test.ts` pins the *tokens* rather than this
- *  composite, which depends on the host page. */
+ *  **The resting bar sits near the AA line, and only the resting bar.** Over
+ *  the playground's near-white page (rgb(253,252,255)) a label straight on the
+ *  bar surface computes to ~5.9:1, and the three that live inside a
+ *  {@link BTN_BG} chip to ~4.8:1 — the chip's white tint lifts the surface
+ *  under the ink, which is what makes those three the worst case. Approaching
+ *  the bar or entering edit mode takes it to opacity 1 and 11:1 or better,
+ *  which is every state a user reads it in for longer than a glance.
+ *
+ *  Those are computed figures, not instrument readings: they model `opacity`
+ *  as the group buffer it is, but not `backdropFilter`'s saturate pass, so
+ *  treat them as ±0.3 and re-measure in the browser before relying on the
+ *  chip case either way — `docs/VERIFICATION.md` carries that check.
+ *  Recessive-until-touched is the point of the surface, so the number stays
+ *  where it is; raising it would mean a bar that never recedes. Tracked as a
+ *  `deferral` on the roadmap board, not a bug — and it is why
+ *  `tests/contrast.test.ts` pins the *tokens* rather than this composite,
+ *  which depends on the host page. */
 const REST_OPACITY = '0.72';
 
 const BTN_BG = 'rgba(255,255,255,0.09)';
 const BTN_BG_HOVER = 'rgba(255,255,255,0.20)';
-const BTN_INK = '#e7e6f2';
+const BTN_INK = COLOR.foreground;
 /** The save button's label while writing — reads as busy without dropping below
  *  AA on the button's own hover background (white at 0.20 over the bar). */
-const SAVING_INK = '#d2d0de';
+const SAVING_INK = COLOR.mutedFg;
 
 const PHASE_LABEL: Record<state.SavePhase, string> = {
   clean: 'Done',
@@ -152,11 +158,11 @@ const PHASE_TITLE: Record<state.SavePhase, string> = {
   error: 'The last save failed and the change was rolled back — click to leave edit mode',
 };
 const PHASE_BG: Record<state.SavePhase, string> = {
-  clean: COLOR.ok,
-  dirty: COLOR.accent,
+  clean: COLOR.success,
+  dirty: COLOR.primary,
   saving: BTN_BG,
-  saved: COLOR.ok,
-  error: COLOR.err,
+  saved: COLOR.success,
+  error: COLOR.destructive,
 };
 
 /** Nudge a hex colour toward white for the hover state of a coloured button. */
@@ -235,9 +241,9 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
       // showed through to an effective #494853, which dropped the hint and menu
       // inks to ~3:1; the blur still reads as glass at 0.94, and over a dark
       // page (the common case) the two are indistinguishable.
-      background: 'rgba(22, 21, 34, 0.94)',
+      background: hexToRgba(COLOR.glass, 0.94),
       backdropFilter: 'blur(12px) saturate(1.3)',
-      color: '#fff',
+      color: COLOR.foreground,
       font: `500 12px ${FONT.ui}`,
       opacity: REST_OPACITY,
       transition: 'opacity 140ms ease, transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -260,7 +266,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
       zIndex: String(Z + 3),
       display: 'none',
       pointerEvents: 'none',
-      background: `linear-gradient(90deg, transparent, ${COLOR.accent}88, transparent)`,
+      background: `linear-gradient(90deg, transparent, ${COLOR.primary}88, transparent)`,
     },
     'atx-hairline',
   );
@@ -270,7 +276,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     transform: 'translateX(-50%)',
     width: '54px',
     height: '3px',
-    background: COLOR.accent,
+    background: COLOR.primary,
   });
   hairline.append(nub);
 
@@ -302,9 +308,9 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
       height: '24px',
       padding: '0',
       border: 'none',
-      borderRadius: '6px',
-      background: COLOR.accent,
-      color: '#fff',
+      borderRadius: RADIUS.md,
+      background: COLOR.primary,
+      color: COLOR.foreground,
       cursor: 'pointer',
       boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.10)',
     },
@@ -314,8 +320,8 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   brand.title = 'astro-dev-edit — menu';
   brand.setAttribute('aria-haspopup', 'menu');
   brand.append(icon('cursor', 15));
-  brand.addEventListener('mouseenter', () => (brand.style.background = lift(COLOR.accent)));
-  brand.addEventListener('mouseleave', () => (brand.style.background = COLOR.accent));
+  brand.addEventListener('mouseenter', () => (brand.style.background = lift(COLOR.primary)));
+  brand.addEventListener('mouseleave', () => (brand.style.background = COLOR.primary));
 
   const separator = styled('div', 'atx-bar-sep', {
     flex: '0 0 auto',
@@ -355,13 +361,13 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
       padding: '5px',
       display: 'none',
       flexDirection: 'column',
-      background: 'rgba(28, 27, 42, 0.97)',
+      background: hexToRgba(COLOR.glassRaised, 0.97),
       backdropFilter: 'blur(14px)',
-      border: `1px solid ${COLOR.panelBorder}`,
-      borderRadius: '9px',
+      border: `1px solid ${COLOR.border}`,
+      borderRadius: RADIUS.md,
       boxShadow: '0 16px 44px rgba(0,0,0,0.5)',
       font: `500 12.5px ${FONT.ui}`,
-      color: '#dedded',
+      color: COLOR.foreground,
       cursor: 'auto',
     },
     'atx-menu',
@@ -374,16 +380,16 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     gap: '7px',
     margin: '5px 4px 0',
     paddingTop: '7px',
-    borderTop: `1px solid ${COLOR.panelDivider}`,
+    borderTop: `1px solid ${COLOR.border}`,
     font: `500 10.5px ${FONT.mono}`,
-    color: COLOR.faint,
+    color: COLOR.faintFg,
   });
   const liveDot = styled('span', 'atx-menu-live', {
     width: '6px',
     height: '6px',
     flex: '0 0 auto',
     borderRadius: '50%',
-    background: COLOR.image,
+    background: COLOR.info,
   });
   menuFoot.append(liveDot);
   menuFoot.append(document.createTextNode('dev server connected'));
@@ -587,10 +593,10 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     btn.setAttribute('aria-label', text);
 
     const on = spec.active?.() ?? false;
-    node.bg = on ? COLOR.accent : spec.place === 'menu' ? 'transparent' : BTN_BG;
-    node.bgHover = on ? lift(COLOR.accent) : spec.place === 'menu' ? `${COLOR.accent}38` : BTN_BG_HOVER;
+    node.bg = on ? COLOR.primary : spec.place === 'menu' ? 'transparent' : BTN_BG;
+    node.bgHover = on ? lift(COLOR.primary) : spec.place === 'menu' ? `${COLOR.primary}38` : BTN_BG_HOVER;
     btn.style.background = node.bg;
-    btn.style.color = on ? '#fff' : spec.place === 'menu' ? '#dedded' : BTN_INK;
+    btn.style.color = on ? COLOR.foreground : spec.place === 'menu' ? COLOR.foreground : BTN_INK;
     const off = spec.disabled?.() ?? false;
     btn.disabled = off;
     btn.style.cursor = off ? 'default' : 'pointer';
@@ -614,9 +620,9 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
             width: '100%',
             padding: '7px 9px',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: RADIUS.md,
             background: 'transparent',
-            color: '#dedded',
+            color: COLOR.foreground,
             font: `500 12.5px ${FONT.ui}`,
             textAlign: 'left',
             cursor: 'pointer',
@@ -632,7 +638,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
             width: spec.compact ? '26px' : 'auto',
             justifyContent: 'center',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: RADIUS.md,
             background: BTN_BG,
             color: BTN_INK,
             font: `600 12px/1 ${FONT.ui}`,
@@ -758,7 +764,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
       const phase = state.savePhase();
       const bg = PHASE_BG[phase];
       btn.style.background = bg;
-      btn.style.color = phase === 'saving' ? SAVING_INK : '#fff';
+      btn.style.color = phase === 'saving' ? SAVING_INK : COLOR.foreground;
       btn.style.cursor = phase === 'saving' ? 'progress' : 'pointer';
       return { bg, bgHover: bg.startsWith('#') ? lift(bg) : bg };
     },

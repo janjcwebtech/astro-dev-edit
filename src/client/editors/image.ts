@@ -3,13 +3,15 @@ import * as api from '../api.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
 import {
-  COLOR,
-  FONT,
   basename,
   buildBackdrop,
   buildPanel,
-  setFreshSrc,
+  CHECKER,
+  COLOR,
+  FONT,
   lockElement,
+  RADIUS,
+  setFreshSrc,
   styled,
   toast,
   wirePanelButtons,
@@ -60,8 +62,8 @@ export async function beginImageEdit(
   // from the DOM rather than from anything patchable.
   const preview = styled('div', 'atx-image-preview', {
     width: '100%', maxHeight: '180px', height: '180px', marginBottom: '10px',
-    borderRadius: '8px', overflow: 'hidden', border: '1px solid #333',
-    background: 'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 14px 14px',
+    borderRadius: RADIUS.md, overflow: 'hidden', border: `1px solid ${COLOR.border}`,
+    background: CHECKER(14),
   });
   const previewImg = styled('img', 'atx-image-preview-img', {
     width: '100%', height: '100%', objectFit: 'contain', display: 'block',
@@ -73,7 +75,7 @@ export async function beginImageEdit(
   preview.append(previewImg);
 
   const meta = styled('p', 'atx-image-meta', {
-    margin: '0 0 12px', font: `11px ${FONT.mono}`, color: COLOR.muted,
+    margin: '0 0 12px', font: `11px ${FONT.mono}`, color: COLOR.mutedFg,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   });
 
@@ -90,7 +92,7 @@ export async function beginImageEdit(
 
   if (!srcEditable) {
     const note = styled('p', 'atx-note', {
-      margin: '0 0 12px', font: '12px/1.5 system-ui', color: COLOR.warn,
+      margin: '0 0 12px', font: '12px/1.5 system-ui', color: COLOR.warning,
     });
     note.textContent =
       'The image file is set from code (an expression or astro:assets), so it can’t be swapped here — only the alt text can be edited.';
@@ -104,7 +106,8 @@ export async function beginImageEdit(
   altLabel.textContent = 'Alt text';
   const altInput = styled('input', 'atx-alt-input', {
     width: '100%', padding: '6px 8px', marginBottom: '12px', boxSizing: 'border-box',
-    border: '1px solid #444', borderRadius: '5px', background: '#111', color: '#fff', font: '13px system-ui',
+    border: `1px solid ${COLOR.input}`, borderRadius: RADIUS.sm,
+    background: COLOR.background, color: COLOR.foreground, font: `13px ${FONT.ui}`,
   });
   altInput.value = originalAlt;
   if (!altEditable) {
@@ -160,7 +163,7 @@ export async function beginImageEdit(
   stripTitle.textContent = 'Recently added';
   const browseAll = styled('button', 'atx-btn atx-image-browse-all', {
     marginLeft: 'auto', padding: '0', border: 'none', background: 'transparent',
-    color: COLOR.accentText, cursor: 'pointer', font: '600 12px system-ui',
+    color: COLOR.primaryText, cursor: 'pointer', font: '600 12px system-ui',
   });
   browseAll.type = 'button';
   browseAll.textContent = 'Browse all →';
@@ -177,9 +180,9 @@ export async function beginImageEdit(
       const current = asset.path === chosenSrc;
       const btn = styled('button', 'atx-image-recent', {
         padding: '0', width: '100%', aspectRatio: '4 / 3', overflow: 'hidden',
-        borderRadius: '6px', border: `1px solid ${current ? COLOR.accent : '#333'}`,
-        outline: current ? `1px solid ${COLOR.accent}` : 'none',
-        background: 'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 10px 10px',
+        borderRadius: RADIUS.md, border: `1px solid ${current ? COLOR.primary : COLOR.border}`,
+        outline: current ? `1px solid ${COLOR.primary}` : 'none',
+        background: CHECKER(10),
         cursor: 'pointer',
       });
       btn.type = 'button';

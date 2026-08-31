@@ -2,7 +2,7 @@ import type { SourceLoc } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
-import { COLOR, basename, lockElement, styled, toast } from '../ui.ts';
+import { COLOR, basename, lockElement, styled, toast, RADIUS } from '../ui.ts';
 import { TAGS, type TagSpec, tagInsertion } from './markup-insert.ts';
 import { openSourcePopup } from './source-popup.ts';
 
@@ -53,15 +53,15 @@ function buildPalette(input: HTMLTextAreaElement, markDirty: () => void): HTMLEl
     display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', marginTop: '8px',
   });
   const hint = styled('span', 'atx-markup-hint', {
-    font: '11px/1.5 system-ui', color: COLOR.muted, marginRight: '2px',
+    font: '11px/1.5 system-ui', color: COLOR.mutedFg, marginRight: '2px',
   });
   hint.textContent = HINT;
   tools.append(hint);
 
   for (const spec of TAGS) {
     const btn = styled('button', 'atx-markup-tag', {
-      padding: '2px 6px', borderRadius: '4px', cursor: 'pointer',
-      border: `1px solid ${COLOR.panelDivider}`, background: '#111', color: '#ddd',
+      padding: '2px 6px', borderRadius: RADIUS.sm, cursor: 'pointer',
+      border: `1px solid ${COLOR.border}`, background: COLOR.background, color: COLOR.foreground,
       font: '11px ui-monospace, SFMono-Regular, Menlo, monospace',
     });
     btn.type = 'button';

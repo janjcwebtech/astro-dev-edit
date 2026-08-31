@@ -5,16 +5,19 @@ import { clearHighlight } from '../hover.ts';
 import { icon } from '../icons.ts';
 import * as state from '../state.ts';
 import {
-  COLOR,
-  FONT,
-  INPUT_STYLE,
   basename,
   buildBackdrop,
   buildPanel,
   buildTabs,
+  CHECKER,
+  COLOR,
+  FONT,
   footButton,
-  setFreshSrc,
+  hexToRgba,
+  INPUT_STYLE,
+  RADIUS,
   setButtonEnabled,
+  setFreshSrc,
   styled,
   toast,
 } from '../ui.ts';
@@ -153,8 +156,8 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     // --- tabs + upload -------------------------------------------------------
     const uploadBtn = styled('button', 'atx-btn atx-media-upload', {
       marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px',
-      padding: '6px 12px', borderRadius: '6px', border: '1px solid #555',
-      background: 'transparent', color: '#ccc', cursor: 'pointer', font: '600 12px system-ui',
+      padding: '6px 12px', borderRadius: RADIUS.md, border: `1px solid ${COLOR.input}`,
+      background: 'transparent', color: COLOR.mutedFg, cursor: 'pointer', font: '600 12px system-ui',
     });
     uploadBtn.type = 'button';
     uploadBtn.append(icon('upload', 13), document.createTextNode('Upload file…'));
@@ -174,7 +177,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       display: 'flex', flexDirection: 'column', gap: '10px',
     });
     const rail = styled('div', 'atx-media-rail', {
-      flex: `0 0 ${RAIL_WIDTH}`, width: RAIL_WIDTH, borderLeft: `1px solid ${COLOR.panelDivider}`,
+      flex: `0 0 ${RAIL_WIDTH}`, width: RAIL_WIDTH, borderLeft: `1px solid ${COLOR.border}`,
       paddingLeft: '14px', marginLeft: '14px', overflowY: 'auto',
     });
     const content = styled('div', 'atx-media-content', {
@@ -183,17 +186,17 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     content.append(paneHost, rail);
 
     const dropStrip = styled('div', 'atx-media-drop', {
-      flex: '0 0 auto', font: `11px ${FONT.mono}`, color: COLOR.muted, textAlign: 'center',
+      flex: '0 0 auto', font: `11px ${FONT.mono}`, color: COLOR.mutedFg, textAlign: 'center',
     });
 
     // `tabsRow` and `toolbarHost` come from buildTabs, below.
 
     // --- footer --------------------------------------------------------------
     const status = styled('span', 'atx-media-status', {
-      marginRight: 'auto', font: '12px system-ui', color: COLOR.muted,
+      marginRight: 'auto', font: '12px system-ui', color: COLOR.mutedFg,
     });
-    const cancelBtn = footButton('Cancel', 'cancel', () => finish(null));
-    const useBtn = footButton('Use image', 'primary', () => void commitSelection());
+    const cancelBtn = footButton('Cancel', 'ghost', () => finish(null));
+    const useBtn = footButton('Use image', 'default', () => void commitSelection());
     foot.append(status, cancelBtn, useBtn);
 
     // --- pane construction ---------------------------------------------------
@@ -272,8 +275,8 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     // target, with an accent tint while a file is over it.
     const dropOverlay = styled('div', 'atx-media-dropzone', {
       position: 'absolute', inset: '0', display: 'none', zIndex: '2',
-      background: 'rgba(97,68,215,0.18)', border: `2px dashed ${COLOR.accent}`,
-      borderRadius: '12px', pointerEvents: 'none',
+      background: hexToRgba(COLOR.primary, 0.18), border: `2px dashed ${COLOR.primary}`,
+      borderRadius: RADIUS.xl, pointerEvents: 'none',
     });
     panel.append(dropOverlay);
     let dragDepth = 0;
@@ -360,8 +363,8 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       filterInput.addEventListener('input', () => paint());
 
       const scopeToggle = styled('button', 'atx-btn atx-asset-scope', {
-        flex: '0 0 auto', display: 'none', padding: '6px 10px', borderRadius: '6px',
-        border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#ccc',
+        flex: '0 0 auto', display: 'none', padding: '6px 10px', borderRadius: RADIUS.md,
+        border: `1px solid ${COLOR.input}`, background: 'transparent', color: COLOR.mutedFg,
         cursor: 'pointer', font: '600 12px system-ui', whiteSpace: 'nowrap',
       });
       scopeToggle.type = 'button';
@@ -498,7 +501,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
 
 export function railEmpty(text: string): HTMLElement {
   const el = styled('p', 'atx-media-rail-empty', {
-    margin: '0', font: '12px/1.6 system-ui', color: COLOR.muted,
+    margin: '0', font: '12px/1.6 system-ui', color: COLOR.mutedFg,
   });
   el.textContent = text;
   return el;
@@ -506,9 +509,9 @@ export function railEmpty(text: string): HTMLElement {
 
 export function railPreview(src: string, color?: string, fresh = false): HTMLElement {
   const box = styled('div', 'atx-media-rail-preview', {
-    width: '100%', aspectRatio: '4 / 3', borderRadius: '8px', overflow: 'hidden',
-    border: '1px solid #333', marginBottom: '10px',
-    background: color || 'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 12px 12px',
+    width: '100%', aspectRatio: '4 / 3', borderRadius: RADIUS.md, overflow: 'hidden',
+    border: `1px solid ${COLOR.border}`, marginBottom: '10px',
+    background: color || CHECKER(12),
   });
   const img = styled('img', 'atx-media-rail-img', {
     width: '100%', height: '100%', objectFit: 'contain', display: 'block',
@@ -526,7 +529,7 @@ export function railPreview(src: string, color?: string, fresh = false): HTMLEle
 
 export function railTitle(text: string): HTMLElement {
   const el = styled('h4', 'atx-media-rail-title', {
-    margin: '0 0 8px', font: '600 13px system-ui', color: '#eee',
+    margin: '0 0 8px', font: '600 13px system-ui', color: COLOR.foreground,
     overflow: 'hidden', textOverflow: 'ellipsis',
   });
   el.textContent = text;
@@ -538,11 +541,11 @@ export function railLine(label: string, value: string): HTMLElement {
   const row = styled('div', 'atx-media-rail-line', { margin: '0 0 6px' });
   const key = styled('span', 'atx-media-rail-key', {
     display: 'block', font: '600 10px system-ui', letterSpacing: '0.04em',
-    textTransform: 'uppercase', color: COLOR.muted,
+    textTransform: 'uppercase', color: COLOR.mutedFg,
   });
   key.textContent = label;
   const val = styled('span', 'atx-media-rail-value', {
-    display: 'block', font: `11px/1.5 ${FONT.mono}`, color: '#ccc', wordBreak: 'break-all',
+    display: 'block', font: `11px/1.5 ${FONT.mono}`, color: COLOR.mutedFg, wordBreak: 'break-all',
   });
   val.textContent = value;
   row.append(key, val);
@@ -553,11 +556,11 @@ export function railLink(label: string, text: string, href: string): HTMLElement
   const row = styled('div', 'atx-media-rail-line', { margin: '0 0 6px' });
   const key = styled('span', 'atx-media-rail-key', {
     display: 'block', font: '600 10px system-ui', letterSpacing: '0.04em',
-    textTransform: 'uppercase', color: COLOR.muted,
+    textTransform: 'uppercase', color: COLOR.mutedFg,
   });
   key.textContent = label;
   const a = styled('a', 'atx-media-rail-value atx-unsplash-credit', {
-    display: 'block', font: '12px/1.5 system-ui', color: COLOR.accentText,
+    display: 'block', font: '12px/1.5 system-ui', color: COLOR.primaryText,
   });
   a.href = href;
   a.target = '_blank';

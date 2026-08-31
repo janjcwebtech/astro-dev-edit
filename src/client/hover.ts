@@ -10,6 +10,7 @@ import {
   basename,
   chromeInset,
   hexToRgba,
+  RADIUS,
   pillButton,
   setPillLabel,
   styled,
@@ -38,23 +39,23 @@ interface Verdict {
 }
 
 /** Neutral pre-verification state — no editability claim yet. */
-const CHECKING: Verdict = { word: "loading…", color: COLOR.muted };
+const CHECKING: Verdict = { word: "loading…", color: COLOR.mutedFg };
 
 /** Collapse the server's classification onto the pill's word + color,
  *  mirroring how router.ts will route the eventual click. (spec §16.1) */
 function verdictFor(result: ClassifyResult): Verdict {
-  if (result.kind === "text") return { word: "editable", color: COLOR.accentText };
+  if (result.kind === "text") return { word: "editable", color: COLOR.primaryText };
   if (result.kind === "image") {
     const attrs = result.attrs ?? { src: "dynamic", alt: "dynamic" };
     // Same rule as the click router: when neither src nor alt is patchable
     // the click ends in a refusal notice, so the pill says dynamic.
     if (attrs.src !== "static" && attrs.alt === "dynamic") {
-      return { word: "dynamic", color: COLOR.warn };
+      return { word: "dynamic", color: COLOR.warning };
     }
-    return { word: "image", color: COLOR.image };
+    return { word: "image", color: COLOR.info };
   }
   // empty / dynamic / ambiguous / unresolved all route to the refusal notice.
-  return { word: "dynamic", color: COLOR.warn };
+  return { word: "dynamic", color: COLOR.warning };
 }
 
 // --- Elements (appended to the body by the composition root at boot) --------
@@ -66,9 +67,9 @@ const outline = styled(
     position: "fixed",
     pointerEvents: "none",
     zIndex: String(Z),
-    border: `2px solid ${COLOR.accent}`,
-    borderRadius: "3px",
-    background: "rgba(97, 68, 215, 0.08)",
+    border: `2px solid ${COLOR.primary}`,
+    borderRadius: RADIUS.sm,
+    background: hexToRgba(COLOR.primary, 0.08),
     display: "none",
     transition: "all 60ms ease-out",
   },
@@ -86,9 +87,9 @@ const tooltip = styled(
     zIndex: String(Z + 1),
     padding: "4px 4px 4px 8px",
     font: `500 12px/1.4 ${FONT.mono}`,
-    color: "#fff",
-    background: "#1a1a2e",
-    borderRadius: "5px",
+    color: COLOR.foreground,
+    background: COLOR.card,
+    borderRadius: RADIUS.sm,
     boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
     display: "none",
     // Column so the loc line and the class/ID chips row stack; each row sizes
@@ -435,10 +436,10 @@ export function initHover(deps: HoverDeps): HoverHandle {
   function makeChip(label: string, token: string, kind: "class" | "id", el: HTMLElement): HTMLElement {
     const chip = styled("span", "atx-tooltip-chip", {
       font: `500 11px ${FONT.mono}`,
-      color: "#c8c8e0",
+      color: COLOR.mutedFg,
       background: "rgba(255,255,255,0.09)",
       border: "1px solid transparent",
-      borderRadius: "4px",
+      borderRadius: RADIUS.sm,
       padding: "1px 6px",
       cursor: "default",
     });
@@ -446,7 +447,7 @@ export function initHover(deps: HoverDeps): HoverHandle {
     chip.title = `Show CSS applied via ${label}`;
     chip.addEventListener("mouseenter", () => {
       cancelHide();
-      chip.style.borderColor = COLOR.accent;
+      chip.style.borderColor = COLOR.primary;
       showCard(chip, token, kind, el);
     });
     chip.addEventListener("mouseleave", () => {

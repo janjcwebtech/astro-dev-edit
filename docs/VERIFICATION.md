@@ -117,7 +117,7 @@ the loc rules in `astro.ts`.
 | `unsplash-search.ts` — the DOM-free search controller: debounce collapsing keystrokes to one request, blank/whitespace staying idle with no fetch, immediate reset on clear, `retry()` bypassing the debounce, stale responses (and stale errors) discarded, zero results as `empty` not an empty `ready`, error code/retryability surfaced, `loadMore` appending and bumping the page, discarded when the query or orientation changed mid-flight, a failed page keeping the shown results via `moreError`, orientation re-running immediately, `dispose()` cancelling | `tests/unsplash-search.test.ts` |
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 | `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
-| `ui.ts` — contrast guard on the ink tokens: each foreground (`muted`, `faint`, `accentText`, `errText`, `warn`, `image`) against every surface it is painted on at AA 4.5:1, white on each colour used as a *background* (`accent`, `ok`, `err`, `idle`), `control`/`errBorder` at the 3:1 WCAG requires of a control boundary, and that `accent`/`err` still fail as foregrounds — which is what the `*Text` pair is for | `tests/contrast.test.ts` |
+| `ui.ts` — contrast guard on the design tokens: every ink against **all three** overlay surfaces (`background`, `card`, `elevated`) at AA 4.5:1, `foreground` on each colour used as a *background* (`primary`, `destructive`, `success`), `input`/`ring`/`destructiveBorder` at the 3:1 WCAG requires of a control boundary, that `primary`/`destructive`/`success` still fail as foregrounds — which is what the `*Text` pair is for — that `border` stays *below* 3:1 because a separator is not a control, that the neutral ramp is achromatic (R = G = B), and that the rich-text editor's light `PAPER` set clears AA on its own ground while being invisible on the dark surfaces, so the two sets cannot be mixed | `tests/contrast.test.ts` |
 | `element-context.ts` — `formatContext` clipboard payload: section order and omission (absent entry/box, and the never-formatted editability verdict), `>` focus-line gutter marking, quoted-range wording, fence language per extension, refused-source sentence, empty-CSS note, rule blocks with/without a source comment, both truncation notices; `relativize` root stripping (trailing slash, outside-root, already-relative, unknown root, Windows separators); `windowAround` 1-based slicing (clamped both ends, whole file, pre-windowed response) | `tests/element-context.test.ts` |
 
 The Settings drawer itself has no unit tests — it is DOM-bound — but it is
@@ -553,14 +553,18 @@ function schema with `image()` fields — and its config sets widget overrides o
       is behind it. On a white section of the playground, the resting bar's
       labels and its `#atx-bar-hint` are readable without hovering.
 
-      Measured on the playground's `rgb(253,252,255)` body: a bar label on the
-      bare surface is 5.3:1, one inside a button chip **4.31:1**, and the whole
-      bar 9.5:1 the moment it is approached or edit mode is on (`#atx-bar-hint`
-      12.6:1, the exit button 5.4:1 — both only ever shown at opacity 1). The
-      sub-AA resting figure is a **deliberate deferral**, not a regression:
-      recessive-until-touched is what the surface is for. See `REST_OPACITY` in
-      `admin-bar.ts` and the board. Re-flag it only if the *approached* bar or
-      any other surface drops below 4.5.
+      Computed against the playground's `rgb(253,252,255)` body: a resting bar
+      label on the bare surface is ~5.9:1, one inside a button chip ~4.8:1 (the
+      worst case — the chip's white tint lifts the surface under the ink), and
+      the bar 11:1 or better the moment it is approached or edit mode is on.
+      **Measure the chip case for real** rather than trusting that number: it
+      sits within a rounding error of the 4.5 line, and the model behind it
+      does not account for the bar's `saturate` backdrop filter.
+
+      A resting figure that lands under AA is a **deliberate deferral**, not a
+      regression: recessive-until-touched is what the surface is for. See
+      `REST_OPACITY` in `admin-bar.ts` and the board. Re-flag it only if the
+      *approached* bar or any other surface drops below 4.5.
 
 **Cleanup**
 

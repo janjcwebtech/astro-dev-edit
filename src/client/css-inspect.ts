@@ -10,7 +10,7 @@
  */
 
 import { icon } from './icons.ts';
-import { COLOR, FONT, Z, basename, isolateScroll, pillButton, styled } from './ui.ts';
+import { COLOR, FONT, Z, basename, isolateScroll, pillButton, styled, RADIUS } from './ui.ts';
 
 /** One applied rule, distilled for display. */
 export interface MatchedRule {
@@ -209,13 +209,13 @@ function openButton(onClick: () => void): HTMLButtonElement {
 // CSS declaration syntax colors on the card's dark ground — the same palette
 // the source-peek panel uses, so highlighting reads consistently across the UI.
 const CSS_COLOR = {
-  prop: '#82b1ff', // property name
-  value: '#cfd2e6', // keyword / identifier value
-  string: '#a5d6a7',
-  number: '#f5c27a', // numbers, units, hex colors
-  variable: '#c9a7ff', // custom properties (--foo)
-  keyword: '#ff8a9e', // !important
-  punct: '#8b94a7', // : ; , ( ) and the like
+  prop: COLOR.chart5, // property name
+  value: COLOR.mutedFg, // keyword / identifier value
+  string: COLOR.chart2,
+  number: COLOR.chart3, // numbers, units, hex colors
+  variable: COLOR.chart1, // custom properties (--foo)
+  keyword: COLOR.chart4, // !important
+  punct: COLOR.mutedFg, // : ; , ( ) and the like
 } as const;
 
 // One pass over a declaration's value: strings, hex colors, custom-property
@@ -273,11 +273,11 @@ function ruleBlock(
 ): HTMLElement {
   const block = styled('div', 'atx-tooltip-rule', {
     padding: first ? '0 0 6px' : '6px 0',
-    borderTop: first ? 'none' : `1px solid ${COLOR.panelDivider}`,
+    borderTop: first ? 'none' : `1px solid ${COLOR.border}`,
   });
 
   const sel = styled('div', 'atx-tooltip-rule-sel', {
-    color: '#cbb9ff',
+    color: COLOR.primaryText,
     wordBreak: 'break-all',
   });
   sel.textContent = rule.selectorText;
@@ -300,7 +300,7 @@ function ruleBlock(
       justifyContent: 'space-between',
     });
     const src = styled('span', 'atx-tooltip-rule-src', {
-      color: COLOR.muted,
+      color: COLOR.mutedFg,
       font: `10.5px ${FONT.mono}`,
       overflow: 'hidden',
       whiteSpace: 'nowrap',
@@ -331,10 +331,10 @@ export function buildRulesCard(
     maxHeight: '50vh',
     overflowY: 'auto',
     padding: '8px 10px',
-    background: COLOR.panelBg,
-    color: '#ddd',
-    border: `1px solid ${COLOR.panelBorder}`,
-    borderRadius: '6px',
+    background: COLOR.card,
+    color: COLOR.foreground,
+    border: `1px solid ${COLOR.border}`,
+    borderRadius: RADIUS.md,
     boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
     font: `12px ${FONT.mono}`,
     cursor: 'default',
@@ -342,7 +342,7 @@ export function buildRulesCard(
   isolateScroll(card);
 
   if (rules.length === 0) {
-    const empty = styled('div', 'atx-tooltip-rules-empty', { color: COLOR.muted });
+    const empty = styled('div', 'atx-tooltip-rules-empty', { color: COLOR.mutedFg });
     empty.textContent = `No applied rules for ${selector}`;
     card.append(empty);
     return card;

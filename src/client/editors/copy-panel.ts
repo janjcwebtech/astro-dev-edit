@@ -22,7 +22,7 @@ export function openCopyPanel(title: string, text: string): void {
   const body = panel.querySelector('[data-body]') as HTMLElement;
 
   const note = styled('p', 'atx-copy-note', {
-    margin: '0 0 10px', font: '13px/1.5 system-ui', color: COLOR.warn,
+    margin: '0 0 10px', font: '13px/1.5 system-ui', color: COLOR.warning,
   });
   note.textContent =
     'Your browser would not let the page write to the clipboard — over a network address the dev server is not a secure context. Copy it from here instead:';
@@ -65,8 +65,8 @@ export function openCopyPanel(title: string, text: string): void {
 
   const foot = panel.querySelector('[data-foot]') as HTMLElement;
   foot.append(
-    footButton('Close', 'cancel', close),
-    footButton('Copy', 'primary', () => void copyNow()),
+    footButton('Close', 'ghost', close),
+    footButton('Copy', 'default', () => void copyNow()),
   );
 
   document.body.append(backdrop, panel);

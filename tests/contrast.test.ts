@@ -1,21 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { COLOR } from '../src/client/ui.ts';
+import { COLOR, PAPER } from '../src/client/ui.ts';
 
 /**
- * Contrast guard for the overlay's ink tokens.
+ * Contrast guard for the overlay's design tokens.
  *
  * The overlay has no stylesheet, so nothing but this test stops an ink from
- * drifting back below the legibility floor — and the failure is silent, because
- * unreadable text still renders. `ui.ts` owns the inks; the surfaces they land
- * on are inline `background` values spread across the client, so the ones that
- * bound each ink are restated here by name.
+ * drifting below the legibility floor — and the failure is silent, because
+ * unreadable text still renders.
  *
- * Pairings are per-ink rather than a blanket cross-product on purpose: the
- * lightest surface in the overlay (the asset picker's transparency
- * checkerboard) only ever carries `muted`, and holding every ink to it would
- * force inks lighter than their own worst case needs. When a new panel puts an
- * existing ink on a lighter background than the ones listed for it, add that
- * background to its row — that is the moment the ink needs rechecking.
+ * The token set is small enough that inks are held to *every* surface they can
+ * land on rather than to a hand-listed subset. That is what `COLOR`'s three
+ * surfaces buy: with `background`, `card` and `elevated` as the only opaque
+ * grounds the overlay paints, "which surfaces does this ink appear on" stops
+ * being a question a reader of this file has to answer correctly.
+ *
+ * `PAPER` is checked separately against its own ground, because the rich-text
+ * editor is a light island and mixing the two sets is exactly the mistake these
+ * assertions exist to catch.
  */
 
 /** WCAG 2.1 relative luminance. Shorthand hex is expanded first — `#888` parses
@@ -40,72 +41,147 @@ const AA_TEXT = 4.5;
 /** WCAG 1.4.11, the boundary of a control. */
 const AA_NON_TEXT = 3;
 
-/** Opaque backgrounds the overlay paints on, by the module that owns each. */
-const SURFACE = {
-  peek: '#12121d', // editors/peek.ts CODE_BG — the darkest
-  field: '#111111', // ui.ts INPUT_STYLE
-  panel: COLOR.panelBg, // ui.ts buildPanel / buildDrawer
-  menu: '#232230', // admin-bar.ts menu, over an opaque page
-  row: '#20202e', // editors/media-grid.ts tile
-  checker: '#2a2a3a', // editors/asset-picker.ts transparency checkerboard
-} as const;
+/** Every opaque ground the overlay paints. Panels and drawers use `card`, list
+ *  rows and the admin bar use `elevated`, field interiors and code wells use
+ *  `background`. */
+const SURFACES = ['background', 'card', 'elevated'] as const;
 
-/** Each foreground ink against the surfaces it is actually painted on. */
-const INK_ON: ReadonlyArray<readonly [string, string, readonly string[]]> = [
-  // Help text and hints, the overlay's most widespread secondary ink — and the
-  // only one that lands on the checkerboard, which is what sets its floor.
-  ['muted', COLOR.muted, [SURFACE.peek, SURFACE.panel, SURFACE.menu, SURFACE.row, SURFACE.checker]],
-  // Peek line numbers, empty-state glyphs, the menu's status footer.
-  ['faint', COLOR.faint, [SURFACE.peek, SURFACE.panel, SURFACE.menu, SURFACE.row]],
-  ['accentText', COLOR.accentText, [SURFACE.panel, SURFACE.row]],
-  ['errText', COLOR.errText, [SURFACE.peek, SURFACE.panel, SURFACE.row]],
-  ['warn', COLOR.warn, [SURFACE.panel, SURFACE.row]],
-  ['image', COLOR.image, [SURFACE.panel]],
-];
+/** Tokens used as foreground text. */
+const INKS = [
+  'foreground',
+  'mutedFg',
+  'faintFg',
+  'primaryText',
+  'destructiveText',
+  'successText',
+  'warning',
+  'info',
+  'chart1',
+  'chart2',
+  'chart3',
+  'chart4',
+  'chart5',
+] as const;
 
 describe('overlay ink contrast', () => {
-  for (const [name, ink, surfaces] of INK_ON) {
-    it(`${name} clears AA on every surface it is used on`, () => {
-      for (const surface of surfaces) {
-        expect(contrast(ink, surface), `${name} (${ink}) on ${surface}`).toBeGreaterThanOrEqual(
-          AA_TEXT,
-        );
+  for (const ink of INKS) {
+    it(`${ink} clears AA on every overlay surface`, () => {
+      for (const surface of SURFACES) {
+        expect(
+          contrast(COLOR[ink], COLOR[surface]),
+          `${ink} (${COLOR[ink]}) on ${surface} (${COLOR[surface]})`,
+        ).toBeGreaterThanOrEqual(AA_TEXT);
       }
     });
   }
 
-  // `accent` and `err` are backgrounds. The lightened `accentText`/`errText`
-  // exist precisely because these two fail as foregrounds — assert that, so the
-  // split does not get "simplified" away and the raw colours reused as ink.
-  it('accent and err fail as text, which is what the *Text pair is for', () => {
-    expect(contrast(COLOR.accent, COLOR.panelBg)).toBeLessThan(AA_TEXT);
-    expect(contrast(COLOR.err, COLOR.panelBg)).toBeLessThan(AA_TEXT);
+  // `primary`, `destructive` and `success` are backgrounds. The lightened
+  // `primaryText`/`destructiveText`/`successText` exist precisely because they
+  // fail as foregrounds — assert that, so the split does not get "simplified"
+  // away and the raw colours reused as ink.
+  it('the filled tokens fail as text, which is what the *Text pair is for', () => {
+    expect(contrast(COLOR.primary, COLOR.card)).toBeLessThan(AA_TEXT);
+    expect(contrast(COLOR.destructive, COLOR.card)).toBeLessThan(AA_TEXT);
+    expect(contrast(COLOR.success, COLOR.card)).toBeLessThan(AA_TEXT);
   });
 });
 
-describe('overlay colours that carry white text', () => {
-  for (const [name, bg] of Object.entries({
-    accent: COLOR.accent, // primary buttons, the veil chip, the bar's dirty state
-    ok: COLOR.ok, // success toast, the bar's saved state
-    err: COLOR.err, // error toast, the bar's failed state
-    idle: COLOR.idle,
-  })) {
-    it(`white clears AA on ${name}`, () => {
-      expect(contrast('#ffffff', bg)).toBeGreaterThanOrEqual(AA_TEXT);
+describe('overlay colours that carry foreground text', () => {
+  for (const bg of ['primary', 'destructive', 'success'] as const) {
+    it(`foreground clears AA on ${bg}`, () => {
+      expect(contrast(COLOR.foreground, COLOR[bg])).toBeGreaterThanOrEqual(AA_TEXT);
     });
   }
+
+  it('primaryFg clears AA on primary', () => {
+    expect(contrast(COLOR.primaryFg, COLOR.primary)).toBeGreaterThanOrEqual(AA_TEXT);
+  });
 });
 
 describe('control boundaries', () => {
-  it('control is visible against a field interior and every panel surface', () => {
-    for (const surface of [SURFACE.field, SURFACE.panel, SURFACE.row]) {
-      expect(contrast(COLOR.control, surface), `control on ${surface}`).toBeGreaterThanOrEqual(
+  it('input is visible against every overlay surface', () => {
+    for (const surface of SURFACES) {
+      expect(
+        contrast(COLOR.input, COLOR[surface]),
+        `input on ${surface}`,
+      ).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    }
+  });
+
+  it('ring is visible against every overlay surface', () => {
+    for (const surface of SURFACES) {
+      expect(contrast(COLOR.ring, COLOR[surface]), `ring on ${surface}`).toBeGreaterThanOrEqual(
         AA_NON_TEXT,
       );
     }
   });
 
-  it('errBorder is visible on panelBg', () => {
-    expect(contrast(COLOR.errBorder, COLOR.panelBg)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  it('destructiveBorder is visible on card', () => {
+    expect(contrast(COLOR.destructiveBorder, COLOR.card)).toBeGreaterThanOrEqual(AA_NON_TEXT);
   });
+
+  // `border` is a separator, not a control boundary, and sits below the
+  // non-text floor on purpose. Pinned so nobody "fixes" it into a hard line
+  // across every panel — an outline the user must see to operate is `input`.
+  it('border stays quieter than a control boundary', () => {
+    expect(contrast(COLOR.border, COLOR.card)).toBeLessThan(AA_NON_TEXT);
+  });
+});
+
+describe('the rich-text editor is a light island', () => {
+  for (const ground of ['bg', 'muted'] as const) {
+    it(`paper ink and links clear AA on paper ${ground}`, () => {
+      expect(contrast(PAPER.fg, PAPER[ground])).toBeGreaterThanOrEqual(AA_TEXT);
+      expect(contrast(PAPER.link, PAPER[ground])).toBeGreaterThanOrEqual(AA_TEXT);
+    });
+  }
+
+  // The hazard the two sets create is mixing them: paper ink on an overlay
+  // surface is invisible (1.0:1), and it is a plausible mistake because both
+  // tokens are called some kind of "foreground". Pinned so the failure is a
+  // red test rather than a blank panel.
+  it('paper ink is invisible on overlay surfaces, so the sets must not be mixed', () => {
+    for (const surface of SURFACES) {
+      expect(contrast(PAPER.fg, COLOR[surface])).toBeLessThan(AA_NON_TEXT);
+    }
+  });
+});
+
+describe('glass is the one tinted grey, and only where it is translucent', () => {
+  // The inverse of the neutral-ramp guard below. These two exist *because*
+  // chroma 0 costs the transparency their alpha pays for — a neutral grey over
+  // a white page reads as a scrim, not as glass. Pinned so a later neutrality
+  // sweep does not quietly flatten them back and take the depth with it.
+  for (const token of ['glass', 'glassRaised'] as const) {
+    it(`${token} carries a hue`, () => {
+      const raw = COLOR[token].replace('#', '');
+      const [r, g, b] = [raw.slice(0, 2), raw.slice(2, 4), raw.slice(4, 6)];
+      expect(`${token}: ${r}/${g}/${b}`).not.toBe(`${token}: ${r}/${r}/${r}`);
+      expect(parseInt(b, 16)).toBeGreaterThan(parseInt(r, 16));
+    });
+  }
+
+  // ...but only just. The old palette sat every surface at ~0.029 chroma; these
+  // are meant to read as glass, not as a violet cast returning by the back door.
+  for (const token of ['glass', 'glassRaised'] as const) {
+    it(`${token} stays far below the old violet cast`, () => {
+      const raw = COLOR[token].replace('#', '');
+      const [r, g, b] = [0, 2, 4].map((i) => parseInt(raw.slice(i, i + 2), 16));
+      expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThanOrEqual(10);
+    });
+  }
+});
+
+describe('the neutral ramp is actually neutral', () => {
+  // The old palette's greys carried a violet tint (chroma ~0.03 at hue 284).
+  // These are authored at chroma 0, which in sRGB means R === G === B.
+  for (const token of ['background', 'card', 'elevated', 'border', 'input', 'foreground', 'mutedFg', 'faintFg'] as const) {
+    it(`${token} has no hue`, () => {
+      const raw = COLOR[token].replace('#', '');
+      const [r, g, b] = [raw.slice(0, 2), raw.slice(2, 4), raw.slice(4, 6)];
+      expect(`${token}: ${r}/${g}/${b}`).toBe(`${token}: ${r}/${r}/${r}`);
+      expect(g).toBe(r);
+      expect(b).toBe(r);
+    });
+  }
 });

@@ -104,7 +104,7 @@ const plainInput: ControlBuilder = ({ field, initial, placeholder, root }) => {
 const checkbox: ControlBuilder = ({ field, raw, root }) => {
   const wrap = styled('label', 'atx-field-check', {
     display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
-    font: '13px system-ui', color: '#eee',
+    font: '13px system-ui', color: COLOR.foreground,
   });
   const input = styled('input', 'atx-field-input', { cursor: 'pointer' });
   input.type = 'checkbox';
@@ -205,13 +205,13 @@ export function buildControl(
 
   const label = styled('label', 'atx-field-label', {
     display: 'block', font: '600 12px system-ui', marginBottom: '4px',
-    color: '#eee', opacity: '0.85',
+    color: COLOR.foreground, opacity: '0.85',
   });
   label.textContent = field.required ? `${field.label} *` : field.label;
   root.append(label);
 
   const error = styled('div', 'atx-field-error', {
-    display: 'none', marginTop: '3px', font: '12px system-ui', color: COLOR.errText,
+    display: 'none', marginTop: '3px', font: '12px system-ui', color: COLOR.destructiveText,
   });
   const setError = (message: string | null): void => {
     error.textContent = message ?? '';
@@ -229,7 +229,7 @@ export function buildControl(
 
   if (field.help) {
     const help = styled('div', 'atx-field-help', {
-      marginTop: '4px', font: '11px/1.45 system-ui', color: COLOR.muted,
+      marginTop: '4px', font: '11px/1.45 system-ui', color: COLOR.mutedFg,
     });
     help.textContent = field.help;
     root.append(help);

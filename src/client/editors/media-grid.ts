@@ -1,4 +1,4 @@
-import { COLOR, FONT, isolateScroll, setFreshSrc, styled } from '../ui.ts';
+import { CHECKER, COLOR, FONT, isolateScroll, RADIUS, setFreshSrc, styled } from '../ui.ts';
 
 /**
  * The tile grid shared by both of the media modal's panes. One builder, two
@@ -71,8 +71,7 @@ export interface MediaGridOptions {
 const TILE_MIN = 132;
 const SKELETON_COUNT = 6;
 
-const CHECKER =
-  'repeating-conic-gradient(#2a2a3a 0% 25%, #202030 0% 50%) 50% / 12px 12px';
+const CHECKER_BG = CHECKER(12);
 
 export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   const el = styled('div', 'atx-media-pane', {
@@ -98,7 +97,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   const paint = (key: string, on: boolean): void => {
     const btn = buttons.get(key);
     if (!btn) return;
-    btn.style.outline = on ? `2px solid ${COLOR.accent}` : '2px solid transparent';
+    btn.style.outline = on ? `2px solid ${COLOR.primary}` : '2px solid transparent';
     btn.style.outlineOffset = '2px';
     const badge = btn.querySelector('.atx-media-check') as HTMLElement | null;
     if (badge) badge.style.display = on ? 'flex' : 'none';
@@ -145,8 +144,8 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
 
     const pick = styled('button', 'atx-media-pick', {
       display: 'block', width: '100%', padding: '0', overflow: 'hidden',
-      aspectRatio: '4 / 3', borderRadius: '8px', border: '1px solid #333',
-      background: tile.color || CHECKER,
+      aspectRatio: '4 / 3', borderRadius: RADIUS.md, border: `1px solid ${COLOR.border}`,
+      background: tile.color || CHECKER_BG,
       cursor: 'pointer', outline: '2px solid transparent', outlineOffset: '2px',
       transition: 'outline-color 100ms',
     });
@@ -164,7 +163,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     // caption still reads and the photo can still be picked.
     img.addEventListener('error', () => {
       img.style.display = 'none';
-      pick.style.background = CHECKER;
+      pick.style.background = CHECKER_BG;
       fallback.style.display = 'flex';
     });
     // A retry that finally succeeds must undo that fallback.
@@ -174,7 +173,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     });
     const fallback = styled('span', 'atx-media-fallback', {
       display: 'none', width: '100%', height: '100%', alignItems: 'center',
-      justifyContent: 'center', font: '18px system-ui', color: COLOR.faint,
+      justifyContent: 'center', font: '18px system-ui', color: COLOR.faintFg,
     });
     fallback.textContent = '🖼';
     pick.append(img, fallback);
@@ -185,8 +184,8 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     // Selection badge, hidden until staged.
     const check = styled('span', 'atx-media-check', {
       display: 'none', position: 'absolute', top: '6px', right: '6px',
-      width: '20px', height: '20px', borderRadius: '50%', background: COLOR.accent,
-      color: '#fff', alignItems: 'center', justifyContent: 'center',
+      width: '20px', height: '20px', borderRadius: '50%', background: COLOR.primary,
+      color: COLOR.foreground, alignItems: 'center', justifyContent: 'center',
       font: '700 12px system-ui', pointerEvents: 'none',
     });
     check.textContent = '✓';
@@ -195,7 +194,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     if (tile.current) {
       const chip = styled('span', 'atx-media-current', {
         position: 'absolute', top: '6px', left: '6px', padding: '2px 6px',
-        borderRadius: '4px', background: 'rgba(0,0,0,0.7)', color: '#ddd',
+        borderRadius: RADIUS.sm, background: 'rgba(0,0,0,0.7)', color: COLOR.foreground,
         font: '600 10px system-ui', pointerEvents: 'none',
       });
       chip.textContent = 'Current';
@@ -250,11 +249,11 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
       for (let i = 0; i < count; i++) {
         const wrap = styled('div', 'atx-media-tile atx-media-skeleton', { minWidth: '0' });
         const box = styled('div', 'atx-media-thumb', {
-          width: '100%', aspectRatio: '4 / 3', borderRadius: '8px',
-          border: '1px solid #2a2a3a', background: '#20202e',
+          width: '100%', aspectRatio: '4 / 3', borderRadius: RADIUS.md,
+          border: `1px solid ${COLOR.border}`, background: COLOR.elevated,
         });
         const bar = styled('div', 'atx-media-cap', {
-          height: '10px', margin: '6px 0 0', borderRadius: '3px', background: '#20202e',
+          height: '10px', margin: '6px 0 0', borderRadius: RADIUS.sm, background: COLOR.elevated,
         });
         wrap.append(box, bar);
         grid.append(wrap);
@@ -283,13 +282,13 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   function message(text: string, retry?: () => void): HTMLElement {
     const box = styled('div', 'atx-media-status', {
       gridColumn: '1 / -1', padding: '28px 12px', textAlign: 'center',
-      font: '13px/1.6 system-ui', color: COLOR.muted,
+      font: '13px/1.6 system-ui', color: COLOR.mutedFg,
     });
     box.textContent = text;
     if (retry) {
       const btn = styled('button', 'atx-btn atx-btn-retry', {
-        display: 'block', margin: '12px auto 0', padding: '5px 12px', borderRadius: '6px',
-        border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#ccc',
+        display: 'block', margin: '12px auto 0', padding: '5px 12px', borderRadius: RADIUS.md,
+        border: `1px solid ${COLOR.input}`, background: 'transparent', color: COLOR.mutedFg,
         cursor: 'pointer', font: '600 12px system-ui',
       });
       btn.type = 'button';
@@ -304,7 +303,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
 /** The caption sits *outside* the pick button — see the module header. */
 function buildCaption(caption: TileCaption): HTMLElement {
   const cap = styled('div', 'atx-media-cap', {
-    margin: '6px 2px 0', font: `11px/1.4 ${FONT.mono}`, color: COLOR.muted,
+    margin: '6px 2px 0', font: `11px/1.4 ${FONT.mono}`, color: COLOR.mutedFg,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   });
 
@@ -325,7 +324,7 @@ function buildCaption(caption: TileCaption): HTMLElement {
 }
 
 function link(className: string, text: string, href: string): HTMLAnchorElement {
-  const a = styled('a', `atx-unsplash-credit ${className}`, { color: COLOR.accentText });
+  const a = styled('a', `atx-unsplash-credit ${className}`, { color: COLOR.primaryText });
   a.href = href;
   a.target = '_blank';
   a.rel = 'noreferrer';

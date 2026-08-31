@@ -18,24 +18,24 @@ import { COLOR, FONT, basename, buildBackdrop, buildPanel, footButton, hexToRgba
 /** Token colors on the panel's dark background. Chosen for contrast, not to
  *  mimic any one editor theme. */
 const TOKEN_COLOR: Record<TokenKind, string> = {
-  plain: '#e2e2ef',
-  comment: '#8b94a7',
-  string: '#a5d6a7',
-  tag: '#82b1ff',
-  attr: '#c9a7ff',
-  keyword: '#ff8a9e',
-  number: '#f5c27a',
-  fence: '#8b94a7',
+  plain: COLOR.foreground,
+  comment: COLOR.mutedFg,
+  string: COLOR.successText,
+  tag: COLOR.primaryText,
+  attr: COLOR.primaryText,
+  keyword: COLOR.destructiveText,
+  number: COLOR.warning,
+  fence: COLOR.mutedFg,
 };
 
-const CODE_BG = '#12121d';
-const FOCUS_BG = hexToRgba(COLOR.accent, 0.16);
+const CODE_BG = COLOR.background;
+const FOCUS_BG = hexToRgba(COLOR.primary, 0.16);
 
 /** A muted "⋯ N more lines" marker row for content the huge-file cap cut. */
 function moreRow(count: number, where: 'above' | 'below'): HTMLElement {
   const row = styled('div', 'atx-peek-more', {
     padding: '4px 12px 4px 15px',
-    color: COLOR.faint,
+    color: COLOR.faintFg,
     fontStyle: 'italic',
     userSelect: 'none',
   });
@@ -70,7 +70,7 @@ function renderCode(peeked: PeekResponse): { container: HTMLElement; focusRow: H
       display: 'flex',
       // Every row carries the border so the gutter stays aligned; only the
       // focus row's is visible.
-      borderLeft: `3px solid ${isFocus ? COLOR.accent : 'transparent'}`,
+      borderLeft: `3px solid ${isFocus ? COLOR.primary : 'transparent'}`,
       background: isFocus ? FOCUS_BG : 'transparent',
     });
     const gutter = styled('span', 'atx-peek-gutter', {
@@ -78,7 +78,7 @@ function renderCode(peeked: PeekResponse): { container: HTMLElement; focusRow: H
       width: gutterWidth,
       padding: '0 12px 0 0',
       textAlign: 'right',
-      color: isFocus ? '#bda9ff' : COLOR.faint,
+      color: isFocus ? COLOR.primaryText : COLOR.faintFg,
       userSelect: 'none',
     });
     gutter.textContent = String(lineNo);
@@ -119,7 +119,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
 
   const loading = styled('div', 'atx-peek-loading', {
     padding: '24px 16px',
-    color: COLOR.muted,
+    color: COLOR.mutedFg,
     font: `12.5px ${FONT.mono}`,
     background: CODE_BG,
   });
@@ -138,8 +138,8 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
 
   const foot = panel.querySelector('[data-foot]') as HTMLElement;
   foot.append(
-    footButton('Close', 'cancel', close),
-    footButton('Open in editor', 'primary', () => {
+    footButton('Close', 'ghost', close),
+    footButton('Open in editor', 'default', () => {
       close();
       openSource(src);
     }),
@@ -157,7 +157,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
       // hover pill on an `astro:assets` <Image>.)
       if (peeked.refused) {
         loading.textContent = peeked.refused;
-        loading.style.color = COLOR.warn;
+        loading.style.color = COLOR.warning;
         loading.style.lineHeight = '1.6';
         return;
       }
@@ -173,7 +173,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
     } catch (err) {
       if (closed) return;
       loading.textContent = `Could not load source — ${err instanceof Error ? err.message : 'unknown error'}`;
-      loading.style.color = COLOR.errText;
+      loading.style.color = COLOR.destructiveText;
     }
   })();
 }

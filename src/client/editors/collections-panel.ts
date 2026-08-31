@@ -12,11 +12,12 @@ import { has } from '../features.ts';
 import { clearHighlight } from '../hover.ts';
 import { icon } from '../icons.ts';
 import {
+  buildTabs,
   COLOR,
   FONT,
-  INPUT_STYLE,
-  buildTabs,
   footButton,
+  INPUT_STYLE,
+  RADIUS,
   setButtonEnabled,
   styled,
   toast,
@@ -214,7 +215,7 @@ export function openCollectionsPanel(opts: CollectionsPanelOptions = {}): void {
   });
 
   shell.body.append(pane.root);
-  shell.foot.append(footButton('Close', 'cancel', () => shell.close()));
+  shell.foot.append(footButton('Close', 'ghost', () => shell.close()));
   pane.load();
 }
 
@@ -275,7 +276,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
 
   const load = (): void => {
     root.textContent = '';
-    root.append(note([icon('spinner', 13), textNode('Reading collections…')], COLOR.muted));
+    root.append(note([icon('spinner', 13), textNode('Reading collections…')], COLOR.mutedFg));
     void api.listCollections().then(
       (next) => {
         data = next;
@@ -290,7 +291,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         root.append(
           note(
             [icon('alert', 13), textNode(err instanceof Error ? err.message : 'Could not read collections.')],
-            COLOR.warn,
+            COLOR.warning,
           ),
         );
       },
@@ -333,7 +334,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
                 'Settings → Editing turns it on. Widget, label and hidden still save.',
             ),
           ],
-          COLOR.muted,
+          COLOR.mutedFg,
         ),
       );
     }
@@ -341,22 +342,22 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     for (const c of d.collections) {
       const row = styled('button', `atx-collections-row atx-collections-row-${c.name}`, {
         display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
-        padding: '10px 12px', marginBottom: '8px', borderRadius: '8px',
-        border: `1px solid ${COLOR.panelBorder}`, background: '#181826', color: '#eee',
+        padding: '10px 12px', marginBottom: '8px', borderRadius: RADIUS.md,
+        border: `1px solid ${COLOR.border}`, background: COLOR.card, color: COLOR.foreground,
       });
       row.type = 'button';
       const title = styled('div', 'atx-collections-row-name', {
         font: '600 13px system-ui', display: 'flex', alignItems: 'center', gap: '8px',
       });
       title.append(textNode(c.name));
-      if (!c.registered) title.append(badge('not registered', COLOR.warn));
-      if (c.schemaForm === null) title.append(badge('no readable schema', COLOR.muted));
+      if (!c.registered) title.append(badge('not registered', COLOR.warning));
+      if (c.schemaForm === null) title.append(badge('no readable schema', COLOR.mutedFg));
       if (c.fieldSource === 'source' && c.schemaForm !== null) {
-        title.append(badge('schema not loaded', COLOR.warn));
+        title.append(badge('schema not loaded', COLOR.warning));
       }
-      if (!c.dirExists) title.append(badge('directory missing', COLOR.warn));
+      if (!c.dirExists) title.append(badge('directory missing', COLOR.warning));
       const meta = styled('div', 'atx-collections-row-meta', {
-        marginTop: '3px', font: `11px ${FONT.mono}`, color: COLOR.muted,
+        marginTop: '3px', font: `11px ${FONT.mono}`, color: COLOR.mutedFg,
       });
       meta.textContent = `${c.dir} · ${c.entryCount} ${c.entryCount === 1 ? 'entry' : 'entries'} · ${c.fields.length} fields`;
       row.append(title, meta);
@@ -365,7 +366,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     }
 
     if (d.configPath && d.schemaEditor) {
-      const add = footButton('New collection', 'secondary', goCreate);
+      const add = footButton('New collection', 'outline', goCreate);
       add.style.marginTop = '4px';
       wrap.append(add);
     }
@@ -379,7 +380,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px',
     });
     head.append(backLink(goList));
-    const name = styled('span', 'atx-collections-title', { font: '600 14px system-ui', color: '#eee' });
+    const name = styled('span', 'atx-collections-title', { font: '600 14px system-ui', color: COLOR.foreground });
     name.textContent = c.name;
     head.append(name);
     const spacer = styled('span', 'atx-collections-spacer', { flex: '1 1 auto' });
@@ -396,7 +397,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     wrap.append(head);
 
     const meta = styled('div', 'atx-collections-meta', {
-      font: `11px ${FONT.mono}`, color: COLOR.muted, marginBottom: '12px',
+      font: `11px ${FONT.mono}`, color: COLOR.mutedFg, marginBottom: '12px',
     });
     meta.textContent =
       `${c.dir} · ${c.entryCount} ${c.entryCount === 1 ? 'entry' : 'entries'}` +
@@ -429,7 +430,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
               `${c.unrecognized}. Fields are read-only here — edit the config directly.`,
             ),
           ],
-          COLOR.warn,
+          COLOR.warning,
         ),
       );
     }
@@ -444,7 +445,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
                 'server log names it.',
             ),
           ],
-          COLOR.warn,
+          COLOR.warning,
         ),
       );
     }
@@ -473,7 +474,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     fieldsPane.append(pending);
 
     const error = styled('p', 'atx-collections-error', {
-      margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.warn, display: 'none',
+      margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.warning, display: 'none',
     });
 
     if (writable) {
@@ -492,9 +493,9 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
 
     const actions = styled('div', 'atx-collections-actions', {
       display: 'flex', alignItems: 'center', gap: '8px', marginTop: '14px',
-      paddingTop: '12px', borderTop: `1px solid ${COLOR.panelDivider}`,
+      paddingTop: '12px', borderTop: `1px solid ${COLOR.border}`,
     });
-    const saveBtn = footButton('Save changes', 'primary', () => void saveDetail(c, error));
+    const saveBtn = footButton('Save changes', 'default', () => void saveDetail(c, error));
     saveBtn.style.marginRight = '0';
     actions.append(saveBtn);
     fieldsPane.append(actions, error);
@@ -522,7 +523,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px',
       });
       const count = styled('span', 'atx-collections-itemcount', {
-        font: '12px system-ui', color: COLOR.muted, flex: '1 1 auto',
+        font: '12px system-ui', color: COLOR.mutedFg, flex: '1 1 auto',
       });
       count.textContent = `${list.length} ${list.length === 1 ? 'entry' : 'entries'} in ${c.dir}`;
       bar.append(count);
@@ -531,7 +532,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       // there is nothing to build it from, so the button says why instead of
       // opening an empty drawer.
       const canCreate = c.fieldSource === 'schema' && c.dirExists;
-      const newBtn = footButton('New item', 'secondary', () => {
+      const newBtn = footButton('New item', 'outline', () => {
         opts.handoff(() =>
           openEntryCreatePanel({
             collection: c.name,
@@ -558,7 +559,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
                   : `${c.dir} doesn’t exist yet, so there is nowhere to write an entry.`,
               ),
             ],
-            COLOR.muted,
+            COLOR.mutedFg,
           ),
         );
       }
@@ -571,17 +572,17 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       for (const e of list) {
         const row = styled('button', 'atx-collections-item', {
           display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
-          padding: '9px 12px', marginBottom: '6px', borderRadius: '7px',
-          border: `1px solid ${COLOR.panelBorder}`, background: '#181826', color: '#eee',
+          padding: '9px 12px', marginBottom: '6px', borderRadius: RADIUS.md,
+          border: `1px solid ${COLOR.border}`, background: COLOR.card, color: COLOR.foreground,
         });
         row.type = 'button';
         const title = styled('div', 'atx-collections-item-title', {
           font: '600 12px system-ui', display: 'flex', alignItems: 'center', gap: '8px',
         });
         title.append(textNode(e.title ?? e.slug));
-        if (e.draft) title.append(badge('draft', COLOR.warn));
+        if (e.draft) title.append(badge('draft', COLOR.warning));
         const meta = styled('div', 'atx-collections-item-meta', {
-          marginTop: '2px', font: `11px ${FONT.mono}`, color: COLOR.muted,
+          marginTop: '2px', font: `11px ${FONT.mono}`, color: COLOR.mutedFg,
         });
         meta.textContent = `${e.slug} · ${when(e.mtime)}`;
         row.append(title, meta);
@@ -600,7 +601,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
                 `Only the first ${list.length} entries are listed — this collection has more.`,
               ),
             ],
-            COLOR.warn,
+            COLOR.warning,
           ),
         );
       }
@@ -610,7 +611,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       if (loaded) return;
       loaded = true;
       root.textContent = '';
-      root.append(note([icon('spinner', 13), textNode('Reading entries…')], COLOR.muted));
+      root.append(note([icon('spinner', 13), textNode('Reading entries…')], COLOR.mutedFg));
       void api.listCollectionEntries({ collection: c.name }).then(
         (res) => paint(res.entries, res.truncated === true),
         (err: unknown) => {
@@ -621,7 +622,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
                 icon('alert', 13),
                 textNode(err instanceof Error ? err.message : 'Could not read the entries.'),
               ],
-              COLOR.warn,
+              COLOR.warning,
             ),
           );
         },
@@ -644,19 +645,19 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     const schemaEditable = writable && inSchema && f.type !== 'json';
 
     const card = styled('div', `atx-collections-field atx-collections-field-${f.name}`, {
-      padding: '10px 12px', marginBottom: '8px', borderRadius: '8px',
-      border: `1px solid ${COLOR.panelBorder}`, background: '#181826',
+      padding: '10px 12px', marginBottom: '8px', borderRadius: RADIUS.md,
+      border: `1px solid ${COLOR.border}`, background: COLOR.card,
     });
 
     const head = styled('div', 'atx-collections-field-head', {
       display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px',
     });
     const nameEl = styled('span', 'atx-collections-field-name', {
-      font: `600 12px ${FONT.mono}`, color: '#eee',
+      font: `600 12px ${FONT.mono}`, color: COLOR.foreground,
     });
     nameEl.textContent = f.name;
     head.append(nameEl);
-    if (!inSchema) head.append(badge('not in schema', COLOR.muted));
+    if (!inSchema) head.append(badge('not in schema', COLOR.mutedFg));
     head.append(styled('span', 'atx-collections-spacer', { flex: '1 1 auto' }));
 
     const listeners: Array<() => void> = [];
@@ -740,7 +741,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       editorGroup.append(
         note(
           [icon('lock', 11), textNode('Set in astro.config.mjs, which takes precedence.')],
-          COLOR.muted,
+          COLOR.mutedFg,
         ),
       );
     }
@@ -748,7 +749,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
 
     if (inSchema) {
       const exprEl = styled('code', 'atx-collections-expr', {
-        display: 'block', marginTop: '8px', font: `11px ${FONT.mono}`, color: COLOR.muted,
+        display: 'block', marginTop: '8px', font: `11px ${FONT.mono}`, color: COLOR.mutedFg,
         wordBreak: 'break-all',
       });
       exprEl.textContent = expr;
@@ -867,7 +868,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px',
     });
     head.append(backLink(goList));
-    const title = styled('span', 'atx-collections-title', { font: '600 14px system-ui', color: '#eee' });
+    const title = styled('span', 'atx-collections-title', { font: '600 14px system-ui', color: COLOR.foreground });
     title.textContent = 'New collection';
     head.append(title);
     wrap.append(head);
@@ -896,7 +897,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     );
 
     const error = styled('p', 'atx-collections-error', {
-      margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.warn, display: 'none',
+      margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.warning, display: 'none',
     });
 
     const fieldList = styled('div', 'atx-collections-newfields', { marginTop: '12px' });
@@ -933,9 +934,9 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
 
     const actions = styled('div', 'atx-collections-actions', {
       display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '12px',
-      borderTop: `1px solid ${COLOR.panelDivider}`,
+      borderTop: `1px solid ${COLOR.border}`,
     });
-    const createBtn = footButton('Create collection', 'primary', () => void create());
+    const createBtn = footButton('Create collection', 'default', () => void create());
     createBtn.style.marginRight = '0';
     actions.append(createBtn);
     wrap.append(actions, error);
@@ -982,8 +983,8 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     accept: (spec: SchemaFieldSpec) => boolean,
   ): { root: HTMLElement } {
     const wrap = styled('div', 'atx-collections-addfield', {
-      marginTop: '10px', padding: '10px 12px', borderRadius: '8px',
-      border: `1px dashed ${COLOR.panelBorder}`,
+      marginTop: '10px', padding: '10px 12px', borderRadius: RADIUS.md,
+      border: `1px dashed ${COLOR.border}`,
     });
     wrap.append(caption('Add field'));
 
@@ -1018,12 +1019,12 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
                 'schema by hand to add one.',
             ),
           ],
-          COLOR.muted,
+          COLOR.mutedFg,
         ),
       );
     }
 
-    const addBtn = footButton('Add', 'secondary', () => {
+    const addBtn = footButton('Add', 'outline', () => {
       const name = nameInput.value.trim();
       if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
         toast('A field name must be a plain identifier', 'err');
@@ -1072,16 +1073,16 @@ interface FieldEditor {
 /** Two-store legend. The one piece of chrome that explains the whole drawer. */
 function legend(): HTMLElement {
   const wrap = styled('div', 'atx-collections-legend', {
-    padding: '9px 11px', borderRadius: '7px', background: '#16161f',
-    border: `1px solid ${COLOR.panelDivider}`, font: '11px/1.55 system-ui', color: COLOR.muted,
+    padding: '9px 11px', borderRadius: RADIUS.md, background: COLOR.background,
+    border: `1px solid ${COLOR.border}`, font: '11px/1.55 system-ui', color: COLOR.mutedFg,
   });
   const line = (word: string, rest: string): HTMLElement => {
     // The colour is repeated from the wrapper rather than inherited: a host
     // page's own `p { color }` rule outranks an inherited value (only the
     // *inline* declaration outranks the host), and silently repainted this
     // legend in the page's body colour.
-    const p = styled('p', 'atx-collections-legend-line', { margin: '0', color: COLOR.muted });
-    const strong = styled('strong', 'atx-collections-legend-word', { color: '#ddd' });
+    const p = styled('p', 'atx-collections-legend-line', { margin: '0', color: COLOR.mutedFg });
+    const strong = styled('strong', 'atx-collections-legend-word', { color: COLOR.foreground });
     strong.textContent = word;
     p.append(strong, document.createTextNode(` ${rest}`));
     return p;
@@ -1101,7 +1102,7 @@ function legend(): HTMLElement {
 
 function group(title: string, rows: HTMLElement[]): HTMLElement {
   const wrap = styled('div', `atx-collections-group atx-collections-group-${title.toLowerCase()}`, {
-    marginTop: '6px', paddingLeft: '8px', borderLeft: `2px solid ${COLOR.panelDivider}`,
+    marginTop: '6px', paddingLeft: '8px', borderLeft: `2px solid ${COLOR.border}`,
   });
   wrap.append(caption(title));
   for (const r of rows) wrap.append(r);
@@ -1111,7 +1112,7 @@ function group(title: string, rows: HTMLElement[]): HTMLElement {
 function caption(text: string): HTMLElement {
   const el = styled('div', 'atx-collections-caption', {
     font: '600 10px system-ui', letterSpacing: '0.06em', textTransform: 'uppercase',
-    color: COLOR.muted, marginBottom: '4px',
+    color: COLOR.mutedFg, marginBottom: '4px',
   });
   el.textContent = text;
   return el;
@@ -1120,7 +1121,7 @@ function caption(text: string): HTMLElement {
 function controlRow(label: string, controls: HTMLElement[]): HTMLElement {
   const row = styled('label', 'atx-collections-control', {
     display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 6px',
-    font: '12px system-ui', color: '#bbb',
+    font: '12px system-ui', color: COLOR.mutedFg,
   });
   const name = styled('span', 'atx-collections-control-label', { flex: '0 0 74px' });
   name.textContent = label;
@@ -1163,10 +1164,10 @@ function checkbox(
   const wrap = styled('span', 'atx-collections-checkbox', {
     display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 auto',
   });
-  const box = styled('input', 'atx-collections-check', { accentColor: COLOR.accent, margin: '0' });
+  const box = styled('input', 'atx-collections-check', { accentColor: COLOR.primary, margin: '0' });
   box.type = 'checkbox';
   box.checked = checked;
-  const hint = styled('span', 'atx-collections-check-hint', { font: '12px system-ui', color: COLOR.muted });
+  const hint = styled('span', 'atx-collections-check-hint', { font: '12px system-ui', color: COLOR.mutedFg });
   hint.textContent = checked ? 'Yes' : 'No';
   box.addEventListener('change', () => {
     hint.textContent = box.checked ? 'Yes' : 'No';
@@ -1180,12 +1181,12 @@ function checkbox(
 function pendingRow(spec: SchemaFieldSpec, undo: () => void): HTMLElement {
   const row = styled('div', 'atx-collections-new', {
     display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-    marginBottom: '8px', borderRadius: '8px',
-    border: `1px solid ${COLOR.accent}`, background: '#1d1930',
+    marginBottom: '8px', borderRadius: RADIUS.md,
+    border: `1px solid ${COLOR.primary}`, background: COLOR.card,
   });
-  const name = styled('span', 'atx-collections-new-name', { font: `600 12px ${FONT.mono}`, color: '#eee' });
+  const name = styled('span', 'atx-collections-new-name', { font: `600 12px ${FONT.mono}`, color: COLOR.foreground });
   name.textContent = spec.name;
-  const meta = styled('span', 'atx-collections-new-meta', { font: '11px system-ui', color: COLOR.muted, flex: '1 1 auto' });
+  const meta = styled('span', 'atx-collections-new-meta', { font: '11px system-ui', color: COLOR.mutedFg, flex: '1 1 auto' });
   meta.textContent =
     `${TYPE_LABEL[spec.type] ?? spec.type}${spec.required ? ' · required' : ' · optional'}` +
     (spec.defaultValue !== undefined ? ` · default ${String(spec.defaultValue)}` : '');
@@ -1198,7 +1199,7 @@ function pendingRow(spec: SchemaFieldSpec, undo: () => void): HTMLElement {
 function backLink(onClick: () => void): HTMLButtonElement {
   const btn = styled('button', 'atx-collections-back', {
     display: 'inline-flex', alignItems: 'center', gap: '3px', cursor: 'pointer',
-    background: 'transparent', border: 'none', padding: '0', color: COLOR.accentText,
+    background: 'transparent', border: 'none', padding: '0', color: COLOR.primaryText,
     font: '12px system-ui',
   });
   btn.type = 'button';
@@ -1210,7 +1211,7 @@ function backLink(onClick: () => void): HTMLButtonElement {
 
 function badge(label: string, color: string): HTMLElement {
   const el = styled('span', 'atx-collections-badge', {
-    padding: '1px 6px', borderRadius: '999px', font: '10px system-ui',
+    padding: '1px 6px', borderRadius: RADIUS.full, font: '10px system-ui',
     color, border: `1px solid ${color}`,
   });
   el.textContent = label;
@@ -1219,7 +1220,7 @@ function badge(label: string, color: string): HTMLElement {
 
 function blurb(text: string): HTMLElement {
   const el = styled('p', 'atx-collections-blurb', {
-    margin: '0 0 12px', font: '12px/1.5 system-ui', color: COLOR.muted,
+    margin: '0 0 12px', font: '12px/1.5 system-ui', color: COLOR.mutedFg,
   });
   el.textContent = text;
   return el;

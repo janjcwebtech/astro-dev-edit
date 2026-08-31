@@ -23,14 +23,14 @@ export function showDynamicNotice(
   const body = panel.querySelector('[data-body]') as HTMLElement;
 
   const msg = styled('p', 'atx-notice-reason', {
-    margin: '0 0 6px', font: '13px/1.5 system-ui', color: '#ddd',
+    margin: '0 0 6px', font: '13px/1.5 system-ui', color: COLOR.foreground,
   });
   msg.textContent = reason;
 
   // The location line opens the in-browser source peek — often all that's
   // needed to see *why* this content refused, without leaving the page.
   const where = styled('p', 'atx-notice-loc', {
-    margin: '0 0 12px', font: `12px ${FONT.mono}`, color: COLOR.muted, cursor: 'pointer',
+    margin: '0 0 12px', font: `12px ${FONT.mono}`, color: COLOR.mutedFg, cursor: 'pointer',
   });
   where.textContent = `${basename(src.file)}:${src.loc}`;
   where.title = 'Peek at the source code';
@@ -49,7 +49,7 @@ export function showDynamicNotice(
   const contentFile = pageSource();
   if (contentFile) {
     const hint = styled('p', 'atx-notice-hint', {
-      margin: '0 0 4px', font: '13px/1.5 system-ui', color: '#bda9ff',
+      margin: '0 0 4px', font: '13px/1.5 system-ui', color: COLOR.primaryText,
     });
     hint.textContent = `This page's content comes from ${basename(contentFile)} — that's where its title and body text are edited.`;
     body.append(hint);

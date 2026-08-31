@@ -1,5 +1,5 @@
 import { canRichEdit, escapeHtml, htmlToMarkdown, markdownToHtml } from '../markdown.ts';
-import { COLOR, FONT, INPUT_STYLE, basename, isolateScroll, styled, toast } from '../ui.ts';
+import { COLOR, FONT, INPUT_STYLE, PAPER, RADIUS, basename, hexToRgba, isolateScroll, styled, toast } from '../ui.ts';
 import { buildImageField } from './asset-picker.ts';
 
 /**
@@ -40,21 +40,21 @@ const CONTENT_CSS = `
 .atx-rte-content ul, .atx-rte-content ol { margin: 0.5em 0; padding-left: 1.5em; }
 .atx-rte-content li { margin: 0.2em 0; }
 .atx-rte-content blockquote {
-  margin: 0.6em 0; padding: 0.3em 0.9em; border-left: 3px solid ${COLOR.accent};
-  background: rgba(97, 68, 215, 0.07); border-radius: 0 6px 6px 0;
+  margin: 0.6em 0; padding: 0.3em 0.9em; border-left: 3px solid ${COLOR.primary};
+  background: ${hexToRgba(COLOR.primary, 0.07)}; border-radius: 0 ${RADIUS.md} ${RADIUS.md} 0;
 }
 .atx-rte-content pre {
-  margin: 0.6em 0; padding: 8px 10px; background: #f4f4f6; border: 1px solid #ddd;
+  margin: 0.6em 0; padding: 8px 10px; background: ${PAPER.muted}; border: 1px solid ${PAPER.border};
   border-radius: 6px; font: 12px/1.5 ${FONT.mono}; white-space: pre-wrap; overflow-x: auto;
 }
 .atx-rte-content code {
-  background: #f4f4f6; border: 1px solid #ddd; border-radius: 4px;
+  background: ${PAPER.muted}; border: 1px solid ${PAPER.border}; border-radius: 4px;
   padding: 1px 4px; font-family: ${FONT.mono}; font-size: 0.9em;
 }
 .atx-rte-content pre code { background: transparent; border: none; padding: 0; }
-.atx-rte-content a { color: #5b3fd4; }
+.atx-rte-content a { color: ${PAPER.link}; }
 .atx-rte-content img { max-width: 100%; border-radius: 4px; cursor: pointer; }
-.atx-rte-content hr { border: none; border-top: 1px solid #ddd; margin: 0.8em 0; }
+.atx-rte-content hr { border: none; border-top: 1px solid ${PAPER.border}; margin: 0.8em 0; }
 `;
 
 function ensureContentStyles(): void {
@@ -72,8 +72,8 @@ function toolbarButton(
   labelStyle: Partial<CSSStyleDeclaration> = {},
 ): HTMLButtonElement {
   const b = styled('button', 'atx-rte-btn', {
-    border: 'none', background: 'transparent', color: '#ccc', cursor: 'pointer',
-    padding: '5px 8px', borderRadius: '5px', font: `600 12px ${FONT.ui}`,
+    border: 'none', background: 'transparent', color: COLOR.mutedFg, cursor: 'pointer',
+    padding: '5px 8px', borderRadius: RADIUS.sm, font: `600 12px ${FONT.ui}`,
     minWidth: '28px', lineHeight: '1', ...labelStyle,
   });
   b.type = 'button';
@@ -81,7 +81,7 @@ function toolbarButton(
   b.title = title;
   // preventDefault keeps the contenteditable selection alive through the click.
   b.addEventListener('mousedown', (e) => e.preventDefault());
-  b.addEventListener('mouseenter', () => (b.style.background = '#2c2c3d'));
+  b.addEventListener('mouseenter', () => (b.style.background = COLOR.border));
   b.addEventListener('mouseleave', () => (b.style.background = 'transparent'));
   b.addEventListener('click', onRun);
   return b;
@@ -89,7 +89,7 @@ function toolbarButton(
 
 function divider(): HTMLElement {
   return styled('span', 'atx-rte-divider', {
-    width: '1px', alignSelf: 'stretch', margin: '3px 3px', background: COLOR.panelDivider,
+    width: '1px', alignSelf: 'stretch', margin: '3px 3px', background: COLOR.border,
   });
 }
 
@@ -106,7 +106,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
   // overriding the dark default INPUT_STYLE carries.
   const content = styled('div', 'atx-rte-content', {
     ...INPUT_STYLE, minHeight: '40vh', padding: '10px 14px',
-    background: '#fff', color: '#1a1a1a', border: '1px solid #444', colorScheme: 'light',
+    background: PAPER.bg, color: PAPER.fg, border: `1px solid ${COLOR.input}`, colorScheme: 'light',
     font: `13px/1.6 ${FONT.ui}`, outline: 'none', overflowY: 'auto', cursor: 'text',
   });
   isolateScroll(content);
@@ -171,8 +171,8 @@ export function buildBodyEditor(initial: string): BodyEditor {
   const headWrap = styled('span', 'atx-rte-heading', { position: 'relative', display: 'inline-flex' });
   const headMenu = styled('div', 'atx-rte-heading-menu', {
     position: 'absolute', top: 'calc(100% + 4px)', left: '0', display: 'none',
-    minWidth: '150px', padding: '4px', background: COLOR.panelBg,
-    border: `1px solid ${COLOR.panelBorder}`, borderRadius: '8px',
+    minWidth: '150px', padding: '4px', background: COLOR.card,
+    border: `1px solid ${COLOR.border}`, borderRadius: RADIUS.md,
     boxShadow: '0 8px 24px rgba(0,0,0,0.45)', zIndex: '3',
   });
   const hideMenu = (): void => {
@@ -181,8 +181,8 @@ export function buildBodyEditor(initial: string): BodyEditor {
   const menuItem = (tag: string, chip: string, name: string, size: string): HTMLButtonElement => {
     const item = styled('button', 'atx-rte-heading-item', {
       display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
-      padding: '5px 8px', border: 'none', borderRadius: '5px', background: 'transparent',
-      color: '#ddd', cursor: 'pointer', textAlign: 'left', font: `12px ${FONT.ui}`,
+      padding: '5px 8px', border: 'none', borderRadius: RADIUS.sm, background: 'transparent',
+      color: COLOR.foreground, cursor: 'pointer', textAlign: 'left', font: `12px ${FONT.ui}`,
     });
     item.type = 'button';
     const chipEl = styled('span', 'atx-rte-heading-chip', {
@@ -193,7 +193,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
     nameEl.textContent = name;
     item.append(chipEl, nameEl);
     item.addEventListener('mousedown', (e) => e.preventDefault());
-    item.addEventListener('mouseenter', () => (item.style.background = '#2c2c3d'));
+    item.addEventListener('mouseenter', () => (item.style.background = COLOR.border));
     item.addEventListener('mouseleave', () => (item.style.background = 'transparent'));
     item.addEventListener('click', () => {
       hideMenu();
@@ -218,7 +218,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
 
   const imagePanel = styled('div', 'atx-rte-image-panel', {
     display: 'none', margin: '6px 0 0', padding: '10px',
-    border: `1px solid ${COLOR.panelBorder}`, borderRadius: '8px', background: '#161622',
+    border: `1px solid ${COLOR.border}`, borderRadius: RADIUS.md, background: COLOR.background,
   });
   let imageValue = '';
   let replaceTarget: HTMLImageElement | null = null;
@@ -230,7 +230,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
   let altTouched = false;
   const altLabel = styled('label', 'atx-rte-image-alt-label', {
     display: 'block', font: `600 11px ${FONT.ui}`, margin: '8px 0 4px',
-    color: '#eee', opacity: '0.85',
+    color: COLOR.foreground, opacity: '0.85',
   });
   altLabel.textContent = 'Alt text';
   const altInput = styled('input', 'atx-rte-image-alt', { ...INPUT_STYLE });
@@ -242,10 +242,11 @@ export function buildBodyEditor(initial: string): BodyEditor {
     display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px',
   });
   const smallBtn = (label: string, primary: boolean, onClick: () => void): HTMLButtonElement => {
-    const b = styled('button', `atx-btn atx-btn-${primary ? 'primary' : 'ghost'}`, {
-      padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', font: `600 12px ${FONT.ui}`,
-      border: primary ? 'none' : '1px solid #3a3a4d',
-      background: primary ? COLOR.accent : 'transparent', color: primary ? '#fff' : '#ccc',
+    const b = styled('button', `atx-btn atx-btn-${primary ? 'default' : 'outline'}`, {
+      padding: '4px 10px', borderRadius: RADIUS.md, cursor: 'pointer', font: `600 12px ${FONT.ui}`,
+      border: primary ? '1px solid transparent' : `1px solid ${COLOR.input}`,
+      background: primary ? COLOR.primary : 'transparent',
+      color: primary ? COLOR.primaryFg : COLOR.mutedFg,
     });
     b.type = 'button';
     b.textContent = label;
@@ -311,7 +312,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
   const toolbar = styled('div', 'atx-rte-toolbar', {
     display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1px',
     padding: '4px',
-    background: COLOR.panelBg, border: `1px solid ${COLOR.panelBorder}`, borderRadius: '9px',
+    background: COLOR.card, border: `1px solid ${COLOR.border}`, borderRadius: RADIUS.md,
   });
 
   const modeBtn = toolbarButton('MD', 'Switch between rich text and markdown source', () => {
@@ -326,7 +327,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
       content.innerHTML = markdownToHtml(srcInput.value);
       setMode('visual');
     }
-  }, { marginLeft: 'auto', font: `700 11px ${FONT.mono}`, color: '#9d86ff' });
+  }, { marginLeft: 'auto', font: `700 11px ${FONT.mono}`, color: COLOR.primaryText });
 
   const formatButtons = [
     toolbarButton('B', 'Bold', () => exec('bold'), { fontWeight: '800' }),
@@ -373,7 +374,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
   // view when it's opened for an image far down a long body.
   const stickyHead = styled('div', 'atx-rte-head', {
     position: 'sticky', top: '0', zIndex: '2',
-    background: COLOR.panelBg, paddingBottom: '6px',
+    background: COLOR.card, paddingBottom: '6px',
   });
   stickyHead.append(toolbar, imagePanel);
 

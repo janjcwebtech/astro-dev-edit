@@ -82,7 +82,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
   glass.style.opacity = '0.6';
   const searchInput = styled('input', 'atx-unsplash-input', {
     flex: '1 1 auto', minWidth: '0', border: 'none', background: 'transparent',
-    color: '#fff', font: '13px system-ui', outline: 'none',
+    color: COLOR.foreground, font: '13px system-ui', outline: 'none',
   });
   searchInput.type = 'search';
   searchInput.placeholder = 'Search Unsplash…';
@@ -130,7 +130,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
     controller.setOrientation(orientSelect.value as UnsplashOrientation),
   );
 
-  const loadMoreBtn = footButton('Load more', 'secondary', () => controller.loadMore());
+  const loadMoreBtn = footButton('Load more', 'outline', () => controller.loadMore());
 
   function render(next: SearchState): void {
     deps.grid.footer.textContent = '';
@@ -188,7 +188,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
     }
     if (next.moreError) {
       const line = styled('span', 'atx-media-error', {
-        font: '12px system-ui', color: COLOR.warn, marginLeft: '10px',
+        font: '12px system-ui', color: COLOR.warning, marginLeft: '10px',
       });
       line.textContent = next.moreError.message;
       deps.grid.footer.append(line);
@@ -203,16 +203,16 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
       const box = deps.grid.el.querySelector('.atx-media-status') as HTMLElement;
       box.textContent = '';
       const title = styled('p', 'atx-media-error', {
-        margin: '0 0 6px', font: '600 13px system-ui', color: '#ddd',
+        margin: '0 0 6px', font: '600 13px system-ui', color: COLOR.foreground,
       });
       title.textContent = 'Add an Unsplash access key';
       const detail = styled('p', 'atx-media-error', {
-        margin: '0 0 12px', font: '12px/1.6 system-ui', color: COLOR.muted,
+        margin: '0 0 12px', font: '12px/1.6 system-ui', color: COLOR.mutedFg,
       });
       detail.textContent = error.message;
       // Opened above the modal (which is Z+8), and re-runs the search on close
       // so entering a key here lands you straight back in results.
-      const open = footButton('Open Settings', 'primary', () =>
+      const open = footButton('Open Settings', 'default', () =>
         // Straight to the Unsplash tab: the user clicked a card about a
         // missing key, so landing them on General would be a detour.
         openSettingsPanel({ tab: 'unsplash', layer: 10, onClose: () => controller.retry() }),
@@ -266,7 +266,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
       if (remaining !== undefined) {
         const line = styled('p', 'atx-unsplash-rate', {
           margin: '14px 0 0', font: `11px ${FONT.mono}`,
-          color: remaining <= 5 ? COLOR.warn : COLOR.muted,
+          color: remaining <= 5 ? COLOR.warning : COLOR.mutedFg,
         });
         line.textContent = `${remaining} Unsplash requests left this hour`;
         into.append(line);

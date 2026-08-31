@@ -48,7 +48,7 @@ suffix filled in at runtime — `atx-collections-row-blog`,
 | **Element tree** | `atx-tree` (the left panel), `atx-tree-title` / `atx-tree-title-text` / `atx-tree-close` (header), `atx-tree-body` (scroll container), `atx-tree-row` with `atx-tree-chevron`, `atx-tree-tag`, `atx-tree-preview`, `atx-tree-loc`; `atx-tree-empty`, `atx-tree-selection` (the locked-selection outline), `#atx-tree-tab` (the edge tab that reopens a closed tree) |
 | **Source peek** | `atx-peek-code` (scroll container), `atx-peek-line` / `atx-peek-focus` (rows), `atx-peek-gutter`, `atx-peek-text`, `atx-peek-more` (the "⋯ N more lines" markers), `atx-peek-loading` |
 | **Panels and drawers** | `atx-panel`, `atx-panel-title` (with `atx-panel-heading` and, on the source popups, the `atx-panel-open` jump-to-editor button), `atx-panel-body`, `atx-panel-foot`; `atx-drawer` with `atx-drawer-title` / `atx-drawer-title-text` / `atx-drawer-body` / `atx-drawer-foot` / `atx-drawer-actions`; `atx-backdrop`, `atx-toast` (+ `atx-toast-ok` / `atx-toast-err`), `atx-veil` / `atx-veil-chip` (the editable-text veil), `atx-note`, `atx-section-label` |
-| **Buttons and icons** | `atx-btn` plus one of `atx-btn-primary`, `atx-btn-secondary`, `atx-btn-cancel`, `atx-btn-ghost`, `atx-btn-danger`; `atx-btn-retry`; `atx-pill-label` (the swappable label inside a hover-pill button); `atx-ico` (every icon — an inline SVG inheriting `currentColor`) |
+| **Buttons and icons** | `atx-btn` plus one of `atx-btn-default`, `atx-btn-secondary`, `atx-btn-outline`, `atx-btn-ghost`, `atx-btn-destructive`; `atx-btn-retry`; `atx-pill-label` (the swappable label inside a hover-pill button); `atx-ico` (every icon — an inline SVG inheriting `currentColor`) |
 | **Source popups** (markup, value) | `atx-popup-label`, `atx-popup-input`, `atx-popup-error`; the markup palette's `atx-markup-tags` (the row), `atx-markup-tag` (one per insertable tag), `atx-markup-hint` |
 | **Refusal notice** | `atx-notice-reason`, `atx-notice-loc`, `atx-notice-hint` |
 | **Image swap panel** | `atx-image-preview` / `atx-image-preview-img`, `atx-image-meta`, the recents strip `atx-image-recents` (`atx-image-recents-label`, `atx-image-recents-title`, `atx-image-recent`, `atx-image-recent-thumb`), `atx-image-browse-all`, `atx-alt-label` / `atx-alt-input` |
@@ -85,9 +85,19 @@ so those native controls flip back.
 
 ## Contrast
 
-Overlay text is picked to clear **WCAG AA** contrast (4.5:1) against the
-surface it sits on, and control borders the 3:1 that applies to a control's
-boundary; `tests/contrast.test.ts` holds those tokens to it.
+The overlay's colours are semantic design tokens on the
+[shadcn/ui](https://ui.shadcn.com) naming scheme — `background`, `card`,
+`elevated`, `border`, `input`, `ring`, `foreground`, `mutedFg`, `primary`,
+`destructive` and the rest — authored in OKLCH and defined in
+`src/client/ui.ts`. The greys are achromatic, so nothing in the overlay's own
+chrome carries a hue; only the brand and status tokens do. `RADIUS` is the
+matching corner scale, on shadcn's single-knob `sm`/`md`/`lg`/`xl` steps.
+
+Every ink clears **WCAG AA** (4.5:1) against all three surfaces it can land on,
+and control boundaries clear the 3:1 that applies to a control's outline;
+`tests/contrast.test.ts` holds every token to it, and also pins that the greys
+have no hue. The rich-text editor is the one light surface, with its own
+`PAPER` token group checked against its own ground.
 
 **One deliberate exception:** the admin bar is semi-transparent until the
 pointer comes near, and a chip label on the *resting* bar over a light page

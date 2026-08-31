@@ -24,7 +24,7 @@ import { applyFieldErrors, buildControl, collectChanges, type FieldControl } fro
 function sectionLabel(text: string): HTMLElement {
   const l = styled('div', 'atx-section-label', {
     font: '600 12px system-ui', margin: '16px 0 6px', opacity: '0.85',
-    paddingTop: '12px', borderTop: `1px solid ${COLOR.panelDivider}`,
+    paddingTop: '12px', borderTop: `1px solid ${COLOR.border}`,
   });
   l.textContent = text;
   return l;
@@ -146,9 +146,9 @@ function showEditDrawer(entry: EntryResponse): void {
     }
   };
 
-  const saveBtn = footButton('Save', 'primary', () => void save());
+  const saveBtn = footButton('Save', 'default', () => void save());
   shell.foot.append(
-    footButton('Delete…', 'danger', () => void del()),
+    footButton('Delete…', 'destructive', () => void del()),
     footButton('Cancel', 'ghost', shell.close),
     saveBtn,
   );
@@ -277,7 +277,7 @@ export function openEntryCreatePanel(entry: EntrySeed): void {
     }
   };
 
-  const createBtn = footButton('Create', 'primary', () => void create());
+  const createBtn = footButton('Create', 'default', () => void create());
   shell.foot.append(footButton('Cancel', 'ghost', shell.close), createBtn);
   slugInput.focus();
 }

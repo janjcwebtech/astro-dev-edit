@@ -3,7 +3,7 @@ import { icon } from './icons.ts';
 import { isOwnUi } from './router.ts';
 import { annotatedElements, pathFor, sourceFor } from './source-map.ts';
 import { type TreeNode, buildTreeModel } from './tree-model.ts';
-import { COLOR, FONT, Z, basename, isolateScroll, onChromeInset, styled } from './ui.ts';
+import { basename, COLOR, FONT, hexToRgba, isolateScroll, onChromeInset, RADIUS, styled, Z } from './ui.ts';
 
 /**
  * Element-tree panel: a left-docked, non-modal outline of the page's
@@ -66,8 +66,8 @@ export interface TreeHandle {
   hasSelection(): boolean;
 }
 
-const ROW_INK = '#c8c8e0';
-const ACTIVE_BG = 'rgba(97, 68, 215, 0.16)';
+const ROW_INK = COLOR.mutedFg;
+const ACTIVE_BG = hexToRgba(COLOR.primary, 0.16);
 
 export function initTree(deps: TreeDeps): TreeHandle {
   // Panel shell: fixed to the left edge, full height. Below modal panels/drawer
@@ -83,14 +83,14 @@ export function initTree(deps: TreeDeps): TreeHandle {
       // edge (onChromeInset below), and the panel must never sit under it.
       top: '5px',
       bottom: '5px',
-      borderRadius: '6px',
+      borderRadius: RADIUS.md,
       width: 'min(320px, 90vw)',
       zIndex: String(Z + 3),
       display: 'none',
       flexDirection: 'column',
       background: 'rgba(0,0,0,0.90)',
       color: ROW_INK,
-      borderRight: `1px solid ${COLOR.panelBorder}`,
+      borderRight: `1px solid ${COLOR.border}`,
       boxShadow: '8px 0 40px rgba(0,0,0,0.35)',
       font: `12px ${FONT.mono}`,
       boxSizing: 'border-box',
@@ -107,8 +107,8 @@ export function initTree(deps: TreeDeps): TreeHandle {
     gap: '8px',
     padding: '12px 14px',
     font: `600 12px ${FONT.ui}`,
-    color: '#fff',
-    borderBottom: `1px solid ${COLOR.panelDivider}`,
+    color: COLOR.foreground,
+    borderBottom: `1px solid ${COLOR.border}`,
   });
   const barText = styled('span', 'atx-tree-title-text', { flex: '1 1 auto' });
   barText.textContent = 'Elements';
@@ -120,10 +120,10 @@ export function initTree(deps: TreeDeps): TreeHandle {
     width: '20px',
     height: '20px',
     padding: '0',
-    color: '#ddd',
+    color: COLOR.foreground,
     background: 'rgba(255,255,255,0.08)',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: RADIUS.sm,
     cursor: 'pointer',
   });
   closeBtn.type = 'button';
@@ -156,9 +156,9 @@ export function initTree(deps: TreeDeps): TreeHandle {
       border: 'none',
       borderRight: '1px solid rgba(255,255,255,0.10)',
       borderRadius: '0 7px 7px 0',
-      background: 'rgba(22, 21, 34, 0.88)',
+      background: hexToRgba(COLOR.glass, 0.88),
       backdropFilter: 'blur(10px)',
-      color: '#b9b0ff',
+      color: COLOR.primaryText,
       boxShadow: '2px 0 14px rgba(0,0,0,0.3)',
       cursor: 'pointer',
     },
@@ -167,8 +167,8 @@ export function initTree(deps: TreeDeps): TreeHandle {
   tab.type = 'button';
   tab.title = 'Show the element tree';
   tab.append(icon('sidebar', 15));
-  tab.addEventListener('mouseenter', () => (tab.style.color = '#fff'));
-  tab.addEventListener('mouseleave', () => (tab.style.color = '#b9b0ff'));
+  tab.addEventListener('mouseenter', () => (tab.style.color = COLOR.foreground));
+  tab.addEventListener('mouseleave', () => (tab.style.color = COLOR.primaryText));
   tab.addEventListener('click', () => {
     show();
     deps.onToggle?.(true);
@@ -197,9 +197,9 @@ export function initTree(deps: TreeDeps): TreeHandle {
     position: 'fixed',
     pointerEvents: 'none',
     zIndex: String(Z),
-    border: `2px solid ${COLOR.accent}`,
-    borderRadius: '3px',
-    boxShadow: `0 0 0 2px ${COLOR.accent}44, 0 0 12px ${COLOR.accent}66`,
+    border: `2px solid ${COLOR.primary}`,
+    borderRadius: RADIUS.sm,
+    boxShadow: `0 0 0 2px ${COLOR.primary}44, 0 0 12px ${COLOR.primary}66`,
     display: 'none',
   });
 
@@ -220,11 +220,11 @@ export function initTree(deps: TreeDeps): TreeHandle {
     if (!row) return;
     const selected = el === selectedEl;
     const active = el === activeEl;
-    row.style.background = selected ? COLOR.accent : active ? ACTIVE_BG : 'transparent';
-    row.style.color = selected ? '#fff' : active ? COLOR.accentText : ROW_INK;
+    row.style.background = selected ? COLOR.primary : active ? ACTIVE_BG : 'transparent';
+    row.style.color = selected ? COLOR.foreground : active ? COLOR.primaryText : ROW_INK;
     // Hover-active reads as a dashed ring so it never looks like the solid
     // locked selection, even when both land on the same row.
-    row.style.outline = active && !selected ? `1px dashed ${COLOR.accent}` : 'none';
+    row.style.outline = active && !selected ? `1px dashed ${COLOR.primary}` : 'none';
     row.style.outlineOffset = '-1px';
   }
 
@@ -335,7 +335,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
       paddingLeft: `${10 + depth * 14}px`,
       whiteSpace: 'nowrap',
       cursor: 'pointer',
-      borderRadius: '3px',
+      borderRadius: RADIUS.sm,
       color: ROW_INK,
     });
 
@@ -347,7 +347,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
       alignItems: 'center',
       justifyContent: 'center',
       width: '12px',
-      color: COLOR.muted,
+      color: COLOR.mutedFg,
       cursor: hasChildren ? 'pointer' : 'default',
     });
     // A leaf gets a small dot in the same slot, so tags stay column-aligned.
@@ -376,7 +376,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
           flex: '0 1 auto',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          color: COLOR.muted,
+          color: COLOR.mutedFg,
         });
         preview.textContent = text.length > 24 ? `${text.slice(0, 24)}…` : text;
         row.append(preview);
@@ -390,7 +390,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
       flex: '0 0 auto',
       marginLeft: 'auto',
       paddingLeft: '10px',
-      color: COLOR.muted,
+      color: COLOR.mutedFg,
       fontSize: '10px',
       cursor: 'pointer',
       textDecoration: 'underline dotted transparent',
@@ -399,11 +399,11 @@ export function initTree(deps: TreeDeps): TreeHandle {
     loc.textContent = source.loc || '?';
     loc.title = `Open ${basename(source.file)}:${source.loc} in your editor`;
     loc.addEventListener('mouseenter', () => {
-      loc.style.color = COLOR.accentText;
-      loc.style.textDecorationColor = COLOR.accentText;
+      loc.style.color = COLOR.primaryText;
+      loc.style.textDecorationColor = COLOR.primaryText;
     });
     loc.addEventListener('mouseleave', () => {
-      loc.style.color = COLOR.muted;
+      loc.style.color = COLOR.mutedFg;
       loc.style.textDecorationColor = 'transparent';
     });
     loc.addEventListener('click', (e) => {
@@ -439,7 +439,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     if (model.length === 0) {
       const empty = styled('div', 'atx-tree-empty', {
         padding: '14px',
-        color: COLOR.muted,
+        color: COLOR.mutedFg,
         font: `12px ${FONT.ui}`,
       });
       empty.textContent = 'No source-annotated elements on this page.';

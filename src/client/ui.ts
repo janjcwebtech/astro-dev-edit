@@ -15,46 +15,184 @@
 // the source annotations this whole feature reads, so it stays reachable.
 export const Z = 1999999000;
 
+/**
+ * Design tokens, on the shadcn/ui semantic scheme.
+ *
+ * Names and roles follow shadcn's convention — a surface plus the ink that
+ * goes on it (`card` + `foreground`, `primary` + `primaryFg`), then `muted`,
+ * `destructive`, `border`, `input`, `ring` and a single `radius` knob — so the
+ * vocabulary is one other people already know. Two deliberate departures:
+ * shadcn's three interchangeable `secondary`/`muted`/`accent` surfaces are one
+ * `elevated` here, because the overlay only ever needs one step up from
+ * `card`; and `mutedFg`/`faintFg` are two ink tiers where shadcn has one,
+ * because the hover pill and peek gutter need a quieter grey that is still
+ * legible. Dark only: this overlay paints over a live page and has one look,
+ * so there is no `.dark` counterpart to keep in step.
+ *
+ * **Authored in OKLCH, emitted as hex.** The OKLCH triple in each comment is
+ * the source of truth — it is what makes the neutral ramp perceptually even and
+ * provably untinted (chroma 0, so no hue creeps into the greys). Hex is what
+ * ships, because these are written into *inline* styles: there is no stylesheet
+ * for CSS custom properties to cascade through, and hex keeps `hexToRgba`
+ * working. Re-derive with any OKLCH converter; do not hand-edit the hex.
+ *
+ * **Every pairing below is contrast-verified**, and that is a constraint on
+ * changes, not a note about the past. Text tokens clear WCAG AA (4.5:1) against
+ * all three surfaces they can land on — `card`, `elevated` and `background` —
+ * and control outlines clear 1.4.11 non-text (3:1) against the same three.
+ * shadcn's own dark defaults do *not* all clear these on this palette (its
+ * `input` at oklch(0.371 0 0) reaches only 1.7:1 against `card`), which is why
+ * a few tokens sit lighter than upstream. Verify before changing one.
+ */
 export const COLOR = {
-  /** Brand / editable-text accent. */
-  accent: '#6144d7',
-  /** The accent lightened enough to read as *text* on `panelBg` — the solid
-   *  accent is a background colour and fails contrast as a foreground. Used for
-   *  links inside panels. */
-  accentText: '#a893ff',
-  /** Image classification. */
-  image: '#2bb673',
-  /** Dynamic-content classification and warnings. */
-  warn: '#e0a800',
-  /** Secondary ink: help text, hints, unknown classification — everything that
-   *  should read quieter than `#eee` while still being *read*. Chosen so the
-   *  worst case in the overlay (11px on the lightest surface we paint,
-   *  `#20202e`) clears WCAG AA at 6.3:1. */
-  muted: '#a3a0ba',
-  /** Tertiary ink, one step below `muted`: peek line numbers, empty-state
-   *  glyphs, the menu's status footer. Still AA (4.9:1 worst case) — quiet is
-   *  not the same as unreadable. Nothing may go fainter than this. */
-  faint: '#918fa8',
+  // --- Surfaces (achromatic: chroma 0, no tint) ----------------------------
+  /** Deepest well — input and textarea interiors, code blocks. oklch(0.145 0 0) */
+  background: '#0a0a0a',
+  /** The standard overlay surface: panels, drawers, popovers. oklch(0.205 0 0) */
+  card: '#171717',
+  /** Raised or hovered surface — list rows, secondary buttons, the admin bar's
+   *  own chrome. shadcn's `secondary`/`muted`/`accent` surface. oklch(0.269 0 0) */
+  elevated: '#262626',
+  /** Divider and panel edge. Separators are decorative, so this sits below the
+   *  3:1 non-text floor deliberately — an outline a user must *see* to operate
+   *  is `input`, not this. oklch(0.300 0 0) */
+  border: '#2e2e2e',
   /** Boundary of an interactive control — input/textarea/select borders and
-   *  outline buttons. Sized for WCAG 1.4.11 non-text contrast (3:1) against
-   *  both the field interior (`#111`) and every panel surface it sits on. */
-  control: '#6a6a82',
-  /** Success toast / the bar's saved state — a *background* carrying white
-   *  text, so it is dark enough for white to clear AA on it (5.4:1). */
-  ok: '#1f7a3f',
-  /** Error toast — likewise a background under white text. */
-  err: '#c0392b',
-  /** `err` lightened enough to read as *text* on a panel, the same split as
-   *  `accent`/`accentText`: the solid error red is 3.1:1 as a foreground and
-   *  fails. Used for field errors and failure lines inside panels. */
-  errText: '#ff8a80',
-  /** Border of a danger (outline) button — the `err` hue at control contrast. */
-  errBorder: '#a85450',
-  /** Toggle button when edit mode is off. */
-  idle: '#4a4a6a',
-  panelBg: '#1c1c2b',
-  panelBorder: '#333',
-  panelDivider: '#2c2c3d',
+   *  outline buttons. Clears 3:1 against `card` (3.8), `elevated` (3.2) and
+   *  `background` (4.2). oklch(0.560 0 0) */
+  input: '#747474',
+  /** Focus ring: the brand hue lifted until it clears 3:1 on every surface
+   *  (5.0–6.6). The solid `primary` is too dark to serve as a ring at 2.8:1.
+   *  oklch(0.680 0.160 285) */
+  ring: '#9087f6',
+
+  // --- Ink ------------------------------------------------------------------
+  /** Primary ink. 17.2:1 on `card`. oklch(0.985 0 0) */
+  foreground: '#fafafa',
+  /** Secondary ink: help text, hints, unknown classification — quieter than
+   *  `foreground` while still being *read*. Worst case 5.9:1 on `elevated`.
+   *  oklch(0.708 0 0) */
+  mutedFg: '#a1a1a1',
+  /** Tertiary ink, one step below `mutedFg`: peek line numbers, empty-state
+   *  glyphs, the menu's status footer. Worst case 5.0:1 on `elevated` — quiet
+   *  is not the same as unreadable. Nothing may go fainter than this.
+   *  oklch(0.665 0 0) */
+  faintFg: '#949494',
+
+  // --- Brand ----------------------------------------------------------------
+  /** Brand / editable-text accent, as a *background*. White on it is 6.3:1.
+   *  oklch(0.509 0.212 285) */
+  primary: '#6144d7',
+  /** Ink on `primary`. */
+  primaryFg: '#ffffff',
+  /** The brand lightened enough to read as *text* on a panel — the solid
+   *  `primary` is a background colour and fails contrast as a foreground.
+   *  Used for links inside panels. 8.2:1 on `card`. oklch(0.760 0.110 285) */
+  primaryText: '#aaa7f4',
+
+  // --- Status ---------------------------------------------------------------
+  /** Error *background*, carrying `foreground` text at 4.6:1.
+   *  oklch(0.577 0.215 27.3) */
+  destructive: '#dc2626',
+  /** `destructive` lightened to read as text on a panel, the same split as
+   *  `primary`/`primaryText`. 7.6:1 on `card`. oklch(0.750 0.145 27.3) */
+  destructiveText: '#fc877a',
+  /** Border of a danger (outline) button — the destructive hue at control
+   *  contrast, 4.3:1 on `card`. oklch(0.600 0.140 27.3) */
+  destructiveBorder: '#c65a50',
+  /** Success *background* — the saved state, the ok toast. `foreground` on it
+   *  is 5.0:1. oklch(0.520 0.140 150) */
+  success: '#0a7e3a',
+  /** Success as text on a panel. 9.5:1 on `card`. oklch(0.780 0.150 150) */
+  successText: '#67d283',
+  /** Dynamic-content classification and warnings — a text colour, 8.8:1 on
+   *  `card`. oklch(0.780 0.150 85) */
+  warning: '#e3ae28',
+  /** Image classification. 7.8:1 on `card`. oklch(0.720 0.150 160) */
+  info: '#2fc183',
+
+  // --- Categorical hues -----------------------------------------------------
+  /** shadcn's `chart-1..5`: five hues chosen to stay apart from each other at a
+   *  glance, all at the same lightness so none reads as louder than the rest.
+   *  They are what the CSS inspector's syntax theme is built from — a code
+   *  token needs more distinguishable colours than the semantic set has, and
+   *  reusing `primaryText` for two different token kinds would erase the
+   *  distinction the highlighter exists to draw. All clear AA on `background`,
+   *  `card` and `elevated` (6.7:1 worst case).
+   *  oklch(0.76–0.78 0.11–0.15 · 285/150/85/25/220) */
+  chart1: '#aaa7f4',
+  chart2: '#67d283',
+  chart3: '#e3ae28',
+  chart4: '#f98f87',
+  chart5: '#55c4e5',
+
+  // --- Glass -----------------------------------------------------------------
+  /**
+   * The **one place chroma is allowed in a grey**, and it is allowed for a
+   * reason rather than as a leftover.
+   *
+   * Three surfaces are translucent over the host page — the admin bar, its
+   * menu, and the element tree. A hue shift is the cue the eye uses to decide
+   * something is *showing through*: a tinted grey over a white page reads as
+   * glass because the colour is evidence of a mixture, while a perfectly
+   * neutral one at the same alpha and the same lightness reads as a flat scrim
+   * painted on top. Chroma 0 here costs the transparency the alpha is paying
+   * for.
+   *
+   * So these two carry chroma 0.012 at the **brand hue** — about half the cast
+   * the old palette had everywhere, and deliberately the brand's hue so the
+   * glass relates to something rather than being an arbitrary tint. Composited
+   * over a white page the bar lands at chroma 0.013, against 0.022 before and
+   * 0.000 without this.
+   *
+   * **Opaque surfaces stay achromatic.** `card`, `elevated`, `background` and
+   * every ink are chroma 0 and the contrast test pins them there. If a surface
+   * is not translucent it does not get to use these.
+   */
+  /** Bar and element tree, at the `card` lightness. oklch(0.205 0.012 285) */
+  glass: '#16161d',
+  /** The menu, one lightness step up so it separates from the bar it opens
+   *  from — a step the flat neutral pass had collapsed. oklch(0.234 0.012 285) */
+  glassRaised: '#1d1d23',
+} as const;
+
+/**
+ * The one light surface in a dark-only overlay: the rich-text editor's page,
+ * which shows a Markdown body as it will look once published rather than as
+ * overlay chrome. Its own token group instead of `COLOR` inverted, because the
+ * two are not the same idea — `COLOR.foreground` is *ink*, and using it as this
+ * surface's background would couple a piece of paper to the colour of text.
+ *
+ * Same OKLCH-authored, contrast-verified rules as `COLOR`: body ink is 18.1:1
+ * on `bg` and 16.2:1 on `muted`. `link` is the brand hue darkened for paper
+ * (7.2:1); the overlay's own `primary` would also clear AA here at 6.3:1, but
+ * it is tuned to sit on a dark ground and reads thin as body-text link on
+ * white, so paper gets its own.
+ */
+export const PAPER = {
+  /** The page itself. oklch(1 0 0) */
+  bg: '#ffffff',
+  /** Body ink. oklch(0.200 0 0) */
+  fg: '#161616',
+  /** Inset blocks — code, pre, blockquote fill. oklch(0.960 0 0) */
+  muted: '#f2f2f2',
+  /** Rules and block edges. oklch(0.880 0 0) */
+  border: '#d7d7d7',
+  /** Links, the brand hue at paper contrast. oklch(0.480 0.200 285) */
+  link: '#593ec7',
+} as const;
+
+/**
+ * Corner radii, on shadcn's single-knob scheme: `lg` is the base `--radius`
+ * (0.625rem) and the others step ±4px from it. Pick by element size — `sm` for
+ * a tag or swatch, `md` for a control, `lg` for a panel, `full` for a pill.
+ */
+export const RADIUS = {
+  sm: '6px',
+  md: '8px',
+  lg: '10px',
+  xl: '14px',
+  full: '999px',
 } as const;
 
 export const FONT = {
@@ -68,8 +206,9 @@ export const FONT = {
  *  dark background instead of as a near-invisible dark glyph. */
 export const INPUT_STYLE: Partial<CSSStyleDeclaration> = {
   width: '100%', padding: '6px 8px', boxSizing: 'border-box',
-  border: `1px solid ${COLOR.control}`, borderRadius: '5px', background: '#111', color: '#fff',
-  font: '13px system-ui', colorScheme: 'dark',
+  border: `1px solid ${COLOR.input}`, borderRadius: RADIUS.sm,
+  background: COLOR.background, color: COLOR.foreground,
+  font: `13px ${FONT.ui}`, colorScheme: 'dark',
 };
 
 /**
@@ -89,6 +228,21 @@ export function styled<K extends keyof HTMLElementTagNameMap>(
   if (id) el.id = id;
   Object.assign(el.style, style);
   return el;
+}
+
+/**
+ * The transparency checkerboard behind an image preview, at `size` px per
+ * square. One definition for the four surfaces that draw it (the image panel,
+ * its recent strip, the media grid tile, the asset picker), which previously
+ * each carried their own copy of the gradient and drifted apart in size.
+ *
+ * Built from `card` and `elevated` so the squares read as a *surface* rather
+ * than as content — the contrast between them is deliberately low (1.4:1),
+ * enough to say "this area is transparent" without competing with the image
+ * sitting on top of it.
+ */
+export function CHECKER(size: number): string {
+  return `repeating-conic-gradient(${COLOR.elevated} 0% 25%, ${COLOR.card} 0% 50%) 50% / ${size}px ${size}px`;
 }
 
 export function basename(path: string): string {
@@ -146,12 +300,12 @@ export function lockElement(el: HTMLElement): () => void {
     position: 'fixed', zIndex: String(Z + 3), pointerEvents: 'all',
     left: `${rect.left - 2}px`, top: `${rect.top - 2}px`,
     width: `${rect.width + 4}px`, height: `${rect.height + 4}px`,
-    background: 'rgba(97, 68, 215, 0.12)', borderRadius: '3px',
+    background: hexToRgba(COLOR.primary, 0.12), borderRadius: RADIUS.sm,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   });
   const chip = styled('div', 'atx-veil-chip', {
-    font: '600 11px system-ui', color: '#fff', background: COLOR.accent,
-    padding: '2px 8px', borderRadius: '999px', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+    font: '600 11px system-ui', color: COLOR.primaryFg, background: COLOR.primary,
+    padding: '2px 8px', borderRadius: RADIUS.full, boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
   });
   chip.textContent = 'saving…';
   veil.append(chip);
@@ -164,9 +318,9 @@ export function lockElement(el: HTMLElement): () => void {
 export function toast(message: string, kind: 'ok' | 'err'): void {
   const t = styled('div', `atx-toast atx-toast-${kind}`, {
     position: 'fixed', zIndex: String(Z + 5), left: '50%', bottom: `${24 + inset.bottom}px`,
-    transform: 'translateX(-50%)', padding: '10px 16px', borderRadius: '8px',
-    font: '500 13px system-ui', color: '#fff',
-    background: kind === 'ok' ? COLOR.ok : COLOR.err,
+    transform: 'translateX(-50%)', padding: '10px 16px', borderRadius: RADIUS.md,
+    font: `500 13px ${FONT.ui}`, color: COLOR.primaryFg,
+    background: kind === 'ok' ? COLOR.success : COLOR.destructive,
     boxShadow: '0 4px 16px rgba(0,0,0,0.3)', opacity: '0', transition: 'opacity 120ms',
   });
   t.textContent = message;
@@ -245,16 +399,16 @@ export function buildPanel(
     // A sized panel lays its title/body/foot out as a column so the body is the
     // only part that grows; the default auto-height panel is unaffected.
     ...(opts.height ? { display: 'flex', flexDirection: 'column' } : {}),
-    background: COLOR.panelBg, color: '#eee', borderRadius: '12px',
-    boxShadow: '0 12px 48px rgba(0,0,0,0.5)', border: `1px solid ${COLOR.panelBorder}`,
-    overflow: 'hidden', font: '13px system-ui', boxSizing: 'border-box',
+    background: COLOR.card, color: COLOR.foreground, borderRadius: RADIUS.xl,
+    boxShadow: '0 12px 48px rgba(0,0,0,0.5)', border: `1px solid ${COLOR.border}`,
+    overflow: 'hidden', font: `13px ${FONT.ui}`, boxSizing: 'border-box',
     // Edit mode sets a crosshair cursor on the whole page; our UI is not a
     // click-to-edit surface, so restore normal per-element cursors.
     cursor: 'auto',
   });
 
   const bar = styled('div', 'atx-panel-title', {
-    padding: '12px 16px', font: '600 13px system-ui', borderBottom: `1px solid ${COLOR.panelDivider}`,
+    padding: '12px 16px', font: `600 13px ${FONT.ui}`, borderBottom: `1px solid ${COLOR.border}`,
     display: 'flex', alignItems: 'center', gap: '8px',
   });
   const heading = styled('span', 'atx-panel-heading', {
@@ -275,7 +429,7 @@ export function buildPanel(
 
   const foot = styled('div', 'atx-panel-foot', {
     padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
-    borderTop: `1px solid ${COLOR.panelDivider}`,
+    borderTop: `1px solid ${COLOR.border}`,
     ...(opts.height ? { flex: '0 0 auto' } : {}),
   });
   foot.dataset.foot = '';
@@ -302,17 +456,17 @@ export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElemen
     // never wider than the viewport allows on small screens.
     height: '100vh', width: opts.width ?? 'min(max(440px, 50vw), 94vw)',
     display: 'flex', flexDirection: 'column',
-    background: COLOR.panelBg, color: '#eee',
-    boxShadow: '-8px 0 40px rgba(0,0,0,0.45)', borderLeft: `1px solid ${COLOR.panelBorder}`,
-    font: '13px system-ui', boxSizing: 'border-box',
+    background: COLOR.card, color: COLOR.foreground,
+    boxShadow: '-8px 0 40px rgba(0,0,0,0.45)', borderLeft: `1px solid ${COLOR.border}`,
+    font: `13px ${FONT.ui}`, boxSizing: 'border-box',
     // Edit mode sets a crosshair cursor on the whole page; our UI is not a
     // click-to-edit surface, so restore normal per-element cursors.
     cursor: 'auto',
   });
 
   const bar = styled('div', 'atx-drawer-title', {
-    padding: '14px 16px', font: '600 13px system-ui', flex: '0 0 auto',
-    borderBottom: `1px solid ${COLOR.panelDivider}`,
+    padding: '14px 16px', font: `600 13px ${FONT.ui}`, flex: '0 0 auto',
+    borderBottom: `1px solid ${COLOR.border}`,
     display: 'flex', alignItems: 'center', gap: '8px',
   });
   const barText = styled('span', 'atx-drawer-title-text', {
@@ -333,7 +487,7 @@ export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElemen
 
   const foot = styled('div', 'atx-drawer-foot', {
     padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
-    borderTop: `1px solid ${COLOR.panelDivider}`, flex: '0 0 auto',
+    borderTop: `1px solid ${COLOR.border}`, flex: '0 0 auto',
   });
   foot.dataset.foot = '';
 
@@ -404,8 +558,8 @@ export function buildTabs(tabs: readonly TabSpec[], opts: TabsOptions = {}): Tab
   const paint = (): void => {
     for (const [id, btn] of buttons) {
       const on = id === active?.id;
-      btn.style.background = on ? COLOR.accent : 'transparent';
-      btn.style.color = on ? '#fff' : '#bbb';
+      btn.style.background = on ? COLOR.primary : 'transparent';
+      btn.style.color = on ? COLOR.primaryFg : COLOR.mutedFg;
       btn.setAttribute('aria-selected', on ? 'true' : 'false');
     }
   };
@@ -428,8 +582,8 @@ export function buildTabs(tabs: readonly TabSpec[], opts: TabsOptions = {}): Tab
   if (tabs.length > 1) {
     for (const { id, label } of tabs) {
       const btn = styled('button', `atx-${prefix}-tab atx-${prefix}-tab-${id}`, {
-        padding: '6px 14px', borderRadius: '6px', border: '1px solid transparent',
-        cursor: 'pointer', font: '600 12px system-ui',
+        padding: '6px 14px', borderRadius: RADIUS.md, border: '1px solid transparent',
+        cursor: 'pointer', font: `600 12px ${FONT.ui}`,
       });
       btn.type = 'button';
       btn.role = 'tab';
@@ -503,24 +657,35 @@ export function buildBackdrop(onClose: () => void, layer = 5): HTMLElement {
   return b;
 }
 
-/** Footer-button variants. `cancel` and `ghost` render identically; the class
- *  names differ because the README documents them as separate theming hooks. */
-export type ButtonKind = 'primary' | 'secondary' | 'cancel' | 'ghost' | 'danger';
+/**
+ * Button variants, named as shadcn names them: `default` (the filled brand
+ * action), `secondary` (a filled step up from the surface), `outline`, `ghost`
+ * and `destructive`.
+ *
+ * One deliberate departure: shadcn's `destructive` is *filled* red. Here it is
+ * an outline, because a footer that puts a filled red button beside the filled
+ * brand button reads as two equally-weighted calls to action when only one of
+ * them is the thing the user came to do.
+ */
+export type ButtonKind = 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive';
 
 const BUTTON_STYLES: Record<ButtonKind, Partial<CSSStyleDeclaration>> = {
-  primary: { border: 'none', background: COLOR.accent, color: '#fff' },
-  secondary: { border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#cdd' },
-  cancel: { border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#ccc' },
-  ghost: { border: `1px solid ${COLOR.control}`, background: 'transparent', color: '#ccc' },
-  // marginRight:auto pushes a danger button to the far left of a flex footer,
-  // away from the safe actions.
-  danger: { border: `1px solid ${COLOR.errBorder}`, background: 'transparent', color: COLOR.errText, marginRight: 'auto' },
+  default: { border: '1px solid transparent', background: COLOR.primary, color: COLOR.primaryFg },
+  secondary: { border: '1px solid transparent', background: COLOR.elevated, color: COLOR.foreground },
+  outline: { border: `1px solid ${COLOR.input}`, background: 'transparent', color: COLOR.foreground },
+  ghost: { border: '1px solid transparent', background: 'transparent', color: COLOR.mutedFg },
+  // marginRight:auto pushes a destructive button to the far left of a flex
+  // footer, away from the safe actions.
+  destructive: {
+    border: `1px solid ${COLOR.destructiveBorder}`, background: 'transparent',
+    color: COLOR.destructiveText, marginRight: 'auto',
+  },
 };
 
 /** A panel/drawer footer button. The single source of button styling. */
 export function footButton(label: string, kind: ButtonKind, onClick: () => void): HTMLButtonElement {
   const btn = styled('button', `atx-btn atx-btn-${kind}`, {
-    padding: '7px 14px', borderRadius: '7px', cursor: 'pointer', font: '600 13px system-ui',
+    padding: '7px 14px', borderRadius: RADIUS.md, cursor: 'pointer', font: `600 13px ${FONT.ui}`,
     ...BUTTON_STYLES[kind],
   });
   btn.type = 'button';
@@ -560,8 +725,8 @@ export function pillButton(
   const btn = styled('button', className, {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
     marginLeft: '8px', padding: '2px 7px', font: `600 11px ${FONT.ui}`,
-    color: '#fff', background: 'rgba(255,255,255,0.14)',
-    border: 'none', borderRadius: '4px', cursor: 'pointer',
+    color: COLOR.foreground, background: 'rgba(255,255,255,0.14)',
+    border: 'none', borderRadius: RADIUS.sm, cursor: 'pointer',
     ...extra,
   });
   btn.type = 'button';
@@ -605,9 +770,9 @@ export function wirePanelButtons(
   opts: { confirmLabel?: string; secondaryLabel?: string; onSecondary?: () => void } = {},
 ): void {
   const foot = panel.querySelector('[data-foot]') as HTMLElement;
-  foot.append(footButton('Cancel', 'cancel', onCancel));
+  foot.append(footButton('Cancel', 'ghost', onCancel));
   if (opts.secondaryLabel && opts.onSecondary) {
-    foot.append(footButton(opts.secondaryLabel, 'secondary', opts.onSecondary));
+    foot.append(footButton(opts.secondaryLabel, 'outline', opts.onSecondary));
   }
-  foot.append(footButton(opts.confirmLabel ?? 'Save', 'primary', onConfirm));
+  foot.append(footButton(opts.confirmLabel ?? 'Save', 'default', onConfirm));
 }

@@ -17,7 +17,7 @@ export function beginTextEdit(el: HTMLElement, src: SourceLoc): void {
 
   el.setAttribute('contenteditable', 'plaintext-only');
   el.dataset.astroDevEditActive = '1';
-  el.style.outline = `2px solid ${COLOR.accent}`;
+  el.style.outline = `2px solid ${COLOR.primary}`;
   el.style.outlineOffset = '2px';
   el.style.borderRadius = '2px';
   el.focus();
