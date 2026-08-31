@@ -3,7 +3,9 @@ import * as api from '../api.ts';
 import { EntryApplyError } from '../api.ts';
 import { slugify } from '../../shared/slug.ts';
 import * as state from '../state.ts';
-import { basename, footButton, styled, toast } from '../ui.ts';
+import { basename, footButton, toast } from '../ui.ts';
+import { card, fieldGroup } from '../group.ts';
+import { icon } from '../icons.ts';
 import { buildBodyEditor } from './body-editor.ts';
 import { openDrawer } from './drawer.ts';
 import { applyFieldErrors, buildControl, collectChanges, type FieldControl } from './fields.ts';
@@ -21,10 +23,36 @@ import { applyFieldErrors, buildControl, collectChanges, type FieldControl } fro
 // Shared pieces
 // ---------------------------------------------------------------------------
 
-function sectionLabel(text: string): HTMLElement {
-  const l = styled('div', 'atx-section-label');
-  l.textContent = text;
-  return l;
+/**
+ * Where the field list came from, said plainly. The drawer is schema-driven
+ * when the project's `content.config.ts` resolves and value-inferred when it
+ * does not, and that difference decides whether a missing field is a gap in
+ * the file or a gap in what the tool could work out — worth a line rather than
+ * something the user infers from which fields happen to be present.
+ */
+function fieldsOrigin(fields: readonly FieldDescriptor[]): string {
+  return fields.some((f) => f.source === 'schema')
+    ? "From the collection's schema."
+    : "Inferred from the file's own values.";
+}
+
+/** A card holding one run of fields. The drawer body is a stack of these, so
+ *  every group states what it is instead of running into the next. */
+function fieldCard(title: string, description: string, controls: readonly FieldControl[]): HTMLElement {
+  const c = card({ title, description });
+  const group = fieldGroup();
+  for (const ctl of controls) group.append(ctl.root);
+  c.body.append(group);
+  return c.root;
+}
+
+/** The header's corner action: one size down, and iconned, because it leaves
+ *  the drawer rather than completing it. */
+function newEntryButton(onClick: () => void): HTMLButtonElement {
+  const btn = footButton('New', 'outline', onClick);
+  btn.classList.add('atx-btn-sm');
+  btn.prepend(icon('plus', 16));
+  return btn;
 }
 
 /** URL of the listing above the current detail page (…/articles/x → …/articles). */
@@ -78,7 +106,8 @@ function showEditDrawer(entry: EntryResponse): void {
   );
   const bodyEditor = entry.bodyEditable ? buildBodyEditor(entry.body) : null;
 
-  const shell = openDrawer(`Edit entry · ${basename(entry.file)}`, {
+  const shell = openDrawer('Edit entry', {
+    description: entry.file,
     isDirty: () => controls.some((c) => c.dirty()) || (bodyEditor?.dirty() ?? false),
     discardMessage: 'Discard unsaved changes?',
     // The body editor's writing surface is light-DOM (slotted in), so closing
@@ -86,19 +115,21 @@ function showEditDrawer(entry: EntryResponse): void {
     onClose: () => bodyEditor?.destroy(),
   });
 
-  for (const c of controls) shell.body.append(c.root);
+  shell.body.append(fieldCard('Frontmatter', fieldsOrigin(entry.fields), controls));
   if (bodyEditor) {
-    shell.body.append(sectionLabel('Body'), bodyEditor.root);
+    const bodyCard = card({ title: 'Body', description: 'Markdown, written straight to the file.' });
+    bodyCard.body.append(bodyEditor.root);
+    shell.body.append(bodyCard.root);
   }
 
-  // "+ New" — only when the file maps to a known collection.
+  // "New" — only when the file maps to a known collection.
   if (entry.collection) {
-    const newBtn = footButton('+ New', 'ghost', () => {
-      shell.teardown();
-      showCreateDrawer(entry);
-    });
-    newBtn.classList.add('atx-entry-new');
-    shell.actions.append(newBtn);
+    shell.actions.append(
+      newEntryButton(() => {
+        shell.teardown();
+        showCreateDrawer(entry);
+      }),
+    );
   }
 
   const save = async (): Promise<void> => {
@@ -146,11 +177,12 @@ function showEditDrawer(entry: EntryResponse): void {
   };
 
   const saveBtn = footButton('Save', 'default', () => void save());
-  shell.foot.append(
-    footButton('Delete…', 'destructive', () => void del()),
-    footButton('Cancel', 'ghost', shell.close),
-    saveBtn,
-  );
+  const delBtn = footButton('Delete…', 'destructive', () => void del());
+  delBtn.prepend(icon('trash', 16));
+  // Delete first in the DOM is what puts it at the far end of the band — see
+  // the `:first-child` rule in styles.ts. Cancel is an outline rather than a
+  // ghost so the pair the user is choosing between reads as a pair.
+  shell.foot.append(delBtn, footButton('Cancel', 'outline', shell.close), saveBtn);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,16 +246,24 @@ export function openEntryCreatePanel(entry: EntrySeed): void {
 
   const bodyEditor = buildBodyEditor('');
 
-  const shell = openDrawer(`New entry · ${collection}`, {
+  const shell = openDrawer('New entry', {
+    description: `in ${collection}`,
     isDirty: () =>
       slugInput.value !== '' || bodyEditor.dirty() || controls.some((c) => c.dirty()),
     discardMessage: 'Discard this new entry?',
     onClose: () => bodyEditor.destroy(),
   });
 
-  shell.body.append(slugControl.root);
-  for (const c of controls) shell.body.append(c.root);
-  shell.body.append(sectionLabel('Body'), bodyEditor.root);
+  // Three concerns, three cards. The slug is not frontmatter — it is the
+  // filename, and therefore the URL — so it gets said separately rather than
+  // sitting at the top of the field list looking like a key.
+  shell.body.append(
+    fieldCard('File', 'The filename, and the path it will be served at.', [slugControl]),
+    fieldCard('Frontmatter', fieldsOrigin(entry.fields), controls),
+  );
+  const bodyCard = card({ title: 'Body', description: 'Markdown, written straight to the file.' });
+  bodyCard.body.append(bodyEditor.root);
+  shell.body.append(bodyCard.root);
 
   let slugTouched = false;
   slugInput.addEventListener('input', () => (slugTouched = true));
@@ -278,6 +318,6 @@ export function openEntryCreatePanel(entry: EntrySeed): void {
   };
 
   const createBtn = footButton('Create', 'default', () => void create());
-  shell.foot.append(footButton('Cancel', 'ghost', shell.close), createBtn);
+  shell.foot.append(footButton('Cancel', 'outline', shell.close), createBtn);
   slugInput.focus();
 }

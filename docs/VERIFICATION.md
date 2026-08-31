@@ -118,6 +118,7 @@ the loc rules in `astro.ts`.
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 | `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
 | `ui.ts` — contrast guard on the design tokens. Parses both notations (`#rrggbb` and `rgb(r g b / a)`) and **flattens a translucent token onto the ground beneath it**, since `border`/`input`/`inputBg` have one ratio per surface rather than one ratio. Every ink against **all three** surfaces (`background`, `card`, `elevated`) at AA 4.5:1, plus `foreground`/`mutedFg` against a field interior composited on each; `foreground` on `brand` and `success`, `primaryFg` on `primary` and `destructive` — and that `foreground` *fails* on `primary`, so the dark-ink pairing cannot be dropped; `input`/`ring`/`destructive` at the 3:1 a control boundary requires; `brand`/`success` still failing as foregrounds, which is what `brandText`/`successText` are for; `border` staying *below* 3:1 because a separator is not a control; `inputBg` lifting the surface without becoming one; the neutral ramp achromatic on parsed channels (translucent white included) with `primary` in it and `brand` deliberately not; and the rich-text editor's light `PAPER` set clearing AA on its own ground while being invisible on the dark surfaces, so the two cannot be mixed | `tests/contrast.test.ts` |
+| `group.ts` — no unit test: pure DOM with no branching beyond "was this slot given". Covered by the **Grouping and precedence** manual checklist below | — |
 | `element-context.ts` — `formatContext` clipboard payload: section order and omission (absent entry/box, and the never-formatted editability verdict), `>` focus-line gutter marking, quoted-range wording, fence language per extension, refused-source sentence, empty-CSS note, rule blocks with/without a source comment, both truncation notices; `relativize` root stripping (trailing slash, outside-root, already-relative, unknown root, Windows separators); `windowAround` 1-based slicing (clamped both ends, whole file, pre-windowed response) | `tests/element-context.test.ts` |
 
 The Settings drawer itself has no unit tests — it is DOM-bound — but it is
@@ -555,6 +556,42 @@ function schema with `image()` fields — and its config sets widget overrides o
       file.
       Do it with a queued field edit pending: the discard confirm appears first,
       and cancelling keeps you where you were.
+
+**Grouping and precedence** (structure, not tokens — nothing here is unit
+testable, because the check is "does the eye group these the way the code says
+they group")
+
+- [ ] **Every drawer is a stack of cards on a darker canvas.** Open the entry,
+      Settings and Collections drawers. In each, the scrolling area is darker
+      than the surfaces on it, every card carries a hairline edge, and no
+      control floats directly on the canvas. A card whose header repeats the
+      drawer's own title is a bug — the Collections card is titled by count for
+      exactly that reason.
+
+- [ ] **A card header states its concern.** The entry drawer's Frontmatter card
+      says where its fields came from — "From the collection's schema." when
+      `content.config.ts` resolved, "Inferred from the file's own values."
+      when it did not. Break the config and reopen: the line must change, since
+      it is the only place the drawer says which mode it is in.
+
+- [ ] **A corner action leaves; a footer action completes.** **New** sits in a
+      header's top-right and opens something else. Save, Create and Use image
+      sit in a footer band — a rule and a darker ground — and are the only
+      filled buttons on their surface.
+
+- [ ] **Delete is not in the pair.** In the entry drawer's footer, Delete… is at
+      the far left with an icon, and Cancel/Save are together at the right.
+      Cancel is outlined; a drawer whose only footer button is **Close** keeps
+      it quiet (ghost), because there is nothing to weigh it against.
+
+- [ ] **A list is rows, not blocks.** The Collections list gives each row a
+      16px icon, a name, a monospaced path-and-counts line, and a chevron.
+      Hover fills the row and brightens the chevron; Tab reaches each row and
+      Enter opens it, since the row itself carries the button semantics.
+
+- [ ] **Buttons and fields share a corner.** A button beside a text field is
+      the same height and the same radius — if the button reads as a pill next
+      to a box, the radius ladder has drifted off its 10px base.
 
 **Focus and field state** (new behaviour, no unit test — the tokens are pinned,
 the fact that a rule reaches the right element is not)

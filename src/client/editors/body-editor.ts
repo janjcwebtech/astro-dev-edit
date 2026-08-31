@@ -50,7 +50,7 @@ const CONTENT_CSS = `
   min-height: 40vh;
   padding: 16px 20px;
   border: none;
-  border-radius: ${RADIUS['2xl']};
+  border-radius: ${RADIUS.lg};
   background: ${PAPER.bg};
   color: ${PAPER.fg};
   font: 15px/1.65 ${FONT.ui};

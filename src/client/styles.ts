@@ -86,7 +86,7 @@ ${vars('font-', FONT)}
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid transparent;
-  border-radius: var(--atx-radius-3xl);
+  border-radius: var(--atx-radius-xl);
   background: var(--atx-card);
   color: var(--atx-foreground);
   /* A ring separates the surfaces; the shadow only lifts the panel off the
@@ -142,12 +142,17 @@ ${vars('font-', FONT)}
   overflow-y: auto;
 }
 
+/* Same band as the drawer's: a rule and a ground one step down from the panel,
+   so the row that completes the modal is plainly not part of its content. */
 .atx-panel-foot {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   padding: 16px 20px;
   border-top: 1px solid var(--atx-border);
+  border-radius: 0 0 var(--atx-radius-xl) var(--atx-radius-xl);
+  background: var(--atx-background);
 }
 
 .atx-panel[data-sized] .atx-panel-foot {
@@ -166,55 +171,292 @@ ${vars('font-', FONT)}
   width: min(max(440px, 50vw), 94vw);
   box-sizing: border-box;
   border-left: 1px solid var(--atx-border);
-  background: var(--atx-card);
+  /* The scrolling body is the canvas, one step darker than the cards on it --
+     which is the whole reason a card reads as a bounded thing here. The
+     title bar and the footer band paint themselves back up to the card
+     surface, so the drawer reads as chrome around content. */
+  background: var(--atx-background);
   color: var(--atx-foreground);
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.32);
   font: 400 14px var(--atx-font-ui);
   cursor: auto;
 }
 
+/* The drawer's title bar is a card header: a grid so the name and the line
+   under it both stop short of the corner action instead of running under it,
+   and so the action stays pinned to the top-right however tall the text
+   column grows. Two columns only when there is something to put in the
+   second -- [data-action], set by group.ts::cardHead. */
 .atx-drawer-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 2px 12px;
   flex: 0 0 auto;
   padding: 16px 20px;
   border-bottom: 1px solid var(--atx-border);
-  font: 500 14px var(--atx-font-ui);
+  background: var(--atx-card);
 }
 
+/* The second column appears only once a caller has actually put something in
+   the action slot. :has() rather than a flag the caller has to remember to
+   set: the slot is filled after the drawer is built, and a header that
+   reserved the column unconditionally would pull the title short of an edge
+   with nothing at it. */
+.atx-drawer-title:has([data-actions] > *) {
+  grid-template-columns: 1fr auto;
+}
+
+/* 16px/500 is the only type at that size in a drawer, which is what makes it
+   read as the name of the thing rather than as the first of the labels. */
 .atx-drawer-title-text {
-  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--atx-foreground);
+  font: 500 16px/1.4 var(--atx-font-ui);
 }
 
+/* The line under the name: which file, which collection, what the caveat is.
+   Muted ink at body size -- separated from the title by weight and colour,
+   not by shrinking it into small print. */
+.atx-drawer-subtitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--atx-muted-fg);
+  font: 400 14px/1.4 var(--atx-font-ui);
+}
+
+/* Spans both rows and sits at the top of them, so a one-line and a two-line
+   header put their action in the same place. */
 .atx-drawer-actions {
   display: flex;
   gap: 6px;
-  flex: 0 0 auto;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  justify-self: end;
 }
 
+/* A stack of cards, not a form. The gap is the only spacing the body owns;
+   each card brings its own padding, which is what keeps a card's edge a real
+   boundary rather than a line drawn through continuous content. */
 .atx-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   flex: 1 1 auto;
-  padding: 20px;
+  padding: 16px;
   overflow-y: auto;
 }
 
+/* A band, not a strip of the body: a rule above it and a ground half a step
+   off the drawer's own are what separate "the form" from "what you do with
+   it", and are the reason the footer survives being scrolled up to. */
 .atx-drawer-foot {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   flex: 0 0 auto;
   padding: 16px 20px;
   border-top: 1px solid var(--atx-border);
+  background: var(--atx-card);
+}
+
+/* The destructive action goes to the far end, away from the pair the user is
+   actually choosing between. Cancel and Save are one decision; Delete is a
+   different one, and putting all three in a row invites the wrong click. */
+.atx-drawer-foot > .atx-btn-destructive:first-child,
+.atx-panel-foot > .atx-btn-destructive:first-child {
+  margin-right: auto;
 }
 
 .atx-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
+}
+
+/* == Grouping =============================================================
+   group.ts. The structural vocabulary every panel builds its content from:
+   a card is a bounded concern, a field group is a run of controls answering
+   one question, an item is one row of a list, and a separator is the smaller
+   claim a card makes about how far apart two things are.
+
+   These carry no colour of their own beyond a surface and a rule. What they
+   own is *distance* -- which is the part a flat run of controls gets wrong
+   however well each control is styled. */
+
+/* The edge is a 1px inset shadow rather than a border, so a card can sit
+   flush inside a padded body without its own border-box changing the width
+   its children get. Same trick shadcn uses, same reason. */
+.atx-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0 0;
+  border-radius: var(--atx-radius-xl);
+  background: var(--atx-card);
+  box-shadow: 0 0 0 1px var(--atx-border);
+}
+
+/* Horizontal padding lives on the header, the body and the footer rather
+   than on the card, which is what lets the footer band and a full-bleed
+   list run edge to edge inside it. */
+.atx-card-head {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 2px 12px;
+  padding: 0 16px;
+}
+
+.atx-card-head[data-action] {
+  grid-template-columns: 1fr auto;
+}
+
+.atx-card-title {
+  min-width: 0;
+  color: var(--atx-foreground);
+  font: 500 16px/1.4 var(--atx-font-ui);
+}
+
+.atx-card-desc {
+  min-width: 0;
+  color: var(--atx-muted-fg);
+  font: 400 14px/1.45 var(--atx-font-ui);
+}
+
+/* Spans both rows and pins to the top-right, so a card with a description and
+   one without put their action in the same place. */
+.atx-card-action {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  justify-self: end;
+}
+
+.atx-card-body {
+  padding: 0 16px;
+}
+
+/* The card's own footer band. Matches the drawer's for the same reason: the
+   action that completes a thing sits below a rule, on a ground half a step
+   off the surface it completes. */
+.atx-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--atx-border);
+  border-radius: 0 0 var(--atx-radius-xl) var(--atx-radius-xl);
+  background: var(--atx-background);
+}
+
+.atx-card-foot > .atx-btn-destructive:first-child {
+  margin-right: auto;
+}
+
+/* Trailing padding on the last slot, so the card's bottom matches the 16px it
+   opens with. A footer brings its own, hence the reset. */
+.atx-card > :last-child {
+  padding-bottom: 16px;
+}
+
+.atx-card > .atx-card-foot:last-child {
+  padding-bottom: 16px;
+}
+
+/* One question's worth of controls. 20px between fields is wide enough that
+   the label of the next one is plainly a new field rather than a second line
+   of the last one's help text -- which is the whole job. */
+.atx-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.atx-sep {
+  height: 1px;
+  flex: 0 0 auto;
+  background: var(--atx-border);
+}
+
+/* == Items ================================================================
+   One row: an optional 16px media slot, a text column that takes the slack,
+   and actions pinned right. Every list in the overlay is built from this
+   rather than each panel growing its own row. */
+
+.atx-item-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--atx-radius-lg);
+  color: var(--atx-foreground);
+  font: 400 14px var(--atx-font-ui);
+}
+
+/* A filled tile, for a row that stands alone. A row inside a list stays
+   transparent: there, the list is the object and painting every row makes it
+   read as a stack of separate cards. */
+.atx-item[data-variant='muted'] {
+  border-color: var(--atx-border);
+  background: var(--atx-elevated);
+}
+
+.atx-item-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--atx-muted-fg);
+}
+
+.atx-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.atx-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 14px/1.4 var(--atx-font-ui);
+}
+
+/* 12px here, unlike a field's help text at 14px. A description under a row
+   title is an attribute of the row -- a count, a path, a date -- not prose
+   the user has to read, and at 14px it competes with the title. */
+.atx-item-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--atx-muted-fg);
+  font: 500 12px/1.5 var(--atx-font-ui);
+}
+
+.atx-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 /* Tabs are keyed off their ARIA roles, not their classes: buildTabs names
@@ -226,12 +468,15 @@ ${vars('font-', FONT)}
    is a raised card sitting in it. The alternative — a filled accent on the
    selected tab — reads as a call to action, which a tab is not. */
 [role='tablist'] {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   gap: 2px;
+  width: fit-content;
+  max-width: 100%;
   flex: 0 0 auto;
   padding: 3px;
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-input-bg);
 }
 
@@ -239,7 +484,7 @@ ${vars('font-', FONT)}
   height: 26px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: var(--atx-radius-full);
+  border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
   font: 500 13px var(--atx-font-ui);
@@ -277,10 +522,10 @@ ${vars('font-', FONT)}
    without a variant and carry their own box, and handing them this padding
    and radius would resize them.
 
-   32px and fully rounded, matching the height of a form control so a button
-   beside a field lines up without either being nudged. The pill is not
-   decoration -- at this size it is what tells a button from an input at a
-   glance, now that neither of them carries a visible outline. */
+   32px, and on the same radius rung as a form control, so a button beside a
+   field lines up and reads as part of the same object rather than as a
+   different kind of thing parked next to it. What separates the two is fill
+   and weight, not shape. */
 .atx-btn-default,
 .atx-btn-secondary,
 .atx-btn-outline,
@@ -291,14 +536,35 @@ ${vars('font-', FONT)}
   justify-content: center;
   gap: 6px;
   height: 32px;
-  padding: 0 12px;
+  padding: 0 10px;
   box-sizing: border-box;
-  border-radius: var(--atx-radius-full);
+  border-radius: var(--atx-radius-lg);
   font: 500 14px/1 var(--atx-font-ui);
   white-space: nowrap;
   outline: none;
   transition: background 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
   cursor: pointer;
+}
+
+/* One size down, for a button that is not the point of the surface it sits on:
+   a header's corner action, a row's own control. Smaller in every dimension
+   at once -- height, type, gap and radius -- because a button that only loses
+   height reads as a squashed full-size button rather than as a lesser one. */
+.atx-btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  gap: 4px;
+  border-radius: var(--atx-radius-md);
+  font-size: 12.8px;
+}
+
+/* Icon-only: a square, so the glyph sits in the middle of it rather than in
+   the middle of a label-shaped box that has no label. */
+.atx-btn-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--atx-radius-md);
 }
 
 /* An icon inside a button is sized to the type, not to the button, and sits
@@ -440,7 +706,7 @@ button:disabled,
   padding: 4px 10px;
   box-sizing: border-box;
   border: 1px solid transparent;
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-input-bg);
   color: var(--atx-foreground);
   font: 400 14px/1.45 var(--atx-font-ui);
@@ -515,7 +781,7 @@ input[type='checkbox'] {
   flex: 0 0 auto;
   box-sizing: border-box;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 4px;
   background: var(--atx-input);
   outline: none;
   transition: background 150ms, border-color 150ms, box-shadow 150ms;
@@ -578,7 +844,7 @@ input[type='checkbox']:focus-visible {
   left: 50%;
   transform: translateX(-50%);
   padding: 10px 18px;
-  border-radius: var(--atx-radius-full);
+  border-radius: var(--atx-radius-lg);
   font: 500 14px var(--atx-font-ui);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
   opacity: 0;
@@ -740,7 +1006,7 @@ input[type='checkbox']:focus-visible {
   width: min(320px, 90vw);
   box-sizing: border-box;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-xl);
   background: rgba(0, 0, 0, 0.9);
   color: var(--atx-muted-fg);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
@@ -777,7 +1043,7 @@ input[type='checkbox']:focus-visible {
   height: 24px;
   padding: 0;
   border: none;
-  border-radius: var(--atx-radius-full);
+  border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
   cursor: pointer;
@@ -847,7 +1113,7 @@ input[type='checkbox']:focus-visible {
   align-items: center;
   gap: 5px;
   padding: 3px 10px 3px 0;
-  border-radius: var(--atx-radius-lg);
+  border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
   outline: none;
@@ -1078,7 +1344,7 @@ input[type='checkbox']:focus-visible {
   height: 24px;
   padding: 0;
   border: none;
-  border-radius: var(--atx-radius-lg);
+  border-radius: var(--atx-radius-md);
   background: var(--atx-brand);
   color: var(--atx-foreground);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
@@ -1122,7 +1388,7 @@ input[type='checkbox']:focus-visible {
   width: auto;
   padding: 0 11px;
   border: none;
-  border-radius: var(--atx-radius-full);
+  border-radius: var(--atx-radius-md);
   background: ${BAR_CHIP};
   color: var(--atx-foreground);
   font: 500 13px/1 var(--atx-font-ui);
@@ -1154,7 +1420,7 @@ input[type='checkbox']:focus-visible {
   height: 32px;
   padding: 0 12px;
   border: none;
-  border-radius: var(--atx-radius-xl);
+  border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-foreground);
   font: 500 14px var(--atx-font-ui);
@@ -1200,7 +1466,7 @@ input[type='checkbox']:focus-visible {
   min-width: 220px;
   padding: 6px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: ${hexToRgba(COLOR.glassRaised, 0.97)};
   backdrop-filter: blur(14px);
   color: var(--atx-foreground);
@@ -1244,8 +1510,12 @@ input[type='checkbox']:focus-visible {
    project's config owns, and [data-on] on the error line, which is the only
    part of the stack that is conditionally present. */
 
+/* No margin of its own: distance between fields belongs to the group that
+   holds them (.atx-field-group), so a field is the same object wherever it is
+   mounted and a lone one does not push a gap below itself. */
 .atx-field {
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* A field the project's own config owns. The dim lands on the control, not on
@@ -1327,24 +1597,7 @@ input[type='checkbox']:focus-visible {
   resize: vertical;
 }
 
-/* "+ New" sits in the drawer's title bar rather than its footer, so it is a
-   size down from a footer button. */
-.atx-entry-new {
-  height: 28px;
-  padding: 0 12px;
-  font: 500 13px/1 var(--atx-font-ui);
-}
 
-/* The rule between groups of fields in the entry drawer. */
-.atx-section-label {
-  margin: 24px 0 12px;
-  padding-top: 20px;
-  border-top: 1px solid var(--atx-border);
-  color: var(--atx-muted-fg);
-  font: 500 12px/1 var(--atx-font-ui);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 
 /* == Settings drawer =======================================================
    editors/settings-panel.ts. The option controls themselves come from
@@ -1354,8 +1607,12 @@ input[type='checkbox']:focus-visible {
    and gitignore-warning lines, [data-hidden] on the clear-key button, and
    [data-tone] / [data-mono] on a status word. */
 
+/* A stack of cards under the tab strip, spaced like the entry drawer's. */
 .atx-settings-pane {
-  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
 }
 
 .atx-settings-status,
@@ -1367,7 +1624,7 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-settings-status {
-  margin: 0 0 12px;
+  margin: 0;
 }
 
 .atx-settings-key-status {
@@ -1394,35 +1651,20 @@ input[type='checkbox']:focus-visible {
   display: block;
 }
 
-/* The access key is a secret with its own endpoint, not an option, so it sits
-   below a rule rather than among the controls. It dims whole while the photo
-   source it belongs to is off. */
-.atx-settings-key-section {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--atx-border);
-}
+/* The access key is a secret with its own endpoint, not an option, so it is a
+   card of its own rather than a heading inside the options card. It dims
+   whole while the photo source it belongs to is off. */
 
 .atx-settings-key-section[data-off] {
   opacity: 0.55;
 }
 
-.atx-settings-heading {
-  margin: 0 0 4px;
-  color: var(--atx-foreground);
-  font: 500 14px var(--atx-font-ui);
-}
-
+/* Body size, muted -- a card description that happens to carry a link, so it
+   matches .atx-card-desc rather than being a size down from it. */
 .atx-settings-blurb {
   margin: 0 0 12px;
   color: var(--atx-muted-fg);
-  font: 13px/1.5 var(--atx-font-ui);
-}
-
-/* A tab's own opening line sits a little further from the first control than
-   the key section's does from its field. */
-.atx-settings-pane-blurb {
-  margin: 0 0 14px;
+  font: 400 14px/1.45 var(--atx-font-ui);
 }
 
 .atx-settings-link {
@@ -1450,7 +1692,7 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-settings-key-actions {
-  margin-top: 10px;
+  display: flex;
 }
 
 /* A destructive button pushes itself to the far left of a footer; here it is
@@ -1491,8 +1733,8 @@ input[type='checkbox']:focus-visible {
 .atx-settings-lock {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin: 4px 0 0;
+  gap: 6px;
+  margin: 8px 0 0;
   color: var(--atx-muted-fg);
   font: 12px/1.45 var(--atx-font-ui);
 }
@@ -1510,13 +1752,15 @@ input[type='checkbox']:focus-visible {
   padding-top: 12px;
 }
 
-/* Both list rows are whole-width buttons that read as cards. */
-.atx-collections-row,
+/* The entry rows are whole-width buttons that read as rows in a list. The
+   collection rows come from group.ts::item and only add the pointer. */
 .atx-collections-item {
   display: block;
   width: 100%;
+  margin-bottom: 6px;
+  padding: 9px 12px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-xl);
+  border-radius: var(--atx-radius-md);
   background: var(--atx-card);
   color: var(--atx-foreground);
   text-align: left;
@@ -1524,39 +1768,60 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-collections-row {
-  margin-bottom: 8px;
-  padding: 10px 12px;
+  cursor: pointer;
 }
 
-.atx-collections-item {
-  margin-bottom: 6px;
-  padding: 9px 12px;
+/* Hover moves the surface, the way a menu item and a tree row do. The chevron
+   is the affordance at rest; the fill is the confirmation under the pointer. */
+.atx-collections-row:hover,
+.atx-collections-row:focus-visible {
+  background: var(--atx-accent);
+  outline: none;
 }
 
-.atx-collections-row-name,
+.atx-collections-row:focus-visible {
+  box-shadow: 0 0 0 2px var(--atx-ring);
+}
+
 .atx-collections-item-title {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.atx-collections-row-name {
-  font: 500 14px var(--atx-font-ui);
+/* The row's title comes from group.ts::item, which already sets the type; it
+   only needs room for the badges that sit beside the name. */
+.atx-collections-row .atx-item-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: visible;
 }
 
 .atx-collections-item-title {
   font: 500 13px var(--atx-font-ui);
 }
 
-.atx-collections-row-meta,
 .atx-collections-item-meta,
 .atx-collections-meta {
   color: var(--atx-muted-fg);
   font: 11px var(--atx-font-mono);
 }
 
-.atx-collections-row-meta {
-  margin-top: 3px;
+/* Monospaced, because it is a path and two counts -- data about the row, not
+   prose. Same size as any other item description. */
+.atx-collections-row .atx-item-desc {
+  font-family: var(--atx-font-mono);
+}
+
+/* The chevron is the row's affordance, not an action: muted at rest, and it
+   steps up with the row under the pointer. */
+.atx-collections-row .atx-item-actions {
+  color: var(--atx-muted-fg);
+}
+
+.atx-collections-row:hover .atx-item-actions {
+  color: var(--atx-foreground);
 }
 
 .atx-collections-item-meta {
@@ -1650,7 +1915,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 8px;
   padding: 10px 12px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-xl);
+  border-radius: var(--atx-radius-md);
   background: var(--atx-card);
 }
 
@@ -1685,7 +1950,7 @@ input[type='checkbox']:focus-visible {
   margin-top: 10px;
   padding: 10px 12px;
   border: 1px dashed var(--atx-border);
-  border-radius: var(--atx-radius-xl);
+  border-radius: var(--atx-radius-md);
 }
 
 .atx-collections-addfield > .atx-btn-outline {
@@ -1696,7 +1961,7 @@ input[type='checkbox']:focus-visible {
 .atx-collections-legend {
   padding: 9px 11px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-full);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-background);
   color: var(--atx-muted-fg);
   font: 12px/1.55 var(--atx-font-ui);
@@ -1781,7 +2046,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 8px;
   padding: 8px 12px;
   border: 1px solid var(--atx-brand);
-  border-radius: var(--atx-radius-xl);
+  border-radius: var(--atx-radius-md);
   background: var(--atx-card);
 }
 
@@ -1864,7 +2129,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 10px;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: ${CHECKER(14)};
 }
 
@@ -1908,7 +2173,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 16px;
   padding: 4px 10px;
   border: 1px solid transparent;
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-input-bg);
   color: var(--atx-foreground);
   font: 400 14px/1.45 var(--atx-font-ui);
@@ -1968,7 +2233,7 @@ input[type='checkbox']:focus-visible {
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   outline: none;
   background: ${CHECKER(10)};
   cursor: pointer;
@@ -2010,7 +2275,7 @@ input[type='checkbox']:focus-visible {
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: ${CHECKER(16)};
   cursor: pointer;
 }
@@ -2047,7 +2312,7 @@ input[type='checkbox']:focus-visible {
   padding: 0 14px;
   box-sizing: border-box;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-full);
+  border-radius: var(--atx-radius-lg);
   background: transparent;
   color: var(--atx-foreground);
   font: 500 14px/1 var(--atx-font-ui);
@@ -2109,7 +2374,7 @@ input[type='checkbox']:focus-visible {
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: ${CHECKER(12)};
   outline: 2px solid transparent;
   outline-offset: 2px;
@@ -2186,7 +2451,7 @@ input[type='checkbox']:focus-visible {
   width: 100%;
   aspect-ratio: 4 / 3;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-elevated);
 }
 
@@ -2217,7 +2482,7 @@ input[type='checkbox']:focus-visible {
   padding: 0 12px;
   box-sizing: border-box;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-full);
+  border-radius: var(--atx-radius-lg);
   background: transparent;
   color: var(--atx-foreground);
   font: 500 14px/1 var(--atx-font-ui);
@@ -2347,7 +2612,7 @@ input[type='checkbox']:focus-visible {
   z-index: 2;
   display: none;
   border: 2px dashed var(--atx-primary);
-  border-radius: var(--atx-radius-xl);
+  border-radius: var(--atx-radius-md);
   background: ${hexToRgba(COLOR.primary, 0.18)};
   pointer-events: none;
 }
@@ -2401,7 +2666,7 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 10px;
   overflow: hidden;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: ${CHECKER(12)};
 }
 
@@ -2712,7 +2977,7 @@ input[type='checkbox']:focus-visible {
   padding: 8px 10px;
   overflow-y: auto;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-xl);
+  border-radius: var(--atx-radius-md);
   background: var(--atx-card);
   color: var(--atx-foreground);
   font: 12px var(--atx-font-mono);
@@ -2797,7 +3062,7 @@ input[type='checkbox']:focus-visible {
   gap: 2px;
   padding: 5px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-card);
 }
 
@@ -2809,7 +3074,7 @@ input[type='checkbox']:focus-visible {
   height: 28px;
   padding: 0 8px;
   border: none;
-  border-radius: var(--atx-radius-lg);
+  border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
   font: 500 13px/1 var(--atx-font-ui);
@@ -2880,7 +3145,7 @@ input[type='checkbox']:focus-visible {
   min-width: 150px;
   padding: 4px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-card);
   box-shadow: 0 0 0 1px var(--atx-border), 0 8px 28px rgba(0, 0, 0, 0.4);
 }
@@ -2896,7 +3161,7 @@ input[type='checkbox']:focus-visible {
   width: 100%;
   padding: 6px 10px;
   border: none;
-  border-radius: var(--atx-radius-lg);
+  border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-foreground);
   font: 400 13px var(--atx-font-ui);
@@ -2927,7 +3192,7 @@ input[type='checkbox']:focus-visible {
   margin: 6px 0 0;
   padding: 12px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-2xl);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-background);
 }
 

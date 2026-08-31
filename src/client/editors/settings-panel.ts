@@ -12,6 +12,7 @@ import {
   styled,
   toast,
 } from '../ui.ts';
+import { card, fieldGroup } from '../group.ts';
 import { openDrawer } from './drawer.ts';
 import { applyFieldErrors, buildControl, collectChanges, type FieldControl } from './fields.ts';
 
@@ -119,10 +120,9 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   const error = styled('p', 'atx-settings-error');
 
   // --- the Unsplash key section, which is not an option ----------------------
-  const keySection = styled('div', 'atx-settings-key-section');
-
-  const keyHeading = styled('h3', 'atx-settings-heading');
-  keyHeading.textContent = 'Access key';
+  const keyCard = card({ title: 'Access key' });
+  const keySection = keyCard.root;
+  keySection.classList.add('atx-settings-key-section');
 
   const keyBlurb = styled('p', 'atx-settings-blurb');
   const appsLink = styled('a', 'atx-settings-link');
@@ -159,7 +159,8 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   const keyActions = styled('div', 'atx-settings-key-actions');
   keyActions.append(clearKeyBtn);
 
-  keySection.append(keyHeading, keyBlurb, keyStatus, keyRow, keyHint, keyActions);
+  keyCard.body.append(keyBlurb, keyStatus, keyRow, keyHint);
+  keyCard.foot().append(keyActions);
 
   const warning = styled('p', 'atx-settings-warning');
 
@@ -181,19 +182,25 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
       pane.textContent = '';
       const mine = options.filter((o) => o.group === g.id);
 
-      const blurb = styled('p', 'atx-settings-blurb atx-settings-pane-blurb');
-      blurb.textContent = g.blurb;
-      pane.append(blurb);
-
+      // One card per tab: the group's name and its one-line blurb are the
+      // card's header, so the pane says what it governs instead of opening
+      // with an unattributed sentence above a run of controls.
+      const group = fieldGroup();
       for (const o of mine) {
         const control = buildControl(toFieldDescriptor(o), o.value);
         if (o.locked) control.root.append(lockNote(o));
         controls.push(control);
-        pane.append(control.root);
+        group.append(control.root);
+      }
+      if (mine.length > 0) {
+        const optionCard = card({ title: g.label, description: g.blurb });
+        optionCard.body.append(group);
+        pane.append(optionCard.root);
       }
 
       // The access key belongs to the Unsplash tab but is not an option: it is
-      // a secret with its own endpoint semantics and its own precedence.
+      // a secret with its own endpoint semantics and its own precedence — so
+      // it is a card of its own rather than a heading inside the options one.
       if (g.id === 'unsplash') pane.append(keySection);
     }
 

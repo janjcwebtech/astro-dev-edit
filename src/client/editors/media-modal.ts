@@ -172,7 +172,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
 
     // --- footer --------------------------------------------------------------
     const status = styled('span', 'atx-media-status atx-media-foot-status');
-    const cancelBtn = footButton('Cancel', 'ghost', () => finish(null));
+    const cancelBtn = footButton('Cancel', 'outline', () => finish(null));
     const useBtn = footButton('Use image', 'default', () => void commitSelection());
     foot.append(status, cancelBtn, useBtn);
 

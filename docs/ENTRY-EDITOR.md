@@ -43,7 +43,7 @@ like a CMS would:
   *before* the write (inline per-field errors), and every write is etag-guarded
   — if the file changed on disk since the panel opened, you get a conflict and
   a fresh reload instead of a lost update.
-- **Create** (the `+ New` button — slug auto-suggested from the title, schema
+- **Create** (the **New** button in the drawer's header — slug auto-suggested from the title, schema
   defaults honoured, never overwrites) and **Delete** (confirmed; undo is git).
   New entries take the collection's file extension: the per-collection
   `extension` config wins; otherwise, when every existing entry shares one

@@ -29,6 +29,8 @@ export type IconName =
   | 'spinner'
   | 'alert'
   | 'x'
+  | 'plus'
+  | 'trash'
   | 'chevronRight'
   | 'chevronDown'
   | 'copy'
@@ -62,6 +64,8 @@ const PATHS: Record<IconName, string> = {
   spinner: '<path d="M12 3a9 9 0 1 0 9 9" opacity="0.9"/><path d="M12 3a9 9 0 0 1 9 9" opacity="0.25"/>',
   alert: '<path d="M12 3.5 21.5 20H2.5z"/><path d="M12 9.5v4.5"/><path d="M12 17.2h.01"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  trash: '<path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   chevronRight: '<path d="m9.5 6 6 6-6 6"/>',
   chevronDown: '<path d="m6 9.5 6 6 6-6"/>',
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/>',

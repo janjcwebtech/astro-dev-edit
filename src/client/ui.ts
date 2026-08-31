@@ -254,25 +254,26 @@ export const PAPER = {
 } as const;
 
 /**
- * Corner radii, on shadcn's single-knob scheme: `lg` is the base `--radius`
- * (0.625rem = 10px) and the rest step ±4px from it.
+ * Corner radii, one ladder derived from a single 10px base the way shadcn's
+ * `--radius` is: 0.6x, 0.8x, 1x, 1.4x.
  *
  * Pick by element, not by taste — the ladder only reads as one family if the
- * same kind of thing always takes the same rung. `sm` a tag or swatch, `md` a
- * checkbox or toolbar button, `xl` a menu item, `2xl` a form control, `3xl` a
- * panel, `full` a button or pill.
+ * same kind of thing always takes the same rung:
  *
- * The upper rungs are where the current shadcn look actually lives: a 32px
- * control at `2xl` reads as a capsule rather than a box, and that one choice
- * places the design more than any value in `COLOR` does.
+ * - `sm` (6px) — a swatch, a tag, a checkbox
+ * - `md` (8px) — a small or icon button, a menu item, a tree row, a tab
+ * - `lg` (10px) — a form control and a full-size button; the workhorse rung
+ * - `xl` (14px) — a panel, a drawer, a card, a modal
+ * - `full` — a badge or a status chip, and nothing else
+ *
+ * A button and the field beside it share `lg`, which is what makes a row of
+ * mixed controls line up as one object rather than as parts.
  */
 export const RADIUS = {
   sm: '6px',
   md: '8px',
   lg: '10px',
   xl: '14px',
-  '2xl': '18px',
-  '3xl': '24px',
   full: '999px',
 } as const;
 
@@ -550,6 +551,12 @@ export function buildPanel(
 export interface DrawerOptions {
   /** CSS width; defaults to `min(max(440px, 50vw), 94vw)`. */
   width?: string;
+  /**
+   * A second line under the title, in muted ink — which file is open, which
+   * collection it belongs to. The title says what the drawer is; this says
+   * which one, which is the half that used to be crammed after a `·`.
+   */
+  description?: string;
   /** Offset added to the base `Z`. Defaults to 6, the standard panel layer.
    *  The settings drawer can open *above* the media modal (which sits at 8),
    *  so it needs to ask for a higher one. */
@@ -561,12 +568,22 @@ export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElemen
     ...(opts.width ? { width: opts.width } : {}),
   });
 
+  // A card header, laid out by the stylesheet's grid: name, optional second
+  // line, and an action corner that spans both rows. `[data-actions]` is only
+  // set when a caller fills the slot — see `wireDrawerAction`.
   const bar = styled('div', 'atx-drawer-title');
   const barText = styled('span', 'atx-drawer-title-text');
   barText.textContent = title;
+  bar.append(barText);
+  if (opts.description) {
+    const sub = styled('span', 'atx-drawer-subtitle');
+    sub.textContent = opts.description;
+    sub.title = opts.description;
+    bar.append(sub);
+  }
   const barActions = styled('span', 'atx-drawer-actions');
   barActions.dataset.actions = '';
-  bar.append(barText, barActions);
+  bar.append(barActions);
 
   const body = styled('div', 'atx-drawer-body');
   body.dataset.body = '';
@@ -828,7 +845,7 @@ export function wirePanelButtons(
   opts: { confirmLabel?: string; secondaryLabel?: string; onSecondary?: () => void } = {},
 ): void {
   const foot = panel.querySelector('[data-foot]') as HTMLElement;
-  foot.append(footButton('Cancel', 'ghost', onCancel));
+  foot.append(footButton('Cancel', 'outline', onCancel));
   if (opts.secondaryLabel && opts.onSecondary) {
     foot.append(footButton(opts.secondaryLabel, 'outline', opts.onSecondary));
   }

@@ -19,6 +19,7 @@ import {
   styled,
   toast,
 } from '../ui.ts';
+import { card, item, itemGroup } from '../group.ts';
 import { openDrawer } from './drawer.ts';
 import { openEntryCreatePanel, openEntryPanel } from './entry.ts';
 
@@ -312,17 +313,27 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
 
   function renderList(d: CollectionsResponse): HTMLElement {
     const wrap = styled('div', 'atx-collections-list');
-    wrap.append(
-      blurb(
-        d.configPath
-          ? `Collections declared in ${d.configPath}. Clicking one opens its fields.`
-          : 'This project has no content config, so there are no collections to show. ' +
-              'Create src/content.config.ts to use the designer.',
-      ),
-    );
+
+    // One card: what these are, where they are declared, and — in the corner —
+    // the one action that adds to them. "New" is a header action rather than a
+    // button trailing the list, so it reads as belonging to the collection set
+    // rather than to the last row.
+    const n = d.collections.length;
+    const listCard = card({
+      // The count rather than the word "Collections", which the drawer's own
+      // title already said 30px above this line.
+      title: n === 1 ? '1 collection' : `${n} collections`,
+      description: d.configPath
+        ? `Declared in ${d.configPath}. Open one to edit its fields.`
+        : 'This project has no content config. Create src/content.config.ts to use the designer.',
+      ...(d.configPath && d.schemaEditor
+        ? { action: newCollectionButton(goCreate) }
+        : {}),
+    });
+    wrap.append(listCard.root);
 
     if (!d.schemaEditor) {
-      wrap.append(
+      listCard.body.append(
         note(
           [
             icon('lock', 12),
@@ -336,27 +347,35 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       );
     }
 
+    const list = itemGroup();
     for (const c of d.collections) {
-      const row = styled('button', `atx-collections-row atx-collections-row-${c.name}`);
-      row.type = 'button';
-      const title = styled('div', 'atx-collections-row-name');
-      title.append(textNode(c.name));
-      if (!c.registered) title.append(badge('not registered', 'warn'));
-      if (c.schemaForm === null) title.append(badge('no readable schema', 'muted'));
+      const row = item({
+        title: c.name,
+        description: `${c.dir} · ${c.entryCount} ${c.entryCount === 1 ? 'entry' : 'entries'} · ${c.fields.length} fields`,
+        media: icon('collections', 16),
+        actions: [icon('chevronRight', 16)],
+      });
+      row.root.classList.add('atx-collections-row', `atx-collections-row-${c.name}`);
+      // A row is the whole hit target, so it carries the button semantics
+      // rather than nesting a button that would only cover its label.
+      row.root.role = 'button';
+      row.root.tabIndex = 0;
+      if (!c.registered) row.title.append(badge('not registered', 'warn'));
+      if (c.schemaForm === null) row.title.append(badge('no readable schema', 'muted'));
       if (c.fieldSource === 'source' && c.schemaForm !== null) {
-        title.append(badge('schema not loaded', 'warn'));
+        row.title.append(badge('schema not loaded', 'warn'));
       }
-      if (!c.dirExists) title.append(badge('directory missing', 'warn'));
-      const meta = styled('div', 'atx-collections-row-meta');
-      meta.textContent = `${c.dir} · ${c.entryCount} ${c.entryCount === 1 ? 'entry' : 'entries'} · ${c.fields.length} fields`;
-      row.append(title, meta);
-      row.addEventListener('click', () => goDetail(c.name));
-      wrap.append(row);
+      if (!c.dirExists) row.title.append(badge('directory missing', 'warn'));
+      row.root.addEventListener('click', () => goDetail(c.name));
+      row.root.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          goDetail(c.name);
+        }
+      });
+      list.append(row.root);
     }
-
-    if (d.configPath && d.schemaEditor) {
-      wrap.append(footButton('New collection', 'outline', goCreate));
-    }
+    listCard.body.append(list);
     return wrap;
   }
 
@@ -1129,6 +1148,15 @@ function badge(label: string, tone: Tone): HTMLElement {
   el.dataset.tone = tone;
   el.textContent = label;
   return el;
+}
+
+/** The collection list's corner action: one size down and iconned, the same
+ *  shape the entry drawer's "New" uses, because it is the same kind of thing. */
+function newCollectionButton(onClick: () => void): HTMLButtonElement {
+  const btn = footButton('New', 'outline', onClick);
+  btn.classList.add('atx-btn-sm');
+  btn.prepend(icon('plus', 16));
+  return btn;
 }
 
 function blurb(text: string): HTMLElement {

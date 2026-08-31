@@ -33,6 +33,8 @@ export interface DrawerOpenOptions {
   discardMessage: string;
   /** CSS width override; see `ui.ts::DrawerOptions`. */
   width?: string;
+  /** Second line under the title; see `ui.ts::DrawerOptions`. */
+  description?: string;
   /** Stacking layer. Needed when a drawer opens above something already
    *  raised — the Settings drawer reached from the media modal's "no key
    *  configured" card. */
@@ -52,6 +54,7 @@ export interface DrawerOpenOptions {
 export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell {
   const drawer = buildDrawer(title, {
     ...(opts.width ? { width: opts.width } : {}),
+    ...(opts.description ? { description: opts.description } : {}),
     ...(opts.layer !== undefined ? { layer: opts.layer } : {}),
   });
   const body = drawer.querySelector('[data-body]') as HTMLElement;

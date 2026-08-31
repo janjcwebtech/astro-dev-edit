@@ -46,7 +46,7 @@ The names are the overlay's design tokens, kebab-cased and prefixed.
 | Status | `--atx-destructive`, `--atx-success`, `--atx-success-text`, `--atx-warning`, `--atx-info` |
 | Syntax | `--atx-chart1` … `--atx-chart5` |
 | Translucent surfaces | `--atx-glass`, `--atx-glass-raised` |
-| Radii | `--atx-radius-sm｜md｜lg｜xl｜2xl｜3xl｜full` |
+| Radii | `--atx-radius-sm｜md｜lg｜xl｜full` |
 | Fonts | `--atx-font-ui`, `--atx-font-mono` |
 
 Three of them are worth knowing the intent behind before you change one.
@@ -72,10 +72,12 @@ of the non-text indication a keyboard user gets, so it is 3px and holds 3:1
 against every surface. Raising `--atx-input` into a visible outline is the
 obvious change to make and it is the one that undoes the design.
 
-**Radii are a ladder, and things stay on their rung.** `sm` a tag, `md` a
-checkbox, `xl` a menu item, `2xl` a form control, `3xl` a panel, `full` a
-button. A 32px control at `2xl` reads as a capsule rather than a box, and that
-single choice does more to place the look than any colour here.
+**Radii are a ladder, and things stay on their rung.** `sm` (6px) a swatch or
+a checkbox, `md` (8px) a small button, a menu item or a tab, `lg` (10px) a form
+control *and* a full-size button, `xl` (14px) a panel, drawer or card, and
+`full` a badge — nothing else. A button sharing `lg` with the field beside it is
+what makes a row of mixed controls read as one object; move the button to
+`full` and it separates into a pill parked next to a box.
 
 **`--atx-accent` is hover, not depth.** A menu item resting on `--atx-card` and
 a secondary button resting on `--atx-elevated` both move here under the
