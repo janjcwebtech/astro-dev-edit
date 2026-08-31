@@ -38,7 +38,7 @@ The names are the overlay's design tokens, kebab-cased and prefixed.
 
 | Group | Properties |
 | --- | --- |
-| Surfaces | `--atx-background`, `--atx-card`, `--atx-elevated` |
+| Surfaces | `--atx-background`, `--atx-card`, `--atx-elevated`, `--atx-accent` |
 | Lines and control edges | `--atx-border`, `--atx-input`, `--atx-input-bg`, `--atx-ring` |
 | Ink | `--atx-foreground`, `--atx-muted-fg`, `--atx-faint-fg` |
 | Emphasis | `--atx-primary`, `--atx-primary-fg` |
@@ -46,7 +46,7 @@ The names are the overlay's design tokens, kebab-cased and prefixed.
 | Status | `--atx-destructive`, `--atx-success`, `--atx-success-text`, `--atx-warning`, `--atx-info` |
 | Syntax | `--atx-chart1` … `--atx-chart5` |
 | Translucent surfaces | `--atx-glass`, `--atx-glass-raised` |
-| Radii | `--atx-radius-sm｜md｜lg｜xl｜full` |
+| Radii | `--atx-radius-sm｜md｜lg｜xl｜2xl｜3xl｜full` |
 | Fonts | `--atx-font-ui`, `--atx-font-mono` |
 
 Three of them are worth knowing the intent behind before you change one.
@@ -62,12 +62,24 @@ for a saturated colour costs you that distinction.
 **`--atx-border`, `--atx-input` and `--atx-input-bg` are translucent white**,
 so one value composites correctly on all three surfaces. Replace one with an
 opaque colour and it will be right on the surface you were looking at and wrong
-on the other two. `border` is a separator and sits deliberately below the 3:1
-non-text floor; `input` is the boundary of something you operate and clears it.
+on the other two.
 
-**Fields sit lighter than the panel they are on.** `--atx-input-bg` is a lift,
-not a well — a lighter box reads as a container you can put something in, and a
-darker one reads as a hole punched in the surface.
+**A form control has no border.** `--atx-input` is the *fill* a control is made
+of, not its outline — a field's edge is where that fill stops, and its 1px
+border stays transparent until focus or an invalid value paints it. That is
+also why `--atx-ring` matters more here than it usually would: it is the whole
+of the non-text indication a keyboard user gets, so it is 3px and holds 3:1
+against every surface. Raising `--atx-input` into a visible outline is the
+obvious change to make and it is the one that undoes the design.
+
+**Radii are a ladder, and things stay on their rung.** `sm` a tag, `md` a
+checkbox, `xl` a menu item, `2xl` a form control, `3xl` a panel, `full` a
+button. A 32px control at `2xl` reads as a capsule rather than a box, and that
+single choice does more to place the look than any colour here.
+
+**`--atx-accent` is hover, not depth.** A menu item resting on `--atx-card` and
+a secondary button resting on `--atx-elevated` both move here under the
+pointer. Hover shifts the surface; it never tints it.
 
 Every property is defined on the host, so a value you do not set keeps its
 built-in default, and the palette is contrast-checked as a set — a token you
