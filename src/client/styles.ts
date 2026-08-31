@@ -46,6 +46,18 @@ const BAR_H = 36;
 const CHECK_MASK =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E\") center / contain no-repeat";
 
+/** Lucide's `chevron-down` as a `background-image`, in a colour baked in at
+ *  stylesheet-build time. A select cannot carry a pseudo-element and a mask
+ *  would clip the control itself, so the arrow has to be a background — which
+ *  means it cannot read a custom property, hence the argument. */
+function chevronUrl(color: string): string {
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' ` +
+    `stroke='${color}' stroke-width='2' stroke-linecap='round' ` +
+    `stroke-linejoin='round'><path d='m6 9.5 6 6 6-6'/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
 export function overlayCss(): string {
   return `
 :host {
@@ -65,9 +77,29 @@ ${vars('font-', FONT)}
   font: 400 14px/1.45 var(--atx-font-ui);
   color: var(--atx-foreground);
   cursor: auto;
+  /* Light type on a near-black ground blooms under subpixel rendering, which
+     is what reads as fringed or crunchy. Grayscale antialiasing on both
+     engines, plus kerning and the discretionary pairs, is the whole of it;
+     everything inside the root inherits all four. */
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
   text-align: left;
   direction: ltr;
+}
+
+/* Form controls carry their own UA font reset, so the smoothing and kerning
+   set on :host stop at their boundary and they render a shade crunchier than
+   the prose beside them. Restating the four here is the only way across. */
+input,
+textarea,
+select,
+button {
+  -webkit-font-smoothing: inherit;
+  -moz-osx-font-smoothing: inherit;
+  text-rendering: inherit;
+  font-kerning: inherit;
 }
 
 /* ── Shells ────────────────────────────────────────────────────────────────
@@ -726,15 +758,37 @@ textarea[data-input] {
   resize: vertical;
 }
 
+/* The browser's own dropdown arrow is drawn hard against the right edge, at
+   whatever weight and size the platform picked, so it sits outside our padding
+   and looks nothing like the 16px icons everywhere else in the overlay. We
+   draw our own instead: appearance:none removes theirs, and the chevron is a
+   background image inset 10px from the edge with the text padded clear of it.
+
+   The glyph's colour is baked in from COLOR.mutedFg rather than read from
+   --atx-muted-fg, because a data: URI cannot see a custom property. It is the
+   one token a theme override will not move; it is chrome on a control, not
+   content, so the trade is worth the alignment. */
 select[data-input] {
   height: 32px;
-  padding-right: 8px;
+  padding-right: 32px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: ${chevronUrl(COLOR.mutedFg)};
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px 16px;
   cursor: pointer;
 }
 
-/* The fill is the control, so the fill is what lifts under the pointer. */
+select[data-input]:hover:not(:disabled) {
+  background-image: ${chevronUrl(COLOR.foreground)};
+}
+
+/* The fill is the control, so the fill is what lifts under the pointer.
+   background-color, not the shorthand: the shorthand would drop the chevron a
+   select paints as its background-image. */
 [data-input]:hover:not(:disabled):not(:focus) {
-  background: rgb(255 255 255 / 0.11);
+  background-color: rgb(255 255 255 / 0.11);
 }
 
 [data-input]::placeholder {
@@ -1158,8 +1212,13 @@ input[type='checkbox']:focus-visible {
   cursor: default;
 }
 
+/* The tag is what the row *is*; the preview and the loc are what it happens to
+   contain and where it happens to live. Full-strength ink on the tag against
+   the row's muted default is what makes a long tree scannable by shape -- the
+   angle brackets included, since they are what say "element" at a glance. */
 .atx-tree-tag {
   flex: 0 0 auto;
+  color: var(--atx-foreground);
   font-weight: 600;
 }
 
@@ -1174,8 +1233,9 @@ input[type='checkbox']:focus-visible {
   flex: 0 0 auto;
   margin-left: auto;
   padding-left: 10px;
-  color: var(--atx-muted-fg);
-  font-size: 10px;
+  color: var(--atx-faint-fg);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   text-decoration: underline dotted transparent;
   text-underline-offset: 2px;
   cursor: pointer;
