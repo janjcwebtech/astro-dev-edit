@@ -55,7 +55,7 @@ ${vars('', COLOR)}
 ${vars('radius-', RADIUS)}
 ${vars('font-', FONT)}
 
-  font: 13px/1.4 var(--atx-font-ui);
+  font: 400 14px/1.45 var(--atx-font-ui);
   color: var(--atx-foreground);
   cursor: auto;
   -webkit-font-smoothing: antialiased;
@@ -82,8 +82,11 @@ ${vars('font-', FONT)}
   border-radius: var(--atx-radius-xl);
   background: var(--atx-card);
   color: var(--atx-foreground);
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
-  font: 13px var(--atx-font-ui);
+  /* A hairline separates the surfaces; the shadow only lifts the panel off the
+     page behind it. A heavy drop shadow doing the separating is the single
+     most un-shadcn thing an overlay can do. */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+  font: 400 14px var(--atx-font-ui);
   /* Edit mode sets a crosshair cursor on the whole page; our UI is not a
      click-to-edit surface, so restore normal per-element cursors. */
   cursor: auto;
@@ -100,9 +103,9 @@ ${vars('font-', FONT)}
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--atx-border);
-  font: 600 13px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
 }
 
 .atx-panel-heading {
@@ -114,7 +117,7 @@ ${vars('font-', FONT)}
 }
 
 .atx-panel-body {
-  padding: 16px;
+  padding: 20px;
 }
 
 /* A body whose content brings its own edges — the source peek's code pane
@@ -135,7 +138,7 @@ ${vars('font-', FONT)}
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 16px 20px;
   border-top: 1px solid var(--atx-border);
 }
 
@@ -157,8 +160,8 @@ ${vars('font-', FONT)}
   border-left: 1px solid var(--atx-border);
   background: var(--atx-card);
   color: var(--atx-foreground);
-  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.45);
-  font: 13px var(--atx-font-ui);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.32);
+  font: 400 14px var(--atx-font-ui);
   cursor: auto;
 }
 
@@ -167,9 +170,9 @@ ${vars('font-', FONT)}
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
-  padding: 14px 16px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--atx-border);
-  font: 600 13px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
 }
 
 .atx-drawer-title-text {
@@ -187,7 +190,7 @@ ${vars('font-', FONT)}
 
 .atx-drawer-body {
   flex: 1 1 auto;
-  padding: 16px;
+  padding: 20px;
   overflow-y: auto;
 }
 
@@ -196,7 +199,7 @@ ${vars('font-', FONT)}
   justify-content: flex-end;
   gap: 8px;
   flex: 0 0 auto;
-  padding: 12px 16px;
+  padding: 16px 20px;
   border-top: 1px solid var(--atx-border);
 }
 
@@ -211,26 +214,40 @@ ${vars('font-', FONT)}
    and the roles are already there and already correct. Selected state reads
    aria-selected for the same reason it is set at all — one source of truth
    for "this tab is active", instead of a class shadowing an attribute. */
+/* A segmented control: the strip is the recessed track, and the selected tab
+   is a raised card sitting in it. The alternative — a filled accent on the
+   selected tab — reads as a call to action, which a tab is not. */
 [role='tablist'] {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex: 0 0 auto;
+  padding: 3px;
+  border-radius: var(--atx-radius-lg);
+  background: rgb(255 255 255 / 0.06);
 }
 
 [role='tab'] {
-  padding: 6px 14px;
-  border: 1px solid transparent;
-  border-radius: var(--atx-radius-md);
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 7px;
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 600 12px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
+  white-space: nowrap;
   cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+
+[role='tab']:hover {
+  color: var(--atx-foreground);
 }
 
 [role='tab'][aria-selected='true'] {
-  background: var(--atx-primary);
-  color: var(--atx-primary-fg);
+  background: var(--atx-card);
+  color: var(--atx-foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 [data-tabhost] {
@@ -247,26 +264,52 @@ ${vars('font-', FONT)}
    translucent chrome, [data-dimmed] for a button switched off through
    setButtonEnabled. */
 
-/* Keyed off the variant classes, not off .atx-btn alone. Four leaves
-   (image.ts, media-modal.ts x2, asset-picker.ts) build their own buttons and
-   borrow the atx-btn hook without a variant, and they carry their own box —
-   a bare .atx-btn rule would hand them a radius and a padding they have never
-   had. They join this rule when their own module is converted. */
+/* Every button in the overlay, keyed off the five variant classes. A bare
+   .atx-btn rule cannot be the base: four leaves borrow the atx-btn hook
+   without a variant and carry their own box, and handing them this padding
+   and radius would resize them. */
 .atx-btn-default,
 .atx-btn-secondary,
 .atx-btn-outline,
 .atx-btn-ghost,
 .atx-btn-destructive {
-  padding: 7px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  box-sizing: border-box;
   border-radius: var(--atx-radius-md);
-  font: 600 13px var(--atx-font-ui);
+  font: 500 14px/1 var(--atx-font-ui);
+  white-space: nowrap;
+  outline: none;
+  transition: background 120ms, border-color 120ms, color 120ms, box-shadow 120ms;
   cursor: pointer;
 }
 
+/* An icon inside a button is sized to the type, not to the button. */
+.atx-btn-default > svg,
+.atx-btn-secondary > svg,
+.atx-btn-outline > svg,
+.atx-btn-ghost > svg,
+.atx-btn-destructive > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+/* The one emphatic fill. Near-white with dark ink, because on a near-black
+   overlay the loudest thing available is light rather than hue. */
 .atx-btn-default {
   border: 1px solid transparent;
   background: var(--atx-primary);
   color: var(--atx-primary-fg);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.atx-btn-default:hover:not(:disabled) {
+  background: ${hexToRgba(COLOR.primary, 0.9)};
 }
 
 .atx-btn-secondary {
@@ -275,10 +318,19 @@ ${vars('font-', FONT)}
   color: var(--atx-foreground);
 }
 
+.atx-btn-secondary:hover:not(:disabled) {
+  background: ${lift(COLOR.elevated, 14)};
+}
+
 .atx-btn-outline {
   border: 1px solid var(--atx-input);
   background: transparent;
   color: var(--atx-foreground);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.atx-btn-outline:hover:not(:disabled) {
+  background: var(--atx-elevated);
 }
 
 .atx-btn-ghost {
@@ -287,38 +339,143 @@ ${vars('font-', FONT)}
   color: var(--atx-muted-fg);
 }
 
-/* margin-right: auto pushes a destructive button to the far left of a flex
-   footer, away from the safe actions. */
-.atx-btn-destructive {
-  margin-right: auto;
-  border: 1px solid var(--atx-destructive-border);
-  background: transparent;
-  color: var(--atx-destructive-text);
+.atx-btn-ghost:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--atx-foreground);
 }
 
-/* Not :disabled. A button switched off through setButtonEnabled dims; the
-   several places that set .disabled directly never did, and making them all
-   dim here would be a visual change this conversion is not allowed to make.
-   Whether those two populations should be one is a question for the restyle. */
-[data-dimmed] {
-  opacity: 0.45;
+/* margin-right: auto pushes a destructive button to the far left of a flex
+   footer, away from the safe actions.
+
+   Deliberately an outline where shadcn fills it: a footer that puts a solid
+   red beside the solid confirm button reads as two equal calls to action when
+   only one of them is the thing the user came to do. */
+.atx-btn-destructive {
+  margin-right: auto;
+  border: 1px solid var(--atx-destructive);
+  background: transparent;
+  color: var(--atx-destructive);
+}
+
+.atx-btn-destructive:hover:not(:disabled) {
+  background: ${hexToRgba(COLOR.destructive, 0.12)};
+}
+
+/* One dimmed population, not two. setButtonEnabled dims through [data-dimmed]
+   and a dozen callers set .disabled directly; a button that is off should look
+   off however it got there, or it reads as broken rather than unavailable. */
+[data-dimmed],
+button:disabled,
+[data-input]:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Baseline for text-ish form controls (inputs, textareas, selects).
-   color-scheme: dark makes the browser render native chrome — the date input's
-   calendar-picker icon and popup, number spinners — light against the dark
-   background instead of as a near-invisible dark glyph. */
+/* ── Focus ──────────────────────────────────────────────────────────────────
+   :focus-visible, never :focus — the ring is for the keyboard, and painting it
+   on every mouse click is what makes people turn focus indicators off. The
+   overlay had no focus indicator at all; this is it, and it is the same ring
+   on a button, a field and a tab so there is one thing to recognise. */
+.atx-btn-default:focus-visible,
+.atx-btn-secondary:focus-visible,
+.atx-btn-outline:focus-visible,
+.atx-btn-ghost:focus-visible,
+.atx-btn-destructive:focus-visible,
+[data-input]:focus-visible,
+[role='tab']:focus-visible {
+  border-color: var(--atx-ring);
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.5)};
+}
+
+.atx-btn-destructive:focus-visible {
+  border-color: var(--atx-destructive);
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.destructive, 0.4)};
+}
+
+/* ── Form controls ──────────────────────────────────────────────────────────
+   Inputs, textareas and selects, keyed off [data-input] rather than a class
+   because every caller names its own (atx-field-input, atx-collections-input,
+   atx-settings-key …) and there is no shared class to match.
+
+   A field sits one step *lighter* than the panel it is on. Punching a darker
+   hole in the surface reads as an absence; a lighter box reads as a container
+   you can put something in. color-scheme: dark keeps the browser's own chrome
+   — the date picker's calendar popup, number spinners — light rather than a
+   near-invisible dark glyph on a dark field. */
 [data-input] {
   width: 100%;
-  padding: 6px 8px;
+  min-height: 36px;
+  padding: 0 12px;
   box-sizing: border-box;
   border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-sm);
-  background: var(--atx-background);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-input-bg);
   color: var(--atx-foreground);
-  font: 13px var(--atx-font-ui);
+  font: 400 14px/1.4 var(--atx-font-ui);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  outline: none;
+  transition: border-color 120ms, box-shadow 120ms;
   color-scheme: dark;
+}
+
+textarea[data-input] {
+  min-height: 64px;
+  padding: 8px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+select[data-input] {
+  height: 36px;
+  cursor: pointer;
+}
+
+select[data-input]:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.08);
+}
+
+[data-input]::placeholder {
+  color: var(--atx-muted-fg);
+}
+
+/* The selection inside a field is the loud colour, so a selected run reads as
+   selected against a surface that is itself already light. */
+[data-input]::selection {
+  background: var(--atx-primary);
+  color: var(--atx-primary-fg);
+}
+
+/* Set by fields.ts alongside the error line, so the boundary and the message
+   appear together — and so a screen reader is told, which the red border on
+   its own never did. */
+[data-input][aria-invalid='true'] {
+  border-color: var(--atx-destructive);
+}
+
+[data-input][aria-invalid='true']:focus-visible {
+  border-color: var(--atx-destructive);
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.destructive, 0.4)};
+}
+
+/* Native checkbox, restyled through accent-color rather than rebuilt: the
+   browser draws a near-white box with a dark tick, which is exactly the
+   shadcn checked state, and keeps every keyboard and assistive behaviour. */
+input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: 0 0 auto;
+  /* accent-color paints the *checked* box; color-scheme is what makes the
+     unchecked one dark. Without it the browser draws its light default and an
+     unticked box is a white square sitting in a dark panel. */
+  color-scheme: dark;
+  accent-color: var(--atx-primary);
+  outline-offset: 2px;
+  cursor: pointer;
+}
+
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--atx-ring);
 }
 
 [data-pill] {
@@ -353,9 +510,8 @@ ${vars('font-', FONT)}
   transform: translateX(-50%);
   padding: 10px 16px;
   border-radius: var(--atx-radius-md);
-  color: var(--atx-primary-fg);
-  font: 500 13px var(--atx-font-ui);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  font: 500 14px var(--atx-font-ui);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
   opacity: 0;
   transition: opacity 120ms;
 }
@@ -366,10 +522,12 @@ ${vars('font-', FONT)}
 
 .atx-toast-ok {
   background: var(--atx-success);
+  color: var(--atx-foreground);
 }
 
 .atx-toast-err {
   background: var(--atx-destructive);
+  color: var(--atx-primary-fg);
 }
 
 /* The save veil's rect is measured off a host element, so its geometry is the
@@ -380,16 +538,16 @@ ${vars('font-', FONT)}
   align-items: center;
   justify-content: center;
   border-radius: var(--atx-radius-sm);
-  background: ${hexToRgba(COLOR.primary, 0.12)};
+  background: ${hexToRgba(COLOR.brand, 0.12)};
   pointer-events: all;
 }
 
 .atx-veil-chip {
   padding: 2px 8px;
   border-radius: var(--atx-radius-full);
-  background: var(--atx-primary);
-  color: var(--atx-primary-fg);
-  font: 600 11px system-ui;
+  background: var(--atx-brand);
+  color: var(--atx-foreground);
+  font: 600 11px var(--atx-font-ui);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
@@ -403,9 +561,9 @@ ${vars('font-', FONT)}
   position: fixed;
   z-index: ${Z};
   display: none;
-  border: 2px solid var(--atx-primary);
+  border: 2px solid var(--atx-brand);
   border-radius: var(--atx-radius-sm);
-  background: ${hexToRgba(COLOR.primary, 0.08)};
+  background: ${hexToRgba(COLOR.brand, 0.08)};
   pointer-events: none;
   transition: all 60ms ease-out;
 }
@@ -490,7 +648,7 @@ ${vars('font-', FONT)}
 
 /* Hovering a chip also pops its rules card; that half stays in JS. */
 .atx-tooltip-chip:hover {
-  border-color: var(--atx-primary);
+  border-color: var(--atx-brand);
 }
 
 /* == Element tree ==========================================================
@@ -512,12 +670,12 @@ ${vars('font-', FONT)}
   flex-direction: column;
   width: min(320px, 90vw);
   box-sizing: border-box;
-  border-right: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-lg);
   background: rgba(0, 0, 0, 0.9);
   color: var(--atx-muted-fg);
-  box-shadow: 8px 0 40px rgba(0, 0, 0, 0.35);
-  font: 12px var(--atx-font-mono);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+  font: 400 12px/1.5 var(--atx-font-mono);
   /* Edit mode sets a page-wide crosshair; the panel is not click-to-edit. */
   cursor: auto;
 }
@@ -531,10 +689,10 @@ ${vars('font-', FONT)}
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--atx-border);
   color: var(--atx-foreground);
-  font: 600 12px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
 }
 
 .atx-tree-title-text {
@@ -546,14 +704,19 @@ ${vars('font-', FONT)}
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   border-radius: var(--atx-radius-sm);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--atx-foreground);
+  background: transparent;
+  color: var(--atx-muted-fg);
   cursor: pointer;
+}
+
+.atx-tree-close:hover {
+  background: rgb(255 255 255 / 0.08);
+  color: var(--atx-foreground);
 }
 
 /* The edge tab that reopens the tree. Only meaningful while editing — outside
@@ -575,7 +738,7 @@ ${vars('font-', FONT)}
   border-radius: 0 7px 7px 0;
   background: ${hexToRgba(COLOR.glass, 0.88)};
   backdrop-filter: blur(10px);
-  color: var(--atx-primary-text);
+  color: var(--atx-brand-text);
   box-shadow: 2px 0 14px rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
@@ -599,9 +762,9 @@ ${vars('font-', FONT)}
   position: fixed;
   z-index: ${Z};
   display: none;
-  border: 2px solid var(--atx-primary);
+  border: 2px solid var(--atx-brand);
   border-radius: var(--atx-radius-sm);
-  box-shadow: 0 0 0 2px ${COLOR.primary}44, 0 0 12px ${COLOR.primary}66;
+  box-shadow: 0 0 0 2px ${COLOR.brand}44, 0 0 12px ${COLOR.brand}66;
   pointer-events: none;
 }
 
@@ -614,7 +777,7 @@ ${vars('font-', FONT)}
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 10px 2px 0;
+  padding: 3px 10px 3px 0;
   border-radius: var(--atx-radius-sm);
   background: transparent;
   color: var(--atx-muted-fg);
@@ -624,17 +787,24 @@ ${vars('font-', FONT)}
   cursor: pointer;
 }
 
+/* Surface shift, not a tint — every colour in the tree means "this is where
+   your element is", so hover must not borrow one. */
+.atx-tree-row:hover:not([data-state]) {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--atx-foreground);
+}
+
 /* Hover-active reads as a dashed ring so it never looks like the solid locked
    selection, even when both land on the same row. The brand tint here is one
    of the places the purple keeps its meaning — it points at your page. */
 .atx-tree-row[data-state='active'] {
-  background: ${hexToRgba(COLOR.primary, 0.16)};
-  color: var(--atx-primary-text);
-  outline: 1px dashed var(--atx-primary);
+  background: ${hexToRgba(COLOR.brand, 0.16)};
+  color: var(--atx-brand-text);
+  outline: 1px dashed var(--atx-brand);
 }
 
 .atx-tree-row[data-state='selected'] {
-  background: var(--atx-primary);
+  background: var(--atx-brand);
   color: var(--atx-foreground);
   outline: none;
 }
@@ -677,14 +847,14 @@ ${vars('font-', FONT)}
 }
 
 .atx-tree-loc:hover {
-  color: var(--atx-primary-text);
-  text-decoration-color: var(--atx-primary-text);
+  color: var(--atx-brand-text);
+  text-decoration-color: var(--atx-brand-text);
 }
 
 .atx-tree-empty {
   padding: 14px;
   color: var(--atx-muted-fg);
-  font: 12px var(--atx-font-ui);
+  font: 400 13px var(--atx-font-ui);
 }
 
 /* == Admin bar =============================================================
@@ -714,7 +884,7 @@ ${vars('font-', FONT)}
   background: ${hexToRgba(COLOR.glass, 0.94)};
   backdrop-filter: blur(12px) saturate(1.3);
   color: var(--atx-foreground);
-  font: 500 12px var(--atx-font-ui);
+  font: 500 13px var(--atx-font-ui);
   transform: none;
   opacity: 1;
   pointer-events: auto;
@@ -781,7 +951,7 @@ ${vars('font-', FONT)}
   height: 3px;
   z-index: ${Z + 3};
   display: none;
-  background: linear-gradient(90deg, transparent, ${COLOR.primary}88, transparent);
+  background: linear-gradient(90deg, transparent, ${COLOR.brand}88, transparent);
   pointer-events: none;
 }
 
@@ -803,7 +973,7 @@ ${vars('font-', FONT)}
   transform: translateX(-50%);
   width: 54px;
   height: 3px;
-  background: var(--atx-primary);
+  background: var(--atx-brand);
 }
 
 .atx-hairline[data-edge='top'] .atx-hairline-nub {
@@ -840,14 +1010,14 @@ ${vars('font-', FONT)}
   padding: 0;
   border: none;
   border-radius: var(--atx-radius-md);
-  background: var(--atx-primary);
+  background: var(--atx-brand);
   color: var(--atx-foreground);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   cursor: pointer;
 }
 
 .atx-bar-brand:hover {
-  background: ${lift(COLOR.primary)};
+  background: ${lift(COLOR.brand)};
 }
 
 .atx-bar-sep {
@@ -879,22 +1049,28 @@ ${vars('font-', FONT)}
   justify-content: center;
   gap: 6px;
   flex: 0 0 auto;
-  height: 24px;
+  height: 26px;
   width: auto;
-  padding: 0 10px;
+  padding: 0 11px;
   border: none;
   border-radius: var(--atx-radius-md);
   background: ${BAR_CHIP};
   color: var(--atx-foreground);
-  font: 600 12px/1 var(--atx-font-ui);
+  font: 500 13px/1 var(--atx-font-ui);
   white-space: nowrap;
+  outline: none;
   cursor: pointer;
   transition: background 120ms, color 120ms;
 }
 
 .atx-bar-btn-icon {
-  width: 26px;
+  width: 28px;
   padding: 0;
+}
+
+.atx-bar-btn:focus-visible,
+.atx-menu-item:focus-visible {
+  box-shadow: 0 0 0 2px ${hexToRgba(COLOR.ring, 0.7)};
 }
 
 .atx-bar-btn:hover:not(:disabled) {
@@ -906,30 +1082,35 @@ ${vars('font-', FONT)}
   align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 7px 9px;
+  height: 32px;
+  padding: 0 10px;
   border: none;
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-sm);
   background: transparent;
   color: var(--atx-foreground);
-  font: 500 12.5px var(--atx-font-ui);
+  font: 500 13px var(--atx-font-ui);
   text-align: left;
+  outline: none;
   cursor: pointer;
 }
 
+/* Hover shifts the surface; it does not tint it. A hue on hover competes with
+   the one colour that is supposed to mean something. */
 .atx-menu-item:hover:not(:disabled) {
-  background: ${COLOR.primary}38;
+  background: rgb(255 255 255 / 0.08);
 }
 
-/* An item whose feature is currently on. */
+/* An item whose feature is currently on. Near-white with dark ink — the same
+   emphasis the confirm button gets, and for the same reason. */
 .atx-bar-btn[data-active],
 .atx-menu-item[data-active] {
   background: var(--atx-primary);
-  color: var(--atx-foreground);
+  color: var(--atx-primary-fg);
 }
 
 .atx-bar-btn[data-active]:hover:not(:disabled),
 .atx-menu-item[data-active]:hover:not(:disabled) {
-  background: ${lift(COLOR.primary)};
+  background: ${hexToRgba(COLOR.primary, 0.9)};
 }
 
 .atx-bar-btn[data-off],
@@ -947,15 +1128,15 @@ ${vars('font-', FONT)}
   z-index: ${Z + 4};
   display: none;
   flex-direction: column;
-  min-width: 208px;
-  padding: 5px;
+  min-width: 216px;
+  padding: 6px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-lg);
   background: ${hexToRgba(COLOR.glassRaised, 0.97)};
   backdrop-filter: blur(14px);
   color: var(--atx-foreground);
-  font: 500 12.5px var(--atx-font-ui);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5);
+  font: 500 13px var(--atx-font-ui);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
   cursor: auto;
 }
 
@@ -972,8 +1153,8 @@ ${vars('font-', FONT)}
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 5px 4px 0;
-  padding-top: 7px;
+  margin: 6px 4px 0;
+  padding-top: 8px;
   border-top: 1px solid var(--atx-border);
   color: var(--atx-faint-fg);
   font: 500 10.5px var(--atx-font-mono);
@@ -995,32 +1176,33 @@ ${vars('font-', FONT)}
    part of the stack that is conditionally present. */
 
 .atx-field {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .atx-field[data-locked] {
   opacity: 0.55;
 }
 
+/* Full opacity, not a dimmed foreground: a label is read, and dimming it was
+   doing the job that a second ink tier does properly. */
 .atx-field-label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   color: var(--atx-foreground);
-  font: 600 12px system-ui;
-  opacity: 0.85;
+  font: 500 14px/1 var(--atx-font-ui);
 }
 
 .atx-field-help {
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--atx-muted-fg);
-  font: 11px/1.45 system-ui;
+  font: 400 12px/1.45 var(--atx-font-ui);
 }
 
 .atx-field-error {
   display: none;
-  margin-top: 3px;
-  color: var(--atx-destructive-text);
-  font: 12px system-ui;
+  margin-top: 6px;
+  color: var(--atx-destructive);
+  font: 400 12px/1.45 var(--atx-font-ui);
 }
 
 .atx-field-error[data-on] {
@@ -1031,8 +1213,9 @@ ${vars('font-', FONT)}
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 36px;
   color: var(--atx-foreground);
-  font: 13px system-ui;
+  font: 400 14px var(--atx-font-ui);
   cursor: pointer;
 }
 
@@ -1045,16 +1228,20 @@ ${vars('font-', FONT)}
   cursor: pointer;
 }
 
+/* field-sizing grows the box with the prose in it, which is what a excerpt or
+   a description wants; min-height is the floor for browsers without it, so the
+   fallback is a fixed textarea rather than a collapsed one. */
 .atx-field-textarea {
   min-height: 64px;
-  resize: vertical;
+  field-sizing: content;
+  max-height: 40vh;
 }
 
 /* A shape the panel cannot edit: read-only, monospaced, and dimmed so it
    reads as a report of the file rather than as an input. */
 .atx-field-json {
   min-height: 48px;
-  font: 12px var(--atx-font-mono);
+  font: 400 12px/1.5 var(--atx-font-mono);
   opacity: 0.6;
   resize: vertical;
 }
@@ -1062,17 +1249,20 @@ ${vars('font-', FONT)}
 /* "+ New" sits in the drawer's title bar rather than its footer, so it is a
    size down from a footer button. */
 .atx-entry-new {
-  padding: 4px 10px;
-  font: 600 12px system-ui;
+  height: 28px;
+  padding: 0 12px;
+  font: 500 13px var(--atx-font-ui);
 }
 
 /* The rule between groups of fields in the entry drawer. */
 .atx-section-label {
-  margin: 16px 0 6px;
-  padding-top: 12px;
+  margin: 24px 0 12px;
+  padding-top: 20px;
   border-top: 1px solid var(--atx-border);
-  font: 600 12px system-ui;
-  opacity: 0.85;
+  color: var(--atx-muted-fg);
+  font: 500 12px/1 var(--atx-font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* == Settings drawer =======================================================
@@ -1092,7 +1282,7 @@ ${vars('font-', FONT)}
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 12px system-ui;
+  font: 12px var(--atx-font-ui);
 }
 
 .atx-settings-status {
@@ -1108,14 +1298,14 @@ ${vars('font-', FONT)}
   display: none;
   margin: 10px 0 0;
   color: var(--atx-warning);
-  font: 12px/1.5 system-ui;
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 .atx-settings-warning {
   display: none;
   margin: 12px 0 0;
   color: var(--atx-warning);
-  font: 11px/1.5 system-ui;
+  font: 11px/1.5 var(--atx-font-ui);
 }
 
 .atx-settings-error[data-on],
@@ -1139,13 +1329,13 @@ ${vars('font-', FONT)}
 .atx-settings-heading {
   margin: 0 0 4px;
   color: var(--atx-foreground);
-  font: 600 13px system-ui;
+  font: 600 13px var(--atx-font-ui);
 }
 
 .atx-settings-blurb {
   margin: 0 0 12px;
   color: var(--atx-muted-fg);
-  font: 12px/1.5 system-ui;
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 /* A tab's own opening line sits a little further from the first control than
@@ -1155,13 +1345,13 @@ ${vars('font-', FONT)}
 }
 
 .atx-settings-link {
-  color: var(--atx-primary-text);
+  color: var(--atx-brand-text);
 }
 
 .atx-settings-hint {
   margin: 8px 0 0;
   color: var(--atx-muted-fg);
-  font: 11px/1.5 system-ui;
+  font: 11px/1.5 var(--atx-font-ui);
 }
 
 .atx-settings-row {
@@ -1193,7 +1383,7 @@ ${vars('font-', FONT)}
 }
 
 .atx-settings-text {
-  font: 12px system-ui;
+  font: 12px var(--atx-font-ui);
 }
 
 .atx-settings-text[data-tone='muted'] {
@@ -1220,7 +1410,7 @@ ${vars('font-', FONT)}
   gap: 4px;
   margin: 4px 0 0;
   color: var(--atx-muted-fg);
-  font: 11px/1.45 system-ui;
+  font: 11px/1.45 var(--atx-font-ui);
 }
 
 /* == Collections drawer ====================================================
@@ -1267,11 +1457,11 @@ ${vars('font-', FONT)}
 }
 
 .atx-collections-row-name {
-  font: 600 13px system-ui;
+  font: 600 13px var(--atx-font-ui);
 }
 
 .atx-collections-item-title {
-  font: 600 12px system-ui;
+  font: 600 12px var(--atx-font-ui);
 }
 
 .atx-collections-row-meta,
@@ -1324,7 +1514,7 @@ ${vars('font-', FONT)}
 
 .atx-collections-title {
   color: var(--atx-foreground);
-  font: 600 14px system-ui;
+  font: 600 14px var(--atx-font-ui);
 }
 
 .atx-collections-spacer {
@@ -1334,7 +1524,7 @@ ${vars('font-', FONT)}
 .atx-collections-itemcount {
   flex: 1 1 auto;
   color: var(--atx-muted-fg);
-  font: 12px system-ui;
+  font: 12px var(--atx-font-ui);
 }
 
 .atx-collections-fields {
@@ -1349,7 +1539,7 @@ ${vars('font-', FONT)}
   display: none;
   margin: 10px 0 0;
   color: var(--atx-warning);
-  font: 12px/1.5 system-ui;
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 .atx-collections-error[data-on] {
@@ -1425,7 +1615,7 @@ ${vars('font-', FONT)}
   border-radius: var(--atx-radius-md);
   background: var(--atx-background);
   color: var(--atx-muted-fg);
-  font: 11px/1.55 system-ui;
+  font: 11px/1.55 var(--atx-font-ui);
 }
 
 /* The colour is repeated from the wrapper rather than inherited: a host page's
@@ -1453,7 +1643,7 @@ ${vars('font-', FONT)}
 .atx-collections-caption {
   margin-bottom: 4px;
   color: var(--atx-muted-fg);
-  font: 600 10px system-ui;
+  font: 600 10px var(--atx-font-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1464,7 +1654,7 @@ ${vars('font-', FONT)}
   gap: 8px;
   margin: 0 0 6px;
   color: var(--atx-muted-fg);
-  font: 12px system-ui;
+  font: 12px var(--atx-font-ui);
 }
 
 /* Options belong to a select field and to nothing else. */
@@ -1495,7 +1685,7 @@ ${vars('font-', FONT)}
 
 .atx-collections-check-hint {
   color: var(--atx-muted-fg);
-  font: 12px system-ui;
+  font: 12px var(--atx-font-ui);
 }
 
 /* A field typed into the add form but not yet written. Outlined in the brand
@@ -1506,7 +1696,7 @@ ${vars('font-', FONT)}
   gap: 8px;
   margin-bottom: 8px;
   padding: 8px 12px;
-  border: 1px solid var(--atx-primary);
+  border: 1px solid var(--atx-brand);
   border-radius: var(--atx-radius-md);
   background: var(--atx-card);
 }
@@ -1519,7 +1709,7 @@ ${vars('font-', FONT)}
 .atx-collections-new-meta {
   flex: 1 1 auto;
   color: var(--atx-muted-fg);
-  font: 11px system-ui;
+  font: 11px var(--atx-font-ui);
 }
 
 .atx-collections-back {
@@ -1529,8 +1719,8 @@ ${vars('font-', FONT)}
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--atx-primary-text);
-  font: 12px system-ui;
+  color: var(--atx-brand-text);
+  font: 12px var(--atx-font-ui);
   cursor: pointer;
 }
 
@@ -1541,13 +1731,13 @@ ${vars('font-', FONT)}
 .atx-collections-badge {
   padding: 1px 6px;
   border-radius: var(--atx-radius-full);
-  font: 10px system-ui;
+  font: 10px var(--atx-font-ui);
 }
 
 .atx-collections-blurb {
   margin: 0 0 12px;
   color: var(--atx-muted-fg);
-  font: 12px/1.5 system-ui;
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 .atx-collections-note {
@@ -1555,7 +1745,7 @@ ${vars('font-', FONT)}
   align-items: flex-start;
   gap: 5px;
   margin: 0 0 10px;
-  font: 11px/1.5 system-ui;
+  font: 11px/1.5 var(--atx-font-ui);
 }
 
 .atx-collections-badge[data-tone='warn'],
@@ -1615,26 +1805,37 @@ ${vars('font-', FONT)}
 .atx-note {
   margin: 0 0 12px;
   color: var(--atx-warning);
-  font: 12px/1.5 system-ui;
+  font: 400 13px/1.5 var(--atx-font-ui);
 }
 
 .atx-alt-label {
   display: block;
-  margin-bottom: 4px;
-  font: 600 12px system-ui;
-  opacity: 0.8;
+  margin-bottom: 6px;
+  color: var(--atx-foreground);
+  font: 500 14px/1 var(--atx-font-ui);
 }
 
+/* Hand-built rather than via inputEl, so it carries the control baseline
+   itself. Keep it in step with [data-input]. */
 .atx-alt-input {
   width: 100%;
+  min-height: 36px;
   box-sizing: border-box;
-  margin-bottom: 12px;
-  padding: 6px 8px;
+  margin-bottom: 16px;
+  padding: 0 12px;
   border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-sm);
-  background: var(--atx-background);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-input-bg);
   color: var(--atx-foreground);
-  font: 13px var(--atx-font-ui);
+  font: 400 14px/1.4 var(--atx-font-ui);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  outline: none;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+
+.atx-alt-input:focus-visible {
+  border-color: var(--atx-ring);
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.5)};
 }
 
 /* Alt text that comes from an expression: readable, but not yours to type in. */
@@ -1653,9 +1854,9 @@ ${vars('font-', FONT)}
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin: 0 0 6px;
-  font: 600 12px system-ui;
-  opacity: 0.8;
+  margin: 0 0 8px;
+  color: var(--atx-foreground);
+  font: 500 14px/1 var(--atx-font-ui);
 }
 
 /* The strip is a convenience; if its listing fails it goes away quietly and
@@ -1669,9 +1870,13 @@ ${vars('font-', FONT)}
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--atx-primary-text);
-  font: 600 12px system-ui;
+  color: var(--atx-muted-fg);
+  font: 500 13px var(--atx-font-ui);
   cursor: pointer;
+}
+
+.atx-image-browse-all:hover {
+  color: var(--atx-foreground);
 }
 
 .atx-image-recent {
@@ -1735,7 +1940,7 @@ ${vars('font-', FONT)}
 
 .atx-image-field-empty {
   color: var(--atx-muted-fg);
-  font: 12px system-ui;
+  font: 400 13px var(--atx-font-ui);
   pointer-events: none;
 }
 
@@ -1751,20 +1956,36 @@ ${vars('font-', FONT)}
   font: 12px var(--atx-font-mono);
 }
 
+/* Sits beside the path field in a flex row, so it takes the field's height
+   rather than a button's own. */
 .atx-image-field-browse {
   flex: 0 0 auto;
-  padding: 6px 10px;
+  height: 36px;
+  padding: 0 14px;
+  box-sizing: border-box;
   border: 1px solid var(--atx-input);
   border-radius: var(--atx-radius-md);
   background: transparent;
-  color: var(--atx-muted-fg);
-  font: 600 12px system-ui;
+  color: var(--atx-foreground);
+  font: 500 14px/1 var(--atx-font-ui);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  outline: none;
+  transition: background 120ms, border-color 120ms, box-shadow 120ms;
   cursor: pointer;
 }
 
+.atx-image-field-browse:hover {
+  background: var(--atx-elevated);
+}
+
+.atx-image-field-browse:focus-visible {
+  border-color: var(--atx-ring);
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.5)};
+}
+
 .atx-image-field-hint {
-  font: 11px var(--atx-font-mono);
-  opacity: 0.6;
+  color: var(--atx-muted-fg);
+  font: 400 12px var(--atx-font-mono);
 }
 
 /* == Media grid ============================================================
@@ -1840,7 +2061,7 @@ ${vars('font-', FONT)}
   width: 100%;
   height: 100%;
   color: var(--atx-faint-fg);
-  font: 18px system-ui;
+  font: 18px var(--atx-font-ui);
 }
 
 .atx-media-fallback[data-on] {
@@ -1858,8 +2079,8 @@ ${vars('font-', FONT)}
   height: 20px;
   border-radius: 50%;
   background: var(--atx-primary);
-  color: var(--atx-foreground);
-  font: 700 12px system-ui;
+  color: var(--atx-primary-fg);
+  font: 700 12px var(--atx-font-ui);
   pointer-events: none;
 }
 
@@ -1875,7 +2096,7 @@ ${vars('font-', FONT)}
   border-radius: var(--atx-radius-sm);
   background: rgba(0, 0, 0, 0.7);
   color: var(--atx-foreground);
-  font: 600 10px system-ui;
+  font: 600 10px var(--atx-font-ui);
   pointer-events: none;
 }
 
@@ -1899,7 +2120,7 @@ ${vars('font-', FONT)}
   grid-column: 1 / -1;
   padding: 28px 12px;
   color: var(--atx-muted-fg);
-  font: 13px/1.6 system-ui;
+  font: 13px/1.6 var(--atx-font-ui);
   text-align: center;
 }
 
@@ -1911,7 +2132,7 @@ ${vars('font-', FONT)}
   border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 600 12px system-ui;
+  font: 600 12px var(--atx-font-ui);
   cursor: pointer;
 }
 
@@ -1927,11 +2148,11 @@ ${vars('font-', FONT)}
 /* A credit is prose, not a filename. It is permanently visible rather than
    revealed on hover: that is what the API guidelines ask for. */
 .atx-media-cap[data-credit] {
-  font: 11px/1.4 system-ui;
+  font: 11px/1.4 var(--atx-font-ui);
 }
 
 .atx-unsplash-credit {
-  color: var(--atx-primary-text);
+  color: var(--atx-brand-text);
 }
 
 /* == Media modal ===========================================================
@@ -1966,7 +2187,7 @@ ${vars('font-', FONT)}
   border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 600 12px system-ui;
+  font: 600 12px var(--atx-font-ui);
   cursor: pointer;
 }
 
@@ -2009,7 +2230,7 @@ ${vars('font-', FONT)}
   grid-column: auto;
   margin-right: auto;
   padding: 0;
-  font: 12px system-ui;
+  font: 12px var(--atx-font-ui);
   text-align: left;
 }
 
@@ -2050,7 +2271,7 @@ ${vars('font-', FONT)}
   border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 600 12px system-ui;
+  font: 600 12px var(--atx-font-ui);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -2064,7 +2285,7 @@ ${vars('font-', FONT)}
 .atx-unsplash-width {
   flex: 0 0 auto;
   width: auto;
-  font: 12px system-ui;
+  font: 12px var(--atx-font-ui);
 }
 
 /* --- the detail rail --- */
@@ -2072,7 +2293,7 @@ ${vars('font-', FONT)}
 .atx-media-rail-empty {
   margin: 0;
   color: var(--atx-muted-fg);
-  font: 12px/1.6 system-ui;
+  font: 12px/1.6 var(--atx-font-ui);
 }
 
 .atx-media-rail-preview {
@@ -2096,7 +2317,7 @@ ${vars('font-', FONT)}
   margin: 0 0 8px;
   overflow: hidden;
   color: var(--atx-foreground);
-  font: 600 13px system-ui;
+  font: 600 13px var(--atx-font-ui);
   text-overflow: ellipsis;
 }
 
@@ -2107,7 +2328,7 @@ ${vars('font-', FONT)}
 .atx-media-rail-key {
   display: block;
   color: var(--atx-muted-fg);
-  font: 600 10px system-ui;
+  font: 600 10px var(--atx-font-ui);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -2120,8 +2341,8 @@ ${vars('font-', FONT)}
 }
 
 .atx-media-rail-link {
-  color: var(--atx-primary-text);
-  font: 12px/1.5 system-ui;
+  color: var(--atx-brand-text);
+  font: 12px/1.5 var(--atx-font-ui);
   word-break: normal;
 }
 
@@ -2148,26 +2369,26 @@ ${vars('font-', FONT)}
   border: none;
   background: transparent;
   color: var(--atx-foreground);
-  font: 13px system-ui;
+  font: 13px var(--atx-font-ui);
   outline: none;
 }
 
 .atx-media-error-more {
   margin-left: 10px;
   color: var(--atx-warning);
-  font: 12px system-ui;
+  font: 12px var(--atx-font-ui);
 }
 
 .atx-media-error-title {
   margin: 0 0 6px;
   color: var(--atx-foreground);
-  font: 600 13px system-ui;
+  font: 600 13px var(--atx-font-ui);
 }
 
 .atx-media-error-detail {
   margin: 0 0 12px;
   color: var(--atx-muted-fg);
-  font: 12px/1.6 system-ui;
+  font: 12px/1.6 var(--atx-font-ui);
 }
 
 /* The only button inside a full-width grid message, so it centres itself. */
@@ -2209,7 +2430,7 @@ ${vars('font-', FONT)}
 .atx-copy-note {
   margin: 0 0 10px;
   color: var(--atx-warning);
-  font: 13px/1.5 system-ui;
+  font: 13px/1.5 var(--atx-font-ui);
 }
 
 .atx-copy-text {
@@ -2222,7 +2443,7 @@ ${vars('font-', FONT)}
 .atx-notice-reason {
   margin: 0 0 6px;
   color: var(--atx-foreground);
-  font: 13px/1.5 system-ui;
+  font: 13px/1.5 var(--atx-font-ui);
 }
 
 /* The location line opens the source peek, so it reads as a link. */
@@ -2239,15 +2460,15 @@ ${vars('font-', FONT)}
 
 .atx-notice-hint {
   margin: 0 0 4px;
-  color: var(--atx-primary-text);
-  font: 13px/1.5 system-ui;
+  color: var(--atx-brand-text);
+  font: 13px/1.5 var(--atx-font-ui);
 }
 
 .atx-popup-label {
   display: block;
   margin-bottom: 4px;
   color: var(--atx-foreground);
-  font: 600 12px system-ui;
+  font: 600 12px var(--atx-font-ui);
   opacity: 0.8;
 }
 
@@ -2255,7 +2476,7 @@ ${vars('font-', FONT)}
   width: 100%;
   min-height: 120px;
   box-sizing: border-box;
-  font: 13px/1.6 system-ui;
+  font: 13px/1.6 var(--atx-font-ui);
   white-space: pre-wrap;
   resize: vertical;
 }
@@ -2267,8 +2488,8 @@ ${vars('font-', FONT)}
 .atx-popup-error {
   display: none;
   margin: 10px 0 0;
-  color: var(--atx-destructive-text);
-  font: 12px/1.5 system-ui;
+  color: var(--atx-destructive);
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 .atx-popup-error[data-on] {
@@ -2286,7 +2507,7 @@ ${vars('font-', FONT)}
 .atx-markup-hint {
   margin-right: 2px;
   color: var(--atx-muted-fg);
-  font: 11px/1.5 system-ui;
+  font: 11px/1.5 var(--atx-font-ui);
 }
 
 .atx-markup-tag {
@@ -2327,8 +2548,8 @@ ${vars('font-', FONT)}
 }
 
 .atx-peek-focus {
-  border-left-color: var(--atx-primary);
-  background: ${hexToRgba(COLOR.primary, 0.16)};
+  border-left-color: var(--atx-brand);
+  background: ${hexToRgba(COLOR.brand, 0.16)};
 }
 
 .atx-peek-gutter {
@@ -2340,7 +2561,7 @@ ${vars('font-', FONT)}
 }
 
 .atx-peek-focus .atx-peek-gutter {
-  color: var(--atx-primary-text);
+  color: var(--atx-brand-text);
 }
 
 .atx-peek-text {
@@ -2364,7 +2585,7 @@ ${vars('font-', FONT)}
 }
 
 .atx-peek-loading[data-tone='err'] {
-  color: var(--atx-destructive-text);
+  color: var(--atx-destructive);
 }
 
 /* Code token colours on the panel's dark ground. Chosen for contrast, not to
@@ -2373,9 +2594,9 @@ ${vars('font-', FONT)}
 .atx-peek-token[data-token='plain'] { color: var(--atx-foreground); }
 .atx-peek-token[data-token='comment'] { color: var(--atx-muted-fg); font-style: italic; }
 .atx-peek-token[data-token='string'] { color: var(--atx-success-text); }
-.atx-peek-token[data-token='tag'] { color: var(--atx-primary-text); }
-.atx-peek-token[data-token='attr'] { color: var(--atx-primary-text); }
-.atx-peek-token[data-token='keyword'] { color: var(--atx-destructive-text); }
+.atx-peek-token[data-token='tag'] { color: var(--atx-brand-text); }
+.atx-peek-token[data-token='attr'] { color: var(--atx-brand-text); }
+.atx-peek-token[data-token='keyword'] { color: var(--atx-destructive); }
 .atx-peek-token[data-token='number'] { color: var(--atx-warning); }
 .atx-peek-token[data-token='fence'] { color: var(--atx-muted-fg); }
 
@@ -2416,7 +2637,7 @@ ${vars('font-', FONT)}
 }
 
 .atx-tooltip-rule-sel {
-  color: var(--atx-primary-text);
+  color: var(--atx-brand-text);
   word-break: break-all;
 }
 
@@ -2474,23 +2695,32 @@ ${vars('font-', FONT)}
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1px;
-  padding: 4px;
+  gap: 2px;
+  padding: 5px;
   border: 1px solid var(--atx-border);
   border-radius: var(--atx-radius-md);
   background: var(--atx-card);
 }
 
 .atx-rte-btn {
-  min-width: 28px;
-  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
   border: none;
   border-radius: var(--atx-radius-sm);
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 600 12px var(--atx-font-ui);
-  line-height: 1;
+  font: 500 13px/1 var(--atx-font-ui);
+  outline: none;
+  transition: background 120ms, color 120ms;
   cursor: pointer;
+}
+
+.atx-rte-btn:focus-visible {
+  box-shadow: 0 0 0 2px ${hexToRgba(COLOR.ring, 0.7)};
 }
 
 /* Each button wears what it does. */
@@ -2515,11 +2745,13 @@ ${vars('font-', FONT)}
   font: 700 13px var(--atx-font-mono);
 }
 
-/* The MD/Rich toggle is the only thing on the right of the toolbar. */
+/* The MD/Rich toggle is the only thing on the right of the toolbar. It is the
+   editor talking about itself, so it stays neutral. */
 .atx-rte-mode {
   margin-left: auto;
-  color: var(--atx-primary-text);
-  font: 700 11px var(--atx-font-mono);
+  color: var(--atx-muted-fg);
+  font: 600 11px var(--atx-font-mono);
+  letter-spacing: 0.04em;
 }
 
 .atx-rte-divider {
@@ -2549,9 +2781,9 @@ ${vars('font-', FONT)}
   min-width: 150px;
   padding: 4px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-card);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
 }
 
 .atx-rte-heading-menu[data-on] {
@@ -2575,7 +2807,8 @@ ${vars('font-', FONT)}
 
 .atx-rte-btn:hover,
 .atx-rte-heading-item:hover {
-  background: var(--atx-border);
+  background: rgb(255 255 255 / 0.08);
+  color: var(--atx-foreground);
 }
 
 .atx-rte-heading-chip {
@@ -2605,10 +2838,9 @@ ${vars('font-', FONT)}
 
 .atx-rte-image-alt-label {
   display: block;
-  margin: 8px 0 4px;
+  margin: 10px 0 6px;
   color: var(--atx-foreground);
-  font: 600 11px var(--atx-font-ui);
-  opacity: 0.85;
+  font: 500 14px/1 var(--atx-font-ui);
 }
 
 .atx-rte-image-actions {
@@ -2620,8 +2852,9 @@ ${vars('font-', FONT)}
 
 /* Smaller than a footer button: these sit inside a panel inside a toolbar. */
 .atx-rte-image-btn {
-  padding: 4px 10px;
-  font: 600 12px var(--atx-font-ui);
+  height: 30px;
+  padding: 0 12px;
+  font: 500 13px/1 var(--atx-font-ui);
 }
 
 .atx-rte-image-btn.atx-btn-outline {
@@ -2632,7 +2865,8 @@ ${vars('font-', FONT)}
 .atx-body-input {
   display: none;
   min-height: 40vh;
-  font: 12px/1.5 var(--atx-font-mono);
+  padding: 12px;
+  font: 400 13px/1.6 var(--atx-font-mono);
   resize: vertical;
 }
 

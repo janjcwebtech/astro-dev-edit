@@ -108,7 +108,6 @@ const HOT_ZONE = 4;
 const RETRACT_DELAY = 350;
 /** The save button's label while writing — reads as busy without dropping below
  *  AA on the button's own hover background (white at 0.20 over the bar). */
-const SAVING_INK = COLOR.mutedFg;
 
 const PHASE_LABEL: Record<state.SavePhase, string> = {
   clean: 'Done',
@@ -131,12 +130,18 @@ const PHASE_TITLE: Record<state.SavePhase, string> = {
   saved: 'Written to disk',
   error: 'The last save failed and the change was rolled back — click to leave edit mode',
 };
-const PHASE_BG: Record<state.SavePhase, string> = {
-  clean: COLOR.success,
-  dirty: COLOR.primary,
-  saving: BAR_CHIP,
-  saved: COLOR.success,
-  error: COLOR.destructive,
+/**
+ * The save chip paints itself, so it carries its own ink as well as its own
+ * fill: `success` is a dark green that needs light ink, while `primary` and
+ * `destructive` are both *light* fills that need dark ink. One shared
+ * foreground across all five would be illegible on two of them.
+ */
+const PHASE_PAINT: Record<state.SavePhase, { bg: string; ink: string }> = {
+  clean: { bg: COLOR.success, ink: COLOR.foreground },
+  dirty: { bg: COLOR.primary, ink: COLOR.primaryFg },
+  saving: { bg: BAR_CHIP, ink: COLOR.mutedFg },
+  saved: { bg: COLOR.success, ink: COLOR.foreground },
+  error: { bg: COLOR.destructive, ink: COLOR.primaryFg },
 };
 
 // --- Persisted preferences ---------------------------------------------------
@@ -546,9 +551,9 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     disabled: () => state.savePhase() === 'saving',
     paint: (btn) => {
       const phase = state.savePhase();
-      const bg = PHASE_BG[phase];
+      const { bg, ink } = PHASE_PAINT[phase];
       btn.style.background = bg;
-      btn.style.color = phase === 'saving' ? SAVING_INK : COLOR.foreground;
+      btn.style.color = ink;
       btn.style.cursor = phase === 'saving' ? 'progress' : 'pointer';
       return { bg, bgHover: bg.startsWith('#') ? lift(bg) : bg };
     },

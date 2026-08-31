@@ -200,9 +200,19 @@ export function buildControl(
   root.append(label);
 
   const error = styled('div', 'atx-field-error');
+  // A live region, so the message is announced when it appears rather than
+  // only being found by someone who happens to navigate back over the field.
+  error.role = 'alert';
   const setError = (message: string | null): void => {
     error.textContent = message ?? '';
     error.toggleAttribute('data-on', Boolean(message));
+    // The destructive border is drawn from aria-invalid rather than from a
+    // class of its own, so the thing a screen reader is told and the thing the
+    // eye is shown are the same fact instead of two that can disagree.
+    for (const el of root.querySelectorAll('[data-input]')) {
+      if (message) el.setAttribute('aria-invalid', 'true');
+      else el.removeAttribute('aria-invalid');
+    }
   };
 
   const initial = displayValue(field, raw);

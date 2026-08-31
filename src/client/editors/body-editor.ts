@@ -74,8 +74,8 @@ const CONTENT_CSS = `
 .atx-rte-content ul, .atx-rte-content ol { margin: 0.5em 0; padding-left: 1.5em; }
 .atx-rte-content li { margin: 0.2em 0; }
 .atx-rte-content blockquote {
-  margin: 0.6em 0; padding: 0.3em 0.9em; border-left: 3px solid ${COLOR.primary};
-  background: ${hexToRgba(COLOR.primary, 0.07)}; border-radius: 0 ${RADIUS.md} ${RADIUS.md} 0;
+  margin: 0.6em 0; padding: 0.3em 0.9em; border-left: 3px solid ${COLOR.brand};
+  background: ${hexToRgba(COLOR.brand, 0.07)}; border-radius: 0 ${RADIUS.md} ${RADIUS.md} 0;
 }
 .atx-rte-content pre {
   margin: 0.6em 0; padding: 8px 10px; background: ${PAPER.muted}; border: 1px solid ${PAPER.border};
