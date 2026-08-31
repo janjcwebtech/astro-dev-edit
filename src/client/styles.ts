@@ -1179,8 +1179,17 @@ input[type='checkbox']:focus-visible {
   margin-bottom: 16px;
 }
 
-.atx-field[data-locked] {
-  opacity: 0.55;
+/* A field the project's own config owns. The dim lands on the control, not on
+   the whole stack: the label and the help text are what explain *why* it is
+   locked, and dimming the explanation along with the thing it explains is the
+   one part a reader still needs at full strength. */
+.atx-field[data-locked] [data-input],
+.atx-field[data-locked] .atx-field-check {
+  opacity: 0.5;
+}
+
+.atx-field[data-locked] .atx-field-label {
+  color: var(--atx-muted-fg);
 }
 
 /* Full opacity, not a dimmed foreground: a label is read, and dimming it was
@@ -1282,7 +1291,7 @@ input[type='checkbox']:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
 }
 
 .atx-settings-status {
@@ -1298,14 +1307,14 @@ input[type='checkbox']:focus-visible {
   display: none;
   margin: 10px 0 0;
   color: var(--atx-warning);
-  font: 12px/1.5 var(--atx-font-ui);
+  font: 13px/1.5 var(--atx-font-ui);
 }
 
 .atx-settings-warning {
   display: none;
   margin: 12px 0 0;
   color: var(--atx-warning);
-  font: 11px/1.5 var(--atx-font-ui);
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 .atx-settings-error[data-on],
@@ -1329,13 +1338,13 @@ input[type='checkbox']:focus-visible {
 .atx-settings-heading {
   margin: 0 0 4px;
   color: var(--atx-foreground);
-  font: 600 13px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
 }
 
 .atx-settings-blurb {
   margin: 0 0 12px;
   color: var(--atx-muted-fg);
-  font: 12px/1.5 var(--atx-font-ui);
+  font: 13px/1.5 var(--atx-font-ui);
 }
 
 /* A tab's own opening line sits a little further from the first control than
@@ -1351,7 +1360,7 @@ input[type='checkbox']:focus-visible {
 .atx-settings-hint {
   margin: 8px 0 0;
   color: var(--atx-muted-fg);
-  font: 11px/1.5 var(--atx-font-ui);
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 .atx-settings-row {
@@ -1383,15 +1392,18 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-settings-text {
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
 }
 
 .atx-settings-text[data-tone='muted'] {
   color: var(--atx-muted-fg);
 }
 
+/* successText, not success: the plain token is a *background* — a dark green
+   that reaches 2.7:1 as ink on a panel, which is the mistake the two-token
+   split exists to prevent. */
 .atx-settings-text[data-tone='ok'] {
-  color: var(--atx-success);
+  color: var(--atx-success-text);
 }
 
 .atx-settings-text[data-tone='warn'] {
@@ -1410,7 +1422,7 @@ input[type='checkbox']:focus-visible {
   gap: 4px;
   margin: 4px 0 0;
   color: var(--atx-muted-fg);
-  font: 11px/1.45 var(--atx-font-ui);
+  font: 12px/1.45 var(--atx-font-ui);
 }
 
 /* == Collections drawer ====================================================
@@ -1457,11 +1469,11 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-collections-row-name {
-  font: 600 13px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
 }
 
 .atx-collections-item-title {
-  font: 600 12px var(--atx-font-ui);
+  font: 500 13px var(--atx-font-ui);
 }
 
 .atx-collections-row-meta,
@@ -1514,7 +1526,7 @@ input[type='checkbox']:focus-visible {
 
 .atx-collections-title {
   color: var(--atx-foreground);
-  font: 600 14px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
 }
 
 .atx-collections-spacer {
@@ -1524,7 +1536,7 @@ input[type='checkbox']:focus-visible {
 .atx-collections-itemcount {
   flex: 1 1 auto;
   color: var(--atx-muted-fg);
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
 }
 
 .atx-collections-fields {
@@ -1539,7 +1551,7 @@ input[type='checkbox']:focus-visible {
   display: none;
   margin: 10px 0 0;
   color: var(--atx-warning);
-  font: 12px/1.5 var(--atx-font-ui);
+  font: 13px/1.5 var(--atx-font-ui);
 }
 
 .atx-collections-error[data-on] {
@@ -1615,7 +1627,7 @@ input[type='checkbox']:focus-visible {
   border-radius: var(--atx-radius-md);
   background: var(--atx-background);
   color: var(--atx-muted-fg);
-  font: 11px/1.55 var(--atx-font-ui);
+  font: 12px/1.55 var(--atx-font-ui);
 }
 
 /* The colour is repeated from the wrapper rather than inherited: a host page's
@@ -1643,7 +1655,7 @@ input[type='checkbox']:focus-visible {
 .atx-collections-caption {
   margin-bottom: 4px;
   color: var(--atx-muted-fg);
-  font: 600 10px var(--atx-font-ui);
+  font: 500 11px var(--atx-font-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1654,7 +1666,7 @@ input[type='checkbox']:focus-visible {
   gap: 8px;
   margin: 0 0 6px;
   color: var(--atx-muted-fg);
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
 }
 
 /* Options belong to a select field and to nothing else. */
@@ -1685,7 +1697,7 @@ input[type='checkbox']:focus-visible {
 
 .atx-collections-check-hint {
   color: var(--atx-muted-fg);
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
 }
 
 /* A field typed into the add form but not yet written. Outlined in the brand
@@ -1709,7 +1721,7 @@ input[type='checkbox']:focus-visible {
 .atx-collections-new-meta {
   flex: 1 1 auto;
   color: var(--atx-muted-fg);
-  font: 11px var(--atx-font-ui);
+  font: 12px var(--atx-font-ui);
 }
 
 .atx-collections-back {
@@ -1720,7 +1732,7 @@ input[type='checkbox']:focus-visible {
   border: none;
   background: transparent;
   color: var(--atx-brand-text);
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
   cursor: pointer;
 }
 
@@ -1731,13 +1743,13 @@ input[type='checkbox']:focus-visible {
 .atx-collections-badge {
   padding: 1px 6px;
   border-radius: var(--atx-radius-full);
-  font: 10px var(--atx-font-ui);
+  font: 11px var(--atx-font-ui);
 }
 
 .atx-collections-blurb {
   margin: 0 0 12px;
   color: var(--atx-muted-fg);
-  font: 12px/1.5 var(--atx-font-ui);
+  font: 13px/1.5 var(--atx-font-ui);
 }
 
 .atx-collections-note {
@@ -1745,7 +1757,7 @@ input[type='checkbox']:focus-visible {
   align-items: flex-start;
   gap: 5px;
   margin: 0 0 10px;
-  font: 11px/1.5 var(--atx-font-ui);
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 .atx-collections-badge[data-tone='warn'],
@@ -2080,7 +2092,7 @@ input[type='checkbox']:focus-visible {
   border-radius: 50%;
   background: var(--atx-primary);
   color: var(--atx-primary-fg);
-  font: 700 12px var(--atx-font-ui);
+  font: 700 13px var(--atx-font-ui);
   pointer-events: none;
 }
 
@@ -2096,7 +2108,7 @@ input[type='checkbox']:focus-visible {
   border-radius: var(--atx-radius-sm);
   background: rgba(0, 0, 0, 0.7);
   color: var(--atx-foreground);
-  font: 600 10px var(--atx-font-ui);
+  font: 500 11px var(--atx-font-ui);
   pointer-events: none;
 }
 
@@ -2120,7 +2132,7 @@ input[type='checkbox']:focus-visible {
   grid-column: 1 / -1;
   padding: 28px 12px;
   color: var(--atx-muted-fg);
-  font: 13px/1.6 var(--atx-font-ui);
+  font: 14px/1.6 var(--atx-font-ui);
   text-align: center;
 }
 
@@ -2132,7 +2144,7 @@ input[type='checkbox']:focus-visible {
   border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 600 12px var(--atx-font-ui);
+  font: 500 13px var(--atx-font-ui);
   cursor: pointer;
 }
 
@@ -2148,7 +2160,7 @@ input[type='checkbox']:focus-visible {
 /* A credit is prose, not a filename. It is permanently visible rather than
    revealed on hover: that is what the API guidelines ask for. */
 .atx-media-cap[data-credit] {
-  font: 11px/1.4 var(--atx-font-ui);
+  font: 12px/1.4 var(--atx-font-ui);
 }
 
 .atx-unsplash-credit {
@@ -2187,7 +2199,7 @@ input[type='checkbox']:focus-visible {
   border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 600 12px var(--atx-font-ui);
+  font: 500 13px var(--atx-font-ui);
   cursor: pointer;
 }
 
@@ -2230,7 +2242,7 @@ input[type='checkbox']:focus-visible {
   grid-column: auto;
   margin-right: auto;
   padding: 0;
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
   text-align: left;
 }
 
@@ -2271,7 +2283,7 @@ input[type='checkbox']:focus-visible {
   border-radius: var(--atx-radius-md);
   background: transparent;
   color: var(--atx-muted-fg);
-  font: 600 12px var(--atx-font-ui);
+  font: 500 13px var(--atx-font-ui);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -2285,7 +2297,7 @@ input[type='checkbox']:focus-visible {
 .atx-unsplash-width {
   flex: 0 0 auto;
   width: auto;
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
 }
 
 /* --- the detail rail --- */
@@ -2293,7 +2305,7 @@ input[type='checkbox']:focus-visible {
 .atx-media-rail-empty {
   margin: 0;
   color: var(--atx-muted-fg);
-  font: 12px/1.6 var(--atx-font-ui);
+  font: 13px/1.6 var(--atx-font-ui);
 }
 
 .atx-media-rail-preview {
@@ -2317,7 +2329,7 @@ input[type='checkbox']:focus-visible {
   margin: 0 0 8px;
   overflow: hidden;
   color: var(--atx-foreground);
-  font: 600 13px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
   text-overflow: ellipsis;
 }
 
@@ -2328,7 +2340,7 @@ input[type='checkbox']:focus-visible {
 .atx-media-rail-key {
   display: block;
   color: var(--atx-muted-fg);
-  font: 600 10px var(--atx-font-ui);
+  font: 500 11px var(--atx-font-ui);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -2342,7 +2354,7 @@ input[type='checkbox']:focus-visible {
 
 .atx-media-rail-link {
   color: var(--atx-brand-text);
-  font: 12px/1.5 var(--atx-font-ui);
+  font: 13px/1.5 var(--atx-font-ui);
   word-break: normal;
 }
 
@@ -2369,26 +2381,26 @@ input[type='checkbox']:focus-visible {
   border: none;
   background: transparent;
   color: var(--atx-foreground);
-  font: 13px var(--atx-font-ui);
+  font: 14px var(--atx-font-ui);
   outline: none;
 }
 
 .atx-media-error-more {
   margin-left: 10px;
   color: var(--atx-warning);
-  font: 12px var(--atx-font-ui);
+  font: 13px var(--atx-font-ui);
 }
 
 .atx-media-error-title {
   margin: 0 0 6px;
   color: var(--atx-foreground);
-  font: 600 13px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
 }
 
 .atx-media-error-detail {
   margin: 0 0 12px;
   color: var(--atx-muted-fg);
-  font: 12px/1.6 var(--atx-font-ui);
+  font: 13px/1.6 var(--atx-font-ui);
 }
 
 /* The only button inside a full-width grid message, so it centres itself. */
@@ -2430,7 +2442,7 @@ input[type='checkbox']:focus-visible {
 .atx-copy-note {
   margin: 0 0 10px;
   color: var(--atx-warning);
-  font: 13px/1.5 var(--atx-font-ui);
+  font: 14px/1.5 var(--atx-font-ui);
 }
 
 .atx-copy-text {
@@ -2443,7 +2455,7 @@ input[type='checkbox']:focus-visible {
 .atx-notice-reason {
   margin: 0 0 6px;
   color: var(--atx-foreground);
-  font: 13px/1.5 var(--atx-font-ui);
+  font: 14px/1.5 var(--atx-font-ui);
 }
 
 /* The location line opens the source peek, so it reads as a link. */
@@ -2461,14 +2473,14 @@ input[type='checkbox']:focus-visible {
 .atx-notice-hint {
   margin: 0 0 4px;
   color: var(--atx-brand-text);
-  font: 13px/1.5 var(--atx-font-ui);
+  font: 14px/1.5 var(--atx-font-ui);
 }
 
 .atx-popup-label {
   display: block;
   margin-bottom: 4px;
   color: var(--atx-foreground);
-  font: 600 12px var(--atx-font-ui);
+  font: 500 13px var(--atx-font-ui);
   opacity: 0.8;
 }
 
@@ -2476,7 +2488,7 @@ input[type='checkbox']:focus-visible {
   width: 100%;
   min-height: 120px;
   box-sizing: border-box;
-  font: 13px/1.6 var(--atx-font-ui);
+  font: 14px/1.6 var(--atx-font-ui);
   white-space: pre-wrap;
   resize: vertical;
 }
@@ -2489,7 +2501,7 @@ input[type='checkbox']:focus-visible {
   display: none;
   margin: 10px 0 0;
   color: var(--atx-destructive);
-  font: 12px/1.5 var(--atx-font-ui);
+  font: 13px/1.5 var(--atx-font-ui);
 }
 
 .atx-popup-error[data-on] {
@@ -2507,7 +2519,7 @@ input[type='checkbox']:focus-visible {
 .atx-markup-hint {
   margin-right: 2px;
   color: var(--atx-muted-fg);
-  font: 11px/1.5 var(--atx-font-ui);
+  font: 12px/1.5 var(--atx-font-ui);
 }
 
 .atx-markup-tag {
