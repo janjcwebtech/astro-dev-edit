@@ -59,6 +59,176 @@ ${vars('font-', FONT)}
   direction: ltr;
 }
 
+/* ── Shells ────────────────────────────────────────────────────────────────
+   The panel, drawer, backdrop and tab strip built by ui.ts. What stays inline
+   at those call sites is only what cannot be known here: the computed stacking
+   layer (Z + n), a caller's width or height override, and the sized-panel
+   branch, which is a [data-sized] flag rather than an inline display so the
+   layout lives in one place. */
+
+.atx-panel {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 92vw);
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-xl);
+  background: var(--atx-card);
+  color: var(--atx-foreground);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  font: 13px var(--atx-font-ui);
+  /* Edit mode sets a crosshair cursor on the whole page; our UI is not a
+     click-to-edit surface, so restore normal per-element cursors. */
+  cursor: auto;
+}
+
+/* A sized panel lays its title/body/foot out as a column so the body is the
+   only part that grows; the default auto-height panel is unaffected. */
+.atx-panel[data-sized] {
+  display: flex;
+  flex-direction: column;
+}
+
+.atx-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--atx-border);
+  font: 600 13px var(--atx-font-ui);
+}
+
+.atx-panel-heading {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atx-panel-body {
+  padding: 16px;
+}
+
+/* In a sized panel the body absorbs the leftover height and scrolls;
+   'min-height: 0' is what lets a flex child actually shrink to do that. */
+.atx-panel[data-sized] .atx-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.atx-panel-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--atx-border);
+}
+
+.atx-panel[data-sized] .atx-panel-foot {
+  flex: 0 0 auto;
+}
+
+.atx-drawer {
+  position: fixed;
+  right: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  /* Half the screen, but never narrower than the classic 440px drawer and
+     never wider than the viewport allows on small screens. */
+  height: 100vh;
+  width: min(max(440px, 50vw), 94vw);
+  box-sizing: border-box;
+  border-left: 1px solid var(--atx-border);
+  background: var(--atx-card);
+  color: var(--atx-foreground);
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.45);
+  font: 13px var(--atx-font-ui);
+  cursor: auto;
+}
+
+.atx-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--atx-border);
+  font: 600 13px var(--atx-font-ui);
+}
+
+.atx-drawer-title-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atx-drawer-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.atx-drawer-body {
+  flex: 1 1 auto;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.atx-drawer-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--atx-border);
+}
+
+.atx-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* Tabs are keyed off their ARIA roles, not their classes: buildTabs names
+   those per caller (atx-<prefix>-tab), so there is no single class to match,
+   and the roles are already there and already correct. Selected state reads
+   aria-selected for the same reason it is set at all — one source of truth
+   for "this tab is active", instead of a class shadowing an attribute. */
+[role='tablist'] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+[role='tab'] {
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--atx-radius-md);
+  background: transparent;
+  color: var(--atx-muted-fg);
+  font: 600 12px var(--atx-font-ui);
+  cursor: pointer;
+}
+
+[role='tab'][aria-selected='true'] {
+  background: var(--atx-primary);
+  color: var(--atx-primary-fg);
+}
+
+[data-tabhost] {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
 /* The rich-text editor's contenteditable is light-DOM and slotted in (see
    shadow.ts::mountLight), so it is styled by the document, not from here.
    ::slotted reaches only the parts that belong to the drawer rather than to

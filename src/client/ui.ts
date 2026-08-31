@@ -244,13 +244,17 @@ const PARTS: Record<string, string> = {
 /**
  * Create an overlay element: marks it as our own UI (so the click router
  * ignores it), stamps the atx-* class hook (and optional id for singletons),
- * exposes it as a `::part()` if it is one of the named surfaces, and applies
- * the inline baseline styles.
+ * and exposes it as a `::part()` if it is one of the named surfaces.
+ *
+ * `style` is optional and is for **runtime values only** — geometry measured
+ * off a host element, a computed stacking layer, a per-instance size override.
+ * Everything static is a rule in styles.ts keyed off the class, which is what
+ * lets `:hover` and `:focus-visible` exist at all.
  */
 export function styled<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className: string,
-  style: Partial<CSSStyleDeclaration>,
+  style?: Partial<CSSStyleDeclaration>,
   id?: string,
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
@@ -261,7 +265,7 @@ export function styled<K extends keyof HTMLElementTagNameMap>(
   const part = className ? PARTS[className.split(' ')[0]] : undefined;
   if (part) el.setAttribute('part', part);
   if (id) el.id = id;
-  Object.assign(el.style, style);
+  if (style) Object.assign(el.style, style);
   return el;
 }
 
@@ -428,45 +432,26 @@ export function buildPanel(
   opts: PanelOptions = {},
 ): HTMLElement {
   const panel = styled('div', 'atx-panel', {
-    position: 'fixed', zIndex: String(Z + (opts.layer ?? 6)), left: '50%', top: '50%',
-    transform: 'translate(-50%, -50%)', width: opts.width ?? 'min(420px, 92vw)',
+    zIndex: String(Z + (opts.layer ?? 6)),
+    ...(opts.width ? { width: opts.width } : {}),
     ...(opts.height ? { height: opts.height } : {}),
-    // A sized panel lays its title/body/foot out as a column so the body is the
-    // only part that grows; the default auto-height panel is unaffected.
-    ...(opts.height ? { display: 'flex', flexDirection: 'column' } : {}),
-    background: COLOR.card, color: COLOR.foreground, borderRadius: RADIUS.xl,
-    boxShadow: '0 12px 48px rgba(0,0,0,0.5)', border: `1px solid ${COLOR.border}`,
-    overflow: 'hidden', font: `13px ${FONT.ui}`, boxSizing: 'border-box',
-    // Edit mode sets a crosshair cursor on the whole page; our UI is not a
-    // click-to-edit surface, so restore normal per-element cursors.
-    cursor: 'auto',
   });
+  // A sized panel lays its title/body/foot out as a column so the body is the
+  // only part that grows, and its body becomes the scrolling region. Both are
+  // layout, so the flag is what crosses into CSS, not the declarations.
+  if (opts.height) panel.dataset.sized = '';
 
-  const bar = styled('div', 'atx-panel-title', {
-    padding: '12px 16px', font: `600 13px ${FONT.ui}`, borderBottom: `1px solid ${COLOR.border}`,
-    display: 'flex', alignItems: 'center', gap: '8px',
-  });
-  const heading = styled('span', 'atx-panel-heading', {
-    flex: '1', minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-  });
+  const bar = styled('div', 'atx-panel-title');
+  const heading = styled('span', 'atx-panel-heading');
   heading.textContent = title;
   bar.append(heading);
   if (action) bar.append(action);
 
-  const body = styled('div', 'atx-panel-body', {
-    padding: '16px',
-    // In a sized panel the body absorbs the leftover height and scrolls;
-    // `minHeight: 0` is what lets a flex child actually shrink to do that.
-    ...(opts.height ? { flex: '1 1 auto', minHeight: '0', overflowY: 'auto' } : {}),
-  });
+  const body = styled('div', 'atx-panel-body');
   body.dataset.body = '';
   isolateScroll(body);
 
-  const foot = styled('div', 'atx-panel-foot', {
-    padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
-    borderTop: `1px solid ${COLOR.border}`,
-    ...(opts.height ? { flex: '0 0 auto' } : {}),
-  });
+  const foot = styled('div', 'atx-panel-foot');
   foot.dataset.foot = '';
 
   panel.append(bar, body, foot);
@@ -486,44 +471,22 @@ export interface DrawerOptions {
 }
 export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElement {
   const drawer = styled('div', 'atx-drawer', {
-    position: 'fixed', zIndex: String(Z + (opts.layer ?? 6)), right: '0', top: '0',
-    // Half the screen, but never narrower than the classic 440px drawer and
-    // never wider than the viewport allows on small screens.
-    height: '100vh', width: opts.width ?? 'min(max(440px, 50vw), 94vw)',
-    display: 'flex', flexDirection: 'column',
-    background: COLOR.card, color: COLOR.foreground,
-    boxShadow: '-8px 0 40px rgba(0,0,0,0.45)', borderLeft: `1px solid ${COLOR.border}`,
-    font: `13px ${FONT.ui}`, boxSizing: 'border-box',
-    // Edit mode sets a crosshair cursor on the whole page; our UI is not a
-    // click-to-edit surface, so restore normal per-element cursors.
-    cursor: 'auto',
+    zIndex: String(Z + (opts.layer ?? 6)),
+    ...(opts.width ? { width: opts.width } : {}),
   });
 
-  const bar = styled('div', 'atx-drawer-title', {
-    padding: '14px 16px', font: `600 13px ${FONT.ui}`, flex: '0 0 auto',
-    borderBottom: `1px solid ${COLOR.border}`,
-    display: 'flex', alignItems: 'center', gap: '8px',
-  });
-  const barText = styled('span', 'atx-drawer-title-text', {
-    flex: '1 1 auto', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-  });
+  const bar = styled('div', 'atx-drawer-title');
+  const barText = styled('span', 'atx-drawer-title-text');
   barText.textContent = title;
-  const barActions = styled('span', 'atx-drawer-actions', {
-    flex: '0 0 auto', display: 'flex', gap: '6px',
-  });
+  const barActions = styled('span', 'atx-drawer-actions');
   barActions.dataset.actions = '';
   bar.append(barText, barActions);
 
-  const body = styled('div', 'atx-drawer-body', {
-    padding: '16px', flex: '1 1 auto', overflowY: 'auto',
-  });
+  const body = styled('div', 'atx-drawer-body');
   body.dataset.body = '';
   isolateScroll(body);
 
-  const foot = styled('div', 'atx-drawer-foot', {
-    padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end',
-    borderTop: `1px solid ${COLOR.border}`, flex: '0 0 auto',
-  });
+  const foot = styled('div', 'atx-drawer-foot');
   foot.dataset.foot = '';
 
   drawer.append(bar, body, foot);
@@ -543,8 +506,9 @@ export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElemen
  *   setup costs something (a network search) should not pay it until the user
  *   asks for them, and should not pay it twice.
  *
- * Selected state is inline rather than a class, the house rule here — there is
- * no stylesheet to hang a `.is-active` off.
+ * Selected state is carried by `aria-selected` alone: styles.ts paints from
+ * that attribute, so the thing a screen reader reads and the thing the eye
+ * reads are the same fact rather than two that can disagree.
  */
 export interface TabSpec {
   /** Stable id; also the `atx-<prefix>-tab-<id>` class suffix. */
@@ -578,13 +542,10 @@ export interface TabsOptions {
 
 export function buildTabs(tabs: readonly TabSpec[], opts: TabsOptions = {}): TabStrip {
   const prefix = opts.classPrefix ?? 'tabs';
-  const strip = styled('div', `atx-${prefix}-tabs`, {
-    display: 'flex', alignItems: 'center', gap: '4px', flex: '0 0 auto',
-  });
+  const strip = styled('div', `atx-${prefix}-tabs`);
   strip.role = 'tablist';
-  const host = styled('div', `atx-${prefix}-host`, {
-    flex: '1 1 auto', minWidth: '0', minHeight: '0',
-  });
+  const host = styled('div', `atx-${prefix}-host`);
+  host.dataset.tabhost = '';
 
   const buttons = new Map<string, HTMLButtonElement>();
   const activated = new Set<string>();
@@ -592,10 +553,7 @@ export function buildTabs(tabs: readonly TabSpec[], opts: TabsOptions = {}): Tab
 
   const paint = (): void => {
     for (const [id, btn] of buttons) {
-      const on = id === active?.id;
-      btn.style.background = on ? COLOR.primary : 'transparent';
-      btn.style.color = on ? COLOR.primaryFg : COLOR.mutedFg;
-      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      btn.setAttribute('aria-selected', id === active?.id ? 'true' : 'false');
     }
   };
 
@@ -616,10 +574,7 @@ export function buildTabs(tabs: readonly TabSpec[], opts: TabsOptions = {}): Tab
   // Only render the strip when there is a choice to make.
   if (tabs.length > 1) {
     for (const { id, label } of tabs) {
-      const btn = styled('button', `atx-${prefix}-tab atx-${prefix}-tab-${id}`, {
-        padding: '6px 14px', borderRadius: RADIUS.md, border: '1px solid transparent',
-        cursor: 'pointer', font: `600 12px ${FONT.ui}`,
-      });
+      const btn = styled('button', `atx-${prefix}-tab atx-${prefix}-tab-${id}`);
       btn.type = 'button';
       btn.role = 'tab';
       btn.textContent = label;
@@ -684,10 +639,7 @@ export function setFreshSrc(img: HTMLImageElement, path: string): void {
  *  it sits under — the media modal's backdrop must land above the CMS drawer it
  *  can open over, not at the standard panel layer. */
 export function buildBackdrop(onClose: () => void, layer = 5): HTMLElement {
-  const b = styled('div', 'atx-backdrop', {
-    position: 'fixed', inset: '0', zIndex: String(Z + layer),
-    background: 'rgba(0,0,0,0.4)',
-  });
+  const b = styled('div', 'atx-backdrop', { zIndex: String(Z + layer) });
   b.addEventListener('click', onClose);
   return b;
 }
