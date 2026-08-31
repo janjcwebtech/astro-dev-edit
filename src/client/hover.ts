@@ -42,7 +42,7 @@ const CHECKING: Verdict = { word: "loading…", color: COLOR.mutedFg };
 /** Collapse the server's classification onto the pill's word + color,
  *  mirroring how router.ts will route the eventual click. (spec §16.1) */
 function verdictFor(result: ClassifyResult): Verdict {
-  if (result.kind === "text") return { word: "editable", color: COLOR.primaryText };
+  if (result.kind === "text") return { word: "editable", color: COLOR.brandText };
   if (result.kind === "image") {
     const attrs = result.attrs ?? { src: "dynamic", alt: "dynamic" };
     // Same rule as the click router: when neither src nor alt is patchable

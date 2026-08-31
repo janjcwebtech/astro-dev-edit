@@ -35,50 +35,74 @@ export const Z = 1999999000;
  * Names and roles follow shadcn's convention — a surface plus the ink that
  * goes on it (`card` + `foreground`, `primary` + `primaryFg`), then `muted`,
  * `destructive`, `border`, `input`, `ring` and a single `radius` knob — so the
- * vocabulary is one other people already know. Two deliberate departures:
+ * vocabulary is one other people already know. Three deliberate departures:
  * shadcn's three interchangeable `secondary`/`muted`/`accent` surfaces are one
  * `elevated` here, because the overlay only ever needs one step up from
- * `card`; and `mutedFg`/`faintFg` are two ink tiers where shadcn has one,
- * because the hover pill and peek gutter need a quieter grey that is still
- * legible. Dark only: this overlay paints over a live page and has one look,
- * so there is no `.dark` counterpart to keep in step.
+ * `card`; `mutedFg`/`faintFg` are two ink tiers where shadcn has one, because
+ * the hover pill and peek gutter need a quieter grey that is still legible;
+ * and `brand` has no shadcn counterpart at all, because shadcn's palette has
+ * nowhere to put a colour that means something. Dark only: this overlay paints
+ * over a live page and has one look, so there is no `.dark` counterpart to
+ * keep in step.
  *
- * **Authored in OKLCH, emitted as hex.** The OKLCH triple in each comment is
+ * **One colour has a job, and the rest are furniture.** `brand` marks the
+ * overlay pointing at *your content* — the editable outline, the hover pill,
+ * the save veil, a tree row aimed at a live node. Everything the tool says
+ * about *itself* is neutral, and its emphatic fill is a near-white `primary`.
+ * A purple that is also the confirm button and the active tab is a purple that
+ * means nothing, which is what this split exists to prevent. If a change makes
+ * something `brand` that is not an editable affordance, it is wrong.
+ *
+ * **Authored in OKLCH, emitted as sRGB.** The OKLCH triple in each comment is
  * the source of truth — it is what makes the neutral ramp perceptually even and
- * provably untinted (chroma 0, so no hue creeps into the greys). Hex is what
- * ships, because these are written into *inline* styles: there is no stylesheet
- * for CSS custom properties to cascade through, and hex keeps `hexToRgba`
- * working. Re-derive with any OKLCH converter; do not hand-edit the hex.
+ * provably untinted (chroma 0, so no hue creeps into the greys). Re-derive with
+ * any OKLCH converter; do not hand-edit the values. Most are hex, which is what
+ * `hexToRgba` and `lift` need; the three that separate surfaces from each other
+ * are translucent white in `rgb(r g b / a)` form, so that one value composites
+ * correctly on every surface it can land on.
  *
  * **Every pairing below is contrast-verified**, and that is a constraint on
  * changes, not a note about the past. Text tokens clear WCAG AA (4.5:1) against
  * all three surfaces they can land on — `card`, `elevated` and `background` —
  * and control outlines clear 1.4.11 non-text (3:1) against the same three.
- * shadcn's own dark defaults do *not* all clear these on this palette (its
- * `input` at oklch(0.371 0 0) reaches only 1.7:1 against `card`), which is why
- * a few tokens sit lighter than upstream. Verify before changing one.
+ * shadcn's own dark defaults do *not* all clear these: its `--input` is white
+ * at 15%, which reaches 1.6:1 on `card`. Where upstream and legibility
+ * disagree, legibility wins; `tests/contrast.test.ts` is what enforces it.
  */
 export const COLOR = {
   // --- Surfaces (achromatic: chroma 0, no tint) ----------------------------
-  /** Deepest well — input and textarea interiors, code blocks. oklch(0.145 0 0) */
+  /** Deepest well — code blocks and the raw-markdown pane. oklch(0.145 0 0) */
   background: '#0a0a0a',
   /** The standard overlay surface: panels, drawers, popovers. oklch(0.205 0 0) */
   card: '#171717',
   /** Raised or hovered surface — list rows, secondary buttons, the admin bar's
    *  own chrome. shadcn's `secondary`/`muted`/`accent` surface. oklch(0.269 0 0) */
   elevated: '#262626',
-  /** Divider and panel edge. Separators are decorative, so this sits below the
-   *  3:1 non-text floor deliberately — an outline a user must *see* to operate
-   *  is `input`, not this. oklch(0.300 0 0) */
-  border: '#2e2e2e',
+
+  // --- Lines and control edges ---------------------------------------------
+  /** Divider and panel edge. **Translucent white, so one value is correct on
+   *  every surface** — a hairline is the only thing separating a panel from the
+   *  ground it sits on, and an opaque grey can only be right on one of them.
+   *  Separators are decorative, so this sits below the 3:1 non-text floor
+   *  deliberately — an outline a user must *see* to operate is `input`. */
+  border: 'rgb(255 255 255 / 0.10)',
   /** Boundary of an interactive control — input/textarea/select borders and
-   *  outline buttons. Clears 3:1 against `card` (3.8), `elevated` (3.2) and
-   *  `background` (4.2). oklch(0.560 0 0) */
-  input: '#747474',
-  /** Focus ring: the brand hue lifted until it clears 3:1 on every surface
-   *  (5.0–6.6). The solid `primary` is too dark to serve as a ring at 2.8:1.
-   *  oklch(0.680 0.160 285) */
-  ring: '#9087f6',
+   *  outline buttons. shadcn's own dark `--input` is white at 15%, which
+   *  composites to 1.6:1 on `card` and **fails WCAG 1.4.11 outright**; 40%
+   *  keeps the same translucent-white idiom and clears 3:1 on all three
+   *  surfaces (3.84 / 3.77 / 3.68). Do not "restore" the upstream value. */
+  input: 'rgb(255 255 255 / 0.40)',
+  /** A field's interior. Fields sit one step **lighter** than the panel they
+   *  are on, not darker — that is what makes a form read as a set of containers
+   *  rather than as holes punched in the surface.
+   *
+   *  Deliberately *not* derived from `input` the way shadcn derives it
+   *  (`dark:bg-input/30`): at our 40% border that formula gives white at 12%,
+   *  which reads as a second panel. Declared outright instead. */
+  inputBg: 'rgb(255 255 255 / 0.04)',
+  /** Focus ring. Neutral, because focus is chrome — the overlay talking about
+   *  itself. Clears 3:1 on every surface (3.2–4.6). oklch(0.556 0 0) */
+  ring: '#737373',
 
   // --- Ink ------------------------------------------------------------------
   /** Primary ink. 17.2:1 on `card`. oklch(0.985 0 0) */
@@ -93,27 +117,47 @@ export const COLOR = {
    *  oklch(0.665 0 0) */
   faintFg: '#949494',
 
+  // --- The loud colour ------------------------------------------------------
+  /**
+   * The overlay's one emphatic fill: the confirm button, a checked checkbox, an
+   * active admin-bar chip. **Near-white, and achromatic** — on a near-black
+   * overlay the loudest thing available is light, not hue, and spending a hue
+   * here is what left the old palette with a purple that meant nothing in
+   * particular. oklch(0.922 0 0)
+   */
+  primary: '#e5e5e5',
+  /** Ink on `primary` — and on `destructive`, which is also a light fill.
+   *  14.2:1 on `primary`. oklch(0.205 0 0) */
+  primaryFg: '#171717',
+
   // --- Brand ----------------------------------------------------------------
-  /** Brand / editable-text accent, as a *background*. White on it is 6.3:1.
-   *  oklch(0.509 0.212 285) */
-  primary: '#6144d7',
-  /** Ink on `primary`. */
-  primaryFg: '#ffffff',
-  /** The brand lightened enough to read as *text* on a panel — the solid
-   *  `primary` is a background colour and fails contrast as a foreground.
-   *  Used for links inside panels. 8.2:1 on `card`. oklch(0.760 0.110 285) */
-  primaryText: '#aaa7f4',
+  /**
+   * The brand purple, with exactly one job: **this element on your page is
+   * editable**. The hover outline and pill, the save veil, the element tree's
+   * pointer at a live node, the launcher glyph.
+   *
+   * It is not a button colour, not an active-tab colour, not a selection
+   * colour inside the tool's own pickers. When the overlay is talking about
+   * itself it goes neutral; the purple is reserved for when it is pointing at
+   * your content, which is the only way a colour can mean anything.
+   * oklch(0.509 0.212 285)
+   */
+  brand: '#6144d7',
+  /** The brand lightened enough to read as *text* on a panel — solid `brand` is
+   *  a background colour and fails contrast as a foreground. Links inside
+   *  panels, and the peek gutter's tag/attr tokens. 8.2:1 on `card`.
+   *  oklch(0.760 0.110 285) */
+  brandText: '#aaa7f4',
 
   // --- Status ---------------------------------------------------------------
-  /** Error *background*, carrying `foreground` text at 4.6:1.
-   *  oklch(0.577 0.215 27.3) */
-  destructive: '#dc2626',
-  /** `destructive` lightened to read as text on a panel, the same split as
-   *  `primary`/`primaryText`. 7.6:1 on `card`. oklch(0.750 0.145 27.3) */
-  destructiveText: '#fc877a',
-  /** Border of a danger (outline) button — the destructive hue at control
-   *  contrast, 4.3:1 on `card`. oklch(0.600 0.140 27.3) */
-  destructiveBorder: '#c65a50',
+  /**
+   * Danger, in one token rather than three. A light red reads as *ink* at
+   * 6.2:1 on `card`, as a *border* well above the 3:1 control floor, and as a
+   * *fill* under `primaryFg` at 6.2:1 — so the error line, the Delete button's
+   * outline and the failure toast are all the same colour instead of three
+   * reds that drift apart. oklch(0.704 0.191 22.2)
+   */
+  destructive: '#ff6467',
   /** Success *background* — the saved state, the ok toast. `foreground` on it
    *  is 5.0:1. oklch(0.520 0.140 150) */
   success: '#0a7e3a',
@@ -130,7 +174,7 @@ export const COLOR = {
    *  glance, all at the same lightness so none reads as louder than the rest.
    *  They are what the CSS inspector's syntax theme is built from — a code
    *  token needs more distinguishable colours than the semantic set has, and
-   *  reusing `primaryText` for two different token kinds would erase the
+   *  reusing `brandText` for two different token kinds would erase the
    *  distinction the highlighter exists to draw. All clear AA on `background`,
    *  `card` and `elevated` (6.7:1 worst case).
    *  oklch(0.76–0.78 0.11–0.15 · 285/150/85/25/220) */
