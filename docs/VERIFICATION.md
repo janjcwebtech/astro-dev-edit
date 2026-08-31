@@ -117,7 +117,7 @@ the loc rules in `astro.ts`.
 | `unsplash-search.ts` — the DOM-free search controller: debounce collapsing keystrokes to one request, blank/whitespace staying idle with no fetch, immediate reset on clear, `retry()` bypassing the debounce, stale responses (and stale errors) discarded, zero results as `empty` not an empty `ready`, error code/retryability surfaced, `loadMore` appending and bumping the page, discarded when the query or orientation changed mid-flight, a failed page keeping the shown results via `moreError`, orientation re-running immediately, `dispose()` cancelling | `tests/unsplash-search.test.ts` |
 | `highlight.ts` — peek tokenizer: lossless round-trip, fence/tag/attr/string/keyword/comment classification, multi-line comment carry, URL/apostrophe/identifier-digit false-positive guards, plain-text degrade | `tests/highlight.test.ts` |
 | `tree-model.ts` — `buildTreeModel` nesting: roots in document order, direct children, loop siblings sharing one loc kept distinct, reparent across an unannotated component gap, sourceless elements dropped, empty input | `tests/tree-model.test.ts` |
-| `ui.ts` — contrast guard on the design tokens: every ink against **all three** overlay surfaces (`background`, `card`, `elevated`) at AA 4.5:1, `foreground` on each colour used as a *background* (`primary`, `destructive`, `success`), `input`/`ring`/`destructiveBorder` at the 3:1 WCAG requires of a control boundary, that `primary`/`destructive`/`success` still fail as foregrounds — which is what the `*Text` pair is for — that `border` stays *below* 3:1 because a separator is not a control, that the neutral ramp is achromatic (R = G = B), and that the rich-text editor's light `PAPER` set clears AA on its own ground while being invisible on the dark surfaces, so the two sets cannot be mixed | `tests/contrast.test.ts` |
+| `ui.ts` — contrast guard on the design tokens. Parses both notations (`#rrggbb` and `rgb(r g b / a)`) and **flattens a translucent token onto the ground beneath it**, since `border`/`input`/`inputBg` have one ratio per surface rather than one ratio. Every ink against **all three** surfaces (`background`, `card`, `elevated`) at AA 4.5:1, plus `foreground`/`mutedFg` against a field interior composited on each; `foreground` on `brand` and `success`, `primaryFg` on `primary` and `destructive` — and that `foreground` *fails* on `primary`, so the dark-ink pairing cannot be dropped; `input`/`ring`/`destructive` at the 3:1 a control boundary requires; `brand`/`success` still failing as foregrounds, which is what `brandText`/`successText` are for; `border` staying *below* 3:1 because a separator is not a control; `inputBg` lifting the surface without becoming one; the neutral ramp achromatic on parsed channels (translucent white included) with `primary` in it and `brand` deliberately not; and the rich-text editor's light `PAPER` set clearing AA on its own ground while being invisible on the dark surfaces, so the two cannot be mixed | `tests/contrast.test.ts` |
 | `element-context.ts` — `formatContext` clipboard payload: section order and omission (absent entry/box, and the never-formatted editability verdict), `>` focus-line gutter marking, quoted-range wording, fence language per extension, refused-source sentence, empty-CSS note, rule blocks with/without a source comment, both truncation notices; `relativize` root stripping (trailing slash, outside-root, already-relative, unknown root, Windows separators); `windowAround` 1-based slicing (clamped both ends, whole file, pre-windowed response) | `tests/element-context.test.ts` |
 
 The Settings drawer itself has no unit tests — it is DOM-bound — but it is
@@ -555,6 +555,41 @@ function schema with `image()` fields — and its config sets widget overrides o
       file.
       Do it with a queued field edit pending: the discard confirm appears first,
       and cancelling keeps you where you were.
+
+**Focus and field state** (new behaviour, no unit test — the tokens are pinned,
+the fact that a rule reaches the right element is not)
+
+- [ ] **Tab through the entry drawer.** Every field, button and tab takes a 3px
+      neutral ring, and the ring appears on **keyboard focus only** — click the
+      same controls with the mouse and no ring should appear. That split is
+      `:focus-visible`, and it is the whole reason the indicator is acceptable
+      to leave on.
+
+- [ ] **An invalid field shows both signals.** Clear a required field and save:
+      the control takes a destructive border, the message appears under it, and
+      `aria-invalid="true"` is on the control itself — check it in the
+      inspector, since that is the half a screen reader uses. Fix the field and
+      both clear together.
+
+- [ ] **Native chrome stays light.** The date field's calendar picker and any
+      number field's spinners render light, not as near-invisible dark glyphs —
+      `color-scheme: dark` reached them. The **checkbox** needs its own look:
+      unticked it is a dark box with a light edge, ticked it is **near-white
+      with a dark tick**, never purple.
+
+- [ ] **Fields read as containers, not holes.** Every text control sits a step
+      *lighter* than the panel behind it, and a textarea grows with its content
+      where `field-sizing` is supported.
+
+- [ ] **Hover shifts, never tints.** Buttons, menu items, tree rows and tabs all
+      move to a lighter surface on hover. If anything picks up a hue, a rule is
+      reaching for `brand` that should not.
+
+- [ ] **The purple is only ever pointing at your content.** In edit mode, hover
+      a heading: the outline and the pill's left edge are brand-coloured. Then
+      check that nothing in the tool's own furniture is — the confirm button, an
+      active tab, a checked box and an active admin-bar chip are all near-white.
+      The launcher glyph is the one deliberate exception.
 
 **Contrast** (`tests/contrast.test.ts` pins the tokens; these two things it cannot)
 

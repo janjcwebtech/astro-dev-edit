@@ -34,15 +34,40 @@ astro-dev-edit {
 }
 ```
 
-The names are the overlay's design tokens, kebab-cased and prefixed. Surfaces:
-`--atx-background`, `--atx-card`, `--atx-elevated`, `--atx-border`,
-`--atx-input`, `--atx-ring`. Ink: `--atx-foreground`, `--atx-muted-fg`,
-`--atx-faint-fg`. Accents: `--atx-primary`, `--atx-primary-fg`,
-`--atx-primary-text`, `--atx-destructive`, `--atx-destructive-text`,
-`--atx-destructive-border`, `--atx-success`, `--atx-success-text`,
-`--atx-warning`, `--atx-info`, `--atx-chart1` … `--atx-chart5`, and the two
-translucent surfaces `--atx-glass` and `--atx-glass-raised`. Radii:
-`--atx-radius-sm|md|lg|xl|full`. Fonts: `--atx-font-ui`, `--atx-font-mono`.
+The names are the overlay's design tokens, kebab-cased and prefixed.
+
+| Group | Properties |
+| --- | --- |
+| Surfaces | `--atx-background`, `--atx-card`, `--atx-elevated` |
+| Lines and control edges | `--atx-border`, `--atx-input`, `--atx-input-bg`, `--atx-ring` |
+| Ink | `--atx-foreground`, `--atx-muted-fg`, `--atx-faint-fg` |
+| Emphasis | `--atx-primary`, `--atx-primary-fg` |
+| Brand | `--atx-brand`, `--atx-brand-text` |
+| Status | `--atx-destructive`, `--atx-success`, `--atx-success-text`, `--atx-warning`, `--atx-info` |
+| Syntax | `--atx-chart1` … `--atx-chart5` |
+| Translucent surfaces | `--atx-glass`, `--atx-glass-raised` |
+| Radii | `--atx-radius-sm｜md｜lg｜xl｜full` |
+| Fonts | `--atx-font-ui`, `--atx-font-mono` |
+
+Three of them are worth knowing the intent behind before you change one.
+
+**`--atx-primary` is the emphatic fill and `--atx-brand` is the purple.** They
+are different jobs. `primary` is a near-white that carries dark `primary-fg`
+ink, and it is what the confirm button, a checked box and an active admin-bar
+chip are made of. `brand` marks the overlay pointing at *your* content — the
+editable outline, the hover pill's edge, the save veil, a tree row aimed at a
+live node, the launcher glyph — and nothing else uses it. Swapping `primary`
+for a saturated colour costs you that distinction.
+
+**`--atx-border`, `--atx-input` and `--atx-input-bg` are translucent white**,
+so one value composites correctly on all three surfaces. Replace one with an
+opaque colour and it will be right on the surface you were looking at and wrong
+on the other two. `border` is a separator and sits deliberately below the 3:1
+non-text floor; `input` is the boundary of something you operate and clears it.
+
+**Fields sit lighter than the panel they are on.** `--atx-input-bg` is a lift,
+not a well — a lighter box reads as a container you can put something in, and a
+darker one reads as a hole punched in the surface.
 
 Every property is defined on the host, so a value you do not set keeps its
 built-in default, and the palette is contrast-checked as a set — a token you
