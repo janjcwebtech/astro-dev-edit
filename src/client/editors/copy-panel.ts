@@ -1,6 +1,7 @@
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
 import { COLOR, FONT, INPUT_STYLE, buildBackdrop, buildPanel, footButton, styled, toast } from '../ui.ts';
+import { mount } from '../shadow.ts';
 
 /**
  * Clipboard fallback for the hover pill's `copy ⧉`: the gathered context shown
@@ -69,7 +70,7 @@ export function openCopyPanel(title: string, text: string): void {
     footButton('Copy', 'default', () => void copyNow()),
   );
 
-  document.body.append(backdrop, panel);
+  mount(backdrop, panel);
   // Preselected, so ⌘C works the moment the panel opens.
   requestAnimationFrame(() => {
     area.focus();

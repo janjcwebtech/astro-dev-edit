@@ -38,6 +38,7 @@ import { initRouter } from './router.ts';
 import { cacheSourceMappings, sourceFor, startCapture } from './source-map.ts';
 import { initTree } from './tree.ts';
 import * as state from './state.ts';
+import { mount } from './shadow.ts';
 import { basename, toast } from './ui.ts';
 
 // Begin capturing source annotations as early as possible. If the body isn't
@@ -410,7 +411,7 @@ async function boot(): Promise<void> {
   // so the media modal can see them without importing the composition root and
   // so a Settings save updates them in place. (see features.ts)
   setFeatures(info);
-  document.body.append(
+  mount(
     ...hover.elements,
     tree.selectionOutline,
     tree.root,

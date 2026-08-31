@@ -3,6 +3,7 @@ import { classifyCached, peekClassification } from "./classify-cache.ts";
 import { buildRulesCard, rulesForToken } from "./css-inspect.ts";
 import { icon, setIcon } from "./icons.ts";
 import { nearestSource, sourceFor } from "./source-map.ts";
+import { isOwnUi, mount } from './shadow.ts';
 import {
   COLOR,
   FONT,
@@ -428,7 +429,7 @@ export function initHover(deps: HoverDeps): HoverHandle {
       scheduleCardHide();
       scheduleHide();
     });
-    document.body.append(card);
+    mount(card);
     positionCard(card, anchor);
     rulesCard = card;
   }
@@ -512,7 +513,9 @@ export function initHover(deps: HoverDeps): HoverHandle {
     // element-tree panel driving highlights of its own — must NOT count as
     // leaving the element, and wins over any pending retarget. (The tree hovers
     // a row to highlight an element; that move must not then hide the pill.)
-    if (e.target instanceof Element && e.target.closest('[data-astro-dev-edit-ui="1"]')) {
+    // composedPath, not e.target: this listener is on document, which sees a
+    // target retargeted to the shadow host for anything inside the overlay.
+    if (isOwnUi(e)) {
       cancelHide();
       cancelCardHide();
       cancelSwitch();

@@ -3,11 +3,25 @@
  * and the generic building blocks (toast, save veil, panel, backdrop, footer
  * buttons).
  *
- * Styling is deliberately inline — inline styles win specificity against any
- * host-page CSS, so the overlay renders correctly on every site. The atx-*
- * IDs/classes exist as stable hooks for DOM references and user CSS overrides
- * (which need !important against the inline baseline), never as styling.
+ * The overlay draws inside a shadow root (shadow.ts), so host-page selectors
+ * cannot reach these elements at all and specificity is no longer a defense we
+ * have to win. Styling is moving to the single stylesheet in styles.ts; what
+ * stays inline here is what cannot be known until runtime — geometry measured
+ * off a host element, chrome insets, computed stacking layers, per-instance
+ * size overrides — plus anything applied to a host-page element, which never
+ * enters the root.
+ *
+ * The atx-* IDs and classes are internal hooks for DOM references and for that
+ * stylesheet. They are *not* a theming API any more: user CSS cannot match
+ * them across the boundary. Theming is `--atx-*` custom properties and
+ * `::part()` — see docs/STYLING.md.
+ *
+ * The tokens below are the single source of truth for both: styles.ts
+ * generates the custom-property block from them, and tests/contrast.test.ts
+ * holds them to WCAG AA.
  */
+
+import { mount } from './shadow.ts';
 
 // Base layer for every overlay surface; individual layers sit at Z+1..Z+10
 // (the deepest is the Unsplash settings panel). Deliberately *below* Astro's
@@ -212,9 +226,26 @@ export const INPUT_STYLE: Partial<CSSStyleDeclaration> = {
 };
 
 /**
+ * The surfaces exposed to user CSS as `::part()`. Deliberately small: a part is
+ * an API commitment, and everything expressible as a value is a custom property
+ * instead. Buttons, fields and rows are *not* here on purpose — add one only
+ * when someone needs to restructure a surface, not to recolour it.
+ * Documented in docs/STYLING.md.
+ */
+const PARTS: Record<string, string> = {
+  'atx-bar': 'bar',
+  'atx-panel': 'panel',
+  'atx-drawer': 'drawer',
+  'atx-backdrop': 'backdrop',
+  'atx-tooltip': 'pill',
+  'atx-toast': 'toast',
+};
+
+/**
  * Create an overlay element: marks it as our own UI (so the click router
  * ignores it), stamps the atx-* class hook (and optional id for singletons),
- * and applies the inline baseline styles.
+ * exposes it as a `::part()` if it is one of the named surfaces, and applies
+ * the inline baseline styles.
  */
 export function styled<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -225,6 +256,10 @@ export function styled<K extends keyof HTMLElementTagNameMap>(
   const el = document.createElement(tag);
   el.dataset.astroDevEditUi = '1';
   if (className) el.className = className;
+  // The first class is the element's identity ('atx-toast atx-toast-ok' → the
+  // toast); the modifiers after it are variants, not separate surfaces.
+  const part = className ? PARTS[className.split(' ')[0]] : undefined;
+  if (part) el.setAttribute('part', part);
   if (id) el.id = id;
   Object.assign(el.style, style);
   return el;
@@ -309,7 +344,7 @@ export function lockElement(el: HTMLElement): () => void {
   });
   chip.textContent = 'saving…';
   veil.append(chip);
-  document.body.append(veil);
+  mount(veil);
   return () => veil.remove();
 }
 
@@ -324,7 +359,7 @@ export function toast(message: string, kind: 'ok' | 'err'): void {
     boxShadow: '0 4px 16px rgba(0,0,0,0.3)', opacity: '0', transition: 'opacity 120ms',
   });
   t.textContent = message;
-  document.body.append(t);
+  mount(t);
   requestAnimationFrame(() => (t.style.opacity = '1'));
   setTimeout(() => {
     t.style.opacity = '0';

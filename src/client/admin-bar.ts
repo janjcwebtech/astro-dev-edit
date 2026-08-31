@@ -2,6 +2,7 @@ import { has } from './features.ts';
 import { type IconName, icon, setIcon } from './icons.ts';
 import * as state from './state.ts';
 import { COLOR, FONT, hexToRgba, RADIUS, setChromeInset, styled, Z } from './ui.ts';
+import { overlayActiveElement } from './shadow.ts';
 
 /**
  * The admin bar — the overlay's one piece of persistent chrome.
@@ -411,7 +412,10 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
    *  mode the bar carries the save state and the way out, so it must never be
    *  off-screen; unpinning is about keeping it out of the way while you browse. */
   function applyVisibility(approached: boolean): void {
-    const open = approached || overBar || menuOpen() || bar.contains(document.activeElement);
+    // overlayActiveElement, not document.activeElement: the latter reports the
+    // shadow host for anything focused in here, so the bar would dim while you
+    // were typing in it.
+    const open = approached || overBar || menuOpen() || bar.contains(overlayActiveElement());
     if (prefs.pinned || deps.isEditMode()) {
       bar.style.transform = 'none';
       bar.style.opacity = open ? '1' : REST_OPACITY;
@@ -560,7 +564,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     }
   });
   document.addEventListener('click', (e) => {
-    if (menuOpen() && e.target instanceof Node && !menu.contains(e.target)) closeMenu();
+    if (menuOpen() && !e.composedPath().includes(menu)) closeMenu();
   });
   // Capture phase + stopPropagation so an open menu consumes the Escape rather
   // than also clearing the tree selection behind it.

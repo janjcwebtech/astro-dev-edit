@@ -23,6 +23,7 @@ import {
 } from '../ui.ts';
 import { buildMediaGrid, type GridTile, type MediaGridHandle } from './media-grid.ts';
 import { createUnsplashPane } from './unsplash-pane.ts';
+import { mount } from '../shadow.ts';
 
 /**
  * The media modal — one picker, four callers, two sources.
@@ -489,7 +490,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     // Kick off the default pane and paint the chrome.
     projectPane.activate();
     refresh();
-    document.body.append(backdrop, panel);
+    mount(backdrop, panel);
 
     /** The panel's own token is re-claimed after any `busy` interaction the
      *  panes take, so the modal keeps owning the page's clicks. */

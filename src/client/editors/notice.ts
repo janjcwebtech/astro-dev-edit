@@ -4,6 +4,7 @@ import { pageSource } from '../page-source.ts';
 import * as state from '../state.ts';
 import { COLOR, FONT, basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
 import { openEntryPanel } from './entry.ts';
+import { mount } from '../shadow.ts';
 
 /**
  * Refusal notice for content that can't be edited in place (expressions,
@@ -89,5 +90,5 @@ export function showDynamicNotice(
         }
       : { confirmLabel: 'Open source' },
   );
-  document.body.append(backdrop, panel);
+  mount(backdrop, panel);
 }

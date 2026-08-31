@@ -17,6 +17,7 @@ import {
   wirePanelButtons,
 } from '../ui.ts';
 import { openMediaModal } from './media-modal.ts';
+import { mount } from '../shadow.ts';
 
 /**
  * Image swap panel: a preview of the image as it is now, its alt text, and a
@@ -134,7 +135,7 @@ export async function beginImageEdit(
   const backdrop = buildBackdrop(() => close(false));
   wirePanelButtons(panel, () => close(false), () => close(true));
   const token = state.begin({ kind: 'panel', close: () => close(false) });
-  document.body.append(backdrop, panel);
+  mount(backdrop, panel);
   altInput.focus();
 
   // --- replace ---------------------------------------------------------------

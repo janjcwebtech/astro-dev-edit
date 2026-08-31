@@ -1,5 +1,6 @@
 import * as state from '../state.ts';
 import { buildBackdrop, buildDrawer } from '../ui.ts';
+import { mount } from '../shadow.ts';
 
 /**
  * Drawer lifecycle scaffold: shell + backdrop + interaction-state token +
@@ -78,6 +79,6 @@ export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell 
   const backdrop = buildBackdrop(close, opts.layer !== undefined ? opts.layer - 1 : undefined);
   let token = state.begin({ kind: 'panel', close });
 
-  document.body.append(backdrop, drawer);
+  mount(backdrop, drawer);
   return { body, foot, actions, close, teardown };
 }

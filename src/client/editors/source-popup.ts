@@ -1,5 +1,6 @@
 import { icon } from '../icons.ts';
 import * as state from '../state.ts';
+import { mount } from '../shadow.ts';
 import {
   COLOR,
   INPUT_STYLE,
@@ -156,7 +157,7 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
   });
   input.addEventListener('input', markDirty);
 
-  document.body.append(backdrop, panel);
+  mount(backdrop, panel);
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
 }

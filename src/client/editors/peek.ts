@@ -4,6 +4,7 @@ import { tokenizeLines, type TokenKind } from '../highlight.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
 import { COLOR, FONT, basename, buildBackdrop, buildPanel, footButton, hexToRgba, isolateScroll, styled } from '../ui.ts';
+import { mount } from '../shadow.ts';
 
 /**
  * Source-peek panel: a read-only, syntax-tinted view of the source file,
@@ -145,7 +146,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
     }),
   );
 
-  document.body.append(backdrop, panel);
+  mount(backdrop, panel);
 
   void (async () => {
     try {

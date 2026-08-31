@@ -137,6 +137,31 @@ dev-server-bound and is verified only by the manual checklist below. When
 extracting pure logic from a client module (as `markdown.ts` was), add a test
 file and move the row up here.
 
+**The shadow root (`shadow.ts`, `styles.ts`) is manual for the same reason**, and
+four of its behaviours fail *silently* rather than visibly — they are the first
+things to check after touching anything in `src/client/`:
+
+- [ ] **Event retargeting.** A `document`-level listener sees `event.target` as
+      the host element, so an `e.target`-based "is this ours" test answers wrong
+      without erroring. Covered by the pill, menu and bar-focus items in the
+      *Boot & chrome* list below; the three known sites are `hover.ts`'s
+      `isOwnUi`, the menu's click-outside, and `applyVisibility`'s
+      `overlayActiveElement()`.
+- [ ] **Mount points.** Every panel must open — settings, collections, entry
+      drawer, media modal, peek, notice, source popup, copy panel, toast, veil.
+      Each is a separate `mount()` call, and one missed redirect appends to the
+      document instead, where the page's CSS can repaint it.
+- [ ] **The slotted writing surface.** Open an entry with a body: the white
+      markdown island must render *inside* the drawer, its toolbar must apply
+      bold to a selection, and closing the drawer must leave
+      `document.querySelector('astro-dev-edit').children.length === 0` — the
+      light-DOM node is not removed by the drawer going away, only by
+      `BodyEditor.destroy()`. **Check this in Safari specifically**; it is the
+      engine the arrangement exists for.
+- [ ] **The theming API.** `astro-dev-edit { --atx-card: … }` reaches inside,
+      and `astro-dev-edit::part(bar) { … }` matches. Both are documented
+      promises in `docs/STYLING.md`.
+
 ## Manual checklist (playground)
 
 Launch per the [verify skill](../.claude/skills/verify/SKILL.md). Work through
@@ -533,20 +558,36 @@ function schema with `image()` fields — and its config sets widget overrides o
 
 **Contrast** (`tests/contrast.test.ts` pins the tokens; these two things it cannot)
 
-- [ ] **Host-page CSS cannot repaint overlay text.** The inline-style rule only
-      protects the element carrying the declaration — a child taking its colour
-      by *inheritance* loses to an ordinary `p { color: … }` or `label { … }` on
-      the page, which is how the Collections legend once rendered in the site's
-      body colour. Paste this in the console on any open panel; it must report
-      nothing. If it names an element, that element needs its own inline colour:
+- [ ] **Host-page CSS cannot touch the overlay at all.** The shadow root makes
+      this a pass/fail rather than a leak hunt: selectors cannot cross the
+      boundary, so no rule on the page can match an overlay node, `!important`
+      included. Open a panel, paste this, and watch the page — the site should
+      go red, lime and cursive while the overlay does not move a pixel. It
+      reports `true` when the overlay is untouched. Reload afterwards.
 
       ```js
-      [...document.querySelectorAll('[data-astro-dev-edit-ui="1"]')]
-        .filter(el => !el.style.color && el.parentElement?.closest('[data-astro-dev-edit-ui="1"]')
-          && getComputedStyle(el).color !== getComputedStyle(el.parentElement).color
-          && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))
-        .map(el => el.className + ' → ' + getComputedStyle(el).color)
+      (() => {
+        const root = document.querySelector('astro-dev-edit').shadowRoot;
+        const shot = () => [...root.querySelectorAll('*')]
+          .map(e => { const s = getComputedStyle(e);
+            return [e.className, s.color, s.backgroundColor, s.fontFamily, s.borderRadius].join('|'); })
+          .join('\n');
+        const before = shot();
+        document.head.insertAdjacentHTML('beforeend',
+          '<style id="atx-probe">*{color:red!important;font-family:cursive!important;' +
+          'background:lime!important;border-radius:0!important}</style>');
+        const after = shot();
+        document.getElementById('atx-probe').remove();
+        return before === after;
+      })()
       ```
+
+- [ ] **Inheritance is closed too.** Inheritance is the one thing that *does*
+      cross a shadow boundary, and `:host { all: initial }` in `styles.ts` is
+      what stops it — this is the check that it is still there. On the
+      playground, whose `global.css` sets `p { color: var(--grey) }`, open
+      *Settings*: the status line under the tabs must be the overlay's own
+      foreground grey-white, not the site's `#5d5d5d`.
 
 - [ ] **The admin bar stays legible over a light page.** It is the one surface
       that is translucent *and* dimmed at rest, so its contrast depends on what

@@ -84,6 +84,9 @@ function showEditDrawer(entry: EntryResponse): void {
   const shell = openDrawer(`Edit entry · ${basename(entry.file)}`, {
     isDirty: () => controls.some((c) => c.dirty()) || (bodyEditor?.dirty() ?? false),
     discardMessage: 'Discard unsaved changes?',
+    // The body editor's writing surface is light-DOM (slotted in), so closing
+    // the drawer does not take it with it.
+    onClose: () => bodyEditor?.destroy(),
   });
 
   for (const c of controls) shell.body.append(c.root);
@@ -219,6 +222,7 @@ export function openEntryCreatePanel(entry: EntrySeed): void {
     isDirty: () =>
       slugInput.value !== '' || bodyEditor.dirty() || controls.some((c) => c.dirty()),
     discardMessage: 'Discard this new entry?',
+    onClose: () => bodyEditor.destroy(),
   });
 
   shell.body.append(slugControl.root);

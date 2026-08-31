@@ -1,5 +1,6 @@
 import { canRichEdit, escapeHtml, htmlToMarkdown, markdownToHtml } from '../markdown.ts';
 import { COLOR, FONT, INPUT_STYLE, PAPER, RADIUS, basename, hexToRgba, isolateScroll, styled, toast } from '../ui.ts';
+import { mountLight } from '../shadow.ts';
 import { buildImageField } from './asset-picker.ts';
 
 /**
@@ -20,11 +21,24 @@ export interface BodyEditor {
   value(): string;
   /** Whether the user actually changed the body. */
   dirty(): boolean;
+  /** Drop the light-DOM contenteditable this editor slots into the drawer.
+   *  Call from the drawer's onClose — `root.remove()` cannot reach it, because
+   *  it is parented to the shadow host rather than to `root`. */
+  destroy(): void;
 }
 
-/** Content styling can't be inlined (the user creates the elements), so the
- *  editor injects one scoped stylesheet. Host pages can still theme via the
- *  documented atx-rte-* hooks. */
+/**
+ * Content styling can't be inlined — the user creates these elements by typing
+ * — so the editor injects one class-scoped stylesheet.
+ *
+ * It lives in the **document**, not in the overlay's shadow stylesheet, because
+ * `.atx-rte-content` is the one piece of overlay chrome that stays in the light
+ * DOM: Safari's selection and `execCommand` APIs are inert against a node
+ * inside a shadow root, which would leave the toolbar doing nothing at all. The
+ * node is slotted back into the drawer instead (shadow.ts::mountLight), so it
+ * renders in place while remaining light-DOM for selection purposes — and is
+ * therefore styled from here, where the document can see it.
+ */
 const CONTENT_CSS = `
 .atx-rte-content h1, .atx-rte-content h2, .atx-rte-content h3,
 .atx-rte-content h4, .atx-rte-content h5, .atx-rte-content h6 {
@@ -93,6 +107,10 @@ function divider(): HTMLElement {
   });
 }
 
+/** Slot names must be unique per editor instance: a drawer hand-off can build
+ *  the next editor before the previous one's node is gone. */
+let rteSeq = 0;
+
 export function buildBodyEditor(initial: string): BodyEditor {
   ensureContentStyles();
 
@@ -109,6 +127,16 @@ export function buildBodyEditor(initial: string): BodyEditor {
     background: PAPER.bg, color: PAPER.fg, border: `1px solid ${COLOR.input}`, colorScheme: 'light',
     font: `13px/1.6 ${FONT.ui}`, outline: 'none', overflowY: 'auto', cursor: 'text',
   });
+  // The editing surface is the one node that does not move into the shadow
+  // root — see CONTENT_CSS above. It is parented to the host and composed back
+  // into the drawer through this slot, so layout is the drawer's job and
+  // selection keeps working in every engine.
+  const slotName = `atx-rte-${++rteSeq}`;
+  content.slot = slotName;
+  const contentSlot = document.createElement('slot');
+  contentSlot.name = slotName;
+  mountLight(content);
+
   isolateScroll(content);
   content.contentEditable = 'true';
   content.addEventListener('focus', () => {
@@ -378,7 +406,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
   });
   stickyHead.append(toolbar, imagePanel);
 
-  root.append(stickyHead, content, srcInput);
+  root.append(stickyHead, contentSlot, srcInput);
 
   const value = (): string => (mode === 'visual' ? htmlToMarkdown(content) : srcInput.value);
 
@@ -389,5 +417,6 @@ export function buildBodyEditor(initial: string): BodyEditor {
       const v = value();
       return v !== initial && (visualBaseline === null || v !== visualBaseline);
     },
+    destroy: () => content.remove(),
   };
 }
