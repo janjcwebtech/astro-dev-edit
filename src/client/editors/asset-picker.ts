@@ -1,5 +1,5 @@
 import { entryAssetDir, entryRelativeToWeb, webToEntryRelative } from '../../shared/asset-path.ts';
-import { CHECKER, COLOR, FONT, INPUT_STYLE, RADIUS, setFreshSrc, styled, toast } from '../ui.ts';
+import { CHECKER, COLOR, FONT, RADIUS, inputEl, setFreshSrc, styled, toast } from '../ui.ts';
 import { openMediaModal } from './media-modal.ts';
 
 /**
@@ -83,8 +83,8 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
   const row = styled('div', 'atx-image-field-row', {
     display: 'flex', alignItems: 'center', gap: '8px',
   });
-  const pathInput = styled('input', 'atx-image-field-path', {
-    ...INPUT_STYLE, flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
+  const pathInput = inputEl('input', 'atx-image-field-path', {
+    flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
   });
   const browse = styled('button', 'atx-btn atx-image-field-browse', {
     flex: '0 0 auto', padding: '6px 10px', borderRadius: RADIUS.md, border: `1px solid ${COLOR.input}`,

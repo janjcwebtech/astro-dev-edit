@@ -14,7 +14,7 @@ import {
   FONT,
   footButton,
   hexToRgba,
-  INPUT_STYLE,
+  inputEl,
   RADIUS,
   setButtonEnabled,
   setFreshSrc,
@@ -356,8 +356,8 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       const el = styled('div', 'atx-media-toolbar atx-media-pane-project', {
         display: 'flex', alignItems: 'center', gap: '6px',
       });
-      const filterInput = styled('input', 'atx-asset-filter', {
-        ...INPUT_STYLE, flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
+      const filterInput = inputEl('input', 'atx-asset-filter', {
+        flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
       });
       filterInput.type = 'search';
       filterInput.placeholder = 'Filter…';
@@ -374,8 +374,8 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
         paint();
       });
 
-      const sortSelect = styled('select', 'atx-media-sort', {
-        ...INPUT_STYLE, flex: '0 0 auto', width: 'auto', font: '12px system-ui',
+      const sortSelect = inputEl('select', 'atx-media-sort', {
+        flex: '0 0 auto', width: 'auto', font: '12px system-ui',
       });
       for (const [value, label] of [['newest', 'Newest'], ['name', 'Name']] as const) {
         const option = document.createElement('option');

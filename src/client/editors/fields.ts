@@ -1,5 +1,5 @@
 import type { FieldDescriptor, FieldType } from '../../shared/protocol.ts';
-import { COLOR, FONT, INPUT_STYLE, styled } from '../ui.ts';
+import { COLOR, FONT, inputEl, styled } from '../ui.ts';
 import { buildImageField } from './asset-picker.ts';
 
 /**
@@ -75,7 +75,7 @@ function displayValue(field: FieldDescriptor, raw: unknown): string {
 
 /** text / date / number / tags share a plain input. */
 const plainInput: ControlBuilder = ({ field, initial, placeholder, root }) => {
-  const input = styled('input', 'atx-field-input', INPUT_STYLE);
+  const input = inputEl('input', 'atx-field-input');
   if (field.type === 'date' && (initial === '' || DATE_RE.test(initial))) {
     input.type = 'date';
     input.value = initial.slice(0, 10);
@@ -125,7 +125,7 @@ const checkbox: ControlBuilder = ({ field, raw, root }) => {
 };
 
 const select: ControlBuilder = ({ field, initial, placeholder, root }) => {
-  const el = styled('select', 'atx-field-input', { ...INPUT_STYLE, cursor: 'pointer' });
+  const el = inputEl('select', 'atx-field-input', { cursor: 'pointer' });
   const opts = [...(field.options ?? [])];
   if (initial && !opts.includes(initial)) opts.unshift(initial);
   if (!field.present) {
@@ -146,8 +146,8 @@ const select: ControlBuilder = ({ field, initial, placeholder, root }) => {
 };
 
 const textarea: ControlBuilder = ({ initial, placeholder, root }) => {
-  const input = styled('textarea', 'atx-field-input', {
-    ...INPUT_STYLE, minHeight: '64px', resize: 'vertical',
+  const input = inputEl('textarea', 'atx-field-input', {
+    minHeight: '64px', resize: 'vertical',
   });
   input.value = initial;
   input.placeholder = placeholder;
@@ -171,8 +171,8 @@ const image: ControlBuilder = ({ field, initial, root, entryFile }) => {
 
 /** Shapes the panel can't edit render read-only; saves never touch them. */
 const json: ControlBuilder = ({ raw, initial, root }) => {
-  const input = styled('textarea', 'atx-field-input', {
-    ...INPUT_STYLE, minHeight: '48px', font: `12px ${FONT.mono}`,
+  const input = inputEl('textarea', 'atx-field-input', {
+    minHeight: '48px', font: `12px ${FONT.mono}`,
     opacity: '0.6', resize: 'vertical',
   });
   input.value = initial;

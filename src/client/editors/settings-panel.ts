@@ -7,7 +7,7 @@ import { icon } from '../icons.ts';
 import {
   COLOR,
   FONT,
-  INPUT_STYLE,
+  inputEl,
   buildTabs,
   footButton,
   setButtonEnabled,
@@ -155,9 +155,9 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   });
 
   const keyRow = styled('div', 'atx-settings-row', { display: 'flex', gap: '6px' });
-  // No masked input exists anywhere else in the overlay, so this is built from
-  // INPUT_STYLE rather than reused.
-  const keyInput = styled('input', 'atx-settings-key', { ...INPUT_STYLE, flex: '1 1 auto' });
+  // No masked input exists anywhere else in the overlay, so this is a plain
+  // control wearing the shared baseline rather than a reusable widget.
+  const keyInput = inputEl('input', 'atx-settings-key', { flex: '1 1 auto' });
   keyInput.type = 'password';
   keyInput.autocomplete = 'off';
   keyInput.spellcheck = false;

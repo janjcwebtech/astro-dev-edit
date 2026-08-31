@@ -3,7 +3,7 @@ import * as state from '../state.ts';
 import { mount } from '../shadow.ts';
 import {
   COLOR,
-  INPUT_STYLE,
+  inputEl,
   buildBackdrop,
   buildPanel,
   pillButton,
@@ -79,8 +79,7 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
   });
   label.textContent = opts.label;
 
-  const input = styled('textarea', 'atx-popup-input', {
-    ...INPUT_STYLE,
+  const input = inputEl('textarea', 'atx-popup-input', {
     width: '100%', minHeight: opts.minHeight ?? '120px', boxSizing: 'border-box',
     resize: 'vertical', whiteSpace: 'pre-wrap',
     font: opts.mono

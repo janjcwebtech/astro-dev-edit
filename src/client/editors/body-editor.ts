@@ -1,5 +1,5 @@
 import { canRichEdit, escapeHtml, htmlToMarkdown, markdownToHtml } from '../markdown.ts';
-import { COLOR, FONT, INPUT_STYLE, PAPER, RADIUS, basename, hexToRgba, isolateScroll, styled, toast } from '../ui.ts';
+import { COLOR, FONT, PAPER, RADIUS, basename, hexToRgba, inputEl, isolateScroll, styled, toast } from '../ui.ts';
 import { mountLight } from '../shadow.ts';
 import { buildImageField } from './asset-picker.ts';
 
@@ -120,10 +120,16 @@ export function buildBodyEditor(initial: string): BodyEditor {
   // --- the two surfaces ----------------------------------------------------
 
   // White writing surface, like the rendered page rather than a form field.
-  // colorScheme:light keeps native chrome (scrollbar) matched to the light bg,
-  // overriding the dark default INPUT_STYLE carries.
+  // colorScheme:light keeps native chrome (scrollbar) matched to the light bg.
+  //
+  // This is the one control that cannot wear the shared [data-input] baseline:
+  // it lives in the light DOM (see CONTENT_CSS below), where the overlay's
+  // stylesheet does not reach. Its box therefore states the three baseline
+  // properties it still wants outright — width, box-sizing, radius — instead
+  // of inheriting them.
   const content = styled('div', 'atx-rte-content', {
-    ...INPUT_STYLE, minHeight: '40vh', padding: '10px 14px',
+    width: '100%', boxSizing: 'border-box', borderRadius: RADIUS.sm,
+    minHeight: '40vh', padding: '10px 14px',
     background: PAPER.bg, color: PAPER.fg, border: `1px solid ${COLOR.input}`, colorScheme: 'light',
     font: `13px/1.6 ${FONT.ui}`, outline: 'none', overflowY: 'auto', cursor: 'text',
   });
@@ -147,8 +153,8 @@ export function buildBodyEditor(initial: string): BodyEditor {
 
   // Class kept from the old plain-textarea body input, so existing user CSS
   // overrides keep working in source mode.
-  const srcInput = styled('textarea', 'atx-body-input', {
-    ...INPUT_STYLE, minHeight: '40vh', font: `12px/1.5 ${FONT.mono}`, resize: 'vertical',
+  const srcInput = inputEl('textarea', 'atx-body-input', {
+    minHeight: '40vh', font: `12px/1.5 ${FONT.mono}`, resize: 'vertical',
   });
   srcInput.value = initial;
 
@@ -261,7 +267,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
     color: COLOR.foreground, opacity: '0.85',
   });
   altLabel.textContent = 'Alt text';
-  const altInput = styled('input', 'atx-rte-image-alt', { ...INPUT_STYLE });
+  const altInput = inputEl('input', 'atx-rte-image-alt');
   altInput.type = 'text';
   altInput.placeholder = 'Describe the image';
   altInput.addEventListener('input', () => (altTouched = true));

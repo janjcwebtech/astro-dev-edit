@@ -1,6 +1,6 @@
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
-import { COLOR, FONT, INPUT_STYLE, buildBackdrop, buildPanel, footButton, styled, toast } from '../ui.ts';
+import { COLOR, FONT, buildBackdrop, buildPanel, footButton, inputEl, styled, toast } from '../ui.ts';
 import { mount } from '../shadow.ts';
 
 /**
@@ -28,8 +28,7 @@ export function openCopyPanel(title: string, text: string): void {
   note.textContent =
     'Your browser would not let the page write to the clipboard — over a network address the dev server is not a secure context. Copy it from here instead:';
 
-  const area = styled('textarea', 'atx-copy-text', {
-    ...INPUT_STYLE,
+  const area = inputEl('textarea', 'atx-copy-text', {
     height: '300px',
     font: `12px/1.5 ${FONT.mono}`,
     whiteSpace: 'pre',

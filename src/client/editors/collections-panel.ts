@@ -16,7 +16,7 @@ import {
   COLOR,
   FONT,
   footButton,
-  INPUT_STYLE,
+  inputEl,
   RADIUS,
   setButtonEnabled,
   styled,
@@ -1130,7 +1130,7 @@ function controlRow(label: string, controls: HTMLElement[]): HTMLElement {
 }
 
 function input(value: string, placeholder: string, onChange: () => void): HTMLInputElement {
-  const el = styled('input', 'atx-collections-input', { ...INPUT_STYLE, flex: '1 1 auto' });
+  const el = inputEl('input', 'atx-collections-input', { flex: '1 1 auto' });
   el.type = 'text';
   el.value = value;
   el.placeholder = placeholder;
@@ -1144,7 +1144,7 @@ function select(
   value: string,
   onChange: () => void,
 ): HTMLSelectElement {
-  const el = styled('select', 'atx-collections-select', { ...INPUT_STYLE, flex: '1 1 auto' });
+  const el = inputEl('select', 'atx-collections-select', { flex: '1 1 auto' });
   for (const [v, label] of choices) {
     const opt = document.createElement('option');
     opt.value = v;

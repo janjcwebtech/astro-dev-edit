@@ -14,7 +14,7 @@ import { UnsplashError } from '../api.ts';
 import { unsplashImportWidth } from '../features.ts';
 import { icon } from '../icons.ts';
 import { createSearchController, type SearchError, type SearchState } from '../unsplash-search.ts';
-import { COLOR, FONT, INPUT_STYLE, footButton, styled, toast } from '../ui.ts';
+import { COLOR, FONT, footButton, inputEl, styled, toast } from '../ui.ts';
 import type { GridTile } from './media-grid.ts';
 import {
   railEmpty,
@@ -74,10 +74,14 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
     display: 'flex', alignItems: 'center', gap: '6px',
   });
 
+  // A div wearing the control baseline: the magnifier and the field sit inside
+  // one bordered box, so the box is the control and the <input> inside it is
+  // bare. inputEl() is typed to real form elements, hence the marker by hand.
   const searchWrap = styled('div', 'atx-unsplash-search', {
     flex: '1 1 auto', minWidth: '0', display: 'flex', alignItems: 'center', gap: '6px',
-    ...INPUT_STYLE, padding: '4px 8px',
+    padding: '4px 8px',
   });
+  searchWrap.dataset.input = '';
   const glass = icon('search', 13);
   glass.style.opacity = '0.6';
   const searchInput = styled('input', 'atx-unsplash-input', {
@@ -88,8 +92,8 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
   searchInput.placeholder = 'Search Unsplash…';
   searchWrap.append(glass, searchInput);
 
-  const orientSelect = styled('select', 'atx-unsplash-orient', {
-    ...INPUT_STYLE, flex: '0 0 auto', width: 'auto', font: '12px system-ui',
+  const orientSelect = inputEl('select', 'atx-unsplash-orient', {
+    flex: '0 0 auto', width: 'auto', font: '12px system-ui',
   });
   for (const { value, label } of ORIENTATIONS) {
     const option = document.createElement('option');
@@ -100,8 +104,8 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
 
   // Width, next to shape: both narrow what a pick will produce, and both are
   // the pane's own state rather than the modal's.
-  const widthSelect = styled('select', 'atx-unsplash-width', {
-    ...INPUT_STYLE, flex: '0 0 auto', width: 'auto', font: '12px system-ui',
+  const widthSelect = inputEl('select', 'atx-unsplash-width', {
+    flex: '0 0 auto', width: 'auto', font: '12px system-ui',
   });
   for (const value of UNSPLASH_IMPORT_WIDTHS) {
     const option = document.createElement('option');

@@ -25,7 +25,7 @@
  * time would hit the temporal dead zone. Reading it at first mount does not.
  */
 
-import { COLOR, FONT, RADIUS } from './ui.ts';
+import { COLOR, FONT, RADIUS, hexToRgba } from './ui.ts';
 
 const kebab = (k: string): string => k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
@@ -227,6 +227,160 @@ ${vars('font-', FONT)}
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+}
+
+/* == Controls ==============================================================
+   Buttons, form controls, the toast, the save veil and the pill button. Three
+   of these are keyed off a data attribute rather than a class, because the
+   class is chosen by the caller and there is no shared one to match:
+   [data-input] for anything built by inputEl(), [data-pill] for pillButton's
+   translucent chrome, [data-dimmed] for a button switched off through
+   setButtonEnabled. */
+
+/* Keyed off the variant classes, not off .atx-btn alone. Four leaves
+   (image.ts, media-modal.ts x2, asset-picker.ts) build their own buttons and
+   borrow the atx-btn hook without a variant, and they carry their own box —
+   a bare .atx-btn rule would hand them a radius and a padding they have never
+   had. They join this rule when their own module is converted. */
+.atx-btn-default,
+.atx-btn-secondary,
+.atx-btn-outline,
+.atx-btn-ghost,
+.atx-btn-destructive {
+  padding: 7px 14px;
+  border-radius: var(--atx-radius-md);
+  font: 600 13px var(--atx-font-ui);
+  cursor: pointer;
+}
+
+.atx-btn-default {
+  border: 1px solid transparent;
+  background: var(--atx-primary);
+  color: var(--atx-primary-fg);
+}
+
+.atx-btn-secondary {
+  border: 1px solid transparent;
+  background: var(--atx-elevated);
+  color: var(--atx-foreground);
+}
+
+.atx-btn-outline {
+  border: 1px solid var(--atx-input);
+  background: transparent;
+  color: var(--atx-foreground);
+}
+
+.atx-btn-ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--atx-muted-fg);
+}
+
+/* margin-right: auto pushes a destructive button to the far left of a flex
+   footer, away from the safe actions. */
+.atx-btn-destructive {
+  margin-right: auto;
+  border: 1px solid var(--atx-destructive-border);
+  background: transparent;
+  color: var(--atx-destructive-text);
+}
+
+/* Not :disabled. A button switched off through setButtonEnabled dims; the
+   several places that set .disabled directly never did, and making them all
+   dim here would be a visual change this conversion is not allowed to make.
+   Whether those two populations should be one is a question for the restyle. */
+[data-dimmed] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Baseline for text-ish form controls (inputs, textareas, selects).
+   color-scheme: dark makes the browser render native chrome — the date input's
+   calendar-picker icon and popup, number spinners — light against the dark
+   background instead of as a near-invisible dark glyph. */
+[data-input] {
+  width: 100%;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-sm);
+  background: var(--atx-background);
+  color: var(--atx-foreground);
+  font: 13px var(--atx-font-ui);
+  color-scheme: dark;
+}
+
+[data-pill] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border: none;
+  border-radius: var(--atx-radius-sm);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--atx-foreground);
+  font: 600 11px var(--atx-font-ui);
+  cursor: pointer;
+}
+
+[data-pill]:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Optical centring, which flexbox cannot do for text — see pillButton in
+   ui.ts for why an 11px lowercase label reads as sitting low without it. */
+.atx-pill-label {
+  position: relative;
+  top: -1.5px;
+}
+
+.atx-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: var(--atx-radius-md);
+  color: var(--atx-primary-fg);
+  font: 500 13px var(--atx-font-ui);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.atx-toast[data-shown] {
+  opacity: 1;
+}
+
+.atx-toast-ok {
+  background: var(--atx-success);
+}
+
+.atx-toast-err {
+  background: var(--atx-destructive);
+}
+
+/* The save veil's rect is measured off a host element, so its geometry is the
+   one thing that stays inline. */
+.atx-veil {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--atx-radius-sm);
+  background: ${hexToRgba(COLOR.primary, 0.12)};
+  pointer-events: all;
+}
+
+.atx-veil-chip {
+  padding: 2px 8px;
+  border-radius: var(--atx-radius-full);
+  background: var(--atx-primary);
+  color: var(--atx-primary-fg);
+  font: 600 11px system-ui;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* The rich-text editor's contenteditable is light-DOM and slotted in (see

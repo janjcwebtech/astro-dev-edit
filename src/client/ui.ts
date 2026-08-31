@@ -214,16 +214,6 @@ export const FONT = {
   ui: 'ui-sans-serif, system-ui, sans-serif',
 } as const;
 
-/** Baseline for text-ish form controls (inputs, textareas, selects).
- *  `colorScheme: dark` makes the browser render native chrome — the date
- *  input's calendar-picker icon and popup, number spinners — light against the
- *  dark background instead of as a near-invisible dark glyph. */
-export const INPUT_STYLE: Partial<CSSStyleDeclaration> = {
-  width: '100%', padding: '6px 8px', boxSizing: 'border-box',
-  border: `1px solid ${COLOR.input}`, borderRadius: RADIUS.sm,
-  background: COLOR.background, color: COLOR.foreground,
-  font: `13px ${FONT.ui}`, colorScheme: 'dark',
-};
 
 /**
  * The surfaces exposed to user CSS as `::part()`. Deliberately small: a part is
@@ -266,6 +256,27 @@ export function styled<K extends keyof HTMLElementTagNameMap>(
   if (part) el.setAttribute('part', part);
   if (id) el.id = id;
   if (style) Object.assign(el.style, style);
+  return el;
+}
+
+/**
+ * A text-ish form control — input, textarea or select — carrying the shared
+ * control baseline from styles.ts.
+ *
+ * The marker is `[data-input]`, not a class, because every caller already
+ * names its own (`atx-field-input`, `atx-collections-input`, `atx-settings-key`
+ * …) and there is no shared class to key a rule off. `style` is for the
+ * per-caller trim a control genuinely needs — a monospace face on a path
+ * field, `flex` inside a row — not for the baseline, which is not repeatable
+ * from out here any more.
+ */
+export function inputEl<K extends 'input' | 'textarea' | 'select'>(
+  tag: K,
+  className: string,
+  style?: Partial<CSSStyleDeclaration>,
+): HTMLElementTagNameMap[K] {
+  const el = styled(tag, className, style);
+  el.dataset.input = '';
   return el;
 }
 
@@ -336,16 +347,11 @@ export function onChromeInset(fn: (i: ChromeInset) => void): void {
 export function lockElement(el: HTMLElement): () => void {
   const rect = el.getBoundingClientRect();
   const veil = styled('div', 'atx-veil', {
-    position: 'fixed', zIndex: String(Z + 3), pointerEvents: 'all',
+    zIndex: String(Z + 3),
     left: `${rect.left - 2}px`, top: `${rect.top - 2}px`,
     width: `${rect.width + 4}px`, height: `${rect.height + 4}px`,
-    background: hexToRgba(COLOR.primary, 0.12), borderRadius: RADIUS.sm,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
   });
-  const chip = styled('div', 'atx-veil-chip', {
-    font: '600 11px system-ui', color: COLOR.primaryFg, background: COLOR.primary,
-    padding: '2px 8px', borderRadius: RADIUS.full, boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-  });
+  const chip = styled('div', 'atx-veil-chip');
   chip.textContent = 'saving…';
   veil.append(chip);
   mount(veil);
@@ -356,17 +362,15 @@ export function lockElement(el: HTMLElement): () => void {
  *  the accent. Auto-dismisses. */
 export function toast(message: string, kind: 'ok' | 'err'): void {
   const t = styled('div', `atx-toast atx-toast-${kind}`, {
-    position: 'fixed', zIndex: String(Z + 5), left: '50%', bottom: `${24 + inset.bottom}px`,
-    transform: 'translateX(-50%)', padding: '10px 16px', borderRadius: RADIUS.md,
-    font: `500 13px ${FONT.ui}`, color: COLOR.primaryFg,
-    background: kind === 'ok' ? COLOR.success : COLOR.destructive,
-    boxShadow: '0 4px 16px rgba(0,0,0,0.3)', opacity: '0', transition: 'opacity 120ms',
+    zIndex: String(Z + 5),
+    // The one runtime value: how far a bottom-docked admin bar pushes it up.
+    bottom: `${24 + inset.bottom}px`,
   });
   t.textContent = message;
   mount(t);
-  requestAnimationFrame(() => (t.style.opacity = '1'));
+  requestAnimationFrame(() => t.toggleAttribute('data-shown', true));
   setTimeout(() => {
-    t.style.opacity = '0';
+    t.toggleAttribute('data-shown', false);
     setTimeout(() => t.remove(), 200);
   }, 2400);
 }
@@ -656,25 +660,11 @@ export function buildBackdrop(onClose: () => void, layer = 5): HTMLElement {
  */
 export type ButtonKind = 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive';
 
-const BUTTON_STYLES: Record<ButtonKind, Partial<CSSStyleDeclaration>> = {
-  default: { border: '1px solid transparent', background: COLOR.primary, color: COLOR.primaryFg },
-  secondary: { border: '1px solid transparent', background: COLOR.elevated, color: COLOR.foreground },
-  outline: { border: `1px solid ${COLOR.input}`, background: 'transparent', color: COLOR.foreground },
-  ghost: { border: '1px solid transparent', background: 'transparent', color: COLOR.mutedFg },
-  // marginRight:auto pushes a destructive button to the far left of a flex
-  // footer, away from the safe actions.
-  destructive: {
-    border: `1px solid ${COLOR.destructiveBorder}`, background: 'transparent',
-    color: COLOR.destructiveText, marginRight: 'auto',
-  },
-};
-
-/** A panel/drawer footer button. The single source of button styling. */
+/** A panel/drawer footer button. The single source of button styling — each
+ *  kind is `.atx-btn-<kind>` in styles.ts, so a variant is a class rather than
+ *  a lookup table copied onto the element. */
 export function footButton(label: string, kind: ButtonKind, onClick: () => void): HTMLButtonElement {
-  const btn = styled('button', `atx-btn atx-btn-${kind}`, {
-    padding: '7px 14px', borderRadius: RADIUS.md, cursor: 'pointer', font: `600 13px ${FONT.ui}`,
-    ...BUTTON_STYLES[kind],
-  });
+  const btn = styled('button', `atx-btn atx-btn-${kind}`);
   btn.type = 'button';
   btn.textContent = label;
   btn.addEventListener('click', onClick);
@@ -682,15 +672,19 @@ export function footButton(label: string, kind: ButtonKind, onClick: () => void)
 }
 
 /**
- * Enable or disable a button *visibly*. There is no stylesheet, so `:disabled`
- * cannot dim it — a disabled primary button would otherwise look identical to a
- * live one and read as broken rather than as unavailable. Every caller that sets
- * `.disabled` on an overlay button should go through this instead.
+ * Enable or disable a button *visibly*: a disabled primary button would
+ * otherwise look identical to a live one and read as broken rather than as
+ * unavailable. Every caller that sets `.disabled` on an overlay button should
+ * go through this instead.
+ *
+ * The dimming is `[data-dimmed]` in styles.ts rather than `:disabled`, because
+ * the two are not the same set — several places set `.disabled` directly and
+ * have never dimmed. Widening that is a design decision, not a side effect of
+ * moving a value into a stylesheet.
  */
 export function setButtonEnabled(btn: HTMLButtonElement, enabled: boolean): void {
   btn.disabled = !enabled;
-  btn.style.opacity = enabled ? '1' : '0.45';
-  btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  btn.toggleAttribute('data-dimmed', !enabled);
 }
 
 /**
@@ -709,35 +703,30 @@ export function pillButton(
   extra: Partial<CSSStyleDeclaration> = {},
   iconEl?: HTMLElement,
 ): HTMLButtonElement {
-  const btn = styled('button', className, {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-    marginLeft: '8px', padding: '2px 7px', font: `600 11px ${FONT.ui}`,
-    color: COLOR.foreground, background: 'rgba(255,255,255,0.14)',
-    border: 'none', borderRadius: RADIUS.sm, cursor: 'pointer',
-    ...extra,
-  });
+  const btn = styled('button', className, extra);
+  // The caller names the class, so there is no shared one for the stylesheet
+  // to match; this attribute is the pill's identity instead.
+  btn.dataset.pill = '';
   btn.type = 'button';
   /**
-   * Optical centring, which flexbox can't do for text. `align-items: center`
-   * lines up the *boxes*, but a text box is asymmetric around its ink: on an
-   * 11px label it reserves ~11px above the baseline for ascenders and 2px
-   * below, while an all-lowercase word ("open", "copy") only paints the ~6px
-   * x-height band. Centred by box, that band lands ~1.5px below the middle of
-   * the pill and the label reads as sitting low. Lift it onto the pill's
-   * centre; the icon, whose glyph does fill its box, needs no correction.
+   * `.atx-pill-label` lifts the text 1.5px — optical centring, which flexbox
+   * can't do for text. `align-items: center` lines up the *boxes*, but a text
+   * box is asymmetric around its ink: on an 11px label it reserves ~11px above
+   * the baseline for ascenders and 2px below, while an all-lowercase word
+   * ("open", "copy") only paints the ~6px x-height band. Centred by box, that
+   * band lands ~1.5px below the middle of the pill and the label reads as
+   * sitting low. The icon, whose glyph does fill its box, needs no correction.
    *
    * Offset rather than margin (a margin would be half-absorbed by the centring
    * it is correcting) and `relative` rather than a transform (the spinner icon
    * animates the host's own transform).
    */
-  const text = styled('span', 'atx-pill-label', { position: 'relative', top: '-1.5px' });
+  const text = styled('span', 'atx-pill-label');
   text.dataset.label = '';
   text.textContent = label;
   if (iconEl) btn.append(iconEl);
   btn.append(text);
   btn.title = title;
-  btn.addEventListener('mouseenter', () => (btn.style.background = 'rgba(255,255,255,0.28)'));
-  btn.addEventListener('mouseleave', () => (btn.style.background = 'rgba(255,255,255,0.14)'));
   return btn;
 }
 
