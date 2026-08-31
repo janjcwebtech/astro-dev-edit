@@ -3,7 +3,7 @@ import * as api from '../api.ts';
 import { EntryApplyError } from '../api.ts';
 import { slugify } from '../../shared/slug.ts';
 import * as state from '../state.ts';
-import { COLOR, basename, footButton, styled, toast } from '../ui.ts';
+import { basename, footButton, styled, toast } from '../ui.ts';
 import { buildBodyEditor } from './body-editor.ts';
 import { openDrawer } from './drawer.ts';
 import { applyFieldErrors, buildControl, collectChanges, type FieldControl } from './fields.ts';
@@ -22,10 +22,7 @@ import { applyFieldErrors, buildControl, collectChanges, type FieldControl } fro
 // ---------------------------------------------------------------------------
 
 function sectionLabel(text: string): HTMLElement {
-  const l = styled('div', 'atx-section-label', {
-    font: '600 12px system-ui', margin: '16px 0 6px', opacity: '0.85',
-    paddingTop: '12px', borderTop: `1px solid ${COLOR.border}`,
-  });
+  const l = styled('div', 'atx-section-label');
   l.textContent = text;
   return l;
 }

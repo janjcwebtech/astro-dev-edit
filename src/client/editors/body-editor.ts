@@ -40,6 +40,26 @@ export interface BodyEditor {
  * therefore styled from here, where the document can see it.
  */
 const CONTENT_CSS = `
+/* The writing surface itself. White, like the rendered page rather than a form
+   field, and color-scheme: light so native chrome (the scrollbar) matches it.
+   Hidden in source mode; [data-on] is the visual half of the MD/Rich toggle. */
+.atx-rte-content {
+  display: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40vh;
+  padding: 10px 14px;
+  border: 1px solid ${COLOR.input};
+  border-radius: ${RADIUS.sm};
+  background: ${PAPER.bg};
+  color: ${PAPER.fg};
+  font: 13px/1.6 ${FONT.ui};
+  color-scheme: light;
+  outline: none;
+  overflow-y: auto;
+  cursor: text;
+}
+.atx-rte-content[data-on] { display: block; }
 .atx-rte-content h1, .atx-rte-content h2, .atx-rte-content h3,
 .atx-rte-content h4, .atx-rte-content h5, .atx-rte-content h6 {
   margin: 0.7em 0 0.35em; font-weight: 700; line-height: 1.25; color: inherit;
@@ -79,32 +99,27 @@ function ensureContentStyles(): void {
   document.head.append(style);
 }
 
+/** A toolbar button. `variant` is an extra class, not a style object: what each
+ *  button does to its own label — bold, italic, struck through, monospaced — is
+ *  a fixed choice from a known set, so it belongs in the stylesheet. */
 function toolbarButton(
   label: string,
   title: string,
   onRun: () => void,
-  labelStyle: Partial<CSSStyleDeclaration> = {},
+  variant = '',
 ): HTMLButtonElement {
-  const b = styled('button', 'atx-rte-btn', {
-    border: 'none', background: 'transparent', color: COLOR.mutedFg, cursor: 'pointer',
-    padding: '5px 8px', borderRadius: RADIUS.sm, font: `600 12px ${FONT.ui}`,
-    minWidth: '28px', lineHeight: '1', ...labelStyle,
-  });
+  const b = styled('button', variant ? `atx-rte-btn ${variant}` : 'atx-rte-btn');
   b.type = 'button';
   b.textContent = label;
   b.title = title;
   // preventDefault keeps the contenteditable selection alive through the click.
   b.addEventListener('mousedown', (e) => e.preventDefault());
-  b.addEventListener('mouseenter', () => (b.style.background = COLOR.border));
-  b.addEventListener('mouseleave', () => (b.style.background = 'transparent'));
   b.addEventListener('click', onRun);
   return b;
 }
 
 function divider(): HTMLElement {
-  return styled('span', 'atx-rte-divider', {
-    width: '1px', alignSelf: 'stretch', margin: '3px 3px', background: COLOR.border,
-  });
+  return styled('span', 'atx-rte-divider');
 }
 
 /** Slot names must be unique per editor instance: a drawer hand-off can build
@@ -114,25 +129,17 @@ let rteSeq = 0;
 export function buildBodyEditor(initial: string): BodyEditor {
   ensureContentStyles();
 
-  const root = styled('div', 'atx-rte', {});
+  const root = styled('div', 'atx-rte');
   let mode: 'visual' | 'source' = canRichEdit(initial) ? 'visual' : 'source';
 
   // --- the two surfaces ----------------------------------------------------
 
-  // White writing surface, like the rendered page rather than a form field.
-  // colorScheme:light keeps native chrome (scrollbar) matched to the light bg.
-  //
-  // This is the one control that cannot wear the shared [data-input] baseline:
-  // it lives in the light DOM (see CONTENT_CSS below), where the overlay's
-  // stylesheet does not reach. Its box therefore states the three baseline
-  // properties it still wants outright — width, box-sizing, radius — instead
-  // of inheriting them.
-  const content = styled('div', 'atx-rte-content', {
-    width: '100%', boxSizing: 'border-box', borderRadius: RADIUS.sm,
-    minHeight: '40vh', padding: '10px 14px',
-    background: PAPER.bg, color: PAPER.fg, border: `1px solid ${COLOR.input}`, colorScheme: 'light',
-    font: `13px/1.6 ${FONT.ui}`, outline: 'none', overflowY: 'auto', cursor: 'text',
-  });
+  // The one control that can wear neither the shared [data-input] baseline nor
+  // a rule from the overlay's stylesheet: it lives in the light DOM, where
+  // selectors from the shadow root do not reach and ::slotted() loses to the
+  // document. Its whole box is in CONTENT_CSS instead, alongside the rules for
+  // the elements the user types into it.
+  const content = styled('div', 'atx-rte-content');
   // The editing surface is the one node that does not move into the shadow
   // root — see CONTENT_CSS above. It is parented to the host and composed back
   // into the drawer through this slot, so layout is the drawer's job and
@@ -153,9 +160,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
 
   // Class kept from the old plain-textarea body input, so existing user CSS
   // overrides keep working in source mode.
-  const srcInput = inputEl('textarea', 'atx-body-input', {
-    minHeight: '40vh', font: `12px/1.5 ${FONT.mono}`, resize: 'vertical',
-  });
+  const srcInput = inputEl('textarea', 'atx-body-input');
   srcInput.value = initial;
 
   let visualBaseline: string | null = null;
@@ -202,33 +207,21 @@ export function buildBodyEditor(initial: string): BodyEditor {
 
   // --- heading dropdown ----------------------------------------------------
 
-  const headWrap = styled('span', 'atx-rte-heading', { position: 'relative', display: 'inline-flex' });
-  const headMenu = styled('div', 'atx-rte-heading-menu', {
-    position: 'absolute', top: 'calc(100% + 4px)', left: '0', display: 'none',
-    minWidth: '150px', padding: '4px', background: COLOR.card,
-    border: `1px solid ${COLOR.border}`, borderRadius: RADIUS.md,
-    boxShadow: '0 8px 24px rgba(0,0,0,0.45)', zIndex: '3',
-  });
+  const headWrap = styled('span', 'atx-rte-heading');
+  const headMenu = styled('div', 'atx-rte-heading-menu');
   const hideMenu = (): void => {
-    headMenu.style.display = 'none';
+    headMenu.toggleAttribute('data-on', false);
   };
   const menuItem = (tag: string, chip: string, name: string, size: string): HTMLButtonElement => {
-    const item = styled('button', 'atx-rte-heading-item', {
-      display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
-      padding: '5px 8px', border: 'none', borderRadius: RADIUS.sm, background: 'transparent',
-      color: COLOR.foreground, cursor: 'pointer', textAlign: 'left', font: `12px ${FONT.ui}`,
-    });
+    const item = styled('button', 'atx-rte-heading-item');
     item.type = 'button';
-    const chipEl = styled('span', 'atx-rte-heading-chip', {
-      font: `700 11px ${FONT.mono}`, opacity: '0.7', minWidth: '20px',
-    });
+    const chipEl = styled('span', 'atx-rte-heading-chip');
     chipEl.textContent = chip;
-    const nameEl = styled('span', 'atx-rte-heading-name', { font: `600 ${size} ${FONT.ui}` });
+    // The one size the stylesheet cannot know: each row previews its own level.
+    const nameEl = styled('span', 'atx-rte-heading-name', { fontSize: size });
     nameEl.textContent = name;
     item.append(chipEl, nameEl);
     item.addEventListener('mousedown', (e) => e.preventDefault());
-    item.addEventListener('mouseenter', () => (item.style.background = COLOR.border));
-    item.addEventListener('mouseleave', () => (item.style.background = 'transparent'));
     item.addEventListener('click', () => {
       hideMenu();
       exec('formatBlock', `<${tag}>`);
@@ -241,7 +234,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
   headMenu.append(menuItem('p', 'P', 'Paragraph', '12px'));
   headWrap.append(
     toolbarButton('Hx', 'Heading level', () => {
-      headMenu.style.display = headMenu.style.display === 'none' ? 'block' : 'none';
+      headMenu.toggleAttribute('data-on');
     }),
     headMenu,
   );
@@ -250,38 +243,26 @@ export function buildBodyEditor(initial: string): BodyEditor {
   //     path). Opened by the toolbar button (insert at caret) or by clicking
   //     an image inside the content (replace that image).
 
-  const imagePanel = styled('div', 'atx-rte-image-panel', {
-    display: 'none', margin: '6px 0 0', padding: '10px',
-    border: `1px solid ${COLOR.border}`, borderRadius: RADIUS.md, background: COLOR.background,
-  });
+  const imagePanel = styled('div', 'atx-rte-image-panel');
   let imageValue = '';
   let replaceTarget: HTMLImageElement | null = null;
-  const imageFieldSlot = styled('div', 'atx-rte-image-slot', {});
+  const imageFieldSlot = styled('div', 'atx-rte-image-slot');
 
   // Alt text, auto-suggested from the picked file's name until edited by hand.
   const altFromPath = (path: string): string =>
     (basename(path).replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ')).trim();
   let altTouched = false;
-  const altLabel = styled('label', 'atx-rte-image-alt-label', {
-    display: 'block', font: `600 11px ${FONT.ui}`, margin: '8px 0 4px',
-    color: COLOR.foreground, opacity: '0.85',
-  });
+  const altLabel = styled('label', 'atx-rte-image-alt-label');
   altLabel.textContent = 'Alt text';
   const altInput = inputEl('input', 'atx-rte-image-alt');
   altInput.type = 'text';
   altInput.placeholder = 'Describe the image';
   altInput.addEventListener('input', () => (altTouched = true));
 
-  const imageActions = styled('div', 'atx-rte-image-actions', {
-    display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px',
-  });
+  const imageActions = styled('div', 'atx-rte-image-actions');
   const smallBtn = (label: string, primary: boolean, onClick: () => void): HTMLButtonElement => {
-    const b = styled('button', `atx-btn atx-btn-${primary ? 'default' : 'outline'}`, {
-      padding: '4px 10px', borderRadius: RADIUS.md, cursor: 'pointer', font: `600 12px ${FONT.ui}`,
-      border: primary ? '1px solid transparent' : `1px solid ${COLOR.input}`,
-      background: primary ? COLOR.primary : 'transparent',
-      color: primary ? COLOR.primaryFg : COLOR.mutedFg,
-    });
+    const kind = primary ? 'default' : 'outline';
+    const b = styled('button', `atx-btn atx-btn-${kind} atx-rte-image-btn`);
     b.type = 'button';
     b.textContent = label;
     b.addEventListener('click', onClick);
@@ -292,7 +273,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
       toast('Pick or upload an image first', 'err');
       return;
     }
-    imagePanel.style.display = 'none';
+    imagePanel.toggleAttribute('data-on', false);
     const alt = altInput.value.trim();
     if (replaceTarget && replaceTarget.isConnected) {
       replaceTarget.src = imageValue;
@@ -304,7 +285,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
     }
   });
   imageActions.append(
-    smallBtn('Cancel', false, () => (imagePanel.style.display = 'none')),
+    smallBtn('Cancel', false, () => imagePanel.toggleAttribute('data-on', false)),
     confirmBtn,
   );
   imagePanel.append(imageFieldSlot, altLabel, altInput, imageActions);
@@ -329,7 +310,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
       },
     }));
     confirmBtn.textContent = target ? 'Replace' : 'Insert';
-    imagePanel.style.display = 'block';
+    imagePanel.toggleAttribute('data-on', true);
   };
 
   // Clicking an image in the content opens the panel targeting it.
@@ -343,11 +324,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
 
   // --- toolbar -------------------------------------------------------------
 
-  const toolbar = styled('div', 'atx-rte-toolbar', {
-    display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1px',
-    padding: '4px',
-    background: COLOR.card, border: `1px solid ${COLOR.border}`, borderRadius: RADIUS.md,
-  });
+  const toolbar = styled('div', 'atx-rte-toolbar');
 
   const modeBtn = toolbarButton('MD', 'Switch between rich text and markdown source', () => {
     if (mode === 'visual') {
@@ -361,12 +338,12 @@ export function buildBodyEditor(initial: string): BodyEditor {
       content.innerHTML = markdownToHtml(srcInput.value);
       setMode('visual');
     }
-  }, { marginLeft: 'auto', font: `700 11px ${FONT.mono}`, color: COLOR.primaryText });
+  }, 'atx-rte-mode');
 
   const formatButtons = [
-    toolbarButton('B', 'Bold', () => exec('bold'), { fontWeight: '800' }),
-    toolbarButton('I', 'Italic', () => exec('italic'), { fontStyle: 'italic', fontFamily: 'serif' }),
-    toolbarButton('S', 'Strikethrough', () => exec('strikeThrough'), { textDecoration: 'line-through' }),
+    toolbarButton('B', 'Bold', () => exec('bold'), 'atx-rte-btn-bold'),
+    toolbarButton('I', 'Italic', () => exec('italic'), 'atx-rte-btn-italic'),
+    toolbarButton('S', 'Strikethrough', () => exec('strikeThrough'), 'atx-rte-btn-strike'),
     divider(),
     headWrap,
     divider(),
@@ -374,13 +351,13 @@ export function buildBodyEditor(initial: string): BodyEditor {
     toolbarButton('1.', 'Numbered list', () => exec('insertOrderedList')),
     divider(),
     toolbarButton('❝', 'Quote', () => exec('formatBlock', '<blockquote>')),
-    toolbarButton('PRE', 'Code block', () => exec('formatBlock', '<pre>'), { font: `700 10px ${FONT.mono}` }),
-    toolbarButton('`', 'Inline code', insertInlineCode, { font: `700 13px ${FONT.mono}` }),
+    toolbarButton('PRE', 'Code block', () => exec('formatBlock', '<pre>'), 'atx-rte-btn-pre'),
+    toolbarButton('`', 'Inline code', insertInlineCode, 'atx-rte-btn-code'),
     divider(),
     toolbarButton('🔗', 'Insert link', insertLink),
     toolbarButton('🖼', 'Insert image', () => {
-      if (imagePanel.style.display !== 'none') {
-        imagePanel.style.display = 'none';
+      if (imagePanel.hasAttribute('data-on')) {
+        imagePanel.toggleAttribute('data-on', false);
         return;
       }
       saveSelection();
@@ -395,21 +372,18 @@ export function buildBodyEditor(initial: string): BodyEditor {
   const setMode = (next: 'visual' | 'source'): void => {
     mode = next;
     const visual = next === 'visual';
-    content.style.display = visual ? 'block' : 'none';
-    imagePanel.style.display = 'none';
+    content.toggleAttribute('data-on', visual);
+    imagePanel.toggleAttribute('data-on', false);
     hideMenu();
-    srcInput.style.display = visual ? 'none' : 'block';
-    for (const el of formatButtons) el.style.display = visual ? '' : 'none';
+    srcInput.toggleAttribute('data-on', !visual);
+    for (const el of formatButtons) el.toggleAttribute('data-hidden', !visual);
     modeBtn.textContent = visual ? 'MD' : 'Rich';
   };
   setMode(mode);
 
   // Toolbar and image panel share one sticky header, so the panel stays in
   // view when it's opened for an image far down a long body.
-  const stickyHead = styled('div', 'atx-rte-head', {
-    position: 'sticky', top: '0', zIndex: '2',
-    background: COLOR.card, paddingBottom: '6px',
-  });
+  const stickyHead = styled('div', 'atx-rte-head');
   stickyHead.append(toolbar, imagePanel);
 
   root.append(stickyHead, contentSlot, srcInput);

@@ -1,5 +1,5 @@
 import type { FieldDescriptor, FieldType } from '../../shared/protocol.ts';
-import { COLOR, FONT, inputEl, styled } from '../ui.ts';
+import { inputEl, styled } from '../ui.ts';
 import { buildImageField } from './asset-picker.ts';
 
 /**
@@ -35,7 +35,7 @@ function lockControls(root: HTMLElement): void {
   for (const el of root.querySelectorAll('input, textarea, select, button')) {
     (el as HTMLInputElement | HTMLButtonElement).disabled = true;
   }
-  root.style.opacity = '0.55';
+  root.dataset.locked = '';
 }
 
 /** What a builder must supply; buildControl adds the label/error chrome. */
@@ -102,17 +102,14 @@ const plainInput: ControlBuilder = ({ field, initial, placeholder, root }) => {
 };
 
 const checkbox: ControlBuilder = ({ field, raw, root }) => {
-  const wrap = styled('label', 'atx-field-check', {
-    display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
-    font: '13px system-ui', color: COLOR.foreground,
-  });
-  const input = styled('input', 'atx-field-input', { cursor: 'pointer' });
+  const wrap = styled('label', 'atx-field-check');
+  const input = styled('input', 'atx-field-input atx-field-checkbox');
   input.type = 'checkbox';
   input.checked = raw === true;
   // A bare checkbox reads as unfinished UI, so the box is always accompanied by
   // words: "not set" while the key is absent from the file (the state the entry
   // drawer has to distinguish), and the plain on/off state once it is not.
-  const hint = styled('span', 'atx-field-check-hint', { opacity: '0.7' });
+  const hint = styled('span', 'atx-field-check-hint');
   const stateWord = (): string => (input.checked ? 'On' : 'Off');
   hint.textContent = field.present ? stateWord() : 'not set';
   input.addEventListener('change', () => (hint.textContent = stateWord()));
@@ -125,7 +122,7 @@ const checkbox: ControlBuilder = ({ field, raw, root }) => {
 };
 
 const select: ControlBuilder = ({ field, initial, placeholder, root }) => {
-  const el = inputEl('select', 'atx-field-input', { cursor: 'pointer' });
+  const el = inputEl('select', 'atx-field-input atx-field-select');
   const opts = [...(field.options ?? [])];
   if (initial && !opts.includes(initial)) opts.unshift(initial);
   if (!field.present) {
@@ -146,9 +143,7 @@ const select: ControlBuilder = ({ field, initial, placeholder, root }) => {
 };
 
 const textarea: ControlBuilder = ({ initial, placeholder, root }) => {
-  const input = inputEl('textarea', 'atx-field-input', {
-    minHeight: '64px', resize: 'vertical',
-  });
+  const input = inputEl('textarea', 'atx-field-input atx-field-textarea');
   input.value = initial;
   input.placeholder = placeholder;
   root.append(input);
@@ -171,10 +166,7 @@ const image: ControlBuilder = ({ field, initial, root, entryFile }) => {
 
 /** Shapes the panel can't edit render read-only; saves never touch them. */
 const json: ControlBuilder = ({ raw, initial, root }) => {
-  const input = inputEl('textarea', 'atx-field-input', {
-    minHeight: '48px', font: `12px ${FONT.mono}`,
-    opacity: '0.6', resize: 'vertical',
-  });
+  const input = inputEl('textarea', 'atx-field-input atx-field-json');
   input.value = initial;
   input.readOnly = true;
   input.title = 'This field has a shape the panel can’t edit — change it in the file.';
@@ -201,21 +193,16 @@ export function buildControl(
   raw: unknown,
   entryFile = '',
 ): FieldControl {
-  const root = styled('div', 'atx-field', { marginBottom: '12px' });
+  const root = styled('div', 'atx-field');
 
-  const label = styled('label', 'atx-field-label', {
-    display: 'block', font: '600 12px system-ui', marginBottom: '4px',
-    color: COLOR.foreground, opacity: '0.85',
-  });
+  const label = styled('label', 'atx-field-label');
   label.textContent = field.required ? `${field.label} *` : field.label;
   root.append(label);
 
-  const error = styled('div', 'atx-field-error', {
-    display: 'none', marginTop: '3px', font: '12px system-ui', color: COLOR.destructiveText,
-  });
+  const error = styled('div', 'atx-field-error');
   const setError = (message: string | null): void => {
     error.textContent = message ?? '';
-    error.style.display = message ? 'block' : 'none';
+    error.toggleAttribute('data-on', Boolean(message));
   };
 
   const initial = displayValue(field, raw);
@@ -228,9 +215,7 @@ export function buildControl(
   const parts = builder({ field, raw, initial, placeholder, root, entryFile });
 
   if (field.help) {
-    const help = styled('div', 'atx-field-help', {
-      marginTop: '4px', font: '11px/1.45 system-ui', color: COLOR.mutedFg,
-    });
+    const help = styled('div', 'atx-field-help');
     help.textContent = field.help;
     root.append(help);
   }

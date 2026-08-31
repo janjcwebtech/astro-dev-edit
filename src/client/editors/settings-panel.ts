@@ -5,8 +5,6 @@ import { coerceImportWidth } from '../../shared/unsplash.ts';
 import { clearHighlight } from '../hover.ts';
 import { icon } from '../icons.ts';
 import {
-  COLOR,
-  FONT,
   inputEl,
   buildTabs,
   footButton,
@@ -112,34 +110,22 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   // --- the option panes ------------------------------------------------------
   const panes = new Map<string, HTMLElement>();
   for (const g of GROUPS) {
-    const pane = styled('div', `atx-settings-pane atx-settings-pane-${g.id}`, {
-      paddingTop: '12px',
-    });
+    const pane = styled('div', `atx-settings-pane atx-settings-pane-${g.id}`);
     panes.set(g.id, pane);
   }
 
-  const status = styled('p', 'atx-settings-status', {
-    margin: '0 0 12px', font: '12px system-ui', display: 'flex', alignItems: 'center', gap: '6px',
-  });
+  const status = styled('p', 'atx-settings-status');
 
-  const error = styled('p', 'atx-settings-error', {
-    margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.warning, display: 'none',
-  });
+  const error = styled('p', 'atx-settings-error');
 
   // --- the Unsplash key section, which is not an option ----------------------
-  const keySection = styled('div', 'atx-settings-key-section', {
-    marginTop: '18px', paddingTop: '14px', borderTop: `1px solid ${COLOR.border}`,
-  });
+  const keySection = styled('div', 'atx-settings-key-section');
 
-  const keyHeading = styled('h3', 'atx-settings-heading', {
-    margin: '0 0 4px', font: '600 13px system-ui', color: COLOR.foreground,
-  });
+  const keyHeading = styled('h3', 'atx-settings-heading');
   keyHeading.textContent = 'Access key';
 
-  const keyBlurb = styled('p', 'atx-settings-blurb', {
-    margin: '0 0 12px', font: '12px/1.5 system-ui', color: COLOR.mutedFg,
-  });
-  const appsLink = styled('a', 'atx-settings-link', { color: COLOR.primaryText });
+  const keyBlurb = styled('p', 'atx-settings-blurb');
+  const appsLink = styled('a', 'atx-settings-link');
   appsLink.href = UNSPLASH_APPS_URL;
   appsLink.target = '_blank';
   appsLink.rel = 'noreferrer';
@@ -149,15 +135,12 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     document.createTextNode(' to get an access key — the demo tier allows 50 searches an hour.'),
   );
 
-  const keyStatus = styled('p', 'atx-settings-key-status', {
-    color: COLOR.foreground, margin: '0 0 10px', font: '12px system-ui',
-    display: 'flex', alignItems: 'center', gap: '6px',
-  });
+  const keyStatus = styled('p', 'atx-settings-key-status');
 
-  const keyRow = styled('div', 'atx-settings-row', { display: 'flex', gap: '6px' });
+  const keyRow = styled('div', 'atx-settings-row');
   // No masked input exists anywhere else in the overlay, so this is a plain
   // control wearing the shared baseline rather than a reusable widget.
-  const keyInput = inputEl('input', 'atx-settings-key', { flex: '1 1 auto' });
+  const keyInput = inputEl('input', 'atx-settings-key');
   keyInput.type = 'password';
   keyInput.autocomplete = 'off';
   keyInput.spellcheck = false;
@@ -168,23 +151,17 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     keyInput.type = hidden ? 'text' : 'password';
     reveal.textContent = hidden ? 'Hide' : 'Show';
   });
-  reveal.style.flex = '0 0 auto';
   keyRow.append(keyInput, reveal);
 
-  const keyHint = styled('p', 'atx-settings-hint', {
-    margin: '8px 0 0', font: '11px/1.5 system-ui', color: COLOR.mutedFg,
-  });
+  const keyHint = styled('p', 'atx-settings-hint');
 
   const clearKeyBtn = footButton('Clear key', 'destructive', () => void save({ clearKey: true }));
-  clearKeyBtn.style.marginRight = '0';
-  const keyActions = styled('div', 'atx-settings-key-actions', { marginTop: '10px' });
+  const keyActions = styled('div', 'atx-settings-key-actions');
   keyActions.append(clearKeyBtn);
 
   keySection.append(keyHeading, keyBlurb, keyStatus, keyRow, keyHint, keyActions);
 
-  const warning = styled('p', 'atx-settings-warning', {
-    margin: '12px 0 0', font: '11px/1.5 system-ui', color: COLOR.warning, display: 'none',
-  });
+  const warning = styled('p', 'atx-settings-warning');
 
   const tabs = buildTabs(
     GROUPS.map((g) => ({ id: g.id, label: g.label, pane: panes.get(g.id)! })),
@@ -204,9 +181,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
       pane.textContent = '';
       const mine = options.filter((o) => o.group === g.id);
 
-      const blurb = styled('p', 'atx-settings-blurb', {
-        margin: '0 0 14px', font: '12px/1.5 system-ui', color: COLOR.mutedFg,
-      });
+      const blurb = styled('p', 'atx-settings-blurb atx-settings-pane-blurb');
       blurb.textContent = g.blurb;
       pane.append(blurb);
 
@@ -236,26 +211,26 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
       // the answer, so point at it instead.
       keyStatus.append(
         icon('dot', 13),
-        text('Turn the photo source on above to add a key', COLOR.mutedFg),
+        text('Turn the photo source on above to add a key', 'muted'),
       );
-      keySection.style.opacity = '0.55';
+      keySection.toggleAttribute('data-off', true);
       keyInput.disabled = true;
       setButtonEnabled(reveal, false);
       keyHint.textContent = '';
-      clearKeyBtn.style.display = 'none';
+      clearKeyBtn.toggleAttribute('data-hidden', true);
       return;
     }
 
-    keySection.style.opacity = '1';
+    keySection.toggleAttribute('data-off', false);
 
     if (u.configured) {
       keyStatus.append(
         icon('check', 13),
-        text(`Configured via ${SOURCE_LABEL[u.source ?? ''] ?? 'stored settings'}`, COLOR.success),
+        text(`Configured via ${SOURCE_LABEL[u.source ?? ''] ?? 'stored settings'}`, 'ok'),
       );
-      if (u.hint) keyStatus.append(text(u.hint, COLOR.mutedFg, true));
+      if (u.hint) keyStatus.append(text(u.hint, 'muted', true));
     } else {
-      keyStatus.append(icon('dot', 13), text('Not configured', COLOR.mutedFg));
+      keyStatus.append(icon('dot', 13), text('Not configured', 'muted'));
     }
 
     // Config and env win at resolve time, so storing a key here would do
@@ -271,24 +246,23 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
         'Remove it to manage the key from this panel.'
       : 'Stored in .astro-dev-edit.json at the project root, readable only by you (0600). ' +
         'It is never sent back to the browser.';
-    clearKeyBtn.style.display = u.configured && u.source === 'file' ? '' : 'none';
+    clearKeyBtn.toggleAttribute('data-hidden', !(u.configured && u.source === 'file'));
 
     if (u.gitignoreWarning) {
       warning.textContent =
         '.astro-dev-edit.json is not listed in this project’s .gitignore. Add it before ' +
         'saving a key, or the key can be committed. (This integration cannot edit your ' +
         'ignore rules for you.)';
-      warning.style.display = '';
+      warning.toggleAttribute('data-on', true);
     } else {
-      warning.style.display = 'none';
+      warning.toggleAttribute('data-on', false);
     }
   };
 
-  const text = (value: string, color: string, mono = false): HTMLElement => {
-    const el = styled('span', 'atx-settings-text', {
-      color,
-      font: mono ? `12px ${FONT.mono}` : '12px system-ui',
-    });
+  const text = (value: string, tone: 'muted' | 'ok' | 'warn', mono = false): HTMLElement => {
+    const el = styled('span', 'atx-settings-text');
+    el.dataset.tone = tone;
+    if (mono) el.dataset.mono = '';
     el.textContent = value;
     return el;
   };
@@ -299,10 +273,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     // normal state, and painting a third of the panel in warning colour would
     // spend the one colour that should mean "something is wrong" — which here
     // is the uncommitted-secret warning at the bottom.
-    const note = styled('p', 'atx-settings-lock', {
-      margin: '4px 0 0', font: '11px/1.45 system-ui', color: COLOR.mutedFg,
-      display: 'flex', alignItems: 'center', gap: '4px',
-    });
+    const note = styled('p', 'atx-settings-lock');
     note.append(
       icon('lock', 11),
       document.createTextNode(
@@ -332,11 +303,11 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
 
   const showError = (message: string): void => {
     error.textContent = message;
-    error.style.display = 'block';
+    error.toggleAttribute('data-on', true);
   };
 
   const save = async (o: { clearKey?: boolean } = {}): Promise<void> => {
-    error.style.display = 'none';
+    error.toggleAttribute('data-on', false);
     applyFieldErrors(controls, {});
 
     const options = collectChanges(controls);
@@ -396,9 +367,9 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   foot.append(closeBtn, saveBtn);
 
   // --- boot ------------------------------------------------------------------
-  status.append(icon('spinner', 13), text('Reading settings…', COLOR.mutedFg));
+  status.append(icon('spinner', 13), text('Reading settings…', 'muted'));
   setButtonEnabled(saveBtn, false);
-  clearKeyBtn.style.display = 'none';
+  clearKeyBtn.toggleAttribute('data-hidden', true);
 
   void api.getSettings().then(
     (data) => {
@@ -407,7 +378,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     },
     (err: unknown) => {
       status.textContent = '';
-      status.append(icon('alert', 13), text('Could not read settings', COLOR.warning));
+      status.append(icon('alert', 13), text('Could not read settings', 'warn'));
       showError(err instanceof Error ? err.message : 'The dev server did not answer.');
     },
   );

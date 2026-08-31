@@ -981,12 +981,775 @@ ${vars('font-', FONT)}
   background: var(--atx-info);
 }
 
-/* The rich-text editor's contenteditable is light-DOM and slotted in (see
-   shadow.ts::mountLight), so it is styled by the document, not from here.
-   ::slotted reaches only the parts that belong to the drawer rather than to
-   the document. */
-::slotted(.atx-rte-content) {
-  box-sizing: border-box;
+/* == Entry drawer fields ===================================================
+   editors/fields.ts and editors/entry.ts. One control per FieldType, all
+   wrapped in the same label/error/help chrome. Two states are attributes
+   rather than inline writes: [data-locked] on a field whose option the
+   project's config owns, and [data-on] on the error line, which is the only
+   part of the stack that is conditionally present. */
+
+.atx-field {
+  margin-bottom: 12px;
+}
+
+.atx-field[data-locked] {
+  opacity: 0.55;
+}
+
+.atx-field-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--atx-foreground);
+  font: 600 12px system-ui;
+  opacity: 0.85;
+}
+
+.atx-field-help {
+  margin-top: 4px;
+  color: var(--atx-muted-fg);
+  font: 11px/1.45 system-ui;
+}
+
+.atx-field-error {
+  display: none;
+  margin-top: 3px;
+  color: var(--atx-destructive-text);
+  font: 12px system-ui;
+}
+
+.atx-field-error[data-on] {
+  display: block;
+}
+
+.atx-field-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--atx-foreground);
+  font: 13px system-ui;
+  cursor: pointer;
+}
+
+.atx-field-check-hint {
+  opacity: 0.7;
+}
+
+.atx-field-checkbox,
+.atx-field-select {
+  cursor: pointer;
+}
+
+.atx-field-textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
+/* A shape the panel cannot edit: read-only, monospaced, and dimmed so it
+   reads as a report of the file rather than as an input. */
+.atx-field-json {
+  min-height: 48px;
+  font: 12px var(--atx-font-mono);
+  opacity: 0.6;
+  resize: vertical;
+}
+
+/* The rule between groups of fields in the entry drawer. */
+.atx-section-label {
+  margin: 16px 0 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--atx-border);
+  font: 600 12px system-ui;
+  opacity: 0.85;
+}
+
+/* == Settings drawer =======================================================
+   editors/settings-panel.ts. The option controls themselves come from
+   fields.ts; what is here is the drawer's own prose, the Unsplash key section
+   and the three status lines. Four states are attributes: [data-off] on the
+   key section while the photo source is switched off, [data-on] on the error
+   and gitignore-warning lines, [data-hidden] on the clear-key button, and
+   [data-tone] / [data-mono] on a status word. */
+
+.atx-settings-pane {
+  padding-top: 12px;
+}
+
+.atx-settings-status,
+.atx-settings-key-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 12px system-ui;
+}
+
+.atx-settings-status {
+  margin: 0 0 12px;
+}
+
+.atx-settings-key-status {
+  margin: 0 0 10px;
+  color: var(--atx-foreground);
+}
+
+.atx-settings-error {
+  display: none;
+  margin: 10px 0 0;
+  color: var(--atx-warning);
+  font: 12px/1.5 system-ui;
+}
+
+.atx-settings-warning {
+  display: none;
+  margin: 12px 0 0;
+  color: var(--atx-warning);
+  font: 11px/1.5 system-ui;
+}
+
+.atx-settings-error[data-on],
+.atx-settings-warning[data-on] {
+  display: block;
+}
+
+/* The access key is a secret with its own endpoint, not an option, so it sits
+   below a rule rather than among the controls. It dims whole while the photo
+   source it belongs to is off. */
+.atx-settings-key-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--atx-border);
+}
+
+.atx-settings-key-section[data-off] {
+  opacity: 0.55;
+}
+
+.atx-settings-heading {
+  margin: 0 0 4px;
+  color: var(--atx-foreground);
+  font: 600 13px system-ui;
+}
+
+.atx-settings-blurb {
+  margin: 0 0 12px;
+  color: var(--atx-muted-fg);
+  font: 12px/1.5 system-ui;
+}
+
+/* A tab's own opening line sits a little further from the first control than
+   the key section's does from its field. */
+.atx-settings-pane-blurb {
+  margin: 0 0 14px;
+}
+
+.atx-settings-link {
+  color: var(--atx-primary-text);
+}
+
+.atx-settings-hint {
+  margin: 8px 0 0;
+  color: var(--atx-muted-fg);
+  font: 11px/1.5 system-ui;
+}
+
+.atx-settings-row {
+  display: flex;
+  gap: 6px;
+}
+
+.atx-settings-key {
+  flex: 1 1 auto;
+}
+
+/* The reveal toggle keeps its own width beside the growing key field. */
+.atx-settings-row > .atx-btn-outline {
+  flex: 0 0 auto;
+}
+
+.atx-settings-key-actions {
+  margin-top: 10px;
+}
+
+/* A destructive button pushes itself to the far left of a footer; here it is
+   the only thing in its own row, so that margin has nothing to do. */
+.atx-settings-key-actions > .atx-btn-destructive {
+  margin-right: 0;
+}
+
+.atx-settings-key-actions > .atx-btn-destructive[data-hidden] {
+  display: none;
+}
+
+.atx-settings-text {
+  font: 12px system-ui;
+}
+
+.atx-settings-text[data-tone='muted'] {
+  color: var(--atx-muted-fg);
+}
+
+.atx-settings-text[data-tone='ok'] {
+  color: var(--atx-success);
+}
+
+.atx-settings-text[data-tone='warn'] {
+  color: var(--atx-warning);
+}
+
+.atx-settings-text[data-mono] {
+  font: 12px var(--atx-font-mono);
+}
+
+/* Muted, not amber: an option the project set in its own config is a normal
+   state, and the one warning colour is spent on the uncommitted-secret line. */
+.atx-settings-lock {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 0;
+  color: var(--atx-muted-fg);
+  font: 11px/1.45 system-ui;
+}
+
+/* == Collections drawer ====================================================
+   editors/collections-panel.ts. A field row spans two stores, and the drawer's
+   job is to keep saying which is which, so most of what is here is the chrome
+   that does the saying: the legend, the two captioned groups, the badges.
+   States are attributes: [data-removed] on a card whose removal is queued,
+   [data-off] on the schema half of a field the project keeps read-only,
+   [data-hidden] on the Options row, which only a select field has,
+   [data-on] on the error line, and [data-tone] on a badge or a note. */
+
+.atx-collections {
+  padding-top: 12px;
+}
+
+/* Both list rows are whole-width buttons that read as cards. */
+.atx-collections-row,
+.atx-collections-item {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-card);
+  color: var(--atx-foreground);
+  text-align: left;
+  cursor: pointer;
+}
+
+.atx-collections-row {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+}
+
+.atx-collections-item {
+  margin-bottom: 6px;
+  padding: 9px 12px;
+}
+
+.atx-collections-row-name,
+.atx-collections-item-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atx-collections-row-name {
+  font: 600 13px system-ui;
+}
+
+.atx-collections-item-title {
+  font: 600 12px system-ui;
+}
+
+.atx-collections-row-meta,
+.atx-collections-item-meta,
+.atx-collections-meta {
+  color: var(--atx-muted-fg);
+  font: 11px var(--atx-font-mono);
+}
+
+.atx-collections-row-meta {
+  margin-top: 3px;
+}
+
+.atx-collections-item-meta {
+  margin-top: 2px;
+}
+
+.atx-collections-meta {
+  margin-bottom: 12px;
+}
+
+/* The one button on the collections list, under the rows. */
+.atx-collections-list > .atx-btn-outline {
+  margin-top: 4px;
+}
+
+.atx-collections-fieldspane,
+.atx-collections-items {
+  padding-top: 10px;
+}
+
+.atx-collections-head,
+.atx-collections-itembar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atx-collections-head {
+  margin-bottom: 4px;
+}
+
+.atx-collections-head-create {
+  margin-bottom: 10px;
+}
+
+.atx-collections-itembar {
+  margin-bottom: 10px;
+}
+
+.atx-collections-title {
+  color: var(--atx-foreground);
+  font: 600 14px system-ui;
+}
+
+.atx-collections-spacer {
+  flex: 1 1 auto;
+}
+
+.atx-collections-itemcount {
+  flex: 1 1 auto;
+  color: var(--atx-muted-fg);
+  font: 12px system-ui;
+}
+
+.atx-collections-fields {
+  margin-top: 10px;
+}
+
+.atx-collections-newfields {
+  margin-top: 12px;
+}
+
+.atx-collections-error {
+  display: none;
+  margin: 10px 0 0;
+  color: var(--atx-warning);
+  font: 12px/1.5 system-ui;
+}
+
+.atx-collections-error[data-on] {
+  display: block;
+}
+
+.atx-collections-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--atx-border);
+}
+
+/* The create form's one action stretches; the detail view's sits centred
+   beside the text next to it. */
+.atx-collections-actions-create {
+  align-items: normal;
+}
+
+/* One field: its name and remove control, then the two stores side by side. */
+.atx-collections-field {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-card);
+}
+
+/* Queued for removal, not removed: the card dims and the button offers the
+   undo, and nothing is written until Save. */
+.atx-collections-field[data-removed] {
+  opacity: 0.45;
+}
+
+.atx-collections-field-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.atx-collections-field-name {
+  color: var(--atx-foreground);
+  font: 600 12px var(--atx-font-mono);
+}
+
+/* The zod expression this field currently compiles to, verbatim. */
+.atx-collections-expr {
+  display: block;
+  margin-top: 8px;
+  color: var(--atx-muted-fg);
+  font: 11px var(--atx-font-mono);
+  word-break: break-all;
+}
+
+.atx-collections-addfield {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--atx-border);
+  border-radius: var(--atx-radius-md);
+}
+
+.atx-collections-addfield > .atx-btn-outline {
+  margin-top: 8px;
+}
+
+/* The two-store legend — the one piece of chrome that explains the drawer. */
+.atx-collections-legend {
+  padding: 9px 11px;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-background);
+  color: var(--atx-muted-fg);
+  font: 11px/1.55 system-ui;
+}
+
+/* The colour is repeated from the wrapper rather than inherited: a host page's
+   own paragraph colour rule outranks an inherited value, and silently
+   repainted this legend in the page's body colour. */
+.atx-collections-legend-line {
+  margin: 0;
+  color: var(--atx-muted-fg);
+}
+
+.atx-collections-legend-word {
+  color: var(--atx-foreground);
+}
+
+.atx-collections-group {
+  margin-top: 6px;
+  padding-left: 8px;
+  border-left: 2px solid var(--atx-border);
+}
+
+.atx-collections-group[data-off] {
+  opacity: 0.6;
+}
+
+.atx-collections-caption {
+  margin-bottom: 4px;
+  color: var(--atx-muted-fg);
+  font: 600 10px system-ui;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.atx-collections-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  color: var(--atx-muted-fg);
+  font: 12px system-ui;
+}
+
+/* Options belong to a select field and to nothing else. */
+.atx-collections-control[data-hidden] {
+  display: none;
+}
+
+.atx-collections-control-label {
+  flex: 0 0 74px;
+}
+
+.atx-collections-input,
+.atx-collections-select {
+  flex: 1 1 auto;
+}
+
+.atx-collections-checkbox {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.atx-collections-check {
+  margin: 0;
+  accent-color: var(--atx-primary);
+}
+
+.atx-collections-check-hint {
+  color: var(--atx-muted-fg);
+  font: 12px system-ui;
+}
+
+/* A field typed into the add form but not yet written. Outlined in the brand
+   colour because it is the only thing on screen that is not yet in the file. */
+.atx-collections-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--atx-primary);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-card);
+}
+
+.atx-collections-new-name {
+  color: var(--atx-foreground);
+  font: 600 12px var(--atx-font-mono);
+}
+
+.atx-collections-new-meta {
+  flex: 1 1 auto;
+  color: var(--atx-muted-fg);
+  font: 11px system-ui;
+}
+
+.atx-collections-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--atx-primary-text);
+  font: 12px system-ui;
+  cursor: pointer;
+}
+
+.atx-collections-back > .atx-ico {
+  transform: rotate(180deg);
+}
+
+.atx-collections-badge {
+  padding: 1px 6px;
+  border-radius: var(--atx-radius-full);
+  font: 10px system-ui;
+}
+
+.atx-collections-blurb {
+  margin: 0 0 12px;
+  color: var(--atx-muted-fg);
+  font: 12px/1.5 system-ui;
+}
+
+.atx-collections-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0 0 10px;
+  font: 11px/1.5 system-ui;
+}
+
+.atx-collections-badge[data-tone='warn'],
+.atx-collections-note[data-tone='warn'] {
+  color: var(--atx-warning);
+}
+
+.atx-collections-badge[data-tone='muted'],
+.atx-collections-note[data-tone='muted'] {
+  color: var(--atx-muted-fg);
+}
+
+.atx-collections-badge[data-tone='warn'] {
+  border: 1px solid var(--atx-warning);
+}
+
+.atx-collections-badge[data-tone='muted'] {
+  border: 1px solid var(--atx-muted-fg);
+}
+
+/* == Markdown body editor ==================================================
+   editors/body-editor.ts. Everything here is the editor's *chrome* — the
+   toolbar, the heading menu, the image panel. The writing surface itself
+   (.atx-rte-content) is deliberately absent: it stays in the light DOM so
+   Safari's selection and execCommand APIs can see it, and ::slotted() loses
+   to the document, so its whole box lives in that module's CONTENT_CSS.
+
+   Three states: [data-on] on the heading menu and the image panel, which are
+   both closed until asked for, and [data-hidden] on the format buttons, which
+   are the half of the toolbar that means nothing in raw-markdown mode. */
+
+.atx-rte-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 6px;
+  background: var(--atx-card);
+}
+
+.atx-rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-card);
+}
+
+.atx-rte-btn {
+  min-width: 28px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--atx-radius-sm);
+  background: transparent;
+  color: var(--atx-muted-fg);
+  font: 600 12px var(--atx-font-ui);
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Each button wears what it does. */
+.atx-rte-btn-bold {
+  font-weight: 800;
+}
+
+.atx-rte-btn-italic {
+  font-family: serif;
+  font-style: italic;
+}
+
+.atx-rte-btn-strike {
+  text-decoration: line-through;
+}
+
+.atx-rte-btn-pre {
+  font: 700 10px var(--atx-font-mono);
+}
+
+.atx-rte-btn-code {
+  font: 700 13px var(--atx-font-mono);
+}
+
+/* The MD/Rich toggle is the only thing on the right of the toolbar. */
+.atx-rte-mode {
+  margin-left: auto;
+  color: var(--atx-primary-text);
+  font: 700 11px var(--atx-font-mono);
+}
+
+.atx-rte-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 3px;
+  background: var(--atx-border);
+}
+
+.atx-rte-btn[data-hidden],
+.atx-rte-divider[data-hidden],
+.atx-rte-heading[data-hidden] {
+  display: none;
+}
+
+.atx-rte-heading {
+  position: relative;
+  display: inline-flex;
+}
+
+.atx-rte-heading-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 3;
+  display: none;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.atx-rte-heading-menu[data-on] {
+  display: block;
+}
+
+.atx-rte-heading-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--atx-radius-sm);
+  background: transparent;
+  color: var(--atx-foreground);
+  font: 12px var(--atx-font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.atx-rte-btn:hover,
+.atx-rte-heading-item:hover {
+  background: var(--atx-border);
+}
+
+.atx-rte-heading-chip {
+  min-width: 20px;
+  font: 700 11px var(--atx-font-mono);
+  opacity: 0.7;
+}
+
+/* Each row previews its own level, so the size is the caller's. */
+.atx-rte-heading-name {
+  font: 600 12px var(--atx-font-ui);
+}
+
+/* Insert or replace an image, sharing the asset picker with the image field. */
+.atx-rte-image-panel {
+  display: none;
+  margin: 6px 0 0;
+  padding: 10px;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-background);
+}
+
+.atx-rte-image-panel[data-on] {
+  display: block;
+}
+
+.atx-rte-image-alt-label {
+  display: block;
+  margin: 8px 0 4px;
+  color: var(--atx-foreground);
+  font: 600 11px var(--atx-font-ui);
+  opacity: 0.85;
+}
+
+.atx-rte-image-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Smaller than a footer button: these sit inside a panel inside a toolbar. */
+.atx-rte-image-btn {
+  padding: 4px 10px;
+  font: 600 12px var(--atx-font-ui);
+}
+
+.atx-rte-image-btn.atx-btn-outline {
+  color: var(--atx-muted-fg);
+}
+
+/* The raw-markdown half of the MD/Rich toggle. */
+.atx-body-input {
+  display: none;
+  min-height: 40vh;
+  font: 12px/1.5 var(--atx-font-mono);
+  resize: vertical;
+}
+
+.atx-body-input[data-on] {
+  display: block;
 }
 `;
 }
