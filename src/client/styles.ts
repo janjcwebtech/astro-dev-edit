@@ -2009,7 +2009,7 @@ input[type='checkbox']:focus-visible {
   height: 160px;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--atx-input);
+  border: 1px solid var(--atx-border);
   border-radius: var(--atx-radius-2xl);
   background: ${CHECKER(16)};
   cursor: pointer;
@@ -2206,16 +2206,49 @@ input[type='checkbox']:focus-visible {
   text-align: center;
 }
 
-.atx-btn-retry {
-  display: block;
-  margin: 12px auto 0;
-  padding: 5px 12px;
-  border: 1px solid var(--atx-input);
+.atx-btn-retry,
+.atx-media-upload,
+.atx-asset-scope {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--atx-border);
   border-radius: var(--atx-radius-full);
   background: transparent;
-  color: var(--atx-muted-fg);
-  font: 500 13px var(--atx-font-ui);
+  color: var(--atx-foreground);
+  font: 500 14px/1 var(--atx-font-ui);
+  white-space: nowrap;
+  outline: none;
+  transition: background 150ms, border-color 150ms, box-shadow 150ms;
   cursor: pointer;
+}
+
+.atx-btn-retry:hover,
+.atx-media-upload:hover,
+.atx-asset-scope:hover {
+  background: var(--atx-accent);
+}
+
+.atx-btn-retry:focus-visible,
+.atx-media-upload:focus-visible,
+.atx-asset-scope:focus-visible {
+  border-color: var(--atx-ring);
+  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
+}
+
+.atx-btn-retry > .atx-ico,
+.atx-media-upload > .atx-ico,
+.atx-asset-scope > .atx-ico {
+  width: 16px;
+  height: 16px;
+}
+
+.atx-btn-retry {
+  margin: 12px auto 0;
 }
 
 .atx-media-cap {
@@ -2260,17 +2293,7 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-media-upload {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   margin-left: auto;
-  padding: 6px 12px;
-  border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-2xl);
-  background: transparent;
-  color: var(--atx-muted-fg);
-  font: 500 13px var(--atx-font-ui);
-  cursor: pointer;
 }
 
 .atx-media-file {
@@ -2345,21 +2368,15 @@ input[type='checkbox']:focus-visible {
   font: 12px var(--atx-font-mono);
 }
 
+/* Hidden until a listing has folders worth scoping to, so its display is a
+   state rather than the shared inline-flex above. */
 .atx-asset-scope {
-  flex: 0 0 auto;
   display: none;
-  padding: 6px 10px;
-  border: 1px solid var(--atx-input);
-  border-radius: var(--atx-radius-full);
-  background: transparent;
-  color: var(--atx-muted-fg);
-  font: 500 13px var(--atx-font-ui);
-  white-space: nowrap;
-  cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .atx-asset-scope[data-on] {
-  display: block;
+  display: inline-flex;
 }
 
 .atx-media-sort,
