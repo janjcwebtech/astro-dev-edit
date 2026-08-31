@@ -1,4 +1,4 @@
-import { CHECKER, COLOR, FONT, isolateScroll, RADIUS, setFreshSrc, styled } from '../ui.ts';
+import { isolateScroll, setFreshSrc, styled } from '../ui.ts';
 
 /**
  * The tile grid shared by both of the media modal's panes. One builder, two
@@ -68,26 +68,16 @@ export interface MediaGridOptions {
   emptyText?: string;
 }
 
-const TILE_MIN = 132;
+/** How many placeholder tiles a loading grid shows. The tile's own minimum
+ *  width lives in styles.ts, where the grid template that uses it is. */
 const SKELETON_COUNT = 6;
 
-const CHECKER_BG = CHECKER(12);
-
 export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
-  const el = styled('div', 'atx-media-pane', {
-    flex: '1 1 auto', minHeight: '0', overflowY: 'auto', padding: '2px',
-  });
+  const el = styled('div', 'atx-media-pane');
   isolateScroll(el);
 
-  const grid = styled('div', 'atx-media-grid', {
-    display: 'grid',
-    gridTemplateColumns: `repeat(auto-fill, minmax(${TILE_MIN}px, 1fr))`,
-    gap: '12px',
-    alignContent: 'start',
-  });
-  const footer = styled('div', 'atx-media-more', {
-    display: 'flex', justifyContent: 'center', padding: '14px 0 4px',
-  });
+  const grid = styled('div', 'atx-media-grid');
+  const footer = styled('div', 'atx-media-more');
   el.append(grid, footer);
 
   /** key → its pick button, for selection and busy state. */
@@ -97,10 +87,8 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   const paint = (key: string, on: boolean): void => {
     const btn = buttons.get(key);
     if (!btn) return;
-    btn.style.outline = on ? `2px solid ${COLOR.primary}` : '2px solid transparent';
-    btn.style.outlineOffset = '2px';
-    const badge = btn.querySelector('.atx-media-check') as HTMLElement | null;
-    if (badge) badge.style.display = on ? 'flex' : 'none';
+    // The ring and the tick are the same state, so one flag drives both.
+    btn.toggleAttribute('data-selected', on);
   };
 
   const select = (key: string | null): void => {
@@ -140,41 +128,34 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   };
 
   const buildTile = (tile: GridTile): HTMLElement => {
-    const wrap = styled('div', 'atx-media-tile', { position: 'relative', minWidth: '0' });
+    const wrap = styled('div', 'atx-media-tile');
 
-    const pick = styled('button', 'atx-media-pick', {
-      display: 'block', width: '100%', padding: '0', overflow: 'hidden',
-      aspectRatio: '4 / 3', borderRadius: RADIUS.md, border: `1px solid ${COLOR.border}`,
-      background: tile.color || CHECKER_BG,
-      cursor: 'pointer', outline: '2px solid transparent', outlineOffset: '2px',
-      transition: 'outline-color 100ms',
-    });
+    const pick = styled('button', 'atx-media-pick');
+    // An Unsplash tile carries the photo's own average colour, so the tile is
+    // never a grey hole while the thumbnail loads. Everything else falls back
+    // to the checkerboard the class already paints.
+    if (tile.color) pick.style.background = tile.color;
     pick.type = 'button';
     pick.setAttribute('aria-label', tile.label);
     pick.title = tile.label;
 
-    const img = styled('img', 'atx-media-thumb', {
-      width: '100%', height: '100%', objectFit: 'cover', display: 'block',
-    });
+    const img = styled('img', 'atx-media-thumb');
     img.alt = '';
     img.loading = 'lazy';
     img.decoding = 'async';
     // A CSP-blocked, offline or deleted image leaves the tile usable — the
     // caption still reads and the photo can still be picked.
     img.addEventListener('error', () => {
-      img.style.display = 'none';
-      pick.style.background = CHECKER_BG;
-      fallback.style.display = 'flex';
+      img.toggleAttribute('data-hidden', true);
+      pick.style.background = ''; // back to the class's checkerboard
+      fallback.toggleAttribute('data-on', true);
     });
     // A retry that finally succeeds must undo that fallback.
     img.addEventListener('load', () => {
-      img.style.display = 'block';
-      fallback.style.display = 'none';
+      img.toggleAttribute('data-hidden', false);
+      fallback.toggleAttribute('data-on', false);
     });
-    const fallback = styled('span', 'atx-media-fallback', {
-      display: 'none', width: '100%', height: '100%', alignItems: 'center',
-      justifyContent: 'center', font: '18px system-ui', color: COLOR.faintFg,
-    });
+    const fallback = styled('span', 'atx-media-fallback');
     fallback.textContent = '🖼';
     pick.append(img, fallback);
     // Assigned last, so both handlers above are attached before loading starts.
@@ -182,21 +163,12 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     else img.src = tile.thumbUrl;
 
     // Selection badge, hidden until staged.
-    const check = styled('span', 'atx-media-check', {
-      display: 'none', position: 'absolute', top: '6px', right: '6px',
-      width: '20px', height: '20px', borderRadius: '50%', background: COLOR.primary,
-      color: COLOR.foreground, alignItems: 'center', justifyContent: 'center',
-      font: '700 12px system-ui', pointerEvents: 'none',
-    });
+    const check = styled('span', 'atx-media-check');
     check.textContent = '✓';
     pick.append(check);
 
     if (tile.current) {
-      const chip = styled('span', 'atx-media-current', {
-        position: 'absolute', top: '6px', left: '6px', padding: '2px 6px',
-        borderRadius: RADIUS.sm, background: 'rgba(0,0,0,0.7)', color: COLOR.foreground,
-        font: '600 10px system-ui', pointerEvents: 'none',
-      });
+      const chip = styled('span', 'atx-media-current');
       chip.textContent = 'Current';
       pick.append(chip);
     }
@@ -247,14 +219,9 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     showSkeletons(count = SKELETON_COUNT) {
       clearGrid();
       for (let i = 0; i < count; i++) {
-        const wrap = styled('div', 'atx-media-tile atx-media-skeleton', { minWidth: '0' });
-        const box = styled('div', 'atx-media-thumb', {
-          width: '100%', aspectRatio: '4 / 3', borderRadius: RADIUS.md,
-          border: `1px solid ${COLOR.border}`, background: COLOR.elevated,
-        });
-        const bar = styled('div', 'atx-media-cap', {
-          height: '10px', margin: '6px 0 0', borderRadius: RADIUS.sm, background: COLOR.elevated,
-        });
+        const wrap = styled('div', 'atx-media-tile atx-media-skeleton');
+        const box = styled('div', 'atx-media-skeleton-thumb');
+        const bar = styled('div', 'atx-media-skeleton-cap');
         wrap.append(box, bar);
         grid.append(wrap);
       }
@@ -271,26 +238,18 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     setTileBusy(key, busy) {
       const btn = buttons.get(key);
       if (!btn) return;
+      // aria-busy is both the accessible state and the style hook; the tile
+      // dims, stops taking clicks and says so with its cursor.
       btn.setAttribute('aria-busy', busy ? 'true' : 'false');
-      btn.style.opacity = busy ? '0.45' : '1';
-      btn.style.pointerEvents = busy ? 'none' : '';
-      btn.style.cursor = busy ? 'progress' : 'pointer';
     },
   };
 
   /** A full-width row inside the grid — messages must not be laid out as a tile. */
   function message(text: string, retry?: () => void): HTMLElement {
-    const box = styled('div', 'atx-media-status', {
-      gridColumn: '1 / -1', padding: '28px 12px', textAlign: 'center',
-      font: '13px/1.6 system-ui', color: COLOR.mutedFg,
-    });
+    const box = styled('div', 'atx-media-status');
     box.textContent = text;
     if (retry) {
-      const btn = styled('button', 'atx-btn atx-btn-retry', {
-        display: 'block', margin: '12px auto 0', padding: '5px 12px', borderRadius: RADIUS.md,
-        border: `1px solid ${COLOR.input}`, background: 'transparent', color: COLOR.mutedFg,
-        cursor: 'pointer', font: '600 12px system-ui',
-      });
+      const btn = styled('button', 'atx-btn atx-btn-retry');
       btn.type = 'button';
       btn.textContent = 'Retry';
       btn.addEventListener('click', retry);
@@ -302,10 +261,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
 
 /** The caption sits *outside* the pick button — see the module header. */
 function buildCaption(caption: TileCaption): HTMLElement {
-  const cap = styled('div', 'atx-media-cap', {
-    margin: '6px 2px 0', font: `11px/1.4 ${FONT.mono}`, color: COLOR.mutedFg,
-    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-  });
+  const cap = styled('div', 'atx-media-cap');
 
   if (caption.kind === 'name') {
     cap.textContent = caption.text;
@@ -315,7 +271,7 @@ function buildCaption(caption: TileCaption): HTMLElement {
 
   // Credit is permanently visible rather than revealed on hover: it is what the
   // API guidelines ask for, and there is no stylesheet to hang a hover on.
-  cap.style.font = '11px/1.4 system-ui';
+  cap.dataset.credit = '';
   const author = link('atx-unsplash-author', caption.photographer, caption.photographerUrl);
   const source = link('atx-unsplash-link', 'Unsplash', caption.pageUrl);
   cap.append(author, document.createTextNode(' · '), source);
@@ -324,7 +280,7 @@ function buildCaption(caption: TileCaption): HTMLElement {
 }
 
 function link(className: string, text: string, href: string): HTMLAnchorElement {
-  const a = styled('a', `atx-unsplash-credit ${className}`, { color: COLOR.primaryText });
+  const a = styled('a', `atx-unsplash-credit ${className}`);
   a.href = href;
   a.target = '_blank';
   a.rel = 'noreferrer';

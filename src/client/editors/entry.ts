@@ -97,8 +97,7 @@ function showEditDrawer(entry: EntryResponse): void {
       shell.teardown();
       showCreateDrawer(entry);
     });
-    newBtn.style.padding = '4px 10px';
-    newBtn.style.font = '600 12px system-ui';
+    newBtn.classList.add('atx-entry-new');
     shell.actions.append(newBtn);
   }
 

@@ -10,7 +10,7 @@
  */
 
 import { icon } from './icons.ts';
-import { COLOR, FONT, Z, basename, isolateScroll, pillButton, styled, RADIUS } from './ui.ts';
+import { FONT, Z, basename, isolateScroll, pillButton, styled } from './ui.ts';
 
 /** One applied rule, distilled for display. */
 export interface MatchedRule {
@@ -206,25 +206,22 @@ function openButton(onClick: () => void): HTMLButtonElement {
   return btn;
 }
 
-// CSS declaration syntax colors on the card's dark ground — the same palette
-// the source-peek panel uses, so highlighting reads consistently across the UI.
-const CSS_COLOR = {
-  prop: COLOR.chart5, // property name
-  value: COLOR.mutedFg, // keyword / identifier value
-  string: COLOR.chart2,
-  number: COLOR.chart3, // numbers, units, hex colors
-  variable: COLOR.chart1, // custom properties (--foo)
-  keyword: COLOR.chart4, // !important
-  punct: COLOR.mutedFg, // : ; , ( ) and the like
-} as const;
+/** The parts of a declaration the tokenizer can tell apart. What each one
+ *  looks like is `[data-css]` in styles.ts, beside the source-peek palette it
+ *  is deliberately the same as. */
+type CssTokenKind = 'prop' | 'value' | 'string' | 'number' | 'variable' | 'keyword' | 'punct';
 
 // One pass over a declaration's value: strings, hex colors, custom-property
 // refs, !important, numbers-with-units, identifiers, whitespace, punctuation.
 const VALUE_TOKEN =
   /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(#[0-9a-fA-F]{3,8}\b)|(--[A-Za-z0-9-]+)|(!important\b)|(-?\d*\.?\d+[a-z%]*)|([A-Za-z][\w-]*)|(\s+)|([^\s])/g;
 
-function span(text: string, color: string): HTMLElement {
-  const s = styled('span', '', { color });
+/** One syntax-tinted run of a declaration. The kind is the attribute, not a
+ *  colour: the seven kinds are a fixed vocabulary, so the palette belongs in
+ *  the stylesheet beside every other one. */
+function span(text: string, kind: CssTokenKind): HTMLElement {
+  const s = styled('span', 'atx-css-token');
+  s.dataset.css = kind;
   s.textContent = text;
   return s;
 }
@@ -234,26 +231,26 @@ function span(text: string, color: string): HTMLElement {
 function appendDeclLine(pre: HTMLElement, line: string): void {
   const colon = line.indexOf(':');
   if (colon === -1) {
-    pre.append(span(line, CSS_COLOR.value));
+    pre.append(span(line, 'value'));
     return;
   }
   const prop = line.slice(0, colon);
-  pre.append(span(prop, /^\s*--/.test(prop) ? CSS_COLOR.variable : CSS_COLOR.prop));
-  pre.append(span(':', CSS_COLOR.punct));
+  pre.append(span(prop, /^\s*--/.test(prop) ? 'variable' : 'prop'));
+  pre.append(span(':', 'punct'));
   for (const m of line.slice(colon + 1).matchAll(VALUE_TOKEN)) {
     const [text, str, hex, variable, imp, num, ident, ws] = m;
-    const color = str
-      ? CSS_COLOR.string
+    const kind: CssTokenKind = str
+      ? 'string'
       : hex || num
-        ? CSS_COLOR.number
+        ? 'number'
         : variable
-          ? CSS_COLOR.variable
+          ? 'variable'
           : imp
-            ? CSS_COLOR.keyword
+            ? 'keyword'
             : ident || ws
-              ? CSS_COLOR.value
-              : CSS_COLOR.punct;
-    pre.append(span(text, color));
+              ? 'value'
+              : 'punct';
+    pre.append(span(text, kind));
   }
 }
 
@@ -268,44 +265,20 @@ function renderDeclarations(pre: HTMLElement, declarations: string): void {
 function ruleBlock(
   rule: MatchedRule,
   selector: string,
-  first: boolean,
   openRule: (file: string, selector: string) => void,
 ): HTMLElement {
-  const block = styled('div', 'atx-tooltip-rule', {
-    padding: first ? '0 0 6px' : '6px 0',
-    borderTop: first ? 'none' : `1px solid ${COLOR.border}`,
-  });
+  const block = styled('div', 'atx-tooltip-rule');
 
-  const sel = styled('div', 'atx-tooltip-rule-sel', {
-    color: COLOR.primaryText,
-    wordBreak: 'break-all',
-  });
+  const sel = styled('div', 'atx-tooltip-rule-sel');
   sel.textContent = rule.selectorText;
 
-  // 10px of breathing room above and below the properties list.
-  const decl = styled('pre', 'atx-tooltip-rule-decl', {
-    margin: '10px 0',
-    font: `12px ${FONT.mono}`,
-    color: CSS_COLOR.value,
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
-  });
+  const decl = styled('pre', 'atx-tooltip-rule-decl');
   renderDeclarations(decl, rule.declarations);
   block.append(sel, decl);
 
   if (rule.sourceFile) {
-    const foot = styled('div', 'atx-tooltip-rule-foot', {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    });
-    const src = styled('span', 'atx-tooltip-rule-src', {
-      color: COLOR.mutedFg,
-      font: `10.5px ${FONT.mono}`,
-      overflow: 'hidden',
-      whiteSpace: 'nowrap',
-      textOverflow: 'ellipsis',
-    });
+    const foot = styled('div', 'atx-tooltip-rule-foot');
+    const src = styled('span', 'atx-tooltip-rule-src');
     src.textContent = basename(rule.sourceFile);
     src.title = rule.sourceFile;
     foot.append(src, openButton(() => openRule(rule.sourceFile!, selector)));
@@ -324,29 +297,16 @@ export function buildRulesCard(
   rules: MatchedRule[],
   openRule: (file: string, selector: string) => void,
 ): HTMLElement {
-  const card = styled('div', 'atx-tooltip-rules', {
-    position: 'fixed',
-    zIndex: String(Z + 1),
-    maxWidth: '360px',
-    maxHeight: '50vh',
-    overflowY: 'auto',
-    padding: '8px 10px',
-    background: COLOR.card,
-    color: COLOR.foreground,
-    border: `1px solid ${COLOR.border}`,
-    borderRadius: RADIUS.md,
-    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-    font: `12px ${FONT.mono}`,
-    cursor: 'default',
-  });
+  // The card's own position is written by the caller once it is measured.
+  const card = styled('div', 'atx-tooltip-rules', { zIndex: String(Z + 1) });
   isolateScroll(card);
 
   if (rules.length === 0) {
-    const empty = styled('div', 'atx-tooltip-rules-empty', { color: COLOR.mutedFg });
+    const empty = styled('div', 'atx-tooltip-rules-empty');
     empty.textContent = `No applied rules for ${selector}`;
     card.append(empty);
     return card;
   }
-  rules.forEach((rule, i) => card.append(ruleBlock(rule, selector, i === 0, openRule)));
+  for (const rule of rules) card.append(ruleBlock(rule, selector, openRule));
   return card;
 }

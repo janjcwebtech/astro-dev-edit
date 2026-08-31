@@ -2,7 +2,6 @@ import { icon } from '../icons.ts';
 import * as state from '../state.ts';
 import { mount } from '../shadow.ts';
 import {
-  COLOR,
   inputEl,
   buildBackdrop,
   buildPanel,
@@ -73,24 +72,20 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
   const panel = buildPanel(opts.title, jump);
   const body = panel.querySelector('[data-body]') as HTMLElement;
 
-  const label = styled('label', 'atx-popup-label', {
-    display: 'block', font: '600 12px system-ui', marginBottom: '4px',
-    color: COLOR.foreground, opacity: '0.8',
-  });
+  const label = styled('label', 'atx-popup-label');
   label.textContent = opts.label;
 
-  const input = inputEl('textarea', 'atx-popup-input', {
-    width: '100%', minHeight: opts.minHeight ?? '120px', boxSizing: 'border-box',
-    resize: 'vertical', whiteSpace: 'pre-wrap',
-    font: opts.mono
-      ? '12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace'
-      : '13px/1.6 system-ui',
-  });
+  // Only the caller's height override stays inline; the face is a flag, since
+  // both faces are fixed and only the choice between them is the caller's.
+  const input = inputEl(
+    'textarea',
+    'atx-popup-input',
+    opts.minHeight ? { minHeight: opts.minHeight } : undefined,
+  );
+  if (opts.mono) input.dataset.mono = '';
   input.value = opts.value;
 
-  const error = styled('p', 'atx-popup-error', {
-    display: 'none', margin: '10px 0 0', font: '12px/1.5 system-ui', color: COLOR.destructiveText,
-  });
+  const error = styled('p', 'atx-popup-error');
 
   const markDirty = (): void => {
     state.setSavePhase(input.value.trim() === opts.value.trim() ? 'clean' : 'dirty');
@@ -117,7 +112,7 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
   const run = async (): Promise<void> => {
     saving = true;
     setBusy(true);
-    error.style.display = 'none';
+    error.toggleAttribute('data-on', false);
 
     const failure = await opts.save(input.value);
 
@@ -131,7 +126,7 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
     token = state.begin({ kind: 'panel', close: () => close(false) });
     setBusy(false);
     error.textContent = failure;
-    error.style.display = '';
+    error.toggleAttribute('data-on', true);
     input.focus();
   };
 

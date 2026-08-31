@@ -1,6 +1,6 @@
 import type { SourceLoc } from '../shared/protocol.ts';
 import { icon } from './icons.ts';
-import { isOwnUi } from './router.ts';
+import { isOwnUi } from './shadow.ts';
 import { annotatedElements, pathFor, sourceFor } from './source-map.ts';
 import { type TreeNode, buildTreeModel } from './tree-model.ts';
 import { basename, isolateScroll, onChromeInset, styled } from './ui.ts';

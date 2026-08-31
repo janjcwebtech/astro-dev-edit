@@ -48,11 +48,6 @@ Every property is defined on the host, so a value you do not set keeps its
 built-in default, and the palette is contrast-checked as a set — a token you
 override is yours to keep legible.
 
-> **Coverage today.** The overlay is mid-migration from inline styles to its
-> stylesheet. Properties are published and inherit correctly, but a surface
-> still painted inline ignores the property you set for it. `::part()` and the
-> boundary itself work everywhere, now.
-
 ## Parts
 
 For anything a value cannot express — moving a surface, hiding one, restyling

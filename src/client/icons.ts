@@ -98,15 +98,7 @@ function svgMarkup(name: IconName, size: number): string {
 
 /** An icon element, ready to append into a button, row or label. */
 export function icon(name: IconName, size = 14): HTMLElement {
-  const host = styled('span', 'atx-ico', {
-    display: 'inline-flex',
-    flex: '0 0 auto',
-    alignItems: 'center',
-    justifyContent: 'center',
-    // The spinner rotates the host, not the <svg> — an HTML element animates
-    // predictably where an SVG child would need transform-box juggling.
-    lineHeight: '0',
-  });
+  const host = styled('span', 'atx-ico');
   paint(host, name, size);
   return host;
 }

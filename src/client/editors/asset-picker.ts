@@ -1,5 +1,5 @@
 import { entryAssetDir, entryRelativeToWeb, webToEntryRelative } from '../../shared/asset-path.ts';
-import { CHECKER, COLOR, FONT, RADIUS, inputEl, setFreshSrc, styled, toast } from '../ui.ts';
+import { inputEl, setFreshSrc, styled, toast } from '../ui.ts';
 import { openMediaModal } from './media-modal.ts';
 
 /**
@@ -49,47 +49,31 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
   const previewSrc = (raw: string): string =>
     relative ? (entryRelativeToWeb(entryFile, raw) ?? '') : raw;
 
-  const wrap = styled('div', 'atx-image-field', { display: 'grid', gap: '8px' });
+  const wrap = styled('div', 'atx-image-field');
 
   // Preview above the path input; clicking it opens the browse list too.
-  const thumbWrap = styled('button', 'atx-image-field-preview', {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0',
-    width: '240px', height: '160px', overflow: 'hidden', cursor: 'pointer',
-    borderRadius: RADIUS.md, border: `1px solid ${COLOR.input}`,
-    background: CHECKER(16),
-  });
+  const thumbWrap = styled('button', 'atx-image-field-preview');
   thumbWrap.type = 'button';
   thumbWrap.title = 'Browse images';
-  const thumb = styled('img', 'atx-image-field-thumb', {
-    width: '100%', height: '100%', objectFit: 'cover', display: 'none',
-  });
+  const thumb = styled('img', 'atx-image-field-thumb');
+  thumb.toggleAttribute('data-hidden', true);
   thumb.alt = '';
-  const thumbEmpty = styled('span', 'atx-image-field-empty', {
-    font: '12px system-ui', color: COLOR.mutedFg, pointerEvents: 'none',
-  });
+  const thumbEmpty = styled('span', 'atx-image-field-empty');
   thumbEmpty.textContent = 'No image — click to browse';
+  /** The preview shows exactly one of the two: the image, or the placeholder. */
+  const showThumb = (on: boolean): void => {
+    thumb.toggleAttribute('data-hidden', !on);
+    thumbEmpty.toggleAttribute('data-hidden', on);
+  };
   // A path that fails to load falls back to the placeholder, never a broken icon.
-  thumb.addEventListener('error', () => {
-    thumb.style.display = 'none';
-    thumbEmpty.style.display = '';
-  });
-  thumb.addEventListener('load', () => {
-    thumb.style.display = '';
-    thumbEmpty.style.display = 'none';
-  });
+  thumb.addEventListener('error', () => showThumb(false));
+  thumb.addEventListener('load', () => showThumb(true));
   thumbWrap.append(thumb, thumbEmpty);
   wrap.append(thumbWrap);
 
-  const row = styled('div', 'atx-image-field-row', {
-    display: 'flex', alignItems: 'center', gap: '8px',
-  });
-  const pathInput = inputEl('input', 'atx-image-field-path', {
-    flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
-  });
-  const browse = styled('button', 'atx-btn atx-image-field-browse', {
-    flex: '0 0 auto', padding: '6px 10px', borderRadius: RADIUS.md, border: `1px solid ${COLOR.input}`,
-    background: 'transparent', color: COLOR.mutedFg, cursor: 'pointer', font: '600 12px system-ui',
-  });
+  const row = styled('div', 'atx-image-field-row');
+  const pathInput = inputEl('input', 'atx-image-field-path');
+  const browse = styled('button', 'atx-btn atx-image-field-browse');
   browse.type = 'button';
   browse.textContent = 'Browse…';
   row.append(pathInput, browse);
@@ -97,9 +81,7 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
 
   // A relative value is meaningless without knowing what it is relative to.
   if (relative) {
-    const hint = styled('div', 'atx-image-field-hint', {
-      font: `11px ${FONT.mono}`, opacity: '0.6',
-    });
+    const hint = styled('div', 'atx-image-field-hint');
     hint.textContent = `relative to ${entryFile}`;
     wrap.append(hint);
   }
@@ -112,8 +94,7 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
       else thumb.src = src;
     } else {
       thumb.removeAttribute('src');
-      thumb.style.display = 'none';
-      thumbEmpty.style.display = '';
+      showThumb(false);
     }
   };
   const set = (next: string, fresh = false): void => {

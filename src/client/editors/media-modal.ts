@@ -9,13 +9,8 @@ import {
   buildBackdrop,
   buildPanel,
   buildTabs,
-  CHECKER,
-  COLOR,
-  FONT,
   footButton,
-  hexToRgba,
   inputEl,
-  RADIUS,
   setButtonEnabled,
   setFreshSrc,
   styled,
@@ -99,7 +94,6 @@ export interface MediaPaneDeps {
   refresh(): void;
 }
 
-const RAIL_WIDTH = '280px';
 type SortKey = 'newest' | 'name';
 
 export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick | null> {
@@ -133,9 +127,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     const body = panel.querySelector('[data-body]') as HTMLElement;
     const foot = panel.querySelector('[data-foot]') as HTMLElement;
     // The body is a column that never scrolls; the grid inside it does.
-    Object.assign(body.style, {
-      display: 'flex', flexDirection: 'column', gap: '10px', overflow: 'hidden',
-    });
+    body.classList.add('atx-media-body');
 
     // The backdrop must sit above the drawer this may have opened over, but
     // below the modal itself.
@@ -155,15 +147,11 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     window.addEventListener('keydown', onKey, true);
 
     // --- tabs + upload -------------------------------------------------------
-    const uploadBtn = styled('button', 'atx-btn atx-media-upload', {
-      marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px',
-      padding: '6px 12px', borderRadius: RADIUS.md, border: `1px solid ${COLOR.input}`,
-      background: 'transparent', color: COLOR.mutedFg, cursor: 'pointer', font: '600 12px system-ui',
-    });
+    const uploadBtn = styled('button', 'atx-btn atx-media-upload');
     uploadBtn.type = 'button';
     uploadBtn.append(icon('upload', 13), document.createTextNode('Upload file…'));
 
-    const fileInput = styled('input', 'atx-media-file', { display: 'none' });
+    const fileInput = styled('input', 'atx-media-file');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
     uploadBtn.addEventListener('click', () => fileInput.click());
@@ -173,29 +161,17 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     });
 
     // --- panes ---------------------------------------------------------------
-    const paneHost = styled('div', 'atx-media-panes', {
-      flex: '1 1 auto', minWidth: '0', minHeight: '0',
-      display: 'flex', flexDirection: 'column', gap: '10px',
-    });
-    const rail = styled('div', 'atx-media-rail', {
-      flex: `0 0 ${RAIL_WIDTH}`, width: RAIL_WIDTH, borderLeft: `1px solid ${COLOR.border}`,
-      paddingLeft: '14px', marginLeft: '14px', overflowY: 'auto',
-    });
-    const content = styled('div', 'atx-media-content', {
-      flex: '1 1 auto', minHeight: '0', display: 'flex',
-    });
+    const paneHost = styled('div', 'atx-media-panes');
+    const rail = styled('div', 'atx-media-rail');
+    const content = styled('div', 'atx-media-content');
     content.append(paneHost, rail);
 
-    const dropStrip = styled('div', 'atx-media-drop', {
-      flex: '0 0 auto', font: `11px ${FONT.mono}`, color: COLOR.mutedFg, textAlign: 'center',
-    });
+    const dropStrip = styled('div', 'atx-media-drop');
 
     // `tabsRow` and `toolbarHost` come from buildTabs, below.
 
     // --- footer --------------------------------------------------------------
-    const status = styled('span', 'atx-media-status', {
-      marginRight: 'auto', font: '12px system-ui', color: COLOR.mutedFg,
-    });
+    const status = styled('span', 'atx-media-status atx-media-foot-status');
     const cancelBtn = footButton('Cancel', 'ghost', () => finish(null));
     const useBtn = footButton('Use image', 'default', () => void commitSelection());
     foot.append(status, cancelBtn, useBtn);
@@ -241,7 +217,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     );
     // The strip's own host is the toolbar slot: only the source's toolbar swaps,
     // while the grid below it stays put.
-    tabs.host.style.flex = '0 0 auto';
+    tabs.host.classList.add('atx-media-tabhost');
     tabs.strip.append(uploadBtn);
     let active = panes[0];
     tabs.host.classList.add('atx-media-toolbars');
@@ -274,29 +250,25 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     // --- drag & drop over the whole modal ------------------------------------
     // A dedicated dashed box would eat grid height; the modal itself is the
     // target, with an accent tint while a file is over it.
-    const dropOverlay = styled('div', 'atx-media-dropzone', {
-      position: 'absolute', inset: '0', display: 'none', zIndex: '2',
-      background: hexToRgba(COLOR.primary, 0.18), border: `2px dashed ${COLOR.primary}`,
-      borderRadius: RADIUS.xl, pointerEvents: 'none',
-    });
+    const dropOverlay = styled('div', 'atx-media-dropzone');
     panel.append(dropOverlay);
     let dragDepth = 0;
     panel.addEventListener('dragenter', (e) => {
       e.preventDefault();
       // Counted, because dragging across child elements fires enter/leave pairs.
-      if (++dragDepth === 1) dropOverlay.style.display = '';
+      if (++dragDepth === 1) dropOverlay.toggleAttribute('data-on', true);
     });
     panel.addEventListener('dragover', (e) => e.preventDefault());
     panel.addEventListener('dragleave', () => {
       if (--dragDepth <= 0) {
         dragDepth = 0;
-        dropOverlay.style.display = 'none';
+        dropOverlay.toggleAttribute('data-on', false);
       }
     });
     panel.addEventListener('drop', (e) => {
       e.preventDefault();
       dragDepth = 0;
-      dropOverlay.style.display = 'none';
+      dropOverlay.toggleAttribute('data-on', false);
       const file = e.dataTransfer?.files?.[0];
       if (file) void uploadFile(file);
     });
@@ -353,30 +325,20 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       let showAll = false;
       let failure: string | null = null;
 
-      const el = styled('div', 'atx-media-toolbar atx-media-pane-project', {
-        display: 'flex', alignItems: 'center', gap: '6px',
-      });
-      const filterInput = inputEl('input', 'atx-asset-filter', {
-        flex: '1 1 auto', minWidth: '0', font: `12px ${FONT.mono}`,
-      });
+      const el = styled('div', 'atx-media-toolbar atx-media-pane-project');
+      const filterInput = inputEl('input', 'atx-asset-filter');
       filterInput.type = 'search';
       filterInput.placeholder = 'Filter…';
       filterInput.addEventListener('input', () => paint());
 
-      const scopeToggle = styled('button', 'atx-btn atx-asset-scope', {
-        flex: '0 0 auto', display: 'none', padding: '6px 10px', borderRadius: RADIUS.md,
-        border: `1px solid ${COLOR.input}`, background: 'transparent', color: COLOR.mutedFg,
-        cursor: 'pointer', font: '600 12px system-ui', whiteSpace: 'nowrap',
-      });
+      const scopeToggle = styled('button', 'atx-btn atx-asset-scope');
       scopeToggle.type = 'button';
       scopeToggle.addEventListener('click', () => {
         showAll = !showAll;
         paint();
       });
 
-      const sortSelect = inputEl('select', 'atx-media-sort', {
-        flex: '0 0 auto', width: 'auto', font: '12px system-ui',
-      });
+      const sortSelect = inputEl('select', 'atx-media-sort');
       for (const [value, label] of [['newest', 'Newest'], ['name', 'Name']] as const) {
         const option = document.createElement('option');
         option.value = value;
@@ -420,7 +382,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
         }
         const scope = modal.scopeDir;
         if (scope) {
-          scopeToggle.style.display = '';
+          scopeToggle.toggleAttribute('data-on', true);
           scopeToggle.textContent = showAll ? 'This folder' : 'Show all';
           scopeToggle.title = showAll ? `Show only ${scope}` : `Showing ${scope} — click to list every asset`;
         }
@@ -501,27 +463,22 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
 // --- rail primitives, shared with the Unsplash pane --------------------------
 
 export function railEmpty(text: string): HTMLElement {
-  const el = styled('p', 'atx-media-rail-empty', {
-    margin: '0', font: '12px/1.6 system-ui', color: COLOR.mutedFg,
-  });
+  const el = styled('p', 'atx-media-rail-empty');
   el.textContent = text;
   return el;
 }
 
 export function railPreview(src: string, color?: string, fresh = false): HTMLElement {
-  const box = styled('div', 'atx-media-rail-preview', {
-    width: '100%', aspectRatio: '4 / 3', borderRadius: RADIUS.md, overflow: 'hidden',
-    border: `1px solid ${COLOR.border}`, marginBottom: '10px',
-    background: color || CHECKER(12),
-  });
-  const img = styled('img', 'atx-media-rail-img', {
-    width: '100%', height: '100%', objectFit: 'contain', display: 'block',
-  });
+  const box = styled('div', 'atx-media-rail-preview');
+  // The photo's own average colour, where the source knows it; otherwise the
+  // checkerboard the class paints.
+  if (color) box.style.background = color;
+  const img = styled('img', 'atx-media-rail-img');
   img.alt = '';
   img.decoding = 'async';
-  img.addEventListener('error', () => (img.style.display = 'none'));
+  img.addEventListener('error', () => img.toggleAttribute('data-hidden', true));
   // A retry that finally succeeds must undo that — see ui.ts::setFreshSrc.
-  img.addEventListener('load', () => (img.style.display = 'block'));
+  img.addEventListener('load', () => img.toggleAttribute('data-hidden', false));
   if (fresh) setFreshSrc(img, src);
   else img.src = src;
   box.append(img);
@@ -529,40 +486,27 @@ export function railPreview(src: string, color?: string, fresh = false): HTMLEle
 }
 
 export function railTitle(text: string): HTMLElement {
-  const el = styled('h4', 'atx-media-rail-title', {
-    margin: '0 0 8px', font: '600 13px system-ui', color: COLOR.foreground,
-    overflow: 'hidden', textOverflow: 'ellipsis',
-  });
+  const el = styled('h4', 'atx-media-rail-title');
   el.textContent = text;
   el.title = text;
   return el;
 }
 
 export function railLine(label: string, value: string): HTMLElement {
-  const row = styled('div', 'atx-media-rail-line', { margin: '0 0 6px' });
-  const key = styled('span', 'atx-media-rail-key', {
-    display: 'block', font: '600 10px system-ui', letterSpacing: '0.04em',
-    textTransform: 'uppercase', color: COLOR.mutedFg,
-  });
+  const row = styled('div', 'atx-media-rail-line');
+  const key = styled('span', 'atx-media-rail-key');
   key.textContent = label;
-  const val = styled('span', 'atx-media-rail-value', {
-    display: 'block', font: `11px/1.5 ${FONT.mono}`, color: COLOR.mutedFg, wordBreak: 'break-all',
-  });
+  const val = styled('span', 'atx-media-rail-value');
   val.textContent = value;
   row.append(key, val);
   return row;
 }
 
 export function railLink(label: string, text: string, href: string): HTMLElement {
-  const row = styled('div', 'atx-media-rail-line', { margin: '0 0 6px' });
-  const key = styled('span', 'atx-media-rail-key', {
-    display: 'block', font: '600 10px system-ui', letterSpacing: '0.04em',
-    textTransform: 'uppercase', color: COLOR.mutedFg,
-  });
+  const row = styled('div', 'atx-media-rail-line');
+  const key = styled('span', 'atx-media-rail-key');
   key.textContent = label;
-  const a = styled('a', 'atx-media-rail-value atx-unsplash-credit', {
-    display: 'block', font: '12px/1.5 system-ui', color: COLOR.primaryText,
-  });
+  const a = styled('a', 'atx-media-rail-value atx-media-rail-link atx-unsplash-credit');
   a.href = href;
   a.target = '_blank';
   a.rel = 'noreferrer';

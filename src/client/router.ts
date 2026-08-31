@@ -5,6 +5,7 @@ import { beginImageEdit } from './editors/image.ts';
 import { beginMarkupEdit } from './editors/markup.ts';
 import { showDynamicNotice } from './editors/notice.ts';
 import { beginTextEdit } from './editors/text.ts';
+import { isOwnUi } from './shadow.ts';
 import { nearestSource, sourceFor } from './source-map.ts';
 import * as state from './state.ts';
 import { toast } from './ui.ts';
@@ -14,13 +15,6 @@ import { toast } from './ui.ts';
  * classification, then open the matching editor. Capture-phase listeners
  * swallow clicks on editable targets so wrapping links/buttons can't act.
  */
-
-/** True when the event is inside our own overlay UI (toggle, panels, veils). */
-export function isOwnUi(e: Event): boolean {
-  return e
-    .composedPath()
-    .some((n) => n instanceof HTMLElement && n.dataset?.astroDevEditUi === '1');
-}
 
 export interface RouterDeps {
   isEditMode(): boolean;

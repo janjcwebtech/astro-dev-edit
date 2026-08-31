@@ -228,12 +228,11 @@ function openTagOf(el: HTMLElement): string {
   return end === -1 ? `<${el.tagName.toLowerCase()}>` : shallow.outerHTML.slice(0, end + 1);
 }
 
-/** outerHTML with our own overlay nodes removed — an editor panel or the
- *  element-tree outline must never end up in the pasted markup — and capped. */
+/** outerHTML, capped. Nothing of the overlay's can appear in it: every panel,
+ *  outline and veil lives in the shadow root, whose host is a child of <body>
+ *  and never of the element being copied. */
 function renderedHtml(el: HTMLElement): { html: string; dropped: number } {
-  const clone = el.cloneNode(true) as HTMLElement;
-  for (const own of clone.querySelectorAll('[data-astro-dev-edit-ui]')) own.remove();
-  const full = clone.outerHTML;
+  const full = el.outerHTML;
   if (full.length <= HTML_MAX) return { html: full, dropped: 0 };
   return { html: full.slice(0, HTML_MAX), dropped: full.length - HTML_MAX };
 }

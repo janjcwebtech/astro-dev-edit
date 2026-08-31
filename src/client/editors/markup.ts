@@ -2,7 +2,7 @@ import type { SourceLoc } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
-import { COLOR, basename, lockElement, styled, toast, RADIUS } from '../ui.ts';
+import { basename, lockElement, styled, toast } from '../ui.ts';
 import { TAGS, type TagSpec, tagInsertion } from './markup-insert.ts';
 import { openSourcePopup } from './source-popup.ts';
 
@@ -49,21 +49,13 @@ function insertTag(input: HTMLTextAreaElement, spec: TagSpec): void {
 
 /** The palette row: one button per allowed tag. */
 function buildPalette(input: HTMLTextAreaElement, markDirty: () => void): HTMLElement {
-  const tools = styled('div', 'atx-markup-tags', {
-    display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', marginTop: '8px',
-  });
-  const hint = styled('span', 'atx-markup-hint', {
-    font: '11px/1.5 system-ui', color: COLOR.mutedFg, marginRight: '2px',
-  });
+  const tools = styled('div', 'atx-markup-tags');
+  const hint = styled('span', 'atx-markup-hint');
   hint.textContent = HINT;
   tools.append(hint);
 
   for (const spec of TAGS) {
-    const btn = styled('button', 'atx-markup-tag', {
-      padding: '2px 6px', borderRadius: RADIUS.sm, cursor: 'pointer',
-      border: `1px solid ${COLOR.border}`, background: COLOR.background, color: COLOR.foreground,
-      font: '11px ui-monospace, SFMono-Regular, Menlo, monospace',
-    });
+    const btn = styled('button', 'atx-markup-tag');
     btn.type = 'button';
     btn.textContent = `<${spec.tag}>`;
     btn.title = spec.isVoid

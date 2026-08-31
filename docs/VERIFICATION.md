@@ -290,8 +290,8 @@ whichever sections your change touches; run the whole list before a release.
       page without the meta tag it is absent.
 - [ ] An `astro:assets` `<Image>`: the Source section reads "Not available —
       rendered by a package component" and everything else still copies.
-- [ ] The copied HTML contains no `data-astro-dev-edit-ui` node and no
-      `atx-*` class, on a page where an overlay panel was open at copy time.
+- [ ] The copied HTML contains no `atx-*` class, on a page where an overlay
+      panel was open at copy time.
 - [ ] An element over the caps (>4 000 characters of markup, or >40 matching
       rules) ends its section with the `_Truncated — …_` notice. No playground
       fixture is that big — check on a real site.

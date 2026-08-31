@@ -25,7 +25,7 @@
  * time would hit the temporal dead zone. Reading it at first mount does not.
  */
 
-import { BAR_CHIP, BAR_CHIP_HOVER, COLOR, FONT, RADIUS, Z, hexToRgba, lift } from './ui.ts';
+import { BAR_CHIP, BAR_CHIP_HOVER, CHECKER, COLOR, FONT, RADIUS, Z, hexToRgba, lift } from './ui.ts';
 
 const kebab = (k: string): string => k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
@@ -115,6 +115,12 @@ ${vars('font-', FONT)}
 
 .atx-panel-body {
   padding: 16px;
+}
+
+/* A body whose content brings its own edges — the source peek's code pane
+   runs to the panel's sides. */
+.atx-panel-body[data-flush] {
+  padding: 0;
 }
 
 /* In a sized panel the body absorbs the leftover height and scrolls;
@@ -1053,6 +1059,13 @@ ${vars('font-', FONT)}
   resize: vertical;
 }
 
+/* "+ New" sits in the drawer's title bar rather than its footer, so it is a
+   size down from a footer button. */
+.atx-entry-new {
+  padding: 4px 10px;
+  font: 600 12px system-ui;
+}
+
 /* The rule between groups of fields in the entry drawer. */
 .atx-section-label {
   margin: 16px 0 6px;
@@ -1562,6 +1575,881 @@ ${vars('font-', FONT)}
 .atx-collections-badge[data-tone='muted'] {
   border: 1px solid var(--atx-muted-fg);
 }
+
+/* == Image panel and asset picker ==========================================
+   editors/image.ts (the in-page <img> panel) and editors/asset-picker.ts (the
+   entry drawer's image field). Both show a preview over a checkerboard, so a
+   transparent PNG reads as transparent rather than as a hole. An <img> that
+   fails to load takes [data-hidden] rather than showing a broken-image glyph;
+   a retry that finally succeeds removes it again — see ui.ts::setFreshSrc. */
+
+.atx-image-preview {
+  width: 100%;
+  height: 180px;
+  max-height: 180px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: ${CHECKER(14)};
+}
+
+/* No display of its own, deliberately: it inherits the inline default, which
+   the 180px overflow-hidden box above clips to the same pixels a block would
+   occupy. Plan 2 can settle it; a conversion may not. */
+.atx-image-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.atx-image-meta {
+  margin: 0 0 12px;
+  overflow: hidden;
+  color: var(--atx-muted-fg);
+  font: 11px var(--atx-font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.atx-note {
+  margin: 0 0 12px;
+  color: var(--atx-warning);
+  font: 12px/1.5 system-ui;
+}
+
+.atx-alt-label {
+  display: block;
+  margin-bottom: 4px;
+  font: 600 12px system-ui;
+  opacity: 0.8;
+}
+
+.atx-alt-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-sm);
+  background: var(--atx-background);
+  color: var(--atx-foreground);
+  font: 13px var(--atx-font-ui);
+}
+
+/* Alt text that comes from an expression: readable, but not yours to type in. */
+.atx-alt-input[data-off] {
+  opacity: 0.5;
+}
+
+/* The six most recent assets. Mirrors RECENTS in editors/image.ts. */
+.atx-image-recents {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.atx-image-recents-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+  font: 600 12px system-ui;
+  opacity: 0.8;
+}
+
+/* The strip is a convenience; if its listing fails it goes away quietly and
+   the modal's Browse all still works. */
+.atx-image-recents-label[data-hidden] {
+  display: none;
+}
+
+.atx-image-browse-all {
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--atx-primary-text);
+  font: 600 12px system-ui;
+  cursor: pointer;
+}
+
+.atx-image-recent {
+  width: 100%;
+  padding: 0;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  outline: none;
+  background: ${CHECKER(10)};
+  cursor: pointer;
+}
+
+/* The one already on the page. */
+.atx-image-recent[data-current] {
+  border-color: var(--atx-primary);
+  outline: 1px solid var(--atx-primary);
+}
+
+.atx-image-recent-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.atx-image-preview-img[data-hidden],
+.atx-image-recent-thumb[data-hidden],
+.atx-image-field-thumb[data-hidden],
+.atx-image-field-empty[data-hidden],
+.atx-media-thumb[data-hidden],
+.atx-media-rail-img[data-hidden] {
+  display: none;
+}
+
+.atx-image-field {
+  display: grid;
+  gap: 8px;
+}
+
+.atx-image-field-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 240px;
+  height: 160px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-md);
+  background: ${CHECKER(16)};
+  cursor: pointer;
+}
+
+.atx-image-field-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.atx-image-field-empty {
+  color: var(--atx-muted-fg);
+  font: 12px system-ui;
+  pointer-events: none;
+}
+
+.atx-image-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atx-image-field-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 12px var(--atx-font-mono);
+}
+
+.atx-image-field-browse {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-md);
+  background: transparent;
+  color: var(--atx-muted-fg);
+  font: 600 12px system-ui;
+  cursor: pointer;
+}
+
+.atx-image-field-hint {
+  font: 11px var(--atx-font-mono);
+  opacity: 0.6;
+}
+
+/* == Media grid ============================================================
+   editors/media-grid.ts. One tile shape for both panes; the caption sits
+   outside the pick button so a credit link is clickable. [data-selected] is
+   the ring and the tick together, and [aria-busy] — which the tile already
+   carries for assistive tech — is also what dims it during an import. */
+
+.atx-media-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 2px;
+  overflow-y: auto;
+}
+
+/* 132px is the narrowest a tile can be and still read as a picture. */
+.atx-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  align-content: start;
+  gap: 12px;
+}
+
+.atx-media-more {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0 4px;
+}
+
+.atx-media-tile {
+  position: relative;
+  min-width: 0;
+}
+
+.atx-media-pick {
+  display: block;
+  width: 100%;
+  padding: 0;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: ${CHECKER(12)};
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 100ms;
+  cursor: pointer;
+}
+
+.atx-media-pick[data-selected] {
+  outline-color: var(--atx-primary);
+}
+
+.atx-media-pick[aria-busy='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: progress;
+}
+
+.atx-media-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Shown in place of an image that could not load — blocked by a CSP, offline,
+   or deleted. The tile stays usable: its caption reads and it still picks. */
+.atx-media-fallback {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--atx-faint-fg);
+  font: 18px system-ui;
+}
+
+.atx-media-fallback[data-on] {
+  display: flex;
+}
+
+.atx-media-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--atx-primary);
+  color: var(--atx-foreground);
+  font: 700 12px system-ui;
+  pointer-events: none;
+}
+
+.atx-media-pick[data-selected] .atx-media-check {
+  display: flex;
+}
+
+.atx-media-current {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  border-radius: var(--atx-radius-sm);
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--atx-foreground);
+  font: 600 10px system-ui;
+  pointer-events: none;
+}
+
+.atx-media-skeleton-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-elevated);
+}
+
+.atx-media-skeleton-cap {
+  height: 10px;
+  margin: 6px 0 0;
+  border-radius: var(--atx-radius-sm);
+  background: var(--atx-elevated);
+}
+
+/* A message is a full-width row inside the grid, never laid out as a tile. */
+.atx-media-status {
+  grid-column: 1 / -1;
+  padding: 28px 12px;
+  color: var(--atx-muted-fg);
+  font: 13px/1.6 system-ui;
+  text-align: center;
+}
+
+.atx-btn-retry {
+  display: block;
+  margin: 12px auto 0;
+  padding: 5px 12px;
+  border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-md);
+  background: transparent;
+  color: var(--atx-muted-fg);
+  font: 600 12px system-ui;
+  cursor: pointer;
+}
+
+.atx-media-cap {
+  margin: 6px 2px 0;
+  overflow: hidden;
+  color: var(--atx-muted-fg);
+  font: 11px/1.4 var(--atx-font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A credit is prose, not a filename. It is permanently visible rather than
+   revealed on hover: that is what the API guidelines ask for. */
+.atx-media-cap[data-credit] {
+  font: 11px/1.4 system-ui;
+}
+
+.atx-unsplash-credit {
+  color: var(--atx-primary-text);
+}
+
+/* == Media modal ===========================================================
+   editors/media-modal.ts. The sized panel that holds both panes, the detail
+   rail and the drop target. [data-on] opens the drag overlay and reveals the
+   scope toggle, which only a scoped listing has anything to say with. */
+
+/* Matched at the sized panel's own specificity: .atx-panel[data-sized]
+   .atx-panel-body makes the body the scrolling region, and this body is the
+   one that must not scroll — the grid inside it does. */
+.atx-media-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.atx-panel[data-sized] .atx-media-body {
+  overflow: hidden;
+}
+
+.atx-media-tabhost {
+  flex: 0 0 auto;
+}
+
+.atx-media-upload {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-md);
+  background: transparent;
+  color: var(--atx-muted-fg);
+  font: 600 12px system-ui;
+  cursor: pointer;
+}
+
+.atx-media-file {
+  display: none;
+}
+
+.atx-media-content {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.atx-media-panes {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.atx-media-rail {
+  flex: 0 0 280px;
+  width: 280px;
+  margin-left: 14px;
+  padding-left: 14px;
+  border-left: 1px solid var(--atx-border);
+  overflow-y: auto;
+}
+
+.atx-media-drop {
+  flex: 0 0 auto;
+  color: var(--atx-muted-fg);
+  font: 11px var(--atx-font-mono);
+  text-align: center;
+}
+
+.atx-media-foot-status {
+  grid-column: auto;
+  margin-right: auto;
+  padding: 0;
+  font: 12px system-ui;
+  text-align: left;
+}
+
+/* A dedicated dashed box would eat grid height, so the modal itself is the
+   drop target and this tints it while a file is over it. */
+.atx-media-dropzone {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: none;
+  border: 2px dashed var(--atx-primary);
+  border-radius: var(--atx-radius-xl);
+  background: ${hexToRgba(COLOR.primary, 0.18)};
+  pointer-events: none;
+}
+
+.atx-media-dropzone[data-on] {
+  display: block;
+}
+
+.atx-media-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atx-asset-filter {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 12px var(--atx-font-mono);
+}
+
+.atx-asset-scope {
+  flex: 0 0 auto;
+  display: none;
+  padding: 6px 10px;
+  border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-md);
+  background: transparent;
+  color: var(--atx-muted-fg);
+  font: 600 12px system-ui;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.atx-asset-scope[data-on] {
+  display: block;
+}
+
+.atx-media-sort,
+.atx-unsplash-orient,
+.atx-unsplash-width {
+  flex: 0 0 auto;
+  width: auto;
+  font: 12px system-ui;
+}
+
+/* --- the detail rail --- */
+
+.atx-media-rail-empty {
+  margin: 0;
+  color: var(--atx-muted-fg);
+  font: 12px/1.6 system-ui;
+}
+
+.atx-media-rail-preview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: ${CHECKER(12)};
+}
+
+.atx-media-rail-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.atx-media-rail-title {
+  margin: 0 0 8px;
+  overflow: hidden;
+  color: var(--atx-foreground);
+  font: 600 13px system-ui;
+  text-overflow: ellipsis;
+}
+
+.atx-media-rail-line {
+  margin: 0 0 6px;
+}
+
+.atx-media-rail-key {
+  display: block;
+  color: var(--atx-muted-fg);
+  font: 600 10px system-ui;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.atx-media-rail-value {
+  display: block;
+  color: var(--atx-muted-fg);
+  font: 11px/1.5 var(--atx-font-mono);
+  word-break: break-all;
+}
+
+.atx-media-rail-link {
+  color: var(--atx-primary-text);
+  font: 12px/1.5 system-ui;
+  word-break: normal;
+}
+
+/* == Unsplash pane =========================================================
+   editors/unsplash-pane.ts. The search box is a div wearing the control
+   baseline, because the magnifier and the field share one bordered box. */
+
+.atx-unsplash-search {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 8px;
+}
+
+.atx-unsplash-search > .atx-ico {
+  opacity: 0.6;
+}
+
+.atx-unsplash-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--atx-foreground);
+  font: 13px system-ui;
+  outline: none;
+}
+
+.atx-media-error-more {
+  margin-left: 10px;
+  color: var(--atx-warning);
+  font: 12px system-ui;
+}
+
+.atx-media-error-title {
+  margin: 0 0 6px;
+  color: var(--atx-foreground);
+  font: 600 13px system-ui;
+}
+
+.atx-media-error-detail {
+  margin: 0 0 12px;
+  color: var(--atx-muted-fg);
+  font: 12px/1.6 system-ui;
+}
+
+/* The only button inside a full-width grid message, so it centres itself. */
+.atx-media-error-action {
+  margin: 0 auto;
+}
+
+.atx-unsplash-rate {
+  margin: 14px 0 0;
+  color: var(--atx-muted-fg);
+  font: 11px var(--atx-font-mono);
+}
+
+/* The last few requests of the hour are worth noticing. */
+.atx-unsplash-rate[data-tone='warn'] {
+  color: var(--atx-warning);
+}
+
+/* == Icons =================================================================
+   icons.ts. One rule for every glyph in the overlay; the caller sets the size
+   on the <svg> itself, so nothing about a size reaches this. */
+
+.atx-ico {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  /* The spinner rotates the host, not the <svg> — an HTML element animates
+     predictably where an SVG child would need transform-box juggling. */
+  line-height: 0;
+}
+
+/* == Small panels ==========================================================
+   copy-panel.ts, notice.ts, source-popup.ts, markup.ts — four leaves that put
+   one message or one control in a plain panel. [data-on] shows the popup's
+   error line; [data-mono] picks the source popup's face, since both faces are
+   fixed and only the choice between them is the caller's. */
+
+.atx-copy-note {
+  margin: 0 0 10px;
+  color: var(--atx-warning);
+  font: 13px/1.5 system-ui;
+}
+
+.atx-copy-text {
+  height: 300px;
+  font: 12px/1.5 var(--atx-font-mono);
+  white-space: pre;
+  resize: vertical;
+}
+
+.atx-notice-reason {
+  margin: 0 0 6px;
+  color: var(--atx-foreground);
+  font: 13px/1.5 system-ui;
+}
+
+/* The location line opens the source peek, so it reads as a link. */
+.atx-notice-loc {
+  margin: 0 0 12px;
+  color: var(--atx-muted-fg);
+  font: 12px var(--atx-font-mono);
+  cursor: pointer;
+}
+
+.atx-notice-loc:hover {
+  text-decoration: underline;
+}
+
+.atx-notice-hint {
+  margin: 0 0 4px;
+  color: var(--atx-primary-text);
+  font: 13px/1.5 system-ui;
+}
+
+.atx-popup-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--atx-foreground);
+  font: 600 12px system-ui;
+  opacity: 0.8;
+}
+
+.atx-popup-input {
+  width: 100%;
+  min-height: 120px;
+  box-sizing: border-box;
+  font: 13px/1.6 system-ui;
+  white-space: pre-wrap;
+  resize: vertical;
+}
+
+.atx-popup-input[data-mono] {
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.atx-popup-error {
+  display: none;
+  margin: 10px 0 0;
+  color: var(--atx-destructive-text);
+  font: 12px/1.5 system-ui;
+}
+
+.atx-popup-error[data-on] {
+  display: block;
+}
+
+.atx-markup-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.atx-markup-hint {
+  margin-right: 2px;
+  color: var(--atx-muted-fg);
+  font: 11px/1.5 system-ui;
+}
+
+.atx-markup-tag {
+  padding: 2px 6px;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-sm);
+  background: var(--atx-background);
+  color: var(--atx-foreground);
+  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+
+/* == Source peek ===========================================================
+   editors/peek.ts. A read-only, syntax-tinted view of the file, scrolled to
+   the element's line. Every row carries the focus border so the gutter stays
+   aligned; only .atx-peek-focus's is visible. [data-tone] is how the loading
+   line becomes a refusal or an error, and [data-token] is one run of code. */
+
+.atx-peek-code {
+  max-height: 65vh;
+  padding: 8px 0;
+  overflow: auto;
+  background: var(--atx-background);
+  font: 12.5px/1.65 var(--atx-font-mono);
+}
+
+.atx-peek-more {
+  padding: 4px 12px 4px 15px;
+  color: var(--atx-faint-fg);
+  font-style: italic;
+  user-select: none;
+}
+
+.atx-peek-line {
+  display: flex;
+  border-left: 3px solid transparent;
+  background: transparent;
+}
+
+.atx-peek-focus {
+  border-left-color: var(--atx-primary);
+  background: ${hexToRgba(COLOR.primary, 0.16)};
+}
+
+.atx-peek-gutter {
+  flex: 0 0 auto;
+  padding: 0 12px 0 0;
+  color: var(--atx-faint-fg);
+  text-align: right;
+  user-select: none;
+}
+
+.atx-peek-focus .atx-peek-gutter {
+  color: var(--atx-primary-text);
+}
+
+.atx-peek-text {
+  flex: 1 1 auto;
+  padding-right: 16px;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.atx-peek-loading {
+  padding: 24px 16px;
+  background: var(--atx-background);
+  color: var(--atx-muted-fg);
+  font: 12.5px var(--atx-font-mono);
+}
+
+/* Not source but a sentence, so it wants the line-height source does not. */
+.atx-peek-loading[data-tone='warn'] {
+  color: var(--atx-warning);
+  line-height: 1.6;
+}
+
+.atx-peek-loading[data-tone='err'] {
+  color: var(--atx-destructive-text);
+}
+
+/* Code token colours on the panel's dark ground. Chosen for contrast, not to
+   mimic any one editor theme. This is the only copy of the mapping — peek.ts
+   emits the kind and nothing else. */
+.atx-peek-token[data-token='plain'] { color: var(--atx-foreground); }
+.atx-peek-token[data-token='comment'] { color: var(--atx-muted-fg); font-style: italic; }
+.atx-peek-token[data-token='string'] { color: var(--atx-success-text); }
+.atx-peek-token[data-token='tag'] { color: var(--atx-primary-text); }
+.atx-peek-token[data-token='attr'] { color: var(--atx-primary-text); }
+.atx-peek-token[data-token='keyword'] { color: var(--atx-destructive-text); }
+.atx-peek-token[data-token='number'] { color: var(--atx-warning); }
+.atx-peek-token[data-token='fence'] { color: var(--atx-muted-fg); }
+
+/* == Rules card ============================================================
+   css-inspect.ts. The applied CSS rules behind one class or ID chip on the
+   hover pill. Its position is measured, so only that stays inline. The
+   declaration palette is deliberately the peek palette's sibling — same job,
+   different vocabulary. */
+
+.atx-tooltip-rules {
+  position: fixed;
+  max-width: 360px;
+  max-height: 50vh;
+  padding: 8px 10px;
+  overflow-y: auto;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-card);
+  color: var(--atx-foreground);
+  font: 12px var(--atx-font-mono);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.atx-tooltip-rules-empty {
+  color: var(--atx-muted-fg);
+}
+
+/* The first rule sits flush against the top of the card; every one after it
+   is separated from the one before, which is what the hairline is for. */
+.atx-tooltip-rule {
+  padding: 0 0 6px;
+}
+
+.atx-tooltip-rule + .atx-tooltip-rule {
+  padding: 6px 0;
+  border-top: 1px solid var(--atx-border);
+}
+
+.atx-tooltip-rule-sel {
+  color: var(--atx-primary-text);
+  word-break: break-all;
+}
+
+/* 10px of breathing room above and below the properties list. */
+.atx-tooltip-rule-decl {
+  margin: 10px 0;
+  color: var(--atx-muted-fg);
+  font: 12px var(--atx-font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.atx-tooltip-rule-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.atx-tooltip-rule-src {
+  overflow: hidden;
+  color: var(--atx-muted-fg);
+  font: 10.5px var(--atx-font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.atx-css-token[data-css='prop'] { color: var(--atx-chart5); }
+.atx-css-token[data-css='value'] { color: var(--atx-muted-fg); }
+.atx-css-token[data-css='string'] { color: var(--atx-chart2); }
+.atx-css-token[data-css='number'] { color: var(--atx-chart3); }
+.atx-css-token[data-css='variable'] { color: var(--atx-chart1); }
+.atx-css-token[data-css='keyword'] { color: var(--atx-chart4); }
+.atx-css-token[data-css='punct'] { color: var(--atx-muted-fg); }
 
 /* == Markdown body editor ==================================================
    editors/body-editor.ts. Everything here is the editor's *chrome* — the

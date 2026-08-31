@@ -14,7 +14,7 @@ import { UnsplashError } from '../api.ts';
 import { unsplashImportWidth } from '../features.ts';
 import { icon } from '../icons.ts';
 import { createSearchController, type SearchError, type SearchState } from '../unsplash-search.ts';
-import { COLOR, FONT, footButton, inputEl, styled, toast } from '../ui.ts';
+import { footButton, inputEl, styled, toast } from '../ui.ts';
 import type { GridTile } from './media-grid.ts';
 import {
   railEmpty,
@@ -70,31 +70,20 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
 
   // The pane contributes its toolbar only; the shared grid is placed by the
   // shell (see MediaPane.el).
-  const el = styled('div', 'atx-media-toolbar atx-media-pane-unsplash', {
-    display: 'flex', alignItems: 'center', gap: '6px',
-  });
+  const el = styled('div', 'atx-media-toolbar atx-media-pane-unsplash');
 
   // A div wearing the control baseline: the magnifier and the field sit inside
   // one bordered box, so the box is the control and the <input> inside it is
   // bare. inputEl() is typed to real form elements, hence the marker by hand.
-  const searchWrap = styled('div', 'atx-unsplash-search', {
-    flex: '1 1 auto', minWidth: '0', display: 'flex', alignItems: 'center', gap: '6px',
-    padding: '4px 8px',
-  });
+  const searchWrap = styled('div', 'atx-unsplash-search');
   searchWrap.dataset.input = '';
   const glass = icon('search', 13);
-  glass.style.opacity = '0.6';
-  const searchInput = styled('input', 'atx-unsplash-input', {
-    flex: '1 1 auto', minWidth: '0', border: 'none', background: 'transparent',
-    color: COLOR.foreground, font: '13px system-ui', outline: 'none',
-  });
+  const searchInput = styled('input', 'atx-unsplash-input');
   searchInput.type = 'search';
   searchInput.placeholder = 'Search Unsplash…';
   searchWrap.append(glass, searchInput);
 
-  const orientSelect = inputEl('select', 'atx-unsplash-orient', {
-    flex: '0 0 auto', width: 'auto', font: '12px system-ui',
-  });
+  const orientSelect = inputEl('select', 'atx-unsplash-orient');
   for (const { value, label } of ORIENTATIONS) {
     const option = document.createElement('option');
     option.value = value;
@@ -104,9 +93,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
 
   // Width, next to shape: both narrow what a pick will produce, and both are
   // the pane's own state rather than the modal's.
-  const widthSelect = inputEl('select', 'atx-unsplash-width', {
-    flex: '0 0 auto', width: 'auto', font: '12px system-ui',
-  });
+  const widthSelect = inputEl('select', 'atx-unsplash-width');
   for (const value of UNSPLASH_IMPORT_WIDTHS) {
     const option = document.createElement('option');
     option.value = String(value);
@@ -191,9 +178,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
       deps.grid.footer.append(loadMoreBtn);
     }
     if (next.moreError) {
-      const line = styled('span', 'atx-media-error', {
-        font: '12px system-ui', color: COLOR.warning, marginLeft: '10px',
-      });
+      const line = styled('span', 'atx-media-error atx-media-error-more');
       line.textContent = next.moreError.message;
       deps.grid.footer.append(line);
     }
@@ -206,13 +191,9 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
       deps.grid.showMessage('');
       const box = deps.grid.el.querySelector('.atx-media-status') as HTMLElement;
       box.textContent = '';
-      const title = styled('p', 'atx-media-error', {
-        margin: '0 0 6px', font: '600 13px system-ui', color: COLOR.foreground,
-      });
+      const title = styled('p', 'atx-media-error atx-media-error-title');
       title.textContent = 'Add an Unsplash access key';
-      const detail = styled('p', 'atx-media-error', {
-        margin: '0 0 12px', font: '12px/1.6 system-ui', color: COLOR.mutedFg,
-      });
+      const detail = styled('p', 'atx-media-error atx-media-error-detail');
       detail.textContent = error.message;
       // Opened above the modal (which is Z+8), and re-runs the search on close
       // so entering a key here lands you straight back in results.
@@ -221,7 +202,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
         // missing key, so landing them on General would be a detour.
         openSettingsPanel({ tab: 'unsplash', layer: 10, onClose: () => controller.retry() }),
       );
-      open.style.margin = '0 auto';
+      open.classList.add('atx-media-error-action');
       box.append(title, detail, open);
       return;
     }
@@ -268,10 +249,9 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
         );
       }
       if (remaining !== undefined) {
-        const line = styled('p', 'atx-unsplash-rate', {
-          margin: '14px 0 0', font: `11px ${FONT.mono}`,
-          color: remaining <= 5 ? COLOR.warning : COLOR.mutedFg,
-        });
+        const line = styled('p', 'atx-unsplash-rate');
+        // The last few requests of the hour are worth noticing.
+        if (remaining <= 5) line.dataset.tone = 'warn';
         line.textContent = `${remaining} Unsplash requests left this hour`;
         into.append(line);
       }

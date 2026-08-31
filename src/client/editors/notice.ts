@@ -2,7 +2,7 @@ import type { SourceLoc } from '../../shared/protocol.ts';
 import { clearHighlight } from '../hover.ts';
 import { pageSource } from '../page-source.ts';
 import * as state from '../state.ts';
-import { COLOR, FONT, basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
+import { basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
 import { openEntryPanel } from './entry.ts';
 import { mount } from '../shadow.ts';
 
@@ -23,20 +23,14 @@ export function showDynamicNotice(
   const panel = buildPanel('Can’t edit this here');
   const body = panel.querySelector('[data-body]') as HTMLElement;
 
-  const msg = styled('p', 'atx-notice-reason', {
-    margin: '0 0 6px', font: '13px/1.5 system-ui', color: COLOR.foreground,
-  });
+  const msg = styled('p', 'atx-notice-reason');
   msg.textContent = reason;
 
   // The location line opens the in-browser source peek — often all that's
   // needed to see *why* this content refused, without leaving the page.
-  const where = styled('p', 'atx-notice-loc', {
-    margin: '0 0 12px', font: `12px ${FONT.mono}`, color: COLOR.mutedFg, cursor: 'pointer',
-  });
+  const where = styled('p', 'atx-notice-loc');
   where.textContent = `${basename(src.file)}:${src.loc}`;
   where.title = 'Peek at the source code';
-  where.addEventListener('mouseenter', () => (where.style.textDecoration = 'underline'));
-  where.addEventListener('mouseleave', () => (where.style.textDecoration = 'none'));
   where.addEventListener('click', () => {
     close();
     openPeek(src);
@@ -49,9 +43,7 @@ export function showDynamicNotice(
   // the source loc points at. Offer a direct jump to it. (spec §16.2)
   const contentFile = pageSource();
   if (contentFile) {
-    const hint = styled('p', 'atx-notice-hint', {
-      margin: '0 0 4px', font: '13px/1.5 system-ui', color: COLOR.primaryText,
-    });
+    const hint = styled('p', 'atx-notice-hint');
     hint.textContent = `This page's content comes from ${basename(contentFile)} — that's where its title and body text are edited.`;
     body.append(hint);
   }

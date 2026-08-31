@@ -1,6 +1,6 @@
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
-import { COLOR, FONT, buildBackdrop, buildPanel, footButton, inputEl, styled, toast } from '../ui.ts';
+import { buildBackdrop, buildPanel, footButton, inputEl, styled, toast } from '../ui.ts';
 import { mount } from '../shadow.ts';
 
 /**
@@ -18,22 +18,14 @@ import { mount } from '../shadow.ts';
 /** Show the context text for manual copying. `title` names the element. */
 export function openCopyPanel(title: string, text: string): void {
   clearHighlight();
-  const panel = buildPanel(`Element context — ${title}`);
-  panel.style.width = 'min(640px, 94vw)';
+  const panel = buildPanel(`Element context — ${title}`, undefined, { width: 'min(640px, 94vw)' });
   const body = panel.querySelector('[data-body]') as HTMLElement;
 
-  const note = styled('p', 'atx-copy-note', {
-    margin: '0 0 10px', font: '13px/1.5 system-ui', color: COLOR.warning,
-  });
+  const note = styled('p', 'atx-copy-note');
   note.textContent =
     'Your browser would not let the page write to the clipboard — over a network address the dev server is not a secure context. Copy it from here instead:';
 
-  const area = inputEl('textarea', 'atx-copy-text', {
-    height: '300px',
-    font: `12px/1.5 ${FONT.mono}`,
-    whiteSpace: 'pre',
-    resize: 'vertical',
-  });
+  const area = inputEl('textarea', 'atx-copy-text');
   area.readOnly = true;
   area.value = text;
   body.append(note, area);

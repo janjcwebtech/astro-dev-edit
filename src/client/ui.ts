@@ -248,7 +248,6 @@ export function styled<K extends keyof HTMLElementTagNameMap>(
   id?: string,
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
-  el.dataset.astroDevEditUi = '1';
   if (className) el.className = className;
   // The first class is the element's identity ('atx-toast atx-toast-ok' → the
   // toast); the modifiers after it are variants, not separate surfaces.

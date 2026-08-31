@@ -1,9 +1,9 @@
 import type { PeekResponse, SourceLoc } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
-import { tokenizeLines, type TokenKind } from '../highlight.ts';
+import { tokenizeLines } from '../highlight.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
-import { COLOR, FONT, basename, buildBackdrop, buildPanel, footButton, hexToRgba, isolateScroll, styled } from '../ui.ts';
+import { basename, buildBackdrop, buildPanel, footButton, isolateScroll, styled } from '../ui.ts';
 import { mount } from '../shadow.ts';
 
 /**
@@ -16,30 +16,9 @@ import { mount } from '../shadow.ts';
  * button in its footer is the jump-out.
  */
 
-/** Token colors on the panel's dark background. Chosen for contrast, not to
- *  mimic any one editor theme. */
-const TOKEN_COLOR: Record<TokenKind, string> = {
-  plain: COLOR.foreground,
-  comment: COLOR.mutedFg,
-  string: COLOR.successText,
-  tag: COLOR.primaryText,
-  attr: COLOR.primaryText,
-  keyword: COLOR.destructiveText,
-  number: COLOR.warning,
-  fence: COLOR.mutedFg,
-};
-
-const CODE_BG = COLOR.background;
-const FOCUS_BG = hexToRgba(COLOR.primary, 0.16);
-
 /** A muted "⋯ N more lines" marker row for content the huge-file cap cut. */
 function moreRow(count: number, where: 'above' | 'below'): HTMLElement {
-  const row = styled('div', 'atx-peek-more', {
-    padding: '4px 12px 4px 15px',
-    color: COLOR.faintFg,
-    fontStyle: 'italic',
-    userSelect: 'none',
-  });
+  const row = styled('div', 'atx-peek-more');
   row.textContent = `⋯ ${count} more line${count === 1 ? '' : 's'} ${where}`;
   return row;
 }
@@ -47,13 +26,7 @@ function moreRow(count: number, where: 'above' | 'below'): HTMLElement {
 /** Render the fetched lines as gutter-numbered, token-tinted rows. Returns
  *  the scroll container and the focused row (for centering). */
 function renderCode(peeked: PeekResponse): { container: HTMLElement; focusRow: HTMLElement | null } {
-  const container = styled('div', 'atx-peek-code', {
-    maxHeight: '65vh',
-    overflow: 'auto',
-    background: CODE_BG,
-    font: `12.5px/1.65 ${FONT.mono}`,
-    padding: '8px 0',
-  });
+  const container = styled('div', 'atx-peek-code');
   // The peek is the tallest scroller in the overlay and the one most likely to
   // be opened on a page driving its own scroll (Lenis and friends).
   isolateScroll(container);
@@ -67,31 +40,15 @@ function renderCode(peeked: PeekResponse): { container: HTMLElement; focusRow: H
   tokenized.forEach((tokens, idx) => {
     const lineNo = peeked.startLine + idx;
     const isFocus = lineNo === peeked.focusLine;
-    const row = styled('div', `atx-peek-line${isFocus ? ' atx-peek-focus' : ''}`, {
-      display: 'flex',
-      // Every row carries the border so the gutter stays aligned; only the
-      // focus row's is visible.
-      borderLeft: `3px solid ${isFocus ? COLOR.primary : 'transparent'}`,
-      background: isFocus ? FOCUS_BG : 'transparent',
-    });
-    const gutter = styled('span', 'atx-peek-gutter', {
-      flex: '0 0 auto',
-      width: gutterWidth,
-      padding: '0 12px 0 0',
-      textAlign: 'right',
-      color: isFocus ? COLOR.primaryText : COLOR.faintFg,
-      userSelect: 'none',
-    });
+    const row = styled('div', `atx-peek-line${isFocus ? ' atx-peek-focus' : ''}`);
+    // The gutter's width is the widest line number in this file, so it is the
+    // one thing about a row a stylesheet cannot know.
+    const gutter = styled('span', 'atx-peek-gutter', { width: gutterWidth });
     gutter.textContent = String(lineNo);
-    const code = styled('span', 'atx-peek-text', {
-      flex: '1 1 auto',
-      whiteSpace: 'pre',
-      paddingRight: '16px',
-      tabSize: '2',
-    });
+    const code = styled('span', 'atx-peek-text');
     for (const token of tokens) {
-      const span = styled('span', '', { color: TOKEN_COLOR[token.kind] });
-      if (token.kind === 'comment') span.style.fontStyle = 'italic';
+      const span = styled('span', 'atx-peek-token');
+      span.dataset.token = token.kind;
       span.textContent = token.text;
       code.append(span);
     }
@@ -111,19 +68,15 @@ function renderCode(peeked: PeekResponse): { container: HTMLElement; focusRow: H
  *  "Open in editor" jump-out. */
 export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => void): void {
   clearHighlight();
-  const panel = buildPanel(`${basename(src.file)}:${src.loc}`);
   // Code wants room: much wider than the default 420px panel, and the code
   // area runs edge-to-edge (its own padding) instead of the body's 16px.
-  panel.style.width = 'min(780px, 94vw)';
-  const body = panel.querySelector('[data-body]') as HTMLElement;
-  body.style.padding = '0';
-
-  const loading = styled('div', 'atx-peek-loading', {
-    padding: '24px 16px',
-    color: COLOR.mutedFg,
-    font: `12.5px ${FONT.mono}`,
-    background: CODE_BG,
+  const panel = buildPanel(`${basename(src.file)}:${src.loc}`, undefined, {
+    width: 'min(780px, 94vw)',
   });
+  const body = panel.querySelector('[data-body]') as HTMLElement;
+  body.toggleAttribute('data-flush', true);
+
+  const loading = styled('div', 'atx-peek-loading');
   loading.textContent = 'Loading source…';
   body.append(loading);
 
@@ -158,8 +111,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
       // hover pill on an `astro:assets` <Image>.)
       if (peeked.refused) {
         loading.textContent = peeked.refused;
-        loading.style.color = COLOR.warning;
-        loading.style.lineHeight = '1.6';
+        loading.dataset.tone = 'warn';
         return;
       }
       const { container, focusRow } = renderCode(peeked);
@@ -174,7 +126,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
     } catch (err) {
       if (closed) return;
       loading.textContent = `Could not load source — ${err instanceof Error ? err.message : 'unknown error'}`;
-      loading.style.color = COLOR.destructiveText;
+      loading.dataset.tone = 'err';
     }
   })();
 }

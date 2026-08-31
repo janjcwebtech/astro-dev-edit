@@ -6,11 +6,7 @@ import {
   basename,
   buildBackdrop,
   buildPanel,
-  CHECKER,
-  COLOR,
-  FONT,
   lockElement,
-  RADIUS,
   setFreshSrc,
   styled,
   toast,
@@ -61,24 +57,17 @@ export async function beginImageEdit(
   // Shown even when the file cannot be swapped: writing alt text for an image
   // you cannot see is the exact problem this fixes, and the preview is read
   // from the DOM rather than from anything patchable.
-  const preview = styled('div', 'atx-image-preview', {
-    width: '100%', maxHeight: '180px', height: '180px', marginBottom: '10px',
-    borderRadius: RADIUS.md, overflow: 'hidden', border: `1px solid ${COLOR.border}`,
-    background: CHECKER(14),
-  });
-  const previewImg = styled('img', 'atx-image-preview-img', {
-    width: '100%', height: '100%', objectFit: 'contain', display: 'block',
-  });
+  const preview = styled('div', 'atx-image-preview');
+  const previewImg = styled('img', 'atx-image-preview-img');
   previewImg.alt = '';
   previewImg.decoding = 'async';
-  previewImg.addEventListener('error', () => (previewImg.style.display = 'none'));
-  previewImg.addEventListener('load', () => (previewImg.style.display = ''));
+  // A path that fails to load hides rather than showing a broken-image icon;
+  // a retry that finally succeeds undoes that — see ui.ts::setFreshSrc.
+  previewImg.addEventListener('error', () => previewImg.toggleAttribute('data-hidden', true));
+  previewImg.addEventListener('load', () => previewImg.toggleAttribute('data-hidden', false));
   preview.append(previewImg);
 
-  const meta = styled('p', 'atx-image-meta', {
-    margin: '0 0 12px', font: `11px ${FONT.mono}`, color: COLOR.mutedFg,
-    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-  });
+  const meta = styled('p', 'atx-image-meta');
 
   /** `fresh` marks a file written seconds ago, which needs the retrying loader;
    *  `path` is always the clean value the metadata line and the save refer to. */
@@ -92,29 +81,21 @@ export async function beginImageEdit(
   body.append(preview, meta);
 
   if (!srcEditable) {
-    const note = styled('p', 'atx-note', {
-      margin: '0 0 12px', font: '12px/1.5 system-ui', color: COLOR.warning,
-    });
+    const note = styled('p', 'atx-note');
     note.textContent =
       'The image file is set from code (an expression or astro:assets), so it can’t be swapped here — only the alt text can be edited.';
     body.append(note);
   }
 
   // --- alt text --------------------------------------------------------------
-  const altLabel = styled('label', 'atx-alt-label', {
-    display: 'block', font: '600 12px system-ui', marginBottom: '4px', opacity: '0.8',
-  });
+  const altLabel = styled('label', 'atx-alt-label');
   altLabel.textContent = 'Alt text';
-  const altInput = styled('input', 'atx-alt-input', {
-    width: '100%', padding: '6px 8px', marginBottom: '12px', boxSizing: 'border-box',
-    border: `1px solid ${COLOR.input}`, borderRadius: RADIUS.sm,
-    background: COLOR.background, color: COLOR.foreground, font: `13px ${FONT.ui}`,
-  });
+  const altInput = styled('input', 'atx-alt-input');
   altInput.value = originalAlt;
   if (!altEditable) {
     altInput.disabled = true;
     altInput.title = 'The alt text is set from an expression — edit it in the source.';
-    altInput.style.opacity = '0.5';
+    altInput.toggleAttribute('data-off', true);
   }
   body.append(altLabel, altInput);
 
@@ -153,19 +134,11 @@ export async function beginImageEdit(
     paintRecents();
   };
 
-  const strip = styled('div', 'atx-image-recents', {
-    display: 'grid', gridTemplateColumns: `repeat(${RECENTS}, 1fr)`, gap: '6px',
-  });
-  const stripLabel = styled('div', 'atx-image-recents-label', {
-    display: 'flex', alignItems: 'baseline', gap: '8px',
-    font: '600 12px system-ui', opacity: '0.8', margin: '0 0 6px',
-  });
-  const stripTitle = styled('span', 'atx-image-recents-title', {});
+  const strip = styled('div', 'atx-image-recents');
+  const stripLabel = styled('div', 'atx-image-recents-label');
+  const stripTitle = styled('span', 'atx-image-recents-title');
   stripTitle.textContent = 'Recently added';
-  const browseAll = styled('button', 'atx-btn atx-image-browse-all', {
-    marginLeft: 'auto', padding: '0', border: 'none', background: 'transparent',
-    color: COLOR.primaryText, cursor: 'pointer', font: '600 12px system-ui',
-  });
+  const browseAll = styled('button', 'atx-btn atx-image-browse-all');
   browseAll.type = 'button';
   browseAll.textContent = 'Browse all →';
   browseAll.addEventListener('click', () => void browse());
@@ -179,18 +152,11 @@ export async function beginImageEdit(
     strip.textContent = '';
     for (const asset of recents) {
       const current = asset.path === chosenSrc;
-      const btn = styled('button', 'atx-image-recent', {
-        padding: '0', width: '100%', aspectRatio: '4 / 3', overflow: 'hidden',
-        borderRadius: RADIUS.md, border: `1px solid ${current ? COLOR.primary : COLOR.border}`,
-        outline: current ? `1px solid ${COLOR.primary}` : 'none',
-        background: CHECKER(10),
-        cursor: 'pointer',
-      });
+      const btn = styled('button', 'atx-image-recent');
+      btn.toggleAttribute('data-current', current);
       btn.type = 'button';
       btn.title = asset.path;
-      const thumb = styled('img', 'atx-image-recent-thumb', {
-        width: '100%', height: '100%', objectFit: 'cover', display: 'block',
-      });
+      const thumb = styled('img', 'atx-image-recent-thumb');
       // Anything written since this panel opened may still be in Vite's 404
       // window, so it gets the retrying loader; everything else loads normally.
       if (asset.mtime > openedAt) setFreshSrc(thumb, asset.path);
@@ -198,9 +164,9 @@ export async function beginImageEdit(
       thumb.alt = '';
       thumb.loading = 'lazy';
       thumb.decoding = 'async';
-      thumb.addEventListener('error', () => (thumb.style.display = 'none'));
+      thumb.addEventListener('error', () => thumb.toggleAttribute('data-hidden', true));
       // A retry that finally succeeds must undo that — see ui.ts::setFreshSrc.
-      thumb.addEventListener('load', () => (thumb.style.display = 'block'));
+      thumb.addEventListener('load', () => thumb.toggleAttribute('data-hidden', false));
       btn.append(thumb);
       btn.addEventListener('click', () => stage(asset.path));
       strip.append(btn);
@@ -235,7 +201,7 @@ export async function beginImageEdit(
     } catch {
       // The strip is a convenience; the modal's Browse all still works, and it
       // reports its own failure with a Retry.
-      stripLabel.style.display = 'none';
+      stripLabel.toggleAttribute('data-hidden', true);
     }
   }
 
