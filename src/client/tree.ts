@@ -3,7 +3,7 @@ import { icon } from './icons.ts';
 import { isOwnUi } from './shadow.ts';
 import { annotatedElements, pathFor, sourceFor } from './source-map.ts';
 import { type TreeNode, buildTreeModel } from './tree-model.ts';
-import { basename, isolateScroll, onChromeInset, styled } from './ui.ts';
+import { basename, isolateScroll, onChromeInset, outlineRect, styled } from './ui.ts';
 
 /**
  * Element-tree panel: a left-docked, non-modal outline of the page's
@@ -148,12 +148,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     }
     const r = selectedEl.getBoundingClientRect();
     selectionOutline.toggleAttribute('data-on', true);
-    Object.assign(selectionOutline.style, {
-      left: `${r.left - 2}px`,
-      top: `${r.top - 2}px`,
-      width: `${r.width}px`,
-      height: `${r.height}px`,
-    } as Partial<CSSStyleDeclaration>);
+    Object.assign(selectionOutline.style, outlineRect(r) as Partial<CSSStyleDeclaration>);
   }
 
   let repositionScheduled = false;

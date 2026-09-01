@@ -55,7 +55,7 @@ Three of them are worth knowing the intent behind before you change one.
 are different jobs. `primary` is a near-white that carries dark `primary-fg`
 ink, and it is what the confirm button, a checked box and an active admin-bar
 chip are made of. `brand` marks the overlay pointing at *your* content — the
-editable outline, the hover pill's edge, the save veil, a tree row aimed at a
+editable outline, the save veil, a tree row aimed at a
 live node, the launcher glyph — and nothing else uses it. Swapping `primary`
 for a saturated colour costs you that distinction.
 

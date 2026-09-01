@@ -65,12 +65,13 @@ The [README](../README.md) has the short version; this is the whole of it.
 
 ## The hover pill and source peek
 
-In edit mode, hovering an element outlines it and shows a `file:line:col`
-pill. The pill starts neutral (grey `loading…`, no editability claim); once
-the pointer rests on one element for a moment, the source AST is consulted
-and the pill colors up to the verdict a click would get — **editable**,
-**image**, or **dynamic**. Verdicts are remembered until the file next
-changes, so known elements show theirs instantly.
+In edit mode, hovering an element draws a box a couple of pixels clear of it
+and shows a `file:line:col` pill above. The pill starts neutral (grey
+`loading…`, no editability claim); once the pointer rests on one element for a
+moment, the source AST is consulted and both name the verdict a click would
+get — the pill in words (**editable**, **image**, or **dynamic**), the box in
+colour. Verdicts are remembered until the file next changes, so known elements
+show theirs instantly.
 
 Clicking the pill's `file:loc` label opens a **source peek** — a wide
 read-only panel showing the whole file syntax-highlighted, with line numbers,

@@ -9,6 +9,7 @@ import {
   basename,
   chromeInset,
   hexToRgba,
+  outlineRect,
   pillButton,
   setPillLabel,
   styled,
@@ -310,10 +311,7 @@ export function initHover(deps: HoverDeps): HoverHandle {
 
     outline.toggleAttribute("data-on", true);
     Object.assign(outline.style, {
-      left: `${rect.left - 2}px`,
-      top: `${rect.top - 2}px`,
-      width: `${rect.width}px`,
-      height: `${rect.height}px`,
+      ...outlineRect(rect),
       // The verdict picks the colour, so these two cannot live in the sheet.
       borderColor: verdict.color,
       background: hexToRgba(verdict.color, 0.08),
@@ -323,7 +321,9 @@ export function initHover(deps: HoverDeps): HoverHandle {
     const loc = highlightedSrc?.loc || "?";
     tooltipLoc.textContent = `${basename(file)}:${loc} · `;
     tooltipVerdict.textContent = verdict.word;
-    tooltip.style.borderLeft = `3px solid ${verdict.color}`;
+    // The verdict's colour is the outline's alone. Repeating it as an edge on
+    // the pill made two marks claim the same one thing, and cost the pill its
+    // symmetry — it is a label, the box around the element is the highlight.
     tooltip.toggleAttribute("data-on", true);
     positionPill(rect);
   }
