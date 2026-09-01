@@ -2,10 +2,12 @@ import type { ApplyOp, AssetInfo, AttrState, SourceLoc } from '../../shared/prot
 import * as api from '../api.ts';
 import { clearHighlight } from '../hover.ts';
 import * as state from '../state.ts';
+import { icon } from '../icons.ts';
 import {
   basename,
   buildBackdrop,
   buildPanel,
+  footButton,
   lockElement,
   setFreshSrc,
   styled,
@@ -138,10 +140,12 @@ export async function beginImageEdit(
   const stripLabel = styled('div', 'atx-image-recents-label');
   const stripTitle = styled('span', 'atx-image-recents-title');
   stripTitle.textContent = 'Recently added';
-  const browseAll = styled('button', 'atx-btn atx-image-browse-all');
-  browseAll.type = 'button';
-  browseAll.textContent = 'Browse all →';
-  browseAll.addEventListener('click', () => void browse());
+  // The strip's corner action, on the same shape every other corner action in
+  // the overlay takes. The arrow is the chevron glyph rather than a "→" — a
+  // text arrow lands at a different weight and baseline in every platform font.
+  const browseAll = footButton('Browse all', 'outline', () => void browse());
+  browseAll.classList.add('atx-btn-sm', 'atx-image-browse-all');
+  browseAll.append(icon('chevronRight', 16));
   stripLabel.append(stripTitle, browseAll);
   body.append(stripLabel, strip);
 

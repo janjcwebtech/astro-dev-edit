@@ -170,7 +170,7 @@ span changes, so comments, key order and quoting come out exactly as they went i
 Set `schemaEditor: false` to forbid this outright while keeping the rest of the
 tool.
 
-**Every field row spans two stores, and the row says which is which:**
+**Every field card holds two stores side by side, and says which is which:**
 
 | Half | Controls | Written to | Effect |
 | --- | --- | --- | --- |

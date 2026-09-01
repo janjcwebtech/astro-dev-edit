@@ -147,7 +147,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     window.addEventListener('keydown', onKey, true);
 
     // --- tabs + upload -------------------------------------------------------
-    const uploadBtn = styled('button', 'atx-btn atx-media-upload');
+    const uploadBtn = styled('button', 'atx-btn atx-btn-outline atx-media-upload');
     uploadBtn.type = 'button';
     uploadBtn.append(icon('upload', 16), document.createTextNode('Upload file…'));
 
@@ -331,7 +331,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       filterInput.placeholder = 'Filter…';
       filterInput.addEventListener('input', () => paint());
 
-      const scopeToggle = styled('button', 'atx-btn atx-asset-scope');
+      const scopeToggle = styled('button', 'atx-btn atx-btn-outline atx-asset-scope');
       scopeToggle.type = 'button';
       scopeToggle.addEventListener('click', () => {
         showAll = !showAll;

@@ -1,6 +1,7 @@
 import { canRichEdit, escapeHtml, htmlToMarkdown, markdownToHtml } from '../markdown.ts';
 import { COLOR, FONT, PAPER, RADIUS, basename, hexToRgba, inputEl, isolateScroll, styled, toast } from '../ui.ts';
 import { mountLight } from '../shadow.ts';
+import { icon, type IconName } from '../icons.ts';
 import { buildImageField } from './asset-picker.ts';
 
 /**
@@ -102,15 +103,24 @@ function ensureContentStyles(): void {
 /** A toolbar button. `variant` is an extra class, not a style object: what each
  *  button does to its own label — bold, italic, struck through, monospaced — is
  *  a fixed choice from a known set, so it belongs in the stylesheet. */
+/**
+ * One toolbar key. `label` is either a typographic mark the button *is* — B, I,
+ * the list bullets — or an `IconName`, for the three whose meaning no letter
+ * carries. Those three were emoji, which arrive in colour and at a different
+ * weight and baseline in every platform font: the one place in the overlay
+ * where the chrome was the operating system's rather than its own.
+ */
 function toolbarButton(
-  label: string,
+  label: string | IconName,
   title: string,
   onRun: () => void,
   variant = '',
+  glyph = false,
 ): HTMLButtonElement {
   const b = styled('button', variant ? `atx-rte-btn ${variant}` : 'atx-rte-btn');
   b.type = 'button';
-  b.textContent = label;
+  if (glyph) b.append(icon(label as IconName, 16));
+  else b.textContent = label;
   b.title = title;
   // preventDefault keeps the contenteditable selection alive through the click.
   b.addEventListener('mousedown', (e) => e.preventDefault());
@@ -262,7 +272,7 @@ export function buildBodyEditor(initial: string): BodyEditor {
   const imageActions = styled('div', 'atx-rte-image-actions');
   const smallBtn = (label: string, primary: boolean, onClick: () => void): HTMLButtonElement => {
     const kind = primary ? 'default' : 'outline';
-    const b = styled('button', `atx-btn atx-btn-${kind} atx-rte-image-btn`);
+    const b = styled('button', `atx-btn atx-btn-${kind} atx-btn-sm atx-rte-image-btn`);
     b.type = 'button';
     b.textContent = label;
     b.addEventListener('click', onClick);
@@ -350,19 +360,19 @@ export function buildBodyEditor(initial: string): BodyEditor {
     toolbarButton('•–', 'Bulleted list', () => exec('insertUnorderedList')),
     toolbarButton('1.', 'Numbered list', () => exec('insertOrderedList')),
     divider(),
-    toolbarButton('❝', 'Quote', () => exec('formatBlock', '<blockquote>')),
+    toolbarButton('quote', 'Quote', () => exec('formatBlock', '<blockquote>'), '', true),
     toolbarButton('PRE', 'Code block', () => exec('formatBlock', '<pre>'), 'atx-rte-btn-pre'),
     toolbarButton('`', 'Inline code', insertInlineCode, 'atx-rte-btn-code'),
     divider(),
-    toolbarButton('🔗', 'Insert link', insertLink),
-    toolbarButton('🖼', 'Insert image', () => {
+    toolbarButton('link', 'Insert link', insertLink, '', true),
+    toolbarButton('image', 'Insert image', () => {
       if (imagePanel.hasAttribute('data-on')) {
         imagePanel.toggleAttribute('data-on', false);
         return;
       }
       saveSelection();
       openImagePanel('', null);
-    }),
+    }, '', true),
   ];
   toolbar.append(...formatButtons, modeBtn);
 

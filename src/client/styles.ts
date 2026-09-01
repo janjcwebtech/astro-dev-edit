@@ -423,10 +423,42 @@ button {
    and actions pinned right. Every list in the overlay is built from this
    rather than each panel growing its own row. */
 
+/* A list, not a stack of tiles. Rows sit flush and a 1px rule separates them:
+   the row already carries a transparent 1px border, so the rule is a colour
+   change and costs no layout shift. Gaps would make each row read as its own
+   object, which is exactly what a list is not. */
 .atx-item-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+}
+
+.atx-item-group > .atx-item + .atx-item {
+  border-top-color: var(--atx-border);
+}
+
+/* Edge to edge in the card body holding it, so the rules reach the card's own
+   edges and a hover fill covers the whole row rather than an inset tile. The
+   16px it cancels is .atx-card-body's, put back on each row. */
+.atx-item-group[data-bleed] {
+  margin: 0 -16px;
+}
+
+.atx-item-group[data-bleed] > .atx-item {
+  padding-right: 16px;
+  padding-left: 16px;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+/* .atx-card carries no bottom padding, so a bleed list that ends the card
+   also ends the card: its last row has to pick up the card's own corners or a
+   square hover fill spills past them. Selector says exactly that condition --
+   the card can't be given overflow:hidden instead, which would clip a row's
+   focus ring. */
+.atx-card-body:last-child > .atx-item-group[data-bleed]:last-child > .atx-item:last-child {
+  border-bottom-right-radius: var(--atx-radius-xl);
+  border-bottom-left-radius: var(--atx-radius-xl);
 }
 
 .atx-item {
@@ -653,10 +685,19 @@ button {
   background: var(--atx-accent);
 }
 
+/* The quiet variant, and the only one with no boundary at rest -- so it is
+   restricted to a control that sits *inside* another surface and is read as
+   part of it: a header's corner action, a toolbar key, a back link. A footer
+   action is never ghost. A footer is a band of decisions with nothing else in
+   it, and a label floating in one with no box and no edge does not read as a
+   button at all; that is what the outline variant is for.
+
+   Full-strength ink, not muted. Muted is for text being *read*, and a control
+   painted in it looks disabled before it looks quiet. */
 .atx-btn-ghost {
   border: 1px solid transparent;
   background: transparent;
-  color: var(--atx-muted-fg);
+  color: var(--atx-foreground);
 }
 
 .atx-btn-ghost:hover:not(:disabled) {
@@ -1955,19 +1996,12 @@ input[type='checkbox']:focus-visible {
   display: block;
 }
 
-.atx-collections-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--atx-border);
-}
-
-/* The create form's one action stretches; the detail view's sits centred
-   beside the text next to it. */
-.atx-collections-actions-create {
-  align-items: normal;
+/* The footer band's action slot, filled by whichever view the pane is showing.
+   display:contents so an empty slot takes no space in the band and a filled one
+   lays its button out as if the slot were not there -- the list view leaves it
+   empty, and a 0-width flex item would still collect the band's gap. */
+.atx-collections-primary {
+  display: contents;
 }
 
 /* One field: its name and remove control, then the two stores side by side. */
@@ -2039,9 +2073,21 @@ input[type='checkbox']:focus-visible {
   color: var(--atx-foreground);
 }
 
+/* The field's two stores, side by side: they describe the *same* field, and
+   the card's whole job is letting you read one against the other. auto-fit
+   rather than a fixed pair -- a drawer narrow enough that a control would be
+   squeezed off its label stacks them again instead. */
+.atx-collections-stores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: start;
+  gap: 10px 14px;
+  margin-top: 8px;
+}
+
 .atx-collections-group {
-  margin-top: 6px;
-  padding-left: 8px;
+  min-width: 0;
+  padding-left: 10px;
   border-left: 2px solid var(--atx-border);
 }
 
@@ -2057,12 +2103,15 @@ input[type='checkbox']:focus-visible {
   text-transform: uppercase;
 }
 
+/* Muted sits on the label below, not here: colour set on the row is inherited
+   by whatever the row holds, which quietly greys the value as well as the word
+   naming it. */
 .atx-collections-control {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 0 0 6px;
-  color: var(--atx-muted-fg);
+  color: var(--atx-foreground);
   font: 13px var(--atx-font-ui);
 }
 
@@ -2073,10 +2122,15 @@ input[type='checkbox']:focus-visible {
 
 .atx-collections-control-label {
   flex: 0 0 74px;
+  color: var(--atx-muted-fg);
 }
 
+/* min-width:0 so a control shrinks with its column: side by side, a store
+   is half the card wide, and an input's intrinsic width would otherwise push
+   the row past it. */
 .atx-collections-input,
 .atx-collections-select {
+  min-width: 0;
   flex: 1 1 auto;
 }
 
@@ -2121,19 +2175,13 @@ input[type='checkbox']:focus-visible {
   font: 12px var(--atx-font-ui);
 }
 
-.atx-collections-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--atx-brand-text);
-  font: 13px var(--atx-font-ui);
-  cursor: pointer;
-}
+/* The way back out of a collection. It wears the corner-action shape from the
+   button system and adds only the one thing that shape cannot know: the
+   chevron points the other way, since it is the forward one turned around.
 
-.atx-collections-back > .atx-ico {
+   Neutral, not brand: brandText means *this is on your page and editable*,
+   and a back button is the tool talking about its own navigation. */
+.atx-collections-back > .atx-ico:first-child {
   transform: rotate(180deg);
 }
 
@@ -2273,18 +2321,9 @@ input[type='checkbox']:focus-visible {
   display: none;
 }
 
+/* Wears the corner-action shape; the only thing left here is where it sits. */
 .atx-image-browse-all {
   margin-left: auto;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--atx-muted-fg);
-  font: 500 13px var(--atx-font-ui);
-  cursor: pointer;
-}
-
-.atx-image-browse-all:hover {
-  color: var(--atx-foreground);
 }
 
 .atx-image-recent {
@@ -2366,28 +2405,10 @@ input[type='checkbox']:focus-visible {
 
 /* Sits beside the path field in a flex row, so it takes the field's height
    and shape rather than a button's own. */
+/* Wears the shared outline button; the flex basis is the only thing left that
+   belongs to this row rather than to the button system. */
 .atx-image-field-browse {
   flex: 0 0 auto;
-  height: 32px;
-  padding: 0 14px;
-  box-sizing: border-box;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: transparent;
-  color: var(--atx-foreground);
-  font: 500 14px/1 var(--atx-font-ui);
-  outline: none;
-  transition: background 150ms, border-color 150ms, box-shadow 150ms;
-  cursor: pointer;
-}
-
-.atx-image-field-browse:hover {
-  background: var(--atx-accent);
-}
-
-.atx-image-field-browse:focus-visible {
-  border-color: var(--atx-ring);
-  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
 }
 
 .atx-image-field-hint {
@@ -2468,7 +2489,6 @@ input[type='checkbox']:focus-visible {
   width: 100%;
   height: 100%;
   color: var(--atx-faint-fg);
-  font: 18px var(--atx-font-ui);
 }
 
 .atx-media-fallback[data-on] {
@@ -2487,7 +2507,6 @@ input[type='checkbox']:focus-visible {
   border-radius: 50%;
   background: var(--atx-primary);
   color: var(--atx-primary-fg);
-  font: 700 13px var(--atx-font-ui);
   pointer-events: none;
 }
 
@@ -2531,47 +2550,10 @@ input[type='checkbox']:focus-visible {
   text-align: center;
 }
 
-.atx-btn-retry,
-.atx-media-upload,
-.atx-asset-scope {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  box-sizing: border-box;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: transparent;
-  color: var(--atx-foreground);
-  font: 500 14px/1 var(--atx-font-ui);
-  white-space: nowrap;
-  outline: none;
-  transition: background 150ms, border-color 150ms, box-shadow 150ms;
-  cursor: pointer;
-}
-
-.atx-btn-retry:hover,
-.atx-media-upload:hover,
-.atx-asset-scope:hover {
-  background: var(--atx-accent);
-}
-
-.atx-btn-retry:focus-visible,
-.atx-media-upload:focus-visible,
-.atx-asset-scope:focus-visible {
-  border-color: var(--atx-ring);
-  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
-}
-
-.atx-btn-retry > .atx-ico,
-.atx-media-upload > .atx-ico,
-.atx-asset-scope > .atx-ico {
-  width: 16px;
-  height: 16px;
-}
-
+/* Three buttons that were each a hand-copied outline variant -- same border,
+   radius, height, ink, hover and focus ring, written out three times and free
+   to drift. They wear .atx-btn-outline now; what is left here is only what is
+   theirs: where each one sits. */
 .atx-btn-retry {
   margin: 12px auto 0;
 }
@@ -2759,7 +2741,7 @@ input[type='checkbox']:focus-visible {
 
 .atx-media-rail-value {
   display: block;
-  color: var(--atx-muted-fg);
+  color: var(--atx-foreground);
   font: 11px/1.5 var(--atx-font-mono);
   word-break: break-all;
 }
@@ -3136,7 +3118,7 @@ input[type='checkbox']:focus-visible {
   border: none;
   border-radius: var(--atx-radius-md);
   background: transparent;
-  color: var(--atx-muted-fg);
+  color: var(--atx-foreground);
   font: 500 13px/1 var(--atx-font-ui);
   outline: none;
   transition: background 120ms, color 120ms;
@@ -3173,7 +3155,6 @@ input[type='checkbox']:focus-visible {
    editor talking about itself, so it stays neutral. */
 .atx-rte-mode {
   margin-left: auto;
-  color: var(--atx-muted-fg);
   font: 600 11px var(--atx-font-mono);
   letter-spacing: 0.04em;
 }
@@ -3275,15 +3256,6 @@ input[type='checkbox']:focus-visible {
 }
 
 /* Smaller than a footer button: these sit inside a panel inside a toolbar. */
-.atx-rte-image-btn {
-  height: 28px;
-  padding: 0 12px;
-  font: 500 13px/1 var(--atx-font-ui);
-}
-
-.atx-rte-image-btn.atx-btn-outline {
-  color: var(--atx-muted-fg);
-}
 
 /* The raw-markdown half of the MD/Rich toggle. */
 .atx-body-input {

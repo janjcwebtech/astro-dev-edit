@@ -57,7 +57,7 @@ export function openCopyPanel(title: string, text: string): void {
 
   const foot = panel.querySelector('[data-foot]') as HTMLElement;
   foot.append(
-    footButton('Close', 'ghost', close),
+    footButton('Close', 'outline', close),
     footButton('Copy', 'default', () => void copyNow()),
   );
 

@@ -73,7 +73,7 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
 
   const row = styled('div', 'atx-image-field-row');
   const pathInput = inputEl('input', 'atx-image-field-path');
-  const browse = styled('button', 'atx-btn atx-image-field-browse');
+  const browse = styled('button', 'atx-btn atx-btn-outline atx-image-field-browse');
   browse.type = 'button';
   browse.textContent = 'Browse…';
   row.append(pathInput, browse);

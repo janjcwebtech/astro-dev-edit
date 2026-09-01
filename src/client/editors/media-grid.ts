@@ -1,4 +1,5 @@
 import { isolateScroll, setFreshSrc, styled } from '../ui.ts';
+import { icon } from '../icons.ts';
 
 /**
  * The tile grid shared by both of the media modal's panes. One builder, two
@@ -156,7 +157,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
       fallback.toggleAttribute('data-on', false);
     });
     const fallback = styled('span', 'atx-media-fallback');
-    fallback.textContent = '🖼';
+    fallback.append(icon('image', 20));
     pick.append(img, fallback);
     // Assigned last, so both handlers above are attached before loading starts.
     if (tile.fresh) setFreshSrc(img, tile.thumbUrl);
@@ -164,7 +165,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
 
     // Selection badge, hidden until staged.
     const check = styled('span', 'atx-media-check');
-    check.textContent = '✓';
+    check.append(icon('check', 14));
     pick.append(check);
 
     if (tile.current) {
@@ -249,7 +250,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     const box = styled('div', 'atx-media-status');
     box.textContent = text;
     if (retry) {
-      const btn = styled('button', 'atx-btn atx-btn-retry');
+      const btn = styled('button', 'atx-btn atx-btn-outline atx-btn-retry');
       btn.type = 'button';
       btn.textContent = 'Retry';
       btn.addEventListener('click', retry);

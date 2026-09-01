@@ -10,7 +10,7 @@ import type {
 import * as api from '../api.ts';
 import { has } from '../features.ts';
 import { clearHighlight } from '../hover.ts';
-import { icon } from '../icons.ts';
+import { icon, type IconName } from '../icons.ts';
 import {
   buildTabs,
   footButton,
@@ -161,6 +161,18 @@ export interface CollectionsPaneOptions {
   /** Open straight into this collection's detail view, when it exists. Set by the
    *  overlay after a schema write reloaded the page. */
   initialCollection?: string;
+  /**
+   * Hand the surface the one button that completes the view being shown, or
+   * `null` for a view that completes nothing — the list is a place to look, not
+   * a decision to make.
+   *
+   * The pane cannot draw it itself and be read: the field list is longer than
+   * the drawer, so a Save at the end of it sits below the fold behind the
+   * scroll while the footer band — the one place the eye goes for the decision
+   * — holds nothing but Close. Called on every render, so the surface can
+   * assume the previous button is spent.
+   */
+  onPrimary?(button: HTMLElement | null): void;
 }
 
 export interface CollectionsPane {
@@ -184,13 +196,23 @@ export interface CollectionsPanelOptions {
 /**
  * Open the Collections drawer.
  *
- * The pane below carries all the state; this is only its shell. The footer holds
- * nothing but Close, deliberately: every save in here belongs to the row or the
- * form it changes — a schema write and an override write are different stores —
- * so a single drawer-wide Save would have to lie about which one it meant.
+ * The pane below carries all the state; this is only its shell. The footer band
+ * holds Close plus one slot the pane fills with whatever completes the view it
+ * is currently showing — Save changes in a collection, Create collection in the
+ * new-collection form, nothing at all in the list.
+ *
+ * It is a slot rather than a fixed drawer-wide Save because there is no such
+ * thing here: a schema write and an override write are different stores, and one
+ * button standing for both would have to lie about which it meant. What the slot
+ * fixes is where the button *is*. Drawn at the end of the pane it sat below the
+ * fold behind a field list longer than the drawer, leaving the band that every
+ * other drawer uses for the decision holding only the way out.
  */
 export function openCollectionsPanel(opts: CollectionsPanelOptions = {}): void {
   clearHighlight();
+
+  // The footer's action slot, declared before the pane that fills it.
+  const primary = styled('div', 'atx-collections-primary');
 
   const pane = buildCollectionsPane({
     // An entry drawer replaces this one rather than stacking on it (see
@@ -201,6 +223,10 @@ export function openCollectionsPanel(opts: CollectionsPanelOptions = {}): void {
       open();
     },
     ...(opts.collection ? { initialCollection: opts.collection } : {}),
+    onPrimary: (button) => {
+      primary.textContent = '';
+      if (button) primary.append(button);
+    },
   });
 
   const shell = openDrawer('Collections', {
@@ -213,7 +239,9 @@ export function openCollectionsPanel(opts: CollectionsPanelOptions = {}): void {
   });
 
   shell.body.append(pane.root);
-  shell.foot.append(footButton('Close', 'ghost', () => shell.close()));
+  // Close first, then the slot: the pane's own action is the rightmost thing in
+  // the band, where the confirm sits in every other drawer.
+  shell.foot.append(footButton('Close', 'outline', () => shell.close()), primary);
   pane.load();
 }
 
@@ -274,6 +302,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
 
   const load = (): void => {
     root.textContent = '';
+    opts.onPrimary?.(null);
     root.append(note([icon('spinner', 16), textNode('Reading collections…')], 'muted'));
     void api.listCollections().then(
       (next) => {
@@ -299,6 +328,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
   // --- rendering -------------------------------------------------------------
   function render(): void {
     root.textContent = '';
+    opts.onPrimary?.(null);
     // The editor list belongs to the DOM this call is about to build. Without
     // clearing it, a return to this view would leave detached editors from the
     // previous render in the dirty check and in the next save's payload.
@@ -347,7 +377,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       );
     }
 
-    const list = itemGroup();
+    const list = itemGroup({ bleed: true });
     for (const c of d.collections) {
       const row = item({
         title: c.name,
@@ -389,7 +419,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     head.append(name);
     head.append(styled('span', 'atx-collections-spacer'));
     if (has('openInEditor')) {
-      const openBtn = footButton('Open source', 'ghost', () => {
+      const openBtn = cornerButton('Open source', 'code', () => {
         void api.openCollectionSource({ collection: c.name }).catch((err: unknown) => {
           toast(err instanceof Error ? err.message : 'Could not open the config', 'err');
         });
@@ -489,10 +519,9 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       fieldsPane.append(form.root);
     }
 
-    const actions = styled('div', 'atx-collections-actions');
     const saveBtn = footButton('Save changes', 'default', () => void saveDetail(c, error));
-    actions.append(saveBtn);
-    fieldsPane.append(actions, error);
+    opts.onPrimary?.(saveBtn);
+    fieldsPane.append(error);
 
     const refreshSave = (): void => setButtonEnabled(saveBtn, isDirty());
     for (const e of editors) e.onChange(refreshSave);
@@ -638,10 +667,12 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     const fire = (): void => listeners.forEach((fn) => fn());
 
     let removed = false;
-    // Ghost, not danger: clicking this only *queues* a removal — the card dims and
-    // the label becomes "Undo remove", and nothing is written until Save. Eight
-    // red buttons down a field list would also shout louder than the field names.
-    const removeBtn = footButton('Remove', 'ghost', () => {
+    // Outline, not danger: clicking this only *queues* a removal — the card dims
+    // and the label becomes "Undo remove", and nothing is written until Save.
+    // Eight red buttons down a field list would also shout louder than the field
+    // names. What it must not be is a bare word: it is the only control in the
+    // card's header and has to look like one.
+    const removeBtn = cornerButton('Remove', null, () => {
       removed = !removed;
       if (removed) removals.add(f.name);
       else removals.delete(f.name);
@@ -651,6 +682,12 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     });
     if (schemaEditable) head.append(removeBtn);
     card.append(head);
+
+    // The two stores sit side by side, not stacked: they hold the *same* field
+    // and the point of the card is that you can read one against the other.
+    // The grid collapses to one column when the drawer is too narrow to keep
+    // a control legible beside its label.
+    const stores = styled('div', 'atx-collections-stores');
 
     // --- schema half ---------------------------------------------------------
     const typeSel = select(
@@ -692,7 +729,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       }
       schemaGroup.toggleAttribute('data-off', true);
     }
-    card.append(schemaGroup);
+    stores.append(schemaGroup);
 
     // --- editor half ---------------------------------------------------------
     const o = c.overrides[f.name] ?? {};
@@ -718,7 +755,8 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         ),
       );
     }
-    card.append(editorGroup);
+    stores.append(editorGroup);
+    card.append(stores);
 
     if (inSchema) {
       const exprEl = styled('code', 'atx-collections-expr');
@@ -898,10 +936,9 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     });
     wrap.append(form.root);
 
-    const actions = styled('div', 'atx-collections-actions atx-collections-actions-create');
     const createBtn = footButton('Create collection', 'default', () => void create());
-    actions.append(createBtn);
-    wrap.append(actions, error);
+    opts.onPrimary?.(createBtn);
+    wrap.append(error);
 
     function refresh(): void {
       setButtonEnabled(createBtn, nameInput.value.trim().length > 0 && newFields.length > 0);
@@ -1130,16 +1167,32 @@ function pendingRow(spec: SchemaFieldSpec, undo: () => void): HTMLElement {
   meta.textContent =
     `${TYPE_LABEL[spec.type] ?? spec.type}${spec.required ? ' · required' : ' · optional'}` +
     (spec.defaultValue !== undefined ? ` · default ${String(spec.defaultValue)}` : '');
-  row.append(name, meta, footButton('Remove', 'ghost', undo));
+  row.append(name, meta, cornerButton('Remove', null, undo));
   return row;
 }
 
+/**
+ * A control that belongs to the surface it sits on rather than to a footer: a
+ * card header's corner action, or the detail view's way back. One size down
+ * and outlined, which is the shape `newCollectionButton` already uses — these
+ * are the same kind of thing and reading as one family is the point.
+ */
+function cornerButton(
+  label: string,
+  glyph: IconName | null,
+  onClick: () => void,
+): HTMLButtonElement {
+  const btn = footButton(label, 'outline', onClick);
+  btn.classList.add('atx-btn-sm');
+  if (glyph) btn.prepend(icon(glyph, 16));
+  return btn;
+}
+
 function backLink(onClick: () => void): HTMLButtonElement {
-  const btn = styled('button', 'atx-collections-back');
-  btn.type = 'button';
+  const btn = cornerButton('Collections', null, onClick);
+  btn.classList.add('atx-collections-back');
   // The chevron is the forward one, turned around — one path, two directions.
-  btn.append(icon('chevronRight', 12), document.createTextNode('Collections'));
-  btn.addEventListener('click', onClick);
+  btn.prepend(icon('chevronRight', 16));
   return btn;
 }
 
@@ -1150,13 +1203,10 @@ function badge(label: string, tone: Tone): HTMLElement {
   return el;
 }
 
-/** The collection list's corner action: one size down and iconned, the same
- *  shape the entry drawer's "New" uses, because it is the same kind of thing. */
+/** The collection list's corner action, the same shape the entry drawer's
+ *  "New" uses, because it is the same kind of thing. */
 function newCollectionButton(onClick: () => void): HTMLButtonElement {
-  const btn = footButton('New', 'outline', onClick);
-  btn.classList.add('atx-btn-sm');
-  btn.prepend(icon('plus', 16));
-  return btn;
+  return cornerButton('New', 'plus', onClick);
 }
 
 function blurb(text: string): HTMLElement {

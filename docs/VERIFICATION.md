@@ -581,13 +581,44 @@ they group")
 
 - [ ] **Delete is not in the pair.** In the entry drawer's footer, Delete… is at
       the far left with an icon, and Cancel/Save are together at the right.
-      Cancel is outlined; a drawer whose only footer button is **Close** keeps
-      it quiet (ghost), because there is nothing to weigh it against.
+      Both Cancel and Close are outlined: a footer action always has an edge,
+      whatever it weighs against.
+
+- [ ] **Every clickable has a box, and every surface has one primary.** Sweep
+      each drawer, panel and modal: nothing that responds to a click is bare
+      text on the background. A control that carries no edge or fill of its own
+      is legitimate only *inside* a bounded container that supplies one — the
+      markdown toolbar's keys inside its bordered strip, an admin-bar menu item
+      inside the menu. Exactly one button per surface is filled near-white; if
+      two are, they are competing, and if none is, the surface's primary has
+      gone missing or has been drawn somewhere the eye does not look.
+
+- [ ] **The collection designer's primary is in the footer band.** Open a
+      collection with more fields than fit: **Save changes** sits in the sticky
+      band next to Close, still visible with the field list scrolled to the top.
+      Go back to the list and it disappears — a list completes nothing. Open
+      **New collection** and the band carries *Create collection* instead.
+
+- [ ] **No glyph is the operating system's.** Nothing in the overlay draws a
+      unicode dingbat or an emoji: the markdown toolbar's quote, link and image
+      keys, and the media grid's selection tick and broken-thumbnail fallback,
+      are all `icons.ts` strokes in `currentColor`. A coloured glyph anywhere
+      means a literal has crept back into a `textContent`.
 
 - [ ] **A list is rows, not blocks.** The Collections list gives each row a
       16px icon, a name, a monospaced path-and-counts line, and a chevron.
       Hover fills the row and brightens the chevron; Tab reaches each row and
-      Enter opens it, since the row itself carries the button semantics.
+      Enter opens it, since the row itself carries the button semantics. The
+      rows sit flush with a 1px rule between them, and both the rule and the
+      hover fill run to the card's own left and right edges — a gap between
+      rows, or an inset tile under the pointer, means the list is being drawn
+      as a stack of separate objects.
+
+- [ ] **A field's two stores are two columns.** Open a collection: each field
+      card shows *Schema* and *Editor* beside each other, their control rows
+      lining up. Narrow the window until the drawer hits its 440px floor and
+      they stack — a control squeezed off its label instead of stacking means
+      the grid's minimum has drifted.
 
 - [ ] **Buttons and fields share a corner.** A button beside a text field is
       the same height and the same radius — if the button reads as a pill next

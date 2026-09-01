@@ -167,9 +167,20 @@ export function item(o: ItemOptions): Item {
   return { root, content, title };
 }
 
-/** The list an `item` belongs to. Owns the spacing between rows. */
-export function itemGroup(): HTMLElement {
+export interface ItemGroupOptions {
+  /**
+   * Run the rows edge to edge in the surface holding them: cancels a card
+   * body's horizontal padding so the rules between rows reach the card's own
+   * edges and a hover fill covers the whole row. A list sitting directly in a
+   * card body wants this; one indented inside other content does not.
+   */
+  bleed?: boolean;
+}
+
+/** The list an `item` belongs to: rows flush, separated by a rule. */
+export function itemGroup(o: ItemGroupOptions = {}): HTMLElement {
   const el = styled('div', 'atx-item-group');
   el.role = 'list';
+  if (o.bleed) el.dataset.bleed = '';
   return el;
 }

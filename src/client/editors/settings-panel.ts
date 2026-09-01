@@ -369,7 +369,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   };
 
   // --- footer ----------------------------------------------------------------
-  const closeBtn = footButton('Close', 'ghost', () => shell.close());
+  const closeBtn = footButton('Close', 'outline', () => shell.close());
   const saveBtn = footButton('Save', 'default', () => void save());
   foot.append(closeBtn, saveBtn);
 

@@ -92,7 +92,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
 
   const foot = panel.querySelector('[data-foot]') as HTMLElement;
   foot.append(
-    footButton('Close', 'ghost', close),
+    footButton('Close', 'outline', close),
     footButton('Open in editor', 'default', () => {
       close();
       openSource(src);
