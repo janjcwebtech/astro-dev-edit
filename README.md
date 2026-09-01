@@ -38,7 +38,7 @@ Run `npm run dev` and click **Edit page** in the admin bar across the top of the
 
 - **If something is not editable with the tool, it points you to the source.** For components, `set:html`, block-level nested markup, expressions that can't be traced and anything rendered by a package, you get a notice explaining why, plus a jump to the source, rather than a write the tool can't prove is correct.
 
-  ![A notice reading Can't edit this here, explaining the text comes from a template expression, with the source location and an Open source button](docs/images/refusal.png)
+  ![A notice reading Can't edit this here, explaining the text comes from a template expression, with the source location and Open template and Edit page content buttons](docs/images/refusal.png)
 
 - **Images.** Click an image to swap its `src` and edit its `alt`, with a preview and the six most recently added images to hand.
 
