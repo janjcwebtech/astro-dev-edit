@@ -247,10 +247,12 @@ export function initTree(deps: TreeDeps): TreeHandle {
     const chevron = styled('span', 'atx-tree-chevron');
     // A leaf is not clickable, so it does not offer a pointer.
     chevron.toggleAttribute('data-leaf', !hasChildren);
-    // A leaf gets a small dot in the same slot, so tags stay column-aligned.
-    chevron.append(
-      hasChildren ? icon(collapsed.has(path) ? 'chevronRight' : 'chevronDown', 12) : icon('dot', 7),
-    );
+    // A leaf's slot stays empty rather than carrying a mark of its own: the
+    // chevron's fixed width is what keeps the tags column-aligned, and a dot
+    // there read as a list bullet in front of every row that had no children.
+    if (hasChildren) {
+      chevron.append(icon(collapsed.has(path) ? 'chevronRight' : 'chevronDown', 12));
+    }
     if (hasChildren) {
       chevron.addEventListener('click', (e) => {
         e.stopPropagation();

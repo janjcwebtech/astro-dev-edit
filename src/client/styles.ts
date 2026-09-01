@@ -1313,6 +1313,10 @@ input[type='checkbox']:focus-visible {
   gap: 6px;
   padding: 0 8px;
   box-sizing: border-box;
+  /* A bar spans its edge from corner to corner, so it has no corners of its
+     own to round. Stated rather than left to the default, because every other
+     surface in here carries a radius and this one must not pick one up. */
+  border-radius: 0;
   /* Opaque enough to guarantee the bar's own contrast. At 0.78 a white page
      showed through to an effective #494853, which dropped the hint and menu
      inks to ~3:1; the blur still reads as glass at 0.94, and over a dark page
@@ -1441,8 +1445,8 @@ input[type='checkbox']:focus-visible {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: none;
   border-radius: var(--atx-radius-md);
@@ -1485,7 +1489,10 @@ input[type='checkbox']:focus-visible {
   justify-content: center;
   gap: 6px;
   flex: 0 0 auto;
-  height: 26px;
+  /* 28px -- the small rung of the button ladder, shared with the launcher and
+     the icon buttons so everything in the bar is one height, and the icon
+     button (28px wide) is actually square. */
+  height: 28px;
   width: auto;
   padding: 0 11px;
   border: none;
@@ -1626,10 +1633,6 @@ input[type='checkbox']:focus-visible {
 .atx-field[data-locked] [data-input],
 .atx-field[data-locked] .atx-field-check {
   opacity: 0.5;
-}
-
-.atx-field[data-locked] .atx-field-label {
-  color: var(--atx-muted-fg);
 }
 
 /* Full opacity, not a dimmed foreground: a label is read, and dimming it was
@@ -1854,14 +1857,15 @@ input[type='checkbox']:focus-visible {
 }
 
 /* The entry rows are whole-width buttons that read as rows in a list. The
-   collection rows come from group.ts::item and only add the pointer. */
+   collection rows come from group.ts::item and only add the pointer -- these
+   carry the same box as one, so both lists in the drawer are the same object. */
 .atx-collections-item {
   display: block;
   width: 100%;
-  margin-bottom: 6px;
-  padding: 9px 12px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-card);
   color: var(--atx-foreground);
   text-align: left;
@@ -1900,13 +1904,13 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-collections-item-title {
-  font: 500 13px var(--atx-font-ui);
+  font: 500 14px var(--atx-font-ui);
 }
 
 .atx-collections-item-meta,
 .atx-collections-meta {
   color: var(--atx-muted-fg);
-  font: 11px var(--atx-font-mono);
+  font: 12px var(--atx-font-mono);
 }
 
 /* Monospaced, because it is a path and two counts -- data about the row, not
@@ -1926,21 +1930,26 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-collections-item-meta {
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
+/* The line under a collection's name: which directory, how many entries, what
+   kind of schema. 12px is the item-description size, not a size below it -- it
+   is read, and shrinking it was the reason the header felt crowded. */
 .atx-collections-meta {
-  margin-bottom: 12px;
+  margin-top: 4px;
+  margin-bottom: 16px;
+  font-size: 12px;
 }
 
 /* The one button on the collections list, under the rows. */
 .atx-collections-list > .atx-btn-outline {
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .atx-collections-fieldspane,
 .atx-collections-items {
-  padding-top: 10px;
+  padding-top: 16px;
 }
 
 .atx-collections-head,
@@ -1951,15 +1960,15 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-collections-head {
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .atx-collections-head-create {
-  margin-bottom: 10px;
+  margin-bottom: 16px;
 }
 
 .atx-collections-itembar {
-  margin-bottom: 10px;
+  margin-bottom: 16px;
 }
 
 .atx-collections-title {
@@ -1974,20 +1983,23 @@ input[type='checkbox']:focus-visible {
 .atx-collections-itemcount {
   flex: 1 1 auto;
   color: var(--atx-muted-fg);
-  font: 13px var(--atx-font-ui);
+  font: 14px var(--atx-font-ui);
 }
 
-.atx-collections-fields {
-  margin-top: 10px;
-}
-
+/* A column with a gap rather than a margin on each card: the gap belongs to
+   the list, so a card is the same object wherever it is mounted and the last
+   one does not push a space below itself. 12px is the item-group rung. */
+.atx-collections-fields,
 .atx-collections-newfields {
-  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .atx-collections-error {
   display: none;
-  margin: 10px 0 0;
+  margin: 16px 0 0;
   color: var(--atx-warning);
   font: 13px/1.5 var(--atx-font-ui);
 }
@@ -2004,12 +2016,14 @@ input[type='checkbox']:focus-visible {
   display: contents;
 }
 
-/* One field: its name and remove control, then the two stores side by side. */
+/* One field: its name and remove control, then the two stores side by side.
+   16px all round and on the item rung for radius -- this is a card in a list
+   of cards, and the 10/12 it used to carry made a form of nine of them read as
+   one dense block rather than nine things. */
 .atx-collections-field {
-  margin-bottom: 8px;
-  padding: 10px 12px;
+  padding: 16px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-card);
 }
 
@@ -2023,7 +2037,7 @@ input[type='checkbox']:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 14px;
 }
 
 .atx-collections-field-name {
@@ -2031,34 +2045,38 @@ input[type='checkbox']:focus-visible {
   font: 600 12px var(--atx-font-mono);
 }
 
-/* The zod expression this field currently compiles to, verbatim. */
+/* The zod expression this field currently compiles to, verbatim. Set off by
+   the card's own rule, so it reads as a footnote about the field rather than
+   as one more line of it. */
 .atx-collections-expr {
   display: block;
-  margin-top: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--atx-border);
   color: var(--atx-muted-fg);
-  font: 11px var(--atx-font-mono);
+  font: 12px var(--atx-font-mono);
   word-break: break-all;
 }
 
 .atx-collections-addfield {
-  margin-top: 10px;
-  padding: 10px 12px;
+  margin-top: 16px;
+  padding: 16px;
   border: 1px dashed var(--atx-border);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-lg);
 }
 
 .atx-collections-addfield > .atx-btn-outline {
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 /* The two-store legend — the one piece of chrome that explains the drawer. */
 .atx-collections-legend {
-  padding: 9px 11px;
+  padding: 16px;
   border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
+  border-radius: var(--atx-radius-xl);
   background: var(--atx-background);
   color: var(--atx-muted-fg);
-  font: 12px/1.55 var(--atx-font-ui);
+  font: 13px/1.6 var(--atx-font-ui);
 }
 
 /* The colour is repeated from the wrapper rather than inherited: a host page's
@@ -2081,13 +2099,12 @@ input[type='checkbox']:focus-visible {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   align-items: start;
-  gap: 10px 14px;
-  margin-top: 8px;
+  gap: 16px 20px;
 }
 
 .atx-collections-group {
   min-width: 0;
-  padding-left: 10px;
+  padding-left: 14px;
   border-left: 2px solid var(--atx-border);
 }
 
@@ -2096,9 +2113,9 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-collections-caption {
-  margin-bottom: 4px;
+  margin-bottom: 12px;
   color: var(--atx-muted-fg);
-  font: 500 11px var(--atx-font-ui);
+  font: 500 12px var(--atx-font-ui);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -2109,10 +2126,16 @@ input[type='checkbox']:focus-visible {
 .atx-collections-control {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 6px;
+  gap: 12px;
+  margin: 0 0 12px;
   color: var(--atx-foreground);
-  font: 13px var(--atx-font-ui);
+  font: 14px var(--atx-font-ui);
+}
+
+/* The last control in a store carries no gap of its own -- the card's padding
+   is the space under it. */
+.atx-collections-control:last-child {
+  margin-bottom: 0;
 }
 
 /* Options belong to a select field and to nothing else. */
@@ -2121,7 +2144,7 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-collections-control-label {
-  flex: 0 0 74px;
+  flex: 0 0 78px;
   color: var(--atx-muted-fg);
 }
 
@@ -2148,7 +2171,7 @@ input[type='checkbox']:focus-visible {
 
 .atx-collections-check-hint {
   color: var(--atx-muted-fg);
-  font: 13px var(--atx-font-ui);
+  font: 14px var(--atx-font-ui);
 }
 
 /* A field typed into the add form but not yet written. Outlined in the brand
@@ -2157,10 +2180,9 @@ input[type='checkbox']:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border: 1px solid var(--atx-brand);
-  border-radius: var(--atx-radius-md);
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-card);
 }
 
@@ -2872,7 +2894,7 @@ input[type='checkbox']:focus-visible {
 
 .atx-popup-label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 10px;
   color: var(--atx-foreground);
   font: 500 13px var(--atx-font-ui);
   opacity: 0.8;

@@ -484,6 +484,9 @@ split.
       needed, whether or not the config mentions them.
 - [ ] Locked notes are **muted grey with a padlock**, not amber — amber is
       reserved for the gitignore warning.
+- [ ] A locked field's **label stays full-strength white**, the same as an
+      editable one's. The dim lands on the control only: a greyed label reads
+      as a lesser setting rather than as one this project has already decided.
 - [ ] Turn *CSS inspector* off, **Save** (toast: *Settings saved*), close, hover an
       element **with a class** (e.g. the header's `.brand`): no chips row, **with
       no reload**. Turn it back on and the chips return.
@@ -623,6 +626,23 @@ they group")
 - [ ] **Buttons and fields share a corner.** A button beside a text field is
       the same height and the same radius — if the button reads as a pill next
       to a box, the radius ladder has drifted off its 10px base.
+
+- [ ] **The designer's cards are on the same measure as every other card.**
+      Open a collection: a field card has 16px of padding on all four sides,
+      12px between it and the next one, and the zod expression under a hairline
+      at the card's foot. A store's caption sits 12px above its first row and
+      its rows are 12px apart. If two field cards read as one block, the
+      measure has slipped back to the 8/10px it was drawn at.
+
+- [ ] **The admin bar is one height, and has no corners.** The launcher mark,
+      every chip and both icon buttons measure 28px; the icon buttons are
+      square. The bar spans its edge with square corners — a radius anywhere on
+      the bar itself means it has picked one up from the panel vocabulary.
+
+- [ ] **The element tree marks branches only.** Open *Elements*: a row with
+      children carries a chevron, a leaf carries nothing at all, and both kinds
+      of tag still line up in one column. A mark in a leaf's slot reads as a
+      list bullet in front of every leaf in the tree.
 
 **Focus and field state** (new behaviour, no unit test — the tokens are pinned,
 the fact that a rule reaches the right element is not)
