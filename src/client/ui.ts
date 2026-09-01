@@ -111,6 +111,18 @@ export const COLOR = {
    *  `input` instead: a 16px box needs more fill than a 300px one to read at
    *  all. */
   inputBg: 'rgb(255 255 255 / 0.075)',
+  /**
+   * An outline **button's** body — `input` at 30%, shadcn's dark
+   * `bg-input/30`. Lighter than a field's interior, because a button is read
+   * at a glance and a field is read while typing in it.
+   *
+   * It looks like decoration and is not. An outline button with a transparent
+   * body is a hairline drawn around nothing: beside a filled confirm it reads
+   * as bare text rather than as the other half of the decision, which is the
+   * whole reason the variant exists. The edge alone cannot carry it — at these
+   * alphas a 1px line is the first thing the eye discards.
+   */
+  controlBg: 'rgb(255 255 255 / 0.045)',
   /** Focus ring. Neutral, because focus is chrome — the overlay talking about
    *  itself. Clears 3:1 on every surface (3.2–4.6), which matters more here
    *  than it would elsewhere: with control borders transparent at rest, this
@@ -424,6 +436,26 @@ export function setChromeInset(next: ChromeInset): void {
 export function onChromeInset(fn: (i: ChromeInset) => void): void {
   insetListeners.add(fn);
   fn(inset);
+}
+
+/** Breathing room between a highlighted element's box and the inside of the
+ *  outline drawn around it. Flush, the border sits on the element's own edge
+ *  and reads as part of it — worst on a heading, whose ink runs to the box. */
+export const OUTLINE_GAP = 2;
+
+/** Where a 2px outline goes to sit OUTLINE_GAP clear of `rect` on every side.
+ *  Both figures drawn around a page element — hover's verdict box and the
+ *  element tree's locked selection — place themselves through this, so the two
+ *  never disagree by a pixel. The offset carries the outline's own border as
+ *  well as the gap, because the box being sized here is a content box. */
+export function outlineRect(rect: DOMRect): Partial<CSSStyleDeclaration> {
+  const offset = OUTLINE_GAP + 2;
+  return {
+    left: `${rect.left - offset}px`,
+    top: `${rect.top - offset}px`,
+    width: `${rect.width + OUTLINE_GAP * 2}px`,
+    height: `${rect.height + OUTLINE_GAP * 2}px`,
+  };
 }
 
 /** Lock an element during a save: dim + spinner overlay. Returns a release fn. */

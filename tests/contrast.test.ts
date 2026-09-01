@@ -215,6 +215,30 @@ describe('control boundaries', () => {
       expect(ratio, `inputBg on ${surface}`).toBeLessThan(AA_NON_TEXT);
     }
   });
+
+  // The outline button's body. It has to be *present* — a transparent one
+  // makes the button read as bare text beside a filled confirm — and it has to
+  // stay under a field's interior, since a button is not a place to type.
+  it('controlBg is a body, not a surface, and sits under inputBg', () => {
+    for (const surface of SURFACES) {
+      const ratio = contrast(COLOR.controlBg, COLOR[surface]);
+      expect(ratio, `controlBg on ${surface}`).toBeGreaterThan(1.02);
+      expect(ratio, `controlBg on ${surface}`).toBeLessThan(contrast(COLOR.inputBg, COLOR[surface]));
+    }
+  });
+
+  // The label inside one still has to be readable, on every surface the button
+  // can sit on.
+  it('foreground clears AA inside an outline button on every surface', () => {
+    for (const surface of SURFACES) {
+      const body = composite(COLOR.controlBg, COLOR[surface]);
+      const hex = `#${[body.r, body.g, body.b].map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+      expect(
+        contrast(COLOR.foreground, hex),
+        `foreground in an outline button on ${surface}`,
+      ).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
 });
 
 describe('the rich-text editor is a light island', () => {
@@ -274,6 +298,7 @@ describe('the neutral ramp is actually neutral', () => {
     'border',
     'input',
     'inputBg',
+    'controlBg',
     'ring',
     'accent',
     'foreground',

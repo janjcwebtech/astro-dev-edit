@@ -39,7 +39,7 @@ The names are the overlay's design tokens, kebab-cased and prefixed.
 | Group | Properties |
 | --- | --- |
 | Surfaces | `--atx-background`, `--atx-card`, `--atx-elevated`, `--atx-accent` |
-| Lines and control edges | `--atx-border`, `--atx-input`, `--atx-input-bg`, `--atx-ring` |
+| Lines and control edges | `--atx-border`, `--atx-input`, `--atx-input-bg`, `--atx-control-bg`, `--atx-ring` |
 | Ink | `--atx-foreground`, `--atx-muted-fg`, `--atx-faint-fg` |
 | Emphasis | `--atx-primary`, `--atx-primary-fg` |
 | Brand | `--atx-brand`, `--atx-brand-text` |
@@ -59,18 +59,25 @@ editable outline, the hover pill's edge, the save veil, a tree row aimed at a
 live node, the launcher glyph — and nothing else uses it. Swapping `primary`
 for a saturated colour costs you that distinction.
 
-**`--atx-border`, `--atx-input` and `--atx-input-bg` are translucent white**,
-so one value composites correctly on all three surfaces. Replace one with an
-opaque colour and it will be right on the surface you were looking at and wrong
-on the other two.
+**`--atx-border`, `--atx-input`, `--atx-input-bg` and `--atx-control-bg` are
+translucent white**, so one value composites correctly on all three surfaces.
+Replace one with an opaque colour and it will be right on the surface you were
+looking at and wrong on the other two.
 
-**A form control has no border.** `--atx-input` is the *fill* a control is made
+**A form control has no border.** `--atx-input` is the *fill* a field is made
 of, not its outline — a field's edge is where that fill stops, and its 1px
 border stays transparent until focus or an invalid value paints it. That is
 also why `--atx-ring` matters more here than it usually would: it is the whole
 of the non-text indication a keyboard user gets, so it is 3px and holds 3:1
-against every surface. Raising `--atx-input` into a visible outline is the
-obvious change to make and it is the one that undoes the design.
+against every surface. Painting a resting field's border with `--atx-input` is
+the obvious change to make and it is the one that undoes the design.
+
+**An outline button does have both.** It is drawn as a `--atx-control-bg` body
+inside a 1px `--atx-input` edge, because it is read at a glance rather than
+typed into, and next to a filled confirm a button with no body of its own reads
+as a bare word rather than as the other half of the decision. `--atx-control-bg`
+is the lighter of the two fills: a button is not a place to put a cursor, so it
+sits under a field's `--atx-input-bg` interior.
 
 **Radii are a ladder, and things stay on their rung.** `sm` (6px) a swatch or
 a checkbox, `md` (8px) a small button, a menu item or a tab, `lg` (10px) a form

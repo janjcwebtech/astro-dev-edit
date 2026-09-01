@@ -216,11 +216,15 @@ whichever sections your change touches; run the whole list before a release.
 
 **Inline text editing** (e.g. `/articles/` listing)
 
-- [ ] Edit mode on → hovering highlights the element with a neutral grey pill
+- [ ] Edit mode on → hovering boxes the element and shows a neutral grey pill
       (`file:loc · loading…`); after resting ~500ms on it the pill upgrades to
       the server verdict — purple `editable` on literal text, amber `dynamic`
       on expression-driven content, green `image` on a static `<img>` — with
-      no change in pill width (the verdict slot is fixed-width). Sweeping
+      no change in pill width (the verdict slot is fixed-width). Only the box
+      carries the verdict colour; the pill has no coloured edge, and its
+      corners wrap its `open`/`copy` buttons rather than cutting them. The box
+      stands 2px clear of the element on every side — on a heading whose ink
+      runs to its box, the border must not touch the letters. Sweeping
       the mouse across elements without resting fires no `/classify` requests,
       a re-hover of a verified element shows its verdict instantly with no new
       request (network tab), and after an HMR update verdicts re-verify.
@@ -331,7 +335,8 @@ whichever sections your change touches; run the whole list before a release.
       tree come back (session-remembered); do the same with the tree closed and
       it stays closed, tab only.
 - [ ] Hovering a row outlines the matching element on the page with the verdict
-      pill and class/ID chips; hovering an element on the page highlights its row
+      pill and class/ID chips; a clicked row's locked selection sits the same
+      2px clear of the element as the hover box; hovering an element on the page highlights its row
       (dashed, `.atx-tree-selection` distinct) and scrolls the tree to it.
 - [ ] Clicking a row locks a persistent selection outline and scrolls the element
       into view; scrolling the page keeps the outline glued to it. With a row
@@ -622,6 +627,14 @@ they group")
       lining up. Narrow the window until the drawer hits its 440px floor and
       they stack — a control squeezed off its label instead of stacking means
       the grid's minimum has drifted.
+
+- [ ] **An outlined button has a body.** In any footer band, hold a thumb over
+      the labels: *Cancel* and *Save* must still read as two boxes of the same
+      weight. An outlined button is a faint fill inside a 1px edge — if it is a
+      hairline around the band's own ground, it reads as bare text beside the
+      filled confirm however exactly the two boxes measure, which is the
+      failure this check exists for. Its edge is `--atx-input`, not
+      `--atx-border`: a separator may sit under 3:1, a control may not.
 
 - [ ] **Buttons and fields share a corner.** A button beside a text field is
       the same height and the same radius — if the button reads as a pill next

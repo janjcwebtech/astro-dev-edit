@@ -673,11 +673,19 @@ button {
   background: ${lift(COLOR.elevated, 10)};
 }
 
-/* A hairline, not a control outline: the border token at 10%, where this used
-   the 40% input token and read as a boxed-in field. */
+/* A body and an edge, which is what shadcn's dark outline button actually is:
+   bg-input/30 inside border-input, not a line around nothing. Both halves
+   matter and the fill matters more -- with a transparent body this read as
+   bare text beside the filled confirm it is paired with, even though the two
+   boxes measure the same 32px.
+
+   The edge is the input token (15%), not border (10%): a separator may sit
+   under the 3:1 non-text floor, and a control the user has to see to operate
+   is not. Both earlier passes here were wrong in opposite directions -- 40%
+   read as a boxed-in field, 10% read as a hairline. */
 .atx-btn-outline {
-  border: 1px solid var(--atx-border);
-  background: transparent;
+  border: 1px solid var(--atx-input);
+  background: var(--atx-control-bg);
   color: var(--atx-foreground);
 }
 
@@ -983,16 +991,19 @@ input[type='checkbox']:focus-visible {
 
 /* == Hover pill and outline ================================================
    hover.ts. The outline and the pill are shown by a [data-on] flag rather than
-   an inline display, and everything the verdict colours -- the outline's border
-   and fill, the pill's left edge -- stays inline, because that colour is chosen
-   per element at hover time. */
+   an inline display. The verdict colours the outline alone -- its border and
+   fill stay inline, because that colour is chosen per element at hover time.
+   The pill carries no verdict colour: it says the word, the box round the
+   element carries the hue. */
 
+/* The measured rect is inset by OUTLINE_GAP in hover.ts so the border clears
+   the element's own edge instead of sitting flush against its ink. */
 .atx-outline {
   position: fixed;
   z-index: ${Z};
   display: none;
   border: 2px solid var(--atx-brand);
-  border-radius: var(--atx-radius-sm);
+  border-radius: var(--atx-radius-md);
   background: ${hexToRgba(COLOR.brand, 0.08)};
   pointer-events: none;
   transition: all 60ms ease-out;
@@ -1012,8 +1023,12 @@ input[type='checkbox']:focus-visible {
      to its own content (flex-start) rather than stretching to the widest. */
   flex-direction: column;
   align-items: flex-start;
-  padding: 4px 4px 4px 8px;
-  border-radius: var(--atx-radius-sm);
+  /* Concentric with the pill buttons inside it: their 6px radius plus the 4px
+     of padding around them is the 10px this curve needs to read as wrapping
+     them rather than being clipped by them. The left padding is bigger because
+     what sits there is a text label, which has no box of its own to inset. */
+  padding: 4px 4px 4px 10px;
+  border-radius: var(--atx-radius-lg);
   background: var(--atx-card);
   color: var(--atx-foreground);
   font: 500 12px/1.4 var(--atx-font-mono);
@@ -1193,7 +1208,7 @@ input[type='checkbox']:focus-visible {
   z-index: ${Z};
   display: none;
   border: 2px solid var(--atx-brand);
-  border-radius: var(--atx-radius-sm);
+  border-radius: var(--atx-radius-md);
   box-shadow: 0 0 0 2px ${COLOR.brand}44, 0 0 12px ${COLOR.brand}66;
   pointer-events: none;
 }
