@@ -1,4 +1,5 @@
 import { icon } from '../icons.ts';
+import type { Interaction } from '../state.ts';
 import * as state from '../state.ts';
 import { mount } from '../shadow.ts';
 import {
@@ -95,7 +96,13 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
   if (opts.tools) body.append(opts.tools(input, markDirty));
   body.append(error);
 
-  let token = state.begin({ kind: 'panel', close: () => close(false) });
+  // `commit` is what leaving edit mode runs: an action labelled "Save & exit"
+  // must write the draft in the box, not drop it. A refusal keeps the panel
+  // open (see `run`), and the error phase keeps edit mode open with it.
+  const claim = (): Interaction =>
+    state.begin({ kind: 'panel', close: () => close(false), commit: () => close(true) });
+
+  let token = claim();
   let saving = false;
 
   const teardown = (): void => {
@@ -123,7 +130,7 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
     }
     // The in-flight `busy` interaction released the slot; re-claim it so the
     // still-open panel keeps owning the page's clicks.
-    token = state.begin({ kind: 'panel', close: () => close(false) });
+    token = claim();
     setBusy(false);
     error.textContent = failure;
     error.toggleAttribute('data-on', true);

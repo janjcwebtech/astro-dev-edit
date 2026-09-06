@@ -156,7 +156,7 @@ right end that answers "is my work on disk?" without guessing:
 | Button | Meaning |
 | --- | --- |
 | green **Done** | nothing pending — everything typed is written |
-| purple **Save & exit** | an inline edit has unsaved keystrokes |
+| purple **Save & exit** | an inline edit, or an open source popup, has unsaved keystrokes |
 | grey **Saving…** | the write is in flight |
 | green **Saved** | it just landed |
 | red **Save failed** | the write was refused and the change rolled back |

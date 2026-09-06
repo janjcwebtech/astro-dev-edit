@@ -213,6 +213,10 @@ whichever sections your change touches; run the whole list before a release.
       **Editing** toggle, which routes through the same exit.
 - [ ] A refused write (edit, then change the file underneath) shows red
       **Save failed**, keeps you in edit mode, and the file is untouched.
+- [ ] Type into an expression or markup popup, then activate **Save & exit** by
+      keyboard (the backdrop swallows a pointer click on the bar) → the draft is
+      written and edit mode ends. If the write is refused, the popup stays open
+      with the text in it and edit mode stays on.
 
 **Inline text editing** (e.g. `/articles/` listing)
 

@@ -10,7 +10,9 @@
  *   - 'text'  — an inline contenteditable edit; `finish(commit)` commits or
  *               cancels it (cancel restores the original text).
  *   - 'panel' — a modal panel (image swap / refusal notice); `close()` tears
- *               it down without committing.
+ *               it down without committing. A panel that holds a draft of its
+ *               own — the source popups — also supplies `commit()`, so leaving
+ *               edit mode writes that draft instead of dropping it.
  *
  * The token pattern makes async completion safe: `begin()` returns the
  * interaction as a token, and `releaseIf(token)` only frees the slot if that
@@ -22,7 +24,7 @@
 export type Interaction =
   | { kind: 'busy' }
   | { kind: 'text'; finish(commit: boolean): void }
-  | { kind: 'panel'; close(): void };
+  | { kind: 'panel'; close(): void; commit?(): void };
 
 let current: Interaction | null = null;
 
@@ -77,15 +79,21 @@ export function dismiss(): void {
 
 /**
  * Close whatever is open, *keeping* the user's work: a text edit commits
- * (writing to disk) instead of reverting; a panel still just closes, since it
- * owns its own Save button. The counterpart to `dismiss()` — leaving edit mode
- * must never silently discard typing, so the exit path goes through here.
+ * (writing to disk) instead of reverting; a panel that declared a `commit()`
+ * runs it, and one that did not just closes, since it owns its own Save
+ * button. The counterpart to `dismiss()` — leaving edit mode must never
+ * silently discard typing, so the exit path goes through here.
+ *
+ * A committing panel may refuse (a save can come back with a reason) and
+ * re-claim the slot from inside `commit()`, which is why the slot is cleared
+ * first: the panel's own `begin()` then wins, and the exit path reads the save
+ * phase to decide whether it may leave.
  */
 export function commit(): void {
   const interaction = current;
   current = null;
   if (!interaction) return;
-  if (interaction.kind === 'panel') interaction.close();
+  if (interaction.kind === 'panel') (interaction.commit ?? interaction.close)();
   else if (interaction.kind === 'text') interaction.finish(true);
 }
 
