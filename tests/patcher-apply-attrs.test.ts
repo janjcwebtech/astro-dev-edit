@@ -94,4 +94,37 @@ describe('applyAstro — attributes', () => {
     const res = await applyAstro(src, imgReq(src, 'alt', 'Fish & chips', 'Plain'));
     expect(res).toEqual({ ok: true, newSource: `<img src="/a.jpg" alt="Plain">\n` });
   });
+
+  // Astro's compiler decodes an attribute value while parsing the template and
+  // emits the result without re-escaping, so a source `&amp;amp;` reaches the
+  // DOM as a bare `&` — two decodes deep. Verifying at one depth refused that
+  // as "edited elsewhere" and left the element permanently unsaveable, since a
+  // reload produced the same mismatch every time.
+  it('verifies an attr the renderer decoded twice, not only once', async () => {
+    const src = `<img src="/a.jpg" alt="alt with &amp;amp; ampersand">\n`;
+    const res = await applyAstro(src, imgReq(src, 'alt', 'alt with & ampersand', 'Plain'));
+    expect(res).toEqual({ ok: true, newSource: `<img src="/a.jpg" alt="Plain">\n` });
+  });
+
+  it('accepts the shallower reading of the same value too', async () => {
+    // A renderer that decodes once serves `&amp;` and the DOM shows the literal
+    // five characters. Both depths are the same source, so both verify.
+    const src = `<img src="/a.jpg" alt="alt with &amp;amp; ampersand">\n`;
+    const res = await applyAstro(src, imgReq(src, 'alt', 'alt with &amp; ampersand', 'Plain'));
+    expect(res).toEqual({ ok: true, newSource: `<img src="/a.jpg" alt="Plain">\n` });
+  });
+
+  it('still refuses a value that is not the source at any depth', async () => {
+    const src = `<img src="/a.jpg" alt="alt with &amp;amp; ampersand">\n`;
+    const res = await applyAstro(src, imgReq(src, 'alt', 'something else entirely', 'Plain'));
+    expect(res).toMatchObject({ ok: false, code: 'mismatch' });
+  });
+
+  it('leaves a value with no entities on the one comparison it always had', async () => {
+    const src = `<img src="/a.jpg" alt="plain words">\n`;
+    expect(await applyAstro(src, imgReq(src, 'alt', 'plain words', 'Next')))
+      .toEqual({ ok: true, newSource: `<img src="/a.jpg" alt="Next">\n` });
+    expect(await applyAstro(src, imgReq(src, 'alt', 'plain word', 'Next')))
+      .toMatchObject({ ok: false, code: 'mismatch' });
+  });
 });

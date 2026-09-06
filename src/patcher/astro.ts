@@ -115,6 +115,37 @@ function decodeEntities(s: string): string {
   });
 }
 
+/**
+ * Every form the source could be presenting as, by entity-decoding depth —
+ * `['&amp;', '&']` for a source value of `&amp;amp;`, shallowest first,
+ * stopping when a pass changes nothing. The raw source spelling is not among
+ * them: the page always shows at least one decode.
+ *
+ * One decode is normally the whole story: the browser decodes what is served,
+ * and what is served is the source. Attribute values are the exception,
+ * because Astro's compiler decodes them *itself* while parsing the template
+ * and then emits the result without re-escaping — so a source `&amp;amp;`
+ * reaches the DOM as `&`, two decodes deep, and a verify that decoded once saw
+ * a mismatch and reported it as somebody else editing the file. Comparing
+ * against every depth is what makes the check independent of how many passes
+ * the renderer between the file and the page happened to perform.
+ *
+ * The extra tolerance is confined to how a value is *spelled*, never to what
+ * it says: no two depths of the same value differ except in entity references.
+ * The cap is belt-and-braces — decoding strictly shortens the string, so the
+ * loop terminates on its own.
+ */
+function decodeDepths(s: string): string[] {
+  const forms = [decodeEntities(s)];
+  for (let i = 0; i < 8; i++) {
+    const last = forms[forms.length - 1]!;
+    const next = decodeEntities(last);
+    if (next === last) break;
+    forms.push(next);
+  }
+  return forms;
+}
+
 /** Escape text for insertion as literal template content. `<` cannot open a
  *  tag, `{` cannot open an expression, `&` cannot form an entity — the write
  *  can change words but never structure or behaviour. (spec §7.2, §8) */
@@ -665,9 +696,12 @@ function patchAttribute(
 
   // Deliberately exact — no whitespace normalization, unlike text content.
   // The DOM preserves attribute values verbatim, so source and page only
-  // diverge when the file really changed out-of-band; refusing is safe.
-  const current = decodeEntities(source.slice(span.from, span.to));
-  if (current !== original) {
+  // diverge when the file really changed out-of-band; refusing is safe. The one
+  // thing that is not exact is entity-decoding depth: see `decodeDepths` for
+  // why the number of passes between this file and the page is not ours to
+  // assume.
+  const forms = decodeDepths(source.slice(span.from, span.to));
+  if (!forms.includes(original)) {
     return {
       ok: false,
       code: 'mismatch',
