@@ -1,5 +1,7 @@
 /**
- * Path conversions for `image()`-backed frontmatter fields.
+ * Conversions between the universes an asset path lives in — the two the entry
+ * drawer straddles, plus the URL form any of them takes once it is written into
+ * markup (`webPathToUrl`).
  *
  * Two path universes meet in the entry drawer. A plain `<img src>` in a
  * `.astro` file needs a **web-servable, root-relative** path (`/images/hero.png`)
@@ -109,4 +111,22 @@ export function entryAssetDir(entryFile: string, value: string): string | null {
   if (!parts || parts[0] !== IMPORTABLE_PREFIX) return null;
   const dir = parts.slice(0, -1);
   return dir.length ? dir.join('/') : null;
+}
+
+/**
+ * A web path as it must be written into markup: every segment
+ * percent-encoded.
+ *
+ * A filesystem name may hold characters a URL path may not — a space above
+ * all — and the paths this module and `toWebPath` deal in are descriptions of
+ * files, so they carry those characters raw. A browser forgives a raw space
+ * when it fetches one, which is why this is easy to miss, but `src="/a b.png"`
+ * is not a valid URI and is not how anyone writes that path by hand.
+ *
+ * Only for a path that is **not yet** encoded — one this tool composed from a
+ * filename. Running it over a value a person typed would turn their `%20` into
+ * `%2520`, so a hand-edited field keeps what it was given.
+ */
+export function webPathToUrl(webPath: string): string {
+  return webPath.split('/').map(encodeURIComponent).join('/');
 }

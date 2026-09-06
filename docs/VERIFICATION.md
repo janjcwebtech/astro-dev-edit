@@ -69,7 +69,7 @@ Run in this order; each is cheaper than the next.
 | `validateChanges` — null-deletion rules for optional/defaulted/required/unknown keys; wrong-type rejection, blanking a required field, `z.date()` string bridging, and an unreadable date answered in its own words across `z.date()`/`z.coerce.date()`/optional rather than with zod's "expected date, received Date" (non-date errors still zod's). **Both majors** | `tests/schema-introspect.test.ts` |
 | `zod-adapt` accessor tables — major detection, kind normalization, every wrapper (`optional`/`nullable`/`default`/`catch`/`readonly`, v4 `nonoptional` pinning), `.describe()` post-unwrap, enum options, array element, literal value, object shape, transform/refine/brand see-through, v4 `pipe` following `in`; non-zod → null | `tests/zod-adapt.test.ts` |
 | `inferFields` — type inference from frontmatter values | `tests/schema-introspect.test.ts` |
-| `asset-path` conversions — entry-relative ↔ served path, nested/sibling/deeper dirs, round-trips, `./` for siblings, root-escape refusal, `public/` refusal for `image()`, Windows separators, upload-dir derivation | `tests/asset-path.test.ts` |
+| `asset-path` conversions — entry-relative ↔ served path, nested/sibling/deeper dirs, round-trips, `./` for siblings, root-escape refusal, `public/` refusal for `image()`, Windows separators, upload-dir derivation, `webPathToUrl` segment encoding (space, `%`, `?`, `#`; separators untouched; deliberately not idempotent) | `tests/asset-path.test.ts` |
 | `POST /upload` `assetRef: 'relative'` — `imageUploadDir` fallback, honoured in-asset-dir target, ignored out-of-asset-dir and root-escaping targets, GIF refusal (422) vs GIF allowed for web-path uploads | `tests/middleware.test.ts` |
 
 Not automated: `content-config.ts` (loads the project's real
@@ -376,6 +376,11 @@ whichever sections your change touches; run the whole list before a release.
 
 - [ ] Click an `<img>` in edit mode → swap panel with preview, asset browse,
       upload, and alt-text field; save patches src/alt in the source.
+- [ ] Swap in an image whose **filename holds a space** → the source gets
+      `src="/…/Logo%20Miramar%20horizontal.png"`, percent-encoded, while the
+      panel's own labels and the picker's tooltips still read the plain name.
+      Save alt text alone on an element whose `src` was hand-written with `%20`
+      → that attribute comes out byte-identical, not re-encoded.
 
 **Hold-to-navigate**
 

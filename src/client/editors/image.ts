@@ -16,6 +16,7 @@ import {
   wirePanelButtons,
 } from '../ui.ts';
 import { openMediaModal } from './media-modal.ts';
+import { webPathToUrl } from '../../shared/asset-path.ts';
 import { mount } from '../shadow.ts';
 
 /**
@@ -53,8 +54,20 @@ export async function beginImageEdit(
   });
   const body = panel.querySelector('[data-body]') as HTMLElement;
 
-  /** What the panel will save — starts as what the element already has. */
+  /**
+   * What the panel will save, in two shapes, because the picker's path and the
+   * attribute are not the same string.
+   *
+   * `chosenSrc` is the **web path** — what `/assets` lists and what the modal
+   * matches its selection against, so every comparison here uses it.
+   * `chosenSrcAttr` is that path in **URL form**, which is what goes into the
+   * source file. They differ only for a filename holding a character a URL path
+   * must encode; a space is the one that turns up. Both start as what the
+   * element already has, which is already a URL and is never re-encoded — a
+   * hand-written `%20` must survive an alt-only save untouched.
+   */
   let chosenSrc = originalSrc;
+  let chosenSrcAttr = originalSrc;
 
   // --- preview ---------------------------------------------------------------
   // Shown even when the file cannot be swapped: writing alt text for an image
@@ -113,8 +126,8 @@ export async function beginImageEdit(
       return;
     }
     const nextAlt = altInput.value;
-    if (chosenSrc === originalSrc && nextAlt === originalAlt) return;
-    void commitImageEdit(img, src, { originalSrc, originalAlt, nextSrc: chosenSrc, nextAlt });
+    if (chosenSrcAttr === originalSrc && nextAlt === originalAlt) return;
+    void commitImageEdit(img, src, { originalSrc, originalAlt, nextSrc: chosenSrcAttr, nextAlt });
   };
 
   const backdrop = buildBackdrop(() => close(false));
@@ -131,6 +144,7 @@ export async function beginImageEdit(
    *  retrying loader to survive Vite's 404 window (see ui.ts::setFreshSrc). */
   const stage = (webPath: string, fresh = false): void => {
     chosenSrc = webPath;
+    chosenSrcAttr = webPathToUrl(webPath);
     setPreview(webPath, fresh);
     // Live preview on the page itself.
     if (fresh) setFreshSrc(img, webPath);
