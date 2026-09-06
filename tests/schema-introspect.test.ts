@@ -172,6 +172,21 @@ describe.each(MAJORS)('validateChanges · $label', ({ z }) => {
   it('bridges a YAML date string to a Date for z.date()', () => {
     expect(validateChanges(z.object({ when: z.date() }), { when: '2026-06-11' })).toEqual({});
   });
+
+  // z.coerce.date() runs new Date(…) before type-checking, so an unparseable
+  // string arrives as an Invalid Date and zod's own message reads "expected
+  // date, received Date" — true about the internals, useless in a field error.
+  it('explains an unreadable date instead of reporting "received Date"', () => {
+    for (const field of [z.coerce.date(), z.date(), z.coerce.date().optional()]) {
+      const errors = validateChanges(z.object({ when: field }), { when: 'not-a-date' });
+      expect(errors.when).toBe('not a date we can read');
+      expect(errors.when).not.toMatch(/received Date/);
+    }
+  });
+
+  it('leaves non-date type errors to zod', () => {
+    expect(validateChanges(schema, { title: 42 }).title).not.toBe('not a date we can read');
+  });
 });
 
 describe('inferFields', () => {

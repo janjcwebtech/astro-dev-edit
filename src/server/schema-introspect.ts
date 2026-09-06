@@ -127,6 +127,24 @@ function coerceForField(a: ZodAdapter, field: ZodNode, value: unknown): unknown 
 }
 
 /**
+ * A message for an unparseable date, in place of zod's own.
+ *
+ * `z.coerce.date()` runs `new Date(…)` before it type-checks, so an
+ * unparseable string reaches the check as an *Invalid Date* — an object of the
+ * right type — and zod reports "Invalid input: expected date, received Date".
+ * That is accurate about the internals and useless in a field error, so a date
+ * field is asked here first and zod is left to explain everything else.
+ *
+ * Returns `null` when the value is not a date problem, so the caller falls
+ * through to zod's message.
+ */
+function invalidDateMessage(a: ZodAdapter, field: ZodNode, value: unknown): string | null {
+  if (a.kind(a.unwrap(field).inner) !== 'date') return null;
+  const d = value instanceof Date ? value : typeof value === 'string' ? new Date(value) : null;
+  return d && Number.isNaN(d.getTime()) ? 'not a date we can read' : null;
+}
+
+/**
  * Validate changed frontmatter keys against the schema, per key. Returns a
  * field→message map (empty when everything passes). Keys the schema doesn't
  * know are allowed through — they're the user's extra data.
@@ -150,7 +168,10 @@ export function validateChanges(
     if (!field?.safeParse) continue;
     const result = field.safeParse(coerceForField(a, field, value));
     if (!result.success) {
-      errors[key] = result.error?.issues?.[0]?.message ?? 'invalid value';
+      errors[key] =
+        invalidDateMessage(a, field, value) ??
+        result.error?.issues?.[0]?.message ??
+        'invalid value';
     }
   }
   return errors;
@@ -171,7 +192,9 @@ export function validateFull(
     const result = field.safeParse(has ? coerceForField(a, field, values[key]) : undefined);
     if (!result.success) {
       errors[key] = has
-        ? (result.error?.issues?.[0]?.message ?? 'invalid value')
+        ? (invalidDateMessage(a, field, values[key]) ??
+          result.error?.issues?.[0]?.message ??
+          'invalid value')
         : 'required';
     }
   }

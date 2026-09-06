@@ -66,7 +66,7 @@ Run in this order; each is cheaper than the next.
 | `annotateAstroSource` — self-annotation for Astro ≥7: loc parity with `locOf` (text/expression/childless rules), component skip, elements inside expressions, self-closing tags, attr escaping, no-newline invariant, classify/apply round-trip against the original source | `tests/annotate.test.ts` |
 | `locateSelector` — CSS-inspector best-effort selector→line: class/id hit in a `.css` file, token-boundary (no prefix collision), absent→null; `.astro` search confined to `<style>` blocks (markup class attrs ignored) | `tests/inspect-locate.test.ts` |
 | `zodToFields` — playground blog schema, primitive/enum/array mapping, wrapper unwrapping, `readonly`, image() stub → `assetRef: 'relative'` (bare **and** through `.optional()`), plain-string no-assetRef, degrade-to-json. **Runs against both zod majors from the same assertions** | `tests/schema-introspect.test.ts` |
-| `validateChanges` — null-deletion rules for optional/defaulted/required/unknown keys; wrong-type rejection, blanking a required field, `z.date()` string bridging. **Both majors** | `tests/schema-introspect.test.ts` |
+| `validateChanges` — null-deletion rules for optional/defaulted/required/unknown keys; wrong-type rejection, blanking a required field, `z.date()` string bridging, and an unreadable date answered in its own words across `z.date()`/`z.coerce.date()`/optional rather than with zod's "expected date, received Date" (non-date errors still zod's). **Both majors** | `tests/schema-introspect.test.ts` |
 | `zod-adapt` accessor tables — major detection, kind normalization, every wrapper (`optional`/`nullable`/`default`/`catch`/`readonly`, v4 `nonoptional` pinning), `.describe()` post-unwrap, enum options, array element, literal value, object shape, transform/refine/brand see-through, v4 `pipe` following `in`; non-zod → null | `tests/zod-adapt.test.ts` |
 | `inferFields` — type inference from frontmatter values | `tests/schema-introspect.test.ts` |
 | `asset-path` conversions — entry-relative ↔ served path, nested/sibling/deeper dirs, round-trips, `./` for siblings, root-escape refusal, `public/` refusal for `image()`, Windows separators, upload-dir derivation | `tests/asset-path.test.ts` |
@@ -370,8 +370,13 @@ whichever sections your change touches; run the whole list before a release.
       unknown → read-only json). Fields report `source: "schema"`, **not
       `"inferred"`** — inferred everywhere means schema introspection is dead
       for that project's zod major, and every check below it is meaningless.
-- [ ] Blank a required field and save → 422 with an inline field error, not a
-      silent write. (Validation is only live when the schema resolved.)
+- [ ] Send a required field a value its schema rejects — a non-option for
+      `category`, a word for `year` — and save → 422 with an inline field
+      error, not a silent write. (Validation is only live when the schema
+      resolved.) Note that *emptying a text box is not this test*: a bare
+      `z.string()` accepts `''`, so a blanked `title` is validly written as
+      `title: ""`. The 422 comes from **clearing** the key (`null`), which is
+      what the drawer sends for a field it is removing.
 - [ ] Save writes frontmatter surgically — comments, key order, and quoting
       preserved in the entry file.
 - [ ] Dirty-close asks for confirmation; a concurrent external file edit then
