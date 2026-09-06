@@ -195,7 +195,7 @@ export function createUnsplashPane(deps: MediaPaneDeps): MediaPane {
       title.textContent = 'Add an Unsplash access key';
       const detail = styled('p', 'atx-media-error atx-media-error-detail');
       detail.textContent = error.message;
-      // Opened above the modal (which is Z+8), and re-runs the search on close
+      // Opened above the modal (which is Z_MODAL+8), and re-runs on close
       // so entering a key here lands you straight back in results.
       const open = footButton('Open Settings', 'default', () =>
         // Straight to the Unsplash tab: the user clicked a card about a

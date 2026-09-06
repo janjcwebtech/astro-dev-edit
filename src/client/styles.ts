@@ -105,7 +105,7 @@ button {
 /* ── Shells ────────────────────────────────────────────────────────────────
    The panel, drawer, backdrop and tab strip built by ui.ts. What stays inline
    at those call sites is only what cannot be known here: the computed stacking
-   layer (Z + n), a caller's width or height override, and the sized-panel
+   layer (Z_MODAL + n), a caller's width or height override, and the sized-panel
    branch, which is a [data-sized] flag rather than an inline display so the
    layout lives in one place. */
 

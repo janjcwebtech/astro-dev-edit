@@ -23,11 +23,21 @@
 
 import { mount } from './shadow.ts';
 
-// Base layer for every overlay surface; individual layers sit at Z+1..Z+10
-// (the deepest is the Unsplash settings panel). Deliberately *below* Astro's
-// dev toolbar, which pins itself at 2000000010 — the toolbar is the source of
-// the source annotations this whole feature reads, so it stays reachable.
+// Base layer for the overlay's *ambient* chrome — the hover outline and pill,
+// the element tree, the admin bar and its menu, at Z+1..Z+4. Deliberately
+// *below* Astro's dev toolbar, which pins itself at 2000000010: the toolbar is
+// the source of the source annotations this whole feature reads, and none of
+// this chrome claims the screen, so the toolbar stays reachable beside it.
 export const Z = 1999999000;
+
+// Base layer for every *modal* surface — backdrop, toast, panel, drawer, at
+// Z_MODAL+5..Z_MODAL+10 (the deepest is the Unsplash settings panel). Above
+// Astro's toolbar, because a surface that has drawn a backdrop over the page
+// has claimed the whole screen: leaving it underneath let Astro's invisible
+// `#dev-bar-hitbox-above` swallow clicks on whatever overlay control happened
+// to land in the bottom-centre band, most visibly the entry drawer's Delete.
+// The relative offsets are unchanged, so the modal stack keeps its own order.
+export const Z_MODAL = 2000000020;
 
 /**
  * Design tokens, on the shadcn/ui semantic scheme.
@@ -477,7 +487,7 @@ export function lockElement(el: HTMLElement): () => void {
  *  the accent. Auto-dismisses. */
 export function toast(message: string, kind: 'ok' | 'err'): void {
   const t = styled('div', `atx-toast atx-toast-${kind}`, {
-    zIndex: String(Z + 5),
+    zIndex: String(Z_MODAL + 5),
     // The one runtime value: how far a bottom-docked admin bar pushes it up.
     bottom: `${24 + inset.bottom}px`,
   });
@@ -541,8 +551,8 @@ export interface PanelOptions {
   /** CSS height. Omitted means auto — the panel is as tall as its content.
    *  Setting it makes the body the scrolling region. */
   height?: string;
-  /** Offset added to the base `Z`. Defaults to 6 (the standard panel layer);
-   *  the media modal uses 8 so it can stack above the CMS drawer. */
+  /** Offset added to the base `Z_MODAL`. Defaults to 6 (the standard panel
+   *  layer); the media modal uses 8 so it can stack above the CMS drawer. */
   layer?: number;
 }
 export function buildPanel(
@@ -551,7 +561,7 @@ export function buildPanel(
   opts: PanelOptions = {},
 ): HTMLElement {
   const panel = styled('div', 'atx-panel', {
-    zIndex: String(Z + (opts.layer ?? 6)),
+    zIndex: String(Z_MODAL + (opts.layer ?? 6)),
     ...(opts.width ? { width: opts.width } : {}),
     ...(opts.height ? { height: opts.height } : {}),
   });
@@ -589,14 +599,14 @@ export interface DrawerOptions {
    * which one, which is the half that used to be crammed after a `·`.
    */
   description?: string;
-  /** Offset added to the base `Z`. Defaults to 6, the standard panel layer.
-   *  The settings drawer can open *above* the media modal (which sits at 8),
-   *  so it needs to ask for a higher one. */
+  /** Offset added to the base `Z_MODAL`. Defaults to 6, the standard panel
+   *  layer. The settings drawer can open *above* the media modal (which sits at
+   *  8), so it needs to ask for a higher one. */
   layer?: number;
 }
 export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElement {
   const drawer = styled('div', 'atx-drawer', {
-    zIndex: String(Z + (opts.layer ?? 6)),
+    zIndex: String(Z_MODAL + (opts.layer ?? 6)),
     ...(opts.width ? { width: opts.width } : {}),
   });
 
@@ -774,7 +784,7 @@ export function setFreshSrc(img: HTMLImageElement, path: string): void {
  *  it sits under — the media modal's backdrop must land above the CMS drawer it
  *  can open over, not at the standard panel layer. */
 export function buildBackdrop(onClose: () => void, layer = 5): HTMLElement {
-  const b = styled('div', 'atx-backdrop', { zIndex: String(Z + layer) });
+  const b = styled('div', 'atx-backdrop', { zIndex: String(Z_MODAL + layer) });
   b.addEventListener('click', onClose);
   return b;
 }

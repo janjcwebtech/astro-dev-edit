@@ -196,8 +196,9 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   let overBar = false;
   let retractTimer: number | null = null;
 
-  // Z+4: above the element tree (Z+3) and the hover pill, below the modal
-  // backdrop (Z+5) — an open drawer covers the bar, as it should.
+  // Z+4: the top of the ambient chrome — above the element tree (Z+3) and the
+  // hover pill, below every modal surface (Z_MODAL+5 and up, a separate base
+  // that clears Astro's toolbar) — an open drawer covers the bar, as it should.
   const bar = styled('div', 'atx-bar', undefined, 'atx-bar');
 
   // What an unpinned bar leaves behind: a 3px accent line with a wider nub in

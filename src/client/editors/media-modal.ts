@@ -32,8 +32,8 @@ import { mount } from '../shadow.ts';
  * Three things here are easy to get wrong and are load-bearing:
  *
  * 1. **Stacking and the interaction token.** This can open *over* the CMS
- *    drawer, which is `Z+6` and holds the single interaction token. The modal
- *    takes `Z+8` (backdrop `Z+7`) and claims its **own** token, handing it back
+ *    drawer, which is `Z_MODAL+6` and holds the single interaction token. The
+ *    modal takes `+8` (backdrop `+7`) and claims its **own** token, handing back
  *    on close — the re-claim idiom from `source-popup.ts`. Getting it wrong
  *    closes the drawer out from under the modal and discards unsaved fields.
  * 2. **No global busy lock during an import.** Claiming `state.begin({kind:

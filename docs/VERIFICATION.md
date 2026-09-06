@@ -199,6 +199,13 @@ whichever sections your change touches; run the whole list before a release.
       dev server runs and visit it → it resolves with no restart (the routes
       hook re-fired). With `openInEditor` off, the item is gone.
 - [ ] Edit mode persists across a reload (`sessionStorage.astroDevEditMode`).
+- [ ] **Astro's own dev toolbar does not swallow overlay clicks.** With a drawer
+      or panel open, the toolbar's bar and its invisible hover hitboxes sit
+      *under* the backdrop: clicking where they are closes the drawer instead of
+      hitting Astro. Check the footer band explicitly at a ~1200px-wide window,
+      where the bottom-centre `#dev-bar-hitbox-above` lands on the entry
+      drawer's **Delete…** — the mouse must open the confirm, not miss. With
+      nothing open, the toolbar is still clickable beside the admin bar.
 
 **Save state & leaving edit mode** (the bar's exit button)
 
