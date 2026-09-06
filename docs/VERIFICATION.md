@@ -423,6 +423,10 @@ whichever sections your change touches; run the whole list before a release.
       **absent from `examples/playground/dist/`** after `npm run build` — the
       layout gates it on `import.meta.env.DEV`, which is what the reference
       asks every consuming layout to do.
+- [ ] Rename that meta to `astro-text-edit:page-source` (the pre-0.7 name) and
+      reload: the entry button is gone, as it should be — the old name is not
+      honoured — and the console carries **one** `[astro-dev-edit]` line naming
+      both spellings. Restore the layout afterwards.
 - [ ] Entry create (new slug) and delete flows work end-to-end; after create
       the browser polls the new URL and lands on the rendered page (not a
       404), even when the content-layer sync is slow.

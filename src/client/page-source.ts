@@ -14,10 +14,40 @@
  * the page, read by three unrelated callers, and it must stay importable
  * without dragging in the overlay's DOM-side modules.
  */
-export function pageSource(): string | null {
-  const meta = document.querySelector<HTMLMetaElement>(
-    'meta[name="astro-dev-edit:page-source"]',
+const META = 'astro-dev-edit:page-source';
+
+/** The name this meta carried before the project was renamed in 0.7.0. */
+const LEGACY_META = 'astro-text-edit:page-source';
+
+let warnedLegacy = false;
+
+/**
+ * A layout still emitting the pre-0.7 name gets one console line saying so.
+ *
+ * The old name is **not** accepted — there is no migration shim, and quietly
+ * honouring it would make the rename meaningless. But the failure it produces
+ * on its own is invisible: the entry button hides itself, every entry flow
+ * behind it is simply absent, and `/health` still reports the editor as on,
+ * because the server knows nothing about a tag only the client reads. That is
+ * a one-word fix behind an hour of looking, so it is worth a line.
+ */
+function warnLegacyMeta(): void {
+  if (warnedLegacy) return;
+  if (!document.querySelector(`meta[name="${LEGACY_META}"]`)) return;
+  warnedLegacy = true;
+  console.warn(
+    `[astro-dev-edit] This page declares <meta name="${LEGACY_META}">, the name used ` +
+      `before 0.7.0. Rename it to "${META}" — until then the entry editor stays hidden ` +
+      'on this page.',
   );
+}
+
+export function pageSource(): string | null {
+  const meta = document.querySelector<HTMLMetaElement>(`meta[name="${META}"]`);
   const content = meta?.content?.trim();
-  return content ? content : null;
+  if (!content) {
+    warnLegacyMeta();
+    return null;
+  }
+  return content;
 }
