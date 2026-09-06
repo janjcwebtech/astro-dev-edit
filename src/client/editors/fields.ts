@@ -109,10 +109,20 @@ const checkbox: ControlBuilder = ({ field, raw, root }) => {
   // A bare checkbox reads as unfinished UI, so the box is always accompanied by
   // words: "not set" while the key is absent from the file (the state the entry
   // drawer has to distinguish), and the plain on/off state once it is not.
+  // An absent key is not Off — the schema's default is what will apply — so the
+  // words say which default that is, and go back to saying it if the box is
+  // ticked and unticked again.
   const hint = styled('span', 'atx-field-check-hint');
   const stateWord = (): string => (input.checked ? 'On' : 'Off');
-  hint.textContent = field.present ? stateWord() : 'not set';
-  input.addEventListener('change', () => (hint.textContent = stateWord()));
+  const unsetWord =
+    field.defaultValue === undefined
+      ? 'not set'
+      : `not set — defaults to ${field.defaultValue === true ? 'On' : 'Off'}`;
+  const render = (): void => {
+    hint.textContent = !field.present && !input.checked ? unsetWord : stateWord();
+  };
+  render();
+  input.addEventListener('change', render);
   wrap.append(input, hint);
   root.append(wrap);
   return {

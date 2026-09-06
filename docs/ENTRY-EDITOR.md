@@ -43,8 +43,11 @@ like a CMS would:
   *before* the write (inline per-field errors), and every write is etag-guarded
   — if the file changed on disk since the panel opened, you get a conflict and
   a fresh reload instead of a lost update.
-- **Create** (the **New** button in the drawer's header — slug auto-suggested from the title, schema
-  defaults honoured, never overwrites) and **Delete** (confirmed; undo is git).
+- **Create** (the **New** button in the drawer's header — slug auto-suggested from the title,
+  never overwrites) and **Delete** (confirmed; undo is git). A field you leave
+  alone is **left out of the file**, so your schema's default is what applies —
+  including a boolean, whose unticked box means "not set" and says so, naming
+  the default it will take.
   New entries take the collection's file extension: the per-collection
   `extension` config wins; otherwise, when every existing entry shares one
   extension the new entry follows it (an all-`.mdx` collection gets `.mdx`),

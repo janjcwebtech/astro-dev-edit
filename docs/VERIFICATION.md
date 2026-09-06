@@ -388,6 +388,11 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Entry create (new slug) and delete flows work end-to-end; after create
       the browser polls the new URL and lands on the rendered page (not a
       404), even when the content-layer sync is slow.
+- [ ] In the **New entry** drawer every control starts unset: a defaulted field
+      shows its default as a placeholder and an unticked checkbox reads
+      "not set — defaults to On/Off". Create while leaving fields alone → the
+      written file holds **only what you filled in**, so `published:` is absent
+      and the schema's `.default(true)` is what the page renders.
 
 **`image()` schema fields** (`/works/onvero` — the `works` collection exists for
 this; `cover` is required and `thumbnail` is `image().optional()`, both pointing

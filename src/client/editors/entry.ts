@@ -239,10 +239,14 @@ export function openEntryCreatePanel(entry: EntrySeed): void {
   // writes to. Resolve against a placeholder sibling there.
   const entryFile = entry.collectionDir ? `${entry.collectionDir}/_new.md` : entry.file;
 
-  // Only schema fields make sense for a brand-new entry.
+  // Only schema fields make sense for a brand-new entry. The descriptors
+  // describe the entry this drawer was opened from, where a key may well be
+  // present; in a file that does not exist yet none of them is, and `present`
+  // is what tells a control to offer the schema's default rather than to
+  // present its own idle state as a value.
   const controls: FieldControl[] = entry.fields
     .filter((f) => f.source === 'schema' && f.type !== 'json')
-    .map((f) => buildControl(f, undefined, entryFile));
+    .map((f) => buildControl({ ...f, present: false }, undefined, entryFile));
 
   const bodyEditor = buildBodyEditor('');
 
@@ -285,6 +289,12 @@ export function openEntryCreatePanel(entry: EntrySeed): void {
     slugControl.setError(null);
     const frontmatter: Record<string, unknown> = {};
     for (const c of controls) {
+      // Only what was actually filled in. An untouched control has no value to
+      // contribute — it has an idle state, which is not the same thing, and
+      // writing it would override the schema's own default. A checkbox is
+      // where that bites: nobody chose Off, the box simply starts empty, and
+      // `published: false` in the file beats `.default(true)` in the schema.
+      if (!c.dirty()) continue;
       const v = c.value();
       const empty = v === '' || v === undefined || (Array.isArray(v) && v.length === 0);
       if (!empty) frontmatter[c.field.name] = v;
