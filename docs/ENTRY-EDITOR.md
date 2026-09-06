@@ -151,8 +151,9 @@ Rules of the contract:
 
 After a create the browser navigates to the sibling URL (`/articles/<new-slug>`
 by convention), polling it first until Astro's content layer has synced the
-new file (up to ~10s) so you land on the rendered page, not a 404; after a
-delete, to the parent listing. Projects with non-conventional detail routes
+new file (up to ~10s) so you land on the rendered page, not a 404 — and that
+wait survives the reload the sync itself causes, so the page you end up on is
+the new entry either way; after a delete, to the parent listing. Projects with non-conventional detail routes
 still get the file written/removed — only the navigation guess differs.
 
 

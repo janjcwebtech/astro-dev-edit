@@ -68,16 +68,82 @@ function siblingPath(slug: string): string {
   return (parent === '/' ? '' : parent) + '/' + slug;
 }
 
+/**
+ * Where a just-created entry is waiting to be opened, remembered across the
+ * reload that creating it causes.
+ *
+ * Writing the file makes Astro resync its content layer, which full-reloads the
+ * page — the very reload the poll below is waiting for the *result* of. A
+ * promise cannot survive that: the document it belongs to is gone, and with it
+ * the only record that anyone asked to go anywhere. The same `sessionStorage`
+ * trick that carries edit mode across a save carries the destination.
+ */
+const NAV_KEY = 'astroDevEditPendingNav';
+
+/** How long the poll runs, measured from the create — not from the boot that
+ *  resumed it, so a reload cannot extend the wait indefinitely. */
+const NAV_BUDGET_MS = 10_000;
+
+/** After this a remembered destination is stale — a poll that never finished
+ *  must not hijack an unrelated visit minutes later. */
+const NAV_TTL_MS = 30_000;
+
+function rememberNavigation(url: string | null, at = Date.now()): void {
+  try {
+    if (url) sessionStorage.setItem(NAV_KEY, JSON.stringify({ url, at }));
+    else sessionStorage.removeItem(NAV_KEY);
+  } catch {
+    // sessionStorage unavailable — the poll just won't survive a reload.
+  }
+}
+
+function readPendingNavigation(): { url: string; at: number } | null {
+  try {
+    const raw = sessionStorage.getItem(NAV_KEY);
+    if (!raw) return null;
+    const { url, at } = JSON.parse(raw) as { url?: string; at?: number };
+    if (!url || typeof at !== 'number' || Date.now() - at > NAV_TTL_MS) {
+      sessionStorage.removeItem(NAV_KEY);
+      return null;
+    }
+    return { url, at };
+  } catch {
+    return null;
+  }
+}
+
+const samePath = (a: string, b: string): boolean =>
+  a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
+
+/**
+ * Pick a create's navigation back up after Astro's reload interrupted it.
+ * Called from the overlay's boot; does nothing when nothing is pending, and
+ * drops the record when this *is* the page it named.
+ */
+export function resumePendingNavigation(): void {
+  const pending = readPendingNavigation();
+  if (!pending) return;
+  if (samePath(location.pathname, pending.url)) {
+    rememberNavigation(null);
+    return;
+  }
+  void navigateWhenReady(pending.url, pending.at);
+}
+
 /** Navigate to a freshly created route once the content layer has synced it:
  *  poll until it stops 404ing, then go. After ~10s give up and navigate
  *  anyway, so a non-conventional detail route degrades to a visible 404
  *  (reload once the sync lands) instead of stranding the user here. */
-async function navigateWhenReady(url: string): Promise<void> {
-  const deadline = Date.now() + 10_000;
+async function navigateWhenReady(url: string, since = Date.now()): Promise<void> {
+  rememberNavigation(url, since);
+  const deadline = since + NAV_BUDGET_MS;
   while (Date.now() < deadline) {
     if (await api.routeExists(url)) break;
     await new Promise((r) => setTimeout(r, 250));
   }
+  // Consumed *before* the jump: arriving must never re-arm the poll, and a
+  // give-up landing on a route that still 404s must not loop on it either.
+  rememberNavigation(null);
   location.assign(url);
 }
 
