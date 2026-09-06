@@ -1686,7 +1686,6 @@ input[type='checkbox']:focus-visible {
   min-height: 36px;
   color: var(--atx-foreground);
   font: 400 14px var(--atx-font-ui);
-  cursor: pointer;
 }
 
 .atx-field-check-hint {

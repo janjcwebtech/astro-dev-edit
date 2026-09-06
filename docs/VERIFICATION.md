@@ -385,6 +385,10 @@ whichever sections your change touches; run the whole list before a release.
       preserved in the entry file.
 - [ ] Dirty-close asks for confirmation; a concurrent external file edit then
       save → etag conflict surfaced, file not clobbered.
+- [ ] Every field is named by its own label: clicking the label focuses the
+      input (and ticks a checkbox), and `input.labels[0]` is the visible field
+      name — including a checkbox, whose state word is its description, not its
+      name. Same in the Settings drawer, which shares the renderer.
 - [ ] Entry create (new slug) and delete flows work end-to-end; after create
       the browser polls the new URL and lands on the rendered page (not a
       404), even when the content-layer sync is slow.

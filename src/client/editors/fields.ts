@@ -102,7 +102,10 @@ const plainInput: ControlBuilder = ({ field, initial, placeholder, root }) => {
 };
 
 const checkbox: ControlBuilder = ({ field, raw, root }) => {
-  const wrap = styled('label', 'atx-field-check');
+  // A span, not a label: wrapping the input in one would make the state word
+  // the control's accessible name — "On", where the field's own label says
+  // which thing is on. The words describe the box; the field label names it.
+  const wrap = styled('span', 'atx-field-check');
   const input = styled('input', 'atx-field-input atx-field-checkbox');
   input.type = 'checkbox';
   input.checked = raw === true;
@@ -198,15 +201,21 @@ const CONTROL_BUILDERS: Record<FieldType, ControlBuilder> = {
 
 // --- assembly ----------------------------------------------------------------
 
+/** Ids are only ever looked up inside the overlay's shadow root, so a counter
+ *  is enough to keep `for`/`aria-describedby` unambiguous. */
+let controlSeq = 0;
+
 export function buildControl(
   field: FieldDescriptor,
   raw: unknown,
   entryFile = '',
 ): FieldControl {
   const root = styled('div', 'atx-field');
+  const id = `atx-field-${++controlSeq}`;
 
   const label = styled('label', 'atx-field-label');
   label.textContent = field.required ? `${field.label} *` : field.label;
+  label.htmlFor = id;
   root.append(label);
 
   const error = styled('div', 'atx-field-error');
@@ -234,11 +243,36 @@ export function buildControl(
   const builder = CONTROL_BUILDERS[field.type] ?? json;
   const parts = builder({ field, raw, initial, placeholder, root, entryFile });
 
+  // The visible label has to *be* the control's name, not a sibling that reads
+  // like one: a builder mounts whatever it likes, so the association is made
+  // here, on the first form element it mounted. That is the control proper in
+  // every builder — the image field's preview and Browse are buttons around
+  // its path input, and both open the same picker the label's click does not
+  // need to.
+  const control = root.querySelector('input, textarea, select');
+  if (control) control.id = id;
+
+  // Anything that qualifies the control rather than naming it is a description:
+  // the help line, and the checkbox's state word, which says "not set" where
+  // the box alone can only say unticked.
+  const described: string[] = [];
+  const hint = root.querySelector('.atx-field-check-hint');
+  if (hint) {
+    hint.id = `${id}-state`;
+    described.push(hint.id);
+  }
+
   if (field.help) {
     const help = styled('div', 'atx-field-help');
+    help.id = `${id}-help`;
     help.textContent = field.help;
     root.append(help);
+    described.push(help.id);
   }
+
+  error.id = `${id}-error`;
+  described.push(error.id);
+  if (control) control.setAttribute('aria-describedby', described.join(' '));
 
   root.append(error);
 

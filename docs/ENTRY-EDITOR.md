@@ -26,7 +26,11 @@ like a CMS would:
   `z.array(z.string())` → tags, and so on. Both zod majors are read: v3 (Astro
   5/6) and v4 (Astro 7, whose `astro/zod` re-exports `zod/v4`). No schema
   resolvable? Field types are inferred from the entry's own values instead (a
-  `YYYY-MM-DD` value infers as a date) — the panel always works.
+  `YYYY-MM-DD` value infers as a date) — the panel always works. Every control is
+  **named by the label above it** — clicking that label focuses the field (and
+  ticks a checkbox), and a screen reader reads the field's own name, with its
+  help line, its error and a checkbox's "not set" as the description. The same
+  renderer draws the Settings drawer, so both behave alike.
 - **Markdown body in a WYSIWYG editor** — a white writing surface with a
   sticky formatting toolbar: bold / italic / strikethrough, heading levels
   (H1–H6 dropdown), bulleted and numbered lists, quote, code block, inline
