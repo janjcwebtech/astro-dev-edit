@@ -11,6 +11,10 @@ interface Props {
    * `astro-dev-edit:page-source` meta tag the integration reads to offer an
    * "Edit page content" jump on detail pages whose text lives in markdown
    * rather than the .astro template. (integration spec §16.2)
+   *
+   * Emitted in dev only, as the contract requires: it exists for an editor
+   * that never runs in a build, and a built page would be publishing its own
+   * repository paths for nothing.
    */
   pageSource?: string;
 }
@@ -25,7 +29,7 @@ const { title, description = 'A fictional demo site about visual editing, the as
     <link rel="stylesheet" href="/styles/global.css" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    {pageSource && <meta name="astro-dev-edit:page-source" content={pageSource} />}
+    {import.meta.env.DEV && pageSource && <meta name="astro-dev-edit:page-source" content={pageSource} />}
   </head>
   <body>
     <Nav />

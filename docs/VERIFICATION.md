@@ -398,6 +398,10 @@ whichever sections your change touches; run the whole list before a release.
       input (and ticks a checkbox), and `input.labels[0]` is the visible field
       name — including a checkbox, whose state word is its description, not its
       name. Same in the Settings drawer, which shares the renderer.
+- [ ] The playground's `astro-dev-edit:page-source` meta is present in dev and
+      **absent from `examples/playground/dist/`** after `npm run build` — the
+      layout gates it on `import.meta.env.DEV`, which is what the reference
+      asks every consuming layout to do.
 - [ ] Entry create (new slug) and delete flows work end-to-end; after create
       the browser polls the new URL and lands on the rendered page (not a
       404), even when the content-layer sync is slow.
