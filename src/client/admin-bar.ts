@@ -548,7 +548,13 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     side: 'right',
     extra: { minWidth: '96px' },
     visible: () => deps.isEditMode(),
-    disabled: () => state.savePhase() === 'saving',
+    // Deliberately NOT disabled while the write is in flight. Pressing it is
+    // what *starts* that write: the pointer going down blurs the inline edit,
+    // which commits, so by mouse-up the phase is already 'saving' — and a
+    // disabled button swallows the click that was going to ask for the exit.
+    // The user pressed a button labelled "Save & exit" and got the save only.
+    // Staying live costs nothing, because exitEditing() already knows how to
+    // wait for an in-flight write before leaving.
     paint: (btn) => {
       const phase = state.savePhase();
       const { bg, ink } = PHASE_PAINT[phase];

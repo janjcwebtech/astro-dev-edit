@@ -213,6 +213,9 @@ whichever sections your change touches; run the whole list before a release.
       **Editing** toggle, which routes through the same exit.
 - [ ] A refused write (edit, then change the file underneath) shows red
       **Save failed**, keeps you in edit mode, and the file is untouched.
+- [ ] Click **Save & exit** with a real pointer *while the inline edit still has
+      focus* (the blur-commit and the click race there): the file is written and
+      edit mode ends — the bar comes back saying **Edit page**, not **Editing**.
 - [ ] With any panel or drawer open, Tab cycles inside it and wraps at both
       ends — the site's own links, Astro's toolbar and the admin bar are never
       reached — and closing it puts focus back where it was. Open the media
