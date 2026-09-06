@@ -539,6 +539,10 @@ split.
       the drawer, confirming drops the change.
 - [ ] `.astro-dev-edit.json` holds **only** the options you changed, and is
       `-rw-------`.
+- [ ] Remove `.astro-dev-edit.json` from the playground's `.gitignore`, reopen
+      Settings, and the amber warning is on screen **on every tab, with the
+      photo source off** — it is a fact about the file, which the General and
+      Media tabs write too. Put the ignore line back and it goes away.
 - [ ] With `unsplash: {}` commented out of the playground config and the server
       restarted, the Unsplash tab offers an **enable toggle** — *not* the old
       "add `unsplash: {}` … then restart the dev server" text. Enabling it makes

@@ -558,7 +558,11 @@ export interface SettingsResponse {
     hint?: string;
     /** True when the settings file is not covered by the project's .gitignore
      *  — a warning the panel repeats, since this integration cannot fix a
-     *  consuming project's ignore rules. */
+     *  consuming project's ignore rules. It reads as a fact about the file
+     *  rather than about the key, and is reported whatever `enabled` says: the
+     *  file exists as soon as any tab saves an option, key or no key. It rides
+     *  in this block because the key is what makes an untracked settings file
+     *  dangerous, not because the warning belongs to the photo source. */
     gitignoreWarning?: boolean;
   };
 }

@@ -205,6 +205,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     }
 
     paintKey(data);
+    paintWarning(data);
     setButtonEnabled(saveBtn, true);
   };
 
@@ -254,11 +255,23 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
       : 'Stored in .astro-dev-edit.json at the project root, readable only by you (0600). ' +
         'It is never sent back to the browser.';
     clearKeyBtn.toggleAttribute('data-hidden', !(u.configured && u.source === 'file'));
+  };
 
-    if (u.gitignoreWarning) {
+  /**
+   * The uncommitted-secret warning, painted from `paint` rather than from
+   * `paintKey`: it is a fact about the settings file, which every tab writes,
+   * not about the key. Scoping it to the key left it unreachable in exactly the
+   * case it is for — the photo source off, so `paintKey` returns early, while
+   * the file already sits untracked on disk holding whatever General or Media
+   * last saved. It lives under the tab host for the same reason, so it is on
+   * screen whichever tab is open.
+   */
+  const paintWarning = (data: SettingsResponse): void => {
+    if (data.unsplash.gitignoreWarning) {
       warning.textContent =
-        '.astro-dev-edit.json is not listed in this project’s .gitignore. Add it before ' +
-        'saving a key, or the key can be committed. (This integration cannot edit your ' +
+        '.astro-dev-edit.json is not listed in this project’s .gitignore. It holds your ' +
+        'settings and, once you add one, your Unsplash access key — add it to your ignore ' +
+        'rules before that key can be committed. (This integration cannot edit your ' +
         'ignore rules for you.)';
       warning.toggleAttribute('data-on', true);
     } else {
