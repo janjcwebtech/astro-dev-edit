@@ -1,3 +1,4 @@
+import { trapFocus } from '../focus.ts';
 import * as state from '../state.ts';
 import { buildBackdrop, buildDrawer } from '../ui.ts';
 import { mount } from '../shadow.ts';
@@ -65,6 +66,7 @@ export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell 
   const teardown = (): void => {
     if (heldBefore) state.releaseTo(token, heldBefore);
     else state.releaseIf(token);
+    releaseFocus();
     drawer.remove();
     backdrop.remove();
     opts.onClose?.();
@@ -83,5 +85,8 @@ export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell 
   let token = state.begin({ kind: 'panel', close });
 
   mount(backdrop, drawer);
+  // After mounting: a trap focuses its first control, and nothing in a drawer
+  // that is not in the document yet can take focus.
+  const releaseFocus = trapFocus(drawer);
   return { body, foot, actions, close, teardown };
 }

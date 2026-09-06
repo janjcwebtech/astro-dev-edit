@@ -213,6 +213,12 @@ whichever sections your change touches; run the whole list before a release.
       **Editing** toggle, which routes through the same exit.
 - [ ] A refused write (edit, then change the file underneath) shows red
       **Save failed**, keeps you in edit mode, and the file is untouched.
+- [ ] With any panel or drawer open, Tab cycles inside it and wraps at both
+      ends — the site's own links, Astro's toolbar and the admin bar are never
+      reached — and closing it puts focus back where it was. Open the media
+      modal over the entry drawer: the modal traps, and closing it hands the
+      trap back to the drawer rather than dropping it. The drawer's rich-text
+      body (light DOM, slotted) is reachable and keeps focus while typing.
 - [ ] Type into an expression or markup popup, then activate **Save & exit** by
       keyboard (the backdrop swallows a pointer click on the bar) → the draft is
       written and edit mode ends. If the write is refused, the popup stays open

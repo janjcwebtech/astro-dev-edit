@@ -1,4 +1,5 @@
 import { clearHighlight } from '../hover.ts';
+import { trapFocus } from '../focus.ts';
 import * as state from '../state.ts';
 import { buildBackdrop, buildPanel, footButton, inputEl, styled, toast } from '../ui.ts';
 import { mount } from '../shadow.ts';
@@ -32,6 +33,7 @@ export function openCopyPanel(title: string, text: string): void {
 
   const close = (): void => {
     state.releaseIf(token);
+    releaseFocus();
     panel.remove();
     backdrop.remove();
   };
@@ -62,6 +64,7 @@ export function openCopyPanel(title: string, text: string): void {
   );
 
   mount(backdrop, panel);
+  const releaseFocus = trapFocus(panel);
   // Preselected, so ⌘C works the moment the panel opens.
   requestAnimationFrame(() => {
     area.focus();

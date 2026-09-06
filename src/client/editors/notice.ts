@@ -1,6 +1,7 @@
 import type { SourceLoc } from '../../shared/protocol.ts';
 import { clearHighlight } from '../hover.ts';
 import { pageSource } from '../page-source.ts';
+import { trapFocus } from '../focus.ts';
 import * as state from '../state.ts';
 import { basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
 import { openEntryPanel } from './entry.ts';
@@ -50,6 +51,7 @@ export function showDynamicNotice(
 
   const close = (): void => {
     state.releaseIf(token);
+    releaseFocus();
     panel.remove();
     backdrop.remove();
   };
@@ -83,4 +85,5 @@ export function showDynamicNotice(
       : { confirmLabel: 'Open source' },
   );
   mount(backdrop, panel);
+  const releaseFocus = trapFocus(panel);
 }

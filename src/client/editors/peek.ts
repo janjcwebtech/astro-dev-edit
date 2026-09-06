@@ -2,6 +2,7 @@ import type { PeekResponse, SourceLoc } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { tokenizeLines } from '../highlight.ts';
 import { clearHighlight } from '../hover.ts';
+import { trapFocus } from '../focus.ts';
 import * as state from '../state.ts';
 import { basename, buildBackdrop, buildPanel, footButton, isolateScroll, styled } from '../ui.ts';
 import { mount } from '../shadow.ts';
@@ -84,6 +85,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
   const close = (): void => {
     closed = true;
     state.releaseIf(token);
+    releaseFocus();
     panel.remove();
     backdrop.remove();
   };
@@ -100,6 +102,7 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
   );
 
   mount(backdrop, panel);
+  const releaseFocus = trapFocus(panel);
 
   void (async () => {
     try {

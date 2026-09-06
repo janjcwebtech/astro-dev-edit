@@ -1,3 +1,4 @@
+import { trapFocus } from '../focus.ts';
 import { icon } from '../icons.ts';
 import type { Interaction } from '../state.ts';
 import * as state from '../state.ts';
@@ -107,6 +108,7 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
 
   const teardown = (): void => {
     state.releaseIf(token);
+    releaseFocus();
     panel.remove();
     backdrop.remove();
   };
@@ -159,6 +161,6 @@ export function openSourcePopup(opts: SourcePopupOptions): void {
   input.addEventListener('input', markDirty);
 
   mount(backdrop, panel);
-  input.focus();
+  const releaseFocus = trapFocus(panel, { initial: input });
   input.setSelectionRange(input.value.length, input.value.length);
 }

@@ -1,6 +1,7 @@
 import type { AssetInfo, MediaPick } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { hasUnsplash } from '../features.ts';
+import { trapFocus } from '../focus.ts';
 import { clearHighlight } from '../hover.ts';
 import { icon } from '../icons.ts';
 import * as state from '../state.ts';
@@ -112,6 +113,7 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       // Hand the slot back to the drawer/panel underneath, not just release it
       // — see state.ts::releaseTo.
       state.releaseTo(token, heldBefore);
+      releaseFocus();
       panel.remove();
       backdrop.remove();
       window.removeEventListener('keydown', onKey, true);
@@ -453,6 +455,9 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     projectPane.activate();
     refresh();
     mount(backdrop, panel);
+    // Stacks on the trap of whatever this opened over — the CMS drawer keeps
+    // its own the moment this one is released.
+    const releaseFocus = trapFocus(panel);
 
     /** The panel's own token is re-claimed after any `busy` interaction the
      *  panes take, so the modal keeps owning the page's clicks. */

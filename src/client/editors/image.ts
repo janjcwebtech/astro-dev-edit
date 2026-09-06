@@ -1,6 +1,7 @@
 import type { ApplyOp, AssetInfo, AttrState, SourceLoc } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { clearHighlight } from '../hover.ts';
+import { trapFocus } from '../focus.ts';
 import * as state from '../state.ts';
 import { icon } from '../icons.ts';
 import {
@@ -103,6 +104,7 @@ export async function beginImageEdit(
 
   const close = (commit: boolean): void => {
     state.releaseIf(token);
+    releaseFocus();
     panel.remove();
     backdrop.remove();
     if (!commit) {
@@ -119,7 +121,7 @@ export async function beginImageEdit(
   wirePanelButtons(panel, () => close(false), () => close(true));
   const token = state.begin({ kind: 'panel', close: () => close(false) });
   mount(backdrop, panel);
-  altInput.focus();
+  const releaseFocus = trapFocus(panel, { initial: altInput });
 
   // --- replace ---------------------------------------------------------------
   if (!srcEditable) return;

@@ -165,6 +165,11 @@ Every way out of edit mode goes through it, so leaving **saves first and exits
 after the write lands** — no path out silently drops what you typed. Throwing an
 edit away stays deliberate: press **Escape** while editing.
 
+**Panels and drawers are modal.** While one is open, the keyboard stays in it:
+Tab cycles through its own controls and wraps, the page behind it and the bar
+above it are out of reach, Escape closes it, and focus returns to whatever you
+were on when it opened. Each announces itself as a dialog, named by its title.
+
 ## Element tree
 
 A **tree of the page's elements** — every source-annotated element, nested by
