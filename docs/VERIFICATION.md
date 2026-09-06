@@ -289,6 +289,11 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] Clicking dynamic content that can't be traced (`{n + 1}`, an imported
       array) opens the refusal notice with a working "Open source" button —
       never a false edit; its file:loc line opens the source peek.
+- [ ] Click something a **component** renders (a `<Button>`'s own `<a>`) or a
+      paragraph slotted in from MDX: the notice opens with a muted line naming
+      the tag you clicked and saying a component or slot rendered it, above the
+      reason — which describes the ancestor the loc points at. Clicking an
+      element written in the page itself shows **no** such line.
 - [ ] An element rendered by `astro:assets` `<Image>` reports "rendered by a
       package component" instead of logging a `classify failed` WARN, and
       clicking its file:loc label shows that sentence in the peek panel rather

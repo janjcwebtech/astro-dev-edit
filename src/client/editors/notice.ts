@@ -14,15 +14,41 @@ import { mount } from '../shadow.ts';
  * opens the CMS entry drawer for it.
  */
 
+export interface NoticeOptions {
+  /**
+   * The tag the pointer actually landed on, when that element carries no
+   * source annotation and the loc below therefore belongs to an **ancestor**.
+   *
+   * Astro annotates only elements written in the file, so a `<Button>`'s
+   * rendered `<a>` and every element slotted in from MDX have none of their
+   * own, and the router classifies the nearest annotated ancestor instead. The
+   * refusal is right either way — none of it is editable here — but the
+   * *reason* then describes a different element than the one that was clicked,
+   * which reads as a puzzle: "contains nested markup" over a button that
+   * plainly holds one word. Naming the substitution is the whole fix.
+   */
+  clickedTag?: string;
+}
+
 export function showDynamicNotice(
   src: SourceLoc,
   reason: string,
   openSource: (src: SourceLoc) => void,
   openPeek: (src: SourceLoc) => void,
+  opts: NoticeOptions = {},
 ): void {
   clearHighlight();
   const panel = buildPanel('Can’t edit this here');
   const body = panel.querySelector('[data-body]') as HTMLElement;
+
+  if (opts.clickedTag) {
+    const lead = styled('p', 'atx-notice-lead');
+    lead.textContent =
+      `The <${opts.clickedTag}> you clicked isn’t written in this file — a component or ` +
+      'slotted content rendered it. The nearest element that is written here is the one ' +
+      'described below.';
+    body.append(lead);
+  }
 
   const msg = styled('p', 'atx-notice-reason');
   msg.textContent = reason;

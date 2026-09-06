@@ -55,6 +55,12 @@ The [README](../README.md) has the short version; this is the whole of it.
   `set:html`, and block-level nested markup all fall here — on
   detail pages the refusal notice offers "Edit page content", which opens the
   entry drawer.
+- **Something a component or a slot rendered** has no source location of its
+  own — Astro annotates only what is written in the file — so a click on it is
+  answered about the nearest element that *is*. The notice says so, naming the
+  tag you clicked, because the reason then belongs to that ancestor: a one-word
+  button can be refused for "containing nested markup" that lives in the
+  wrapper around it, not in the button.
 - **Package-rendered elements** refuse the same quiet way. Astro's
   `astro:assets` `<Image>` renders through
   `node_modules/astro/components/Image.astro`, and that is the path its source

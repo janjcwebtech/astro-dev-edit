@@ -2882,6 +2882,14 @@ input[type='checkbox']:focus-visible {
   resize: vertical;
 }
 
+/* Said before the reason, and about a different element than the reason is:
+   muted, because it is context for what follows rather than the verdict. */
+.atx-notice-lead {
+  margin: 0 0 8px;
+  color: var(--atx-muted-fg);
+  font: 14px/1.5 var(--atx-font-ui);
+}
+
 .atx-notice-reason {
   margin: 0 0 6px;
   color: var(--atx-foreground);

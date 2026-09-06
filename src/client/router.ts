@@ -3,6 +3,7 @@ import * as api from './api.ts';
 import { beginExpressionEdit } from './editors/expression.ts';
 import { beginImageEdit } from './editors/image.ts';
 import { beginMarkupEdit } from './editors/markup.ts';
+import type { NoticeOptions } from './editors/notice.ts';
 import { showDynamicNotice } from './editors/notice.ts';
 import { beginTextEdit } from './editors/text.ts';
 import { isOwnUi } from './shadow.ts';
@@ -56,7 +57,22 @@ export function initRouter(deps: RouterDeps): RouterHandle {
    * the target with the server's AST classification. The DOM can't distinguish
    * a resolved {expression} from literal text; the AST can. (spec §16.1)
    */
-  async function openElement(el: HTMLElement, src: SourceLoc): Promise<void> {
+  async function openElement(
+    el: HTMLElement,
+    src: SourceLoc,
+    /**
+     * What the pointer actually landed on, when that is not `el`. Astro
+     * annotates only elements written in the file, so a component's or a
+     * slot's output has no loc of its own and `nearestSource` climbs to an
+     * ancestor — whose reason then describes an element the user never
+     * clicked. Carried through so the refusal can say which is which.
+     */
+    clicked?: EventTarget | null,
+  ): Promise<void> {
+    const via: NoticeOptions =
+      clicked instanceof Element && clicked !== el
+        ? { clickedTag: clicked.tagName.toLowerCase() }
+        : {};
     // Claim the interaction slot synchronously: /classify is async, and without
     // this a rapid second click during the round-trip could open a second editor.
     const busy = state.begin({ kind: 'busy' });
@@ -77,6 +93,7 @@ export function initRouter(deps: RouterDeps): RouterHandle {
           'Both the image file and its alt text are set from code, so they must be edited in the source.',
           deps.openSource,
           deps.openPeek,
+          via,
         );
         return;
       }
@@ -94,6 +111,7 @@ export function initRouter(deps: RouterDeps): RouterHandle {
           'This content is generated from a template expression or a loop, so editing it here could change behaviour, not just words. Edit it at the source instead.',
         deps.openSource,
         deps.openPeek,
+        via,
       );
     }
   }
@@ -123,7 +141,8 @@ export function initRouter(deps: RouterDeps): RouterHandle {
       e.stopPropagation();
       e.stopImmediatePropagation();
       interaction.finish(true); // commit the current edit now
-      if (el && src) void openElement(el, src); // and open the new target immediately
+      // and open the new target immediately
+      if (el && src) void openElement(el, src, e.target);
       return;
     }
 
@@ -138,7 +157,7 @@ export function initRouter(deps: RouterDeps): RouterHandle {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-    void openElement(el, src);
+    void openElement(el, src, e.target);
   }
 
   // In edit mode, also swallow mousedown on an editable target in capture
