@@ -69,11 +69,25 @@ function locForElement(node: AstNode): Pos | null {
   return bump(first.position!.start);
 }
 
+/**
+ * Tags that must never be stamped. Astro treats a `<script>` or `<style>`
+ * carrying an attribute it does not recognise as `is:inline` — no bundling,
+ * no TypeScript, no import resolution, no `type="module"` — which breaks
+ * every script on the page (its own `ClientRouter` included). Neither is an
+ * editable element, so nothing in the editing surface is lost.
+ */
+const NEVER_ANNOTATE = new Set(['script', 'style']);
+
 /** Plain lowercase HTML elements only — components/fragments are never
  *  annotated (matches compiler behavior; the client walks up via
- *  nearestSource anyway). */
+ *  nearestSource anyway), nor is anything in NEVER_ANNOTATE. */
 function isAnnotatable(node: AstNode): boolean {
-  return node.type === 'element' && !!node.name && /^[a-z]/.test(node.name);
+  return (
+    node.type === 'element' &&
+    !!node.name &&
+    /^[a-z]/.test(node.name) &&
+    !NEVER_ANNOTATE.has(node.name)
+  );
 }
 
 function escapeAttr(value: string): string {

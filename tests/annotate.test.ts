@@ -73,6 +73,19 @@ describe('annotateAstroSource', () => {
     expect(injectedLoc(out, 'p')).toBe(locOf(src, 'inside'));
   });
 
+  it('never stamps <script> or <style> — an unknown attribute makes Astro treat them as is:inline', async () => {
+    const src =
+      `<style>\n  p { color: red }\n</style>\n` +
+      `<p>hi</p>\n` +
+      `<script>\n  import './a.ts';\n</script>\n`;
+    const out = await annotateAstroSource(src, FILE);
+    expect(out).toContain('<script>');
+    expect(out).toContain('<style>');
+    expect(out).not.toMatch(/<(script|style) data-astro-source-/);
+    // …the ordinary element between them is still annotated
+    expect(injectedLoc(out, 'p')).toBe(locOf(src, 'hi'));
+  });
+
   it('annotates elements inside expressions (e.g. .map loops)', async () => {
     const src = `---\nconst xs = ['a'];\n---\n<ul>\n  {xs.map((x) => (\n    <li>{x}</li>\n  ))}\n</ul>\n`;
     const out = await annotateAstroSource(src, FILE);
