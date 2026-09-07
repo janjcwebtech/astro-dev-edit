@@ -1,4 +1,6 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { launchInEditor } from '../src/server/editor.ts';
+vi.mock('../src/server/editor.ts', () => ({ launchInEditor: vi.fn(async () => {}) }));
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -436,4 +438,29 @@ describe('disabled entry editor', () => {
     });
     expect(r.status).toBe(400);
   });
+});
+
+
+it('reveals entry updates and creation, but does not reveal deletion', async () => {
+  vi.mocked(launchInEditor).mockClear();
+  const h = createMiddleware({
+    logger, root, optionsResolver: stubOptions(root, { revealWrites: true, revealWriteDelayMs: 0 }),
+    schemaProvider: provider, routeManifest: null, unsplash: null,
+  });
+  const updated = await request({ url: '/__dev-edit/entry/apply', body: {
+    file: entryRel, etag: etagOf(ENTRY), changes: { frontmatter: { title: 'Revealed' } },
+  } }, h);
+  expect(updated.status).toBe(200);
+  const created = await request({ url: '/__dev-edit/entry/create', body: {
+    collection: 'blog', slug: 'revealed', frontmatter: {
+      title: 'Revealed', excerpt: 'New', date: '2026-07-18', image: '/images/fresh.webp',
+    }, body: 'New body',
+  } }, h);
+  expect(created.status).toBe(200);
+  expect(launchInEditor).toHaveBeenCalledTimes(2);
+  const deleted = await request({ url: '/__dev-edit/entry/delete', body: {
+    file: created.body.file, etag: etagOf(await readFile(join(root, created.body.file), 'utf8')),
+  } }, h);
+  expect(deleted.status).toBe(200);
+  expect(launchInEditor).toHaveBeenCalledTimes(2);
 });

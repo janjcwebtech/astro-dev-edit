@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { launchInEditor } from '../src/server/editor.ts';
+vi.mock('../src/server/editor.ts', () => ({ launchInEditor: vi.fn(async () => {}) }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -40,6 +42,7 @@ const logger = {
 let root: string;
 
 beforeEach(async () => {
+  vi.mocked(launchInEditor).mockClear();
   root = await mkdtemp(join(tmpdir(), 'atx-settings-routes-'));
 });
 
@@ -280,5 +283,51 @@ describe('the fresh-project case', () => {
     expect(saved.status).toBe(200);
     expect(saved.body.unsplash.enabled).toBe(true);
     expect(opt(saved.body, 'unsplashEnabled').value).toBe(true);
+  });
+});
+
+
+describe('write reveal settings', () => {
+  it('defaults off with a 1000ms delay, and respects config locks', async () => {
+    const defaults = await get(mount());
+    expect(opt(defaults.body, 'revealWrites').value).toBe(false);
+    expect(opt(defaults.body, 'revealWriteDelayMs').value).toBe(1000);
+    const via = mount({ revealWrites: false });
+    expect((await put({ revealWrites: true }, via)).status).toBe(422);
+    expect(opt((await get(via)).body, 'revealWrites')).toMatchObject({ value: false, locked: true });
+  });
+
+  it.each([-1, 10001, 1.5])('rejects invalid delay %s without writing', async (delay) => {
+    const r = await put({ revealWriteDelayMs: delay }, mount());
+    expect(r.status).toBe(422);
+    expect(existsSync(join(root, SETTINGS_FILE))).toBe(false);
+  });
+
+  it('captures mode for the whole request including a combined key save', async () => {
+    const via = mount({ unsplash: {}, openInEditor: false });
+    const enabled = await request({ via, url: '/__dev-edit/settings', body: {
+      options: { revealWrites: true, revealWriteDelayMs: 0 }, unsplash: { accessKey: 'example-key' },
+    } });
+    expect(enabled.status).toBe(200);
+    expect(launchInEditor).not.toHaveBeenCalled();
+    expect(opt((await get(mount())).body, 'revealWrites').value).toBe(true);
+    expect((await put({ cssInspector: false }, via)).status).toBe(200);
+    expect(launchInEditor).toHaveBeenCalledOnce();
+    expect((await put({ revealWrites: false }, via)).status).toBe(200);
+    expect(launchInEditor).toHaveBeenCalledTimes(2);
+    await put({ cssInspector: true }, via);
+    expect(launchInEditor).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(await readFile(join(root, SETTINGS_FILE), 'utf8')).unsplash.accessKey).toBe('example-key');
+  });
+
+  it('preserves both concurrent sparse settings patches', async () => {
+    const via = mount({ revealWrites: true, revealWriteDelayMs: 0 });
+    const responses = await Promise.all([
+      put({ cssInspector: false }, via), put({ openInEditor: false }, via),
+    ]);
+    expect(responses.map(r => r.status)).toEqual([200, 200]);
+    const saved = await get(via);
+    expect(opt(saved.body, 'cssInspector').value).toBe(false);
+    expect(opt(saved.body, 'openInEditor').value).toBe(false);
   });
 });

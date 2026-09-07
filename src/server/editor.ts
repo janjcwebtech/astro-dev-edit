@@ -4,12 +4,12 @@
  */
 
 /** Spawn the editor for `spec` (an abs path, or "abs:line" / "abs:line:col"). */
-export async function launchInEditor(spec: string): Promise<void> {
+export async function launchInEditor(spec: string, onError?: () => void): Promise<void> {
   // launch-editor is CommonJS: the module IS the function. Interop may wrap it
   // under .default depending on the loader, so handle both.
   const mod = (await import('launch-editor')) as unknown as
-    | ((f: string) => void)
-    | { default: (f: string) => void };
+    | ((f: string, onError?: () => void) => void)
+    | { default: (f: string, onError?: () => void) => void };
   const launch = typeof mod === 'function' ? mod : mod.default;
-  launch(spec);
+  launch(spec, onError);
 }

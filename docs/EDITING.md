@@ -93,6 +93,11 @@ editor. The refusal notice's location line opens the same peek, so you can
 see *why* something refused without leaving the browser. The peek's footer
 has its own **Open in editor** jump-out.
 
+That same jump-out can also run on every save: *Settings → Editing* has
+**Show changed files in editor**, which opens each file the tool writes at the
+line it is about to change, so an edit can be watched landing in the source. See
+[Watching writes in your editor](CONFIGURATION.md#watching-writes-in-your-editor).
+
 ![A source peek showing syntax-highlighted Astro source with line numbers and the element's own line focused, above Close and Open in editor buttons](images/source-peek.png)
 
 ## Copy context for an AI assistant

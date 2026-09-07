@@ -49,6 +49,8 @@ Run in this order; each is cheaper than the next.
 | `POST /classify` — literal text, dynamic for non-`.astro`, nonexistent rejection; out-of-root, `node_modules`, and out-resolving symlinks answer 200 `dynamic` instead of throwing | `tests/middleware.test.ts` |
 | Read/write asymmetry of the path gate — `/classify` and `/peek` soften for package-owned paths, while `/open` and `/apply` still refuse them with 400 and leave the file byte-identical | `tests/middleware.test.ts` |
 | `POST /apply` — atomic on-disk patch, multi-op batch (verify-all-then-write-once; a refused op writes nothing), unsupported/refusal 422s, empty-ops/validation 400s | `tests/middleware.test.ts` |
+| **Write reveal** (`text-writes.ts`) — an existing file opened at the first changed line and the delay waited *while the original is still on disk*, then written; a new file written complete before it opens, and a second create on that path refused; unchanged content, and the mode off, launching nothing; an external edit or a parent-symlink swap during the pause refusing the save with the file intact; a launcher that throws or calls back logging one warning carrying none of its internals and saving anyway; whole operations serialized, reads included, with the queue recovering after a failed one | `tests/text-writes.test.ts` |
+| Write reveal at the route level — `/apply` revealing with `openInEditor: false` while `/upload` reveals nothing; `/entry/apply` and `/entry/create` revealing and `/entry/delete` not; `/collection/schema/apply` revealing `content.config.ts` then `.astro-dev-edit.json` in write order, and `/collection/create` revealing; the two options defaulting off at 1000ms, locked by config, and `-1` / `10001` / `1.5` refused with nothing written; the mode captured per request across a combined key + options save (so switching it off still reveals once), and two concurrent sparse patches both surviving the queue | `tests/middleware.test.ts`, `tests/middleware-entry.test.ts`, `tests/schema-routes.test.ts`, `tests/settings-routes.test.ts` |
 | `POST /unsplash/search` — outbound query/paging/orientation + `Client-ID`/`Accept-Version` headers, the reshape (no raw Unsplash field, no download/raw URL crosses the wire), utm params appended with correct separator, perPage/page clamping, blank query 400, disabled 403, unconfigured 403 **with fetch never called**, 401→502 / 403→429 / 5xx→502 / network→502 / `TimeoutError`→504 / malformed JSON→502, TTL cache serving a repeat from one call | `tests/unsplash-routes.test.ts` |
 | `POST /unsplash/import` — bytes land in `uploadDir`, byte URL carries `w`/`fit`/`q`/`fm=jpg` and preserves `ixid`, a per-import `width` honoured and `'original'` **deleting** `w` rather than merely not setting it, an absent width falling back to the resolved option, an off-safelist width (numeric or a string carrying extra query text) refused 400 with no fetch and nothing written, the `download_location` ping fires authenticated with its `ixid`, a failed ping still succeeds, `assetRef: 'relative'` → `imageUploadDir`, targetDir honoured/ignored-outside/ignored-escaping, hostile description → safe basename, re-import suffixes, unknown id → 409 `expired`, byte-fetch failure / non-image content-type / over-cap body → 502 **with nothing written**, cache eviction 409s the oldest id | `tests/unsplash-routes.test.ts` |
 | `GET`/`POST /settings` **(access-key half)** — write-then-read reports masked and **never the raw key**, fixed root path written `0600` with no temp file left, malformed file degrades to unconfigured, clearing, `config` > `env` > `file` precedence, a config/env key refuses a store (409), disabled 403 touching no filesystem, and a stored key usable by the **next** search with no restart. Deliberately **not** moved to `tests/settings-routes.test.ts` with the option half: these cases run the key through the injected `UnsplashConfig` seam, and the last one asserts it reaches the next *search* — which needs this suite's recording fetch fake | `tests/unsplash-routes.test.ts` |
@@ -579,6 +581,35 @@ split.
       restarted, the Unsplash tab offers an **enable toggle** — *not* the old
       "add `unsplash: {}` … then restart the dev server" text. Enabling it makes
       the media picker's Unsplash tab appear. Restore the config line after.
+
+**Show changed files in editor** (`revealWrites`; off by default, so nothing
+below happens until you turn it on — and it needs a real external editor, which
+is why none of it is automated)
+
+- [ ] *Settings → Editing* holds **Show changed files in editor** (off) and
+      **Delay before writing (ms)** (1000), both editable. Turn the switch on
+      and **Save**.
+- [ ] Edit a heading in place on `/`: your editor opens
+      `src/pages/index.astro` at the changed line roughly a second *before* the
+      file changes on disk, then the save lands and HMR refreshes the page.
+- [ ] **New item** in a collection's Items view: the entry file opens *after* it
+      exists, complete, at line 1 — never empty or half-written.
+- [ ] Set the delay to `0` and repeat the text edit: the file still opens and
+      the save is immediate. `-1`, `10001` and `1.5` are refused by the drawer.
+- [ ] Add a field in the Collections designer *and* change that field's label in
+      the same save: `src/content.config.ts` opens, then
+      `.astro-dev-edit.json` — two reveals, each immediately before its own
+      write.
+- [ ] Edit the revealed file yourself during the pause and save it in your
+      editor: the tool's save is **refused**, the panel asks you to reopen, and
+      your version is what is on disk.
+- [ ] Uploading an image opens nothing, and neither does deleting an entry.
+- [ ] Turn the switch off and **Save**: that save reveals `.astro-dev-edit.json`
+      one last time (options are captured when a save starts), and the next
+      edit reveals nothing.
+- [ ] Point the launcher at an editor that cannot start (e.g.
+      `EDITOR=/nonexistent`) and edit text: the dev-server log carries **one**
+      warning naming the file, and the edit is still saved.
 
 **Collections drawer (the designer)**
 

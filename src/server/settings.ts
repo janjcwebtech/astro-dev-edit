@@ -1,3 +1,4 @@
+import type { TextWriter } from './text-writes.ts';
 import { chmod, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SettingsSource } from '../shared/protocol.ts';
@@ -59,9 +60,9 @@ async function readSettingsFile(root: string): Promise<StoredSettings> {
 
 /** Write the settings file atomically, then restrict it to the owner. The chmod
  *  is best-effort: it is meaningless on Windows and must not fail the save. */
-async function writeSettingsFile(root: string, next: StoredSettings): Promise<void> {
+async function writeSettingsFile(root: string, next: StoredSettings, writeText: TextWriter = atomicWrite): Promise<void> {
   const target = join(root, SETTINGS_FILE);
-  await atomicWrite(target, JSON.stringify(next, null, 2) + '\n');
+  await writeText(target, JSON.stringify(next, null, 2) + '\n');
   try {
     await chmod(target, 0o600);
   } catch {
@@ -133,7 +134,7 @@ export async function resolveUnsplashKey(
 
 /** Store (or, with an empty string, clear) the key the Settings panel supplied.
  *  Merges into whatever else the file holds rather than replacing it. */
-export async function saveUnsplashKey(root: string, accessKey: string): Promise<void> {
+export async function saveUnsplashKey(root: string, accessKey: string, writeText?: TextWriter): Promise<void> {
   const current = await readSettingsFile(root);
   const key = accessKey.trim();
   const next: StoredSettings = { ...current };
@@ -142,7 +143,7 @@ export async function saveUnsplashKey(root: string, accessKey: string): Promise<
     const { accessKey: _dropped, ...rest } = next.unsplash;
     next.unsplash = rest;
   }
-  await writeSettingsFile(root, next);
+  await writeSettingsFile(root, next, writeText);
 }
 
 /**
@@ -159,9 +160,9 @@ export async function readStoredOptions(root: string): Promise<StoredOptions> {
 /** Replace the stored option document, leaving the secret compartment alone.
  *  The caller has already merged the panel's sparse patch into `next` — see
  *  `options.ts::applyOptionPatch`. */
-export async function saveStoredOptions(root: string, next: StoredOptions): Promise<void> {
+export async function saveStoredOptions(root: string, next: StoredOptions, writeText?: TextWriter): Promise<void> {
   const current = await readSettingsFile(root);
-  await writeSettingsFile(root, { ...current, options: next });
+  await writeSettingsFile(root, { ...current, options: next }, writeText);
 }
 
 /** A fragment of the key, for recognition only — never enough to use. Eight

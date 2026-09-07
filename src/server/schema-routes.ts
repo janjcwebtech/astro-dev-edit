@@ -1,3 +1,4 @@
+import type { TextWriter } from './text-writes.ts';
 import type { AstroIntegrationLogger } from 'astro';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -75,6 +76,7 @@ import { readStoredOptions, saveStoredOptions } from './settings.ts';
  */
 
 export interface SchemaRouteDeps {
+  writeText?: TextWriter;
   logger: AstroIntegrationLogger;
   /** Project root (fsPath). */
   root: string;
@@ -130,6 +132,7 @@ function refuse(code: CollectionRefusal, error: string): RouteResult {
 
 export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
   const { logger, root, optionsResolver, schemaProvider } = deps;
+  const writeText: TextWriter = deps.writeText ?? atomicWrite;
 
   /** The gate every route in this group starts at. */
   async function gate(): Promise<{
@@ -380,7 +383,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
           }
 
           if (next !== config.source) {
-            await atomicWrite(config.abs, next);
+            await writeText(config.abs, next, config.source);
             logger.info(`${req.collection} schema updated -> ${config.rel}`);
             etag = sha256(next);
           }
@@ -553,7 +556,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
         // Directory first: a registered collection whose directory is missing is
         // a build error, while a directory with no collection is inert.
         await mkdir(dirAbs, { recursive: true });
-        await atomicWrite(config.abs, patched.newSource);
+        await writeText(config.abs, patched.newSource, config.source);
         logger.info(`collection created -> ${name} (${dir})`);
         return { status: 200, body: { name, dir, etag: sha256(patched.newSource) } };
       },
@@ -609,7 +612,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
       await saveStoredOptions(root, {
         ...stored,
         entryEditor: { ...detail, collections },
-      });
+      }, deps.writeText);
       logger.info(`field overrides saved: ${collection}`);
       return { ok: true, changed: true };
     } catch (err) {

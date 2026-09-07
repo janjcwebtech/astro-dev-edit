@@ -61,6 +61,10 @@ export interface DevEditOptions {
   contentRoots?: string[];
   /** Expose the click-to-source fallback. */
   openInEditor?: boolean;
+  /** Reveal text-write destinations in the external editor. Default false. */
+  revealWrites?: boolean;
+  /** Best-effort pause before existing-file writes, 0–10000 ms. Default 1000. */
+  revealWriteDelayMs?: number;
   /**
    * The hover-pill CSS inspector: on hover, list an element's classes and ID,
    * and reveal the CSS rules each one applies (read from the browser, no server
@@ -166,6 +170,8 @@ export const DEFAULTS: ResolvedOptions = {
   editableExtensions: ['.astro', '.md', '.mdx'],
   contentRoots: ['src', 'public'],
   openInEditor: true,
+  revealWrites: false,
+  revealWriteDelayMs: 1000,
   cssInspector: true,
   sourceAnnotations: 'auto',
   entryEditor: {},
@@ -266,6 +272,24 @@ const OPTION_SPECS: readonly OptionSpec[] = [
     group: 'editing',
     fallback: DEFAULTS.openInEditor,
     read: (o) => o.openInEditor,
+  },
+  {
+    key: 'revealWrites',
+    label: 'Show changed files in editor',
+    help: 'Reveal text files before saving, with a best-effort delay. New files open after creation. Independent of manual Open controls; excludes uploads and deletions. Settings files may contain your Unsplash key.',
+    type: 'boolean',
+    group: 'editing',
+    fallback: DEFAULTS.revealWrites,
+    read: (o) => o.revealWrites,
+  },
+  {
+    key: 'revealWriteDelayMs',
+    label: 'Delay before writing (ms)',
+    help: 'Wait 0–10000 milliseconds after requesting the editor to open an existing file. This cannot confirm that the file is visible.',
+    type: 'number',
+    group: 'editing',
+    fallback: DEFAULTS.revealWriteDelayMs,
+    read: (o) => o.revealWriteDelayMs,
   },
   {
     key: 'cssInspector',
@@ -470,6 +494,8 @@ function toResolvedOptions(
     editableExtensions: flat.get('editableExtensions') as string[],
     contentRoots: flat.get('contentRoots') as string[],
     openInEditor: flat.get('openInEditor') === true,
+    revealWrites: flat.get('revealWrites') === true,
+    revealWriteDelayMs: validRevealDelay(flat.get('revealWriteDelayMs')) ? flat.get('revealWriteDelayMs') as number : DEFAULTS.revealWriteDelayMs,
     schemaEditor: flat.get('schemaEditor') === true,
     cssInspector: flat.get('cssInspector') === true,
     sourceAnnotations: flat.get('sourceAnnotations') as 'auto' | 'force' | 'off',
@@ -563,6 +589,10 @@ function specFor(key: string): OptionSpec | undefined {
   return OPTION_SPECS.find((s) => s.key === key);
 }
 
+function validRevealDelay(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 10000;
+}
+
 export interface CoercedPatch {
   /** Wire key → validated value, for keys that passed. */
   values: Map<string, unknown>;
@@ -617,6 +647,10 @@ export function coerceOptionPatch(patch: Record<string, unknown>): CoercedPatch 
       }
       case 'number': {
         const n = typeof raw === 'number' ? raw : Number(raw);
+        if (key === 'revealWriteDelayMs' && !validRevealDelay(n)) {
+          errors[key] = 'expected an integer from 0 to 10000';
+          continue;
+        }
         if (!Number.isFinite(n)) {
           errors[key] = 'expected a number';
           continue;

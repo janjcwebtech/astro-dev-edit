@@ -1,3 +1,4 @@
+import { createTextWrites } from './text-writes.ts';
 import type { AstroIntegrationLogger } from 'astro';
 import { readFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
@@ -18,7 +19,6 @@ import { createInspectRoutes } from './inspect-routes.ts';
 import type { OptionsResolver, ResolvedOptions } from './options.ts';
 import { createPageSourceRoutes } from './page-source-routes.ts';
 import {
-  atomicWrite,
   checkEditablePath,
   isPackageOwned,
   resolveAssetTarget,
@@ -134,6 +134,8 @@ function isLocalRequest(req: Connect.IncomingMessage): boolean {
 
 export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFunction {
   const { logger, root, optionsResolver, routeManifest, schemaProvider, unsplash } = deps;
+  const textWrites = createTextWrites({ root, optionsResolver, logger });
+  const writeText = textWrites.write;
 
   /** The effective options for the request in hand. Every handler starts here
    *  rather than closing over values captured at setup time. */
@@ -400,7 +402,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
           }
           working = result.newSource;
         }
-        await atomicWrite(abs, working);
+        await writeText(abs, working, source);
         logger.info(`applied ${ops.map((o) => o.targetType).join('+')} edit -> ${basename(abs)}:${loc}`);
         return { status: 200, body: { ok: true } };
       },
@@ -415,9 +417,9 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     ...coreRoutes,
     ...createInspectRoutes({ logger, root, optionsResolver }),
     ...createPageSourceRoutes({ logger, optionsResolver, routeManifest }),
-    ...createEntryRoutes({ logger, root, optionsResolver, schemaProvider }),
-    ...createSchemaRoutes({ logger, root, optionsResolver, schemaProvider }),
-    ...createSettingsRoutes({ logger, root, optionsResolver, unsplash }),
+    ...createEntryRoutes({ writeText, logger, root, optionsResolver, schemaProvider }),
+    ...createSchemaRoutes({ writeText, logger, root, optionsResolver, schemaProvider }),
+    ...createSettingsRoutes({ writeText, logger, root, optionsResolver, unsplash }),
     ...createUnsplashRoutes({
       logger,
       root,
@@ -425,6 +427,16 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       unsplash,
     }),
   ];
+
+  const textMutationPaths = new Set([
+    '/apply', '/entry/apply', '/entry/create', '/entry/delete',
+    '/collection/schema/apply', '/collection/create', '/settings',
+  ]);
+  for (const route of routes) {
+    if (route.method !== 'POST' || !textMutationPaths.has(route.path)) continue;
+    const handler = route.handler;
+    route.handler = (body, req) => textWrites.run(() => handler(body, req));
+  }
 
   return (req, res, next) => {
     const url = req.url ?? '';

@@ -1,4 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { launchInEditor } from '../src/server/editor.ts';
+vi.mock('../src/server/editor.ts', () => ({ launchInEditor: vi.fn(async () => {}) }));
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -851,4 +853,25 @@ describe('POST /apply', () => {
     const r = await request({ method: 'POST', url: '/__dev-edit/apply', rawBody: '{not json' });
     expect(r.status).toBe(400);
   });
+});
+
+
+it('reveals source changes with manual Open disabled and excludes uploads', async () => {
+  vi.mocked(launchInEditor).mockClear();
+  await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
+  const via = createMiddleware({
+    logger, root, optionsResolver: stubOptions(root, { revealWrites: true, revealWriteDelayMs: 0, openInEditor: false }),
+    schemaProvider: null, routeManifest: null, unsplash: null,
+  });
+  const result = await request({ via, method: 'POST', url: '/__dev-edit/apply', body: {
+    file: 'src/pages/index.astro', loc: locOf(PAGE_ASTRO, 'Editable text'), tag: 'p',
+    ops: [{ targetType: 'text', original: 'Editable text', newText: 'Revealed text' }],
+  } });
+  expect(result.status).toBe(200);
+  expect(launchInEditor).toHaveBeenCalledOnce();
+  const upload = await request({ via, method: 'POST', url: '/__dev-edit/upload', body: {
+    name: 'reveal-test.png', dataUrl: 'data:image/png;base64,aW1hZ2U=',
+  } });
+  expect(upload.status).toBe(200);
+  expect(launchInEditor).toHaveBeenCalledOnce();
 });

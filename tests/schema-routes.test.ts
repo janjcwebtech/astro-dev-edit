@@ -1,12 +1,14 @@
+import { launchInEditor } from '../src/server/editor.ts';
+vi.mock('../src/server/editor.ts', () => ({ launchInEditor: vi.fn(async () => {}) }));
 import type { AstroIntegrationLogger } from 'astro';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import type { Connect } from 'vite';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createMiddleware } from '../src/server/middleware.ts';
 import type { DevEditOptions } from '../src/server/options.ts';
@@ -576,4 +578,24 @@ describe('POST /collection/create', () => {
     expect(r.status).toBe(200);
     expect(await readConfig()).toContain('schema: ({ image }) =>');
   });
+});
+
+
+it('reveals both collection stores in write order and reveals collection creation', async () => {
+  vi.mocked(launchInEditor).mockClear();
+  const h = await mount({ revealWrites: true, revealWriteDelayMs: 0, openInEditor: false });
+  const result = await request(h, '/__dev-edit/collection/schema/apply', {
+    collection: 'blog', etag: etagOf(CONFIG),
+    schema: { add: [{ name: 'subtitle', type: 'text', required: false }] },
+    overrides: { title: { label: 'Display title' } },
+  });
+  expect(result.body).toMatchObject({ ok: true, schemaWritten: true, overridesWritten: true });
+  expect(vi.mocked(launchInEditor).mock.calls.map(c => c[0].replace(/:\d+:\d+$/, ''))).toEqual([
+    await realpath(join(root, 'src/content.config.ts')), join(root, '.astro-dev-edit.json'),
+  ]);
+  const created = await request(h, '/__dev-edit/collection/create', {
+    name: 'notes', etag: etagOf(await readConfig()), fields: [],
+  });
+  expect(created.status).toBe(200);
+  expect(launchInEditor).toHaveBeenCalledTimes(3);
 });

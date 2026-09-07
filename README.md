@@ -87,7 +87,7 @@ Every option, with its default and what it does: [Configuration reference](docs/
 
 ## Your git tree is the undo button
 
-Every save writes the file on disk immediately. There is no undo button and no edit history, which is deliberate: your working tree already does that job better than a second history system inside an overlay would. Start a session from a clean tree, review with `git diff`, and throw an edit away with `git checkout <file>` if you need to. You can also undo in your editor, if you open the file you just edited.
+Every save writes the file on disk immediately. There is no undo button and no edit history, which is deliberate: your working tree already does that job better than a second history system inside an overlay would. Start a session from a clean tree, review with `git diff`, and throw an edit away with `git checkout <file>` if you need to. You can also undo in your editor, if you open the file you just edited — and a setting will open each file for you as it is written, if you would rather watch the changes land in the source.
 
 The writes themselves are careful. Each one is atomic, and the server confirms the source still matches what the page showed before touching anything, so a stale click fails instead of corrupting the file.
 

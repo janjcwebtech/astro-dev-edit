@@ -1,3 +1,4 @@
+import type { TextWriter } from './text-writes.ts';
 import type { AstroIntegrationLogger } from 'astro';
 import type { SettingsResponse, SettingsUpdateRequest } from '../shared/protocol.ts';
 import {
@@ -47,6 +48,7 @@ import type { UnsplashConfig } from './unsplash-routes.ts';
  */
 
 export interface SettingsRouteDeps {
+  writeText?: TextWriter;
   logger: AstroIntegrationLogger;
   /** Project root (fsPath). The settings file sits at its top level. */
   root: string;
@@ -162,7 +164,7 @@ export function createSettingsRoutes(deps: SettingsRouteDeps): Route[] {
     if (values.size === 0) return null;
 
     const next = applyOptionPatch(await readStoredOptions(root), values);
-    await saveStoredOptions(root, next);
+    await saveStoredOptions(root, next, deps.writeText);
     logger.info(`settings saved: ${[...values.keys()].join(', ')}`);
     return null;
   }
@@ -193,7 +195,7 @@ export function createSettingsRoutes(deps: SettingsRouteDeps): Route[] {
         },
       };
     }
-    await saveUnsplashKey(root, accessKey);
+    await saveUnsplashKey(root, accessKey, deps.writeText);
     logger.info(
       accessKey.trim()
         ? 'stored an Unsplash access key in .astro-dev-edit.json'

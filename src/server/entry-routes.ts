@@ -1,3 +1,4 @@
+import type { TextWriter } from './text-writes.ts';
 import type { AstroIntegrationLogger } from 'astro';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -33,6 +34,7 @@ import {
  */
 
 export interface EntryRouteDeps {
+  writeText?: TextWriter;
   logger: AstroIntegrationLogger;
   /** Project root (fsPath). Every served path is confined to this. */
   root: string;
@@ -100,6 +102,7 @@ function assembleFields(
 
 export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
   const { logger, root, optionsResolver, schemaProvider } = deps;
+  const writeText: TextWriter = deps.writeText ?? atomicWrite;
 
   /** The effective options, plus the entry-specific extension allowlist derived
    *  from them: same confinement as edits, but only markdown-family files are
@@ -203,7 +206,7 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
         if (!result.ok) {
           return { status: 422, body: { error: result.error, code: 'unsupported' } };
         }
-        await atomicWrite(abs, result.newSource);
+        await writeText(abs, result.newSource, source);
         logger.info(`entry saved -> ${basename(abs)}`);
         return { status: 200, body: { ok: true } };
       },
@@ -268,7 +271,7 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
         const values = Object.fromEntries(
           Object.entries(frontmatter).filter(([, v]) => v !== '' && v !== null && v !== undefined),
         );
-        await atomicWrite(abs, serializeEntry(values, String(entryBody ?? '')));
+        await writeText(abs, serializeEntry(values, String(entryBody ?? '')), null);
         const rel = await relToRoot(abs);
         logger.info(`entry created -> ${rel}`);
         return { status: 200, body: { file: rel } };
