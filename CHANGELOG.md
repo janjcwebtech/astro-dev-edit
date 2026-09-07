@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+### Added
+
+-   Three new reference docs, so the README's index now covers the inside of the tool as well as the outside: **[Architecture](docs/ARCHITECTURE.md)** (how the client, server and patcher layers meet at the type-only protocol, which invariants hold each one, and where a new endpoint, widget, file type, panel or option goes), **[Design system](docs/DESIGN-SYSTEM.md)** (the tokens, radius scale and control sizes behind the overlay's own look, as distinct from the `--atx-*` and `::part()` theming API that [Styling](docs/STYLING.md) documents) and **[Working on this repo](docs/WORKFLOW.md)** (commands, playground verification, issue labels, the doc-ownership table, and how a release is stamped)
+-   **Image support is a switch on the collection**, on both the create form and an existing collection's Fields tab. Astro only puts its `image()` helper in scope for a schema written as `({ image }) => z.object({ … })`, and that form is something you turn on rather than something you trigger: ticking **Image fields** stages the change like any other schema edit, **Save changes** rewrites the one `schema:` line, and every *Type* control offers **Image** the moment the switch moves rather than after the save. While it is off, *Image* stays listed and greyed rather than vanishing — a select's popup is drawn over whatever sits beneath it, so an explanation placed under the form is one the popup hides at exactly the moment it is wanted. Turning it back off is refused while any field still uses `image()`, and the refusal names them. Promotion and demotion are each an insert or a delete of one span, so no other line moves and a round trip returns the file byte-identical. `POST /collection/schema/apply` takes `schema.form`, applied before the field edits so that turning the switch on and adding the image field it was turned on for is a single save, and `POST /collection/create` takes `schemaForm`
+
+### Changed
+
+-   The collection designer is marked **experimental** by a badge on its drawer title — it writes committed source, its coverage is thinner than the rest of the tool's, and it has known rough edges, so commit before using it and read the diff afterwards
+-   A schema the designer cannot prove is still reported as unreadable with *Open source* instead of controls, but an `image()` field on a plain object schema no longer sends you to the source to convert the schema by hand — the **Image fields** switch does it
+
 ## \[0.8.0\] - 2026-09-07
 
 ### Added

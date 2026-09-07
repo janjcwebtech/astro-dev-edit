@@ -87,12 +87,16 @@ SSR contains `data-astro-source-*` on all files, not just page entries).
 
 **zod majors.** The introspection suites import v3 from the `zod`
 devDependency and v4 from `astro/zod` — the exact module a consuming Astro 7
-project loads, so the tables break if zod moves its internals again. Note the
-asymmetry: the playground runs Astro 7 (zod v4), so **v3 has unit coverage but
-no live surface**. A regression in the v3 table would pass every automated gate
-and the playground drive alike; only a real Astro 5/6 project would catch it.
-This is also how the v4 breakage shipped unnoticed — the suite pinned v3
-behaviour that no Astro 7 consumer executes.
+project loads, so the tables break if zod moves its internals again. The two
+majors have unequal live surfaces: the playground runs Astro 7 (zod v4), so
+**v3 is exercised only by a real Astro 5/6 project**. The one to hand is the
+gitignored `examples/airbnb` clone (Astro 5.18, zod 3.25), which consumes the
+integration through the same `file:` link and whose pass drove the schema path
+end to end — see `reports/airbnb/tests.md` G-03. Nothing automated covers it:
+a regression in the v3 accessor table passes typecheck, vitest and the
+playground drive alike, so a change to `zod-adapt.ts` wants that clone driven
+by hand. This is also how the v4 breakage shipped unnoticed — the suite pinned
+v3 behaviour that no Astro 7 consumer executes.
 
 ### Patchers (`src/patcher/`)
 
@@ -642,10 +646,13 @@ function schema with `image()` fields — and its config sets widget overrides o
 - [ ] `blog.excerpt` and `blog.image` have their **Editor** group disabled with a
       padlock (*set in astro.config.mjs*); `blog.title` does not. `works` has none
       locked.
-- [ ] The **Add field** form offers `image` for `works` and **not** for `blog`,
-      which instead explains that image fields need the function schema form.
-      `textarea` is absent from the type list — it is a widget, offered in the
-      Editor group.
+- [ ] The **Add field** form offers `image` for `works`. For `blog` it lists it
+      **greyed and unpickable**, reading *needs a schema change, see below* — in
+      the open popup, not only in the note beneath it — and the note under the
+      form spells that change out, naming the config path and showing the
+      you-have/change-to pair in a mono block. The same holds for an existing field's *Type* control on `blog`, so a
+      retype can't reach a save refusal either. `textarea` is absent from the type
+      list altogether — it is a widget, offered in the Editor group.
 - [ ] Add `subtitle` (Text, not required) to `blog` and **Save changes**: the page
       reloads as Astro resyncs, and the drawer **reopens itself in `blog`** with
       `subtitle` showing `z.string().optional()`. `git diff` on

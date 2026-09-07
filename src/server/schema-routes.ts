@@ -10,6 +10,7 @@ import {
   addField,
   readCollectionBlocks,
   removeField,
+  setSchemaForm,
   updateField,
   type CollectionBlock,
   type SchemaField,
@@ -335,8 +336,12 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
         }
 
         const edits = req.schema ?? {};
+        if (edits.form !== undefined && edits.form !== 'object' && edits.form !== 'function') {
+          throw new Error('schema.form must be "object" or "function"');
+        }
         const hasSchemaEdits =
-          (edits.add?.length ?? 0) + (edits.update?.length ?? 0) + (edits.remove?.length ?? 0) > 0;
+          (edits.add?.length ?? 0) + (edits.update?.length ?? 0) + (edits.remove?.length ?? 0) > 0 ||
+          edits.form !== undefined;
         const hasOverrides = req.overrides && Object.keys(req.overrides).length > 0;
         if (!hasSchemaEdits && !hasOverrides) {
           return { status: 400, body: { error: 'nothing to save' } };
@@ -362,6 +367,15 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
 
           // One in-memory copy, verified all the way through, written once.
           let next = config.source;
+          // The form goes first: turning image support on and adding the image
+          // field it was turned on for arrive as a single save, and the field
+          // can't render until the helper is in scope. A form already matching
+          // is a no-op, so an unchanged switch costs nothing.
+          if (edits.form !== undefined) {
+            const step = setSchemaForm(next, req.collection, edits.form);
+            if (!step.ok) return refuse(step.code, step.error);
+            next = step.newSource;
+          }
           for (const name of edits.remove ?? []) {
             const step = removeField(next, req.collection, String(name));
             if (!step.ok) return refuse(step.code, step.error);
@@ -545,10 +559,14 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
           fields.push(field.field);
         }
 
+        if (req.schemaForm !== undefined && req.schemaForm !== 'object' && req.schemaForm !== 'function') {
+          throw new Error('schemaForm must be "object" or "function"');
+        }
         const patched = addCollection(config.source, {
           name,
           dir,
           ...(pattern ? { pattern } : {}),
+          ...(req.schemaForm ? { schemaForm: req.schemaForm } : {}),
           fields,
         });
         if (!patched.ok) return refuse(patched.code, patched.error);

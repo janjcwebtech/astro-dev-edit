@@ -262,6 +262,79 @@ describe('POST /collection/schema/apply', () => {
     expect(r.body.etag).toBe(etagOf(after));
   });
 
+  it('switches the schema form and adds the image field it enables, in one save', async () => {
+    const h = await mount();
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
+      collection: 'blog',
+      etag: etagOf(CONFIG),
+      schema: {
+        form: 'function',
+        add: [{ name: 'cover', type: 'image', required: true }],
+      },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, schemaWritten: true });
+
+    // The form is applied before the add, which is the only order in which the
+    // field can render at all — image() is out of scope until it is.
+    const after = await readConfig();
+    expect(after).toContain('schema: ({ image }) => z.object({');
+    expect(after).toContain('cover: image(),');
+    expect(after).toContain('    // Shown on the index page.');
+  });
+
+  it('refuses to switch a form back while an image field still needs it, writing nothing', async () => {
+    const h = await mount();
+    const on = await request(h, '/__dev-edit/collection/schema/apply', {
+      collection: 'blog',
+      etag: etagOf(CONFIG),
+      schema: { form: 'function', add: [{ name: 'cover', type: 'image', required: true }] },
+    });
+    expect(on.status).toBe(200);
+    const promoted = await readConfig();
+
+    const off = await request(h, '/__dev-edit/collection/schema/apply', {
+      collection: 'blog',
+      etag: etagOf(promoted),
+      schema: { form: 'object' },
+    });
+    expect(off.status).toBe(422);
+    expect(off.body.code).toBe('unsupported');
+    expect(off.body.error).toContain('cover');
+    expect(await readConfig()).toBe(promoted);
+  });
+
+  it('takes a form change as the only edit, and refuses one that is not a form', async () => {
+    const h = await mount();
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
+      collection: 'blog',
+      etag: etagOf(CONFIG),
+      schema: { form: 'function' },
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.schemaWritten).toBe(true);
+    expect(await readConfig()).toContain('schema: ({ image }) => z.object({');
+
+    const bad = await request(h, '/__dev-edit/collection/schema/apply', {
+      collection: 'blog',
+      etag: etagOf(await readConfig()),
+      schema: { form: 'arrow' },
+    });
+    expect(bad.status).toBe(400);
+  });
+
+  it('refuses a form change when schemaEditor is off', async () => {
+    const h = await mount({ schemaEditor: false });
+    const r = await request(h, '/__dev-edit/collection/schema/apply', {
+      collection: 'blog',
+      etag: etagOf(CONFIG),
+      schema: { form: 'function' },
+    });
+    expect(r.status).toBe(403);
+    expect(r.body.code).toBe('disabled');
+    expect(await readConfig()).toBe(CONFIG);
+  });
+
   it('refuses a stale etag and writes nothing', async () => {
     const h = await mount();
     const r = await request(h, '/__dev-edit/collection/schema/apply', {
@@ -507,6 +580,46 @@ describe('POST /collection/create', () => {
     expect(after).toContain("base: './src/content/notes'");
     expect(after).toContain('export const collections = { blog, notes };');
     expect(existsSync(join(root, 'src/content/notes'))).toBe(true);
+  });
+
+  it('writes the function form when the switch asks for it, with no image field present', async () => {
+    const h = await mount();
+    const r = await request(h, '/__dev-edit/collection/create', {
+      name: 'notes',
+      etag: etagOf(CONFIG),
+      schemaForm: 'function',
+      fields: [{ name: 'title', type: 'text', required: true }],
+    });
+    expect(r.status).toBe(200);
+    const after = await readConfig();
+    expect(after).toContain('schema: ({ image }) =>');
+    expect(after).toContain('title: z.string(),');
+  });
+
+  it('still promotes for an image field when the switch says object — the pair cannot compile', async () => {
+    const h = await mount();
+    const r = await request(h, '/__dev-edit/collection/create', {
+      name: 'notes',
+      etag: etagOf(CONFIG),
+      schemaForm: 'object',
+      fields: [{ name: 'cover', type: 'image', required: true }],
+    });
+    expect(r.status).toBe(200);
+    const after = await readConfig();
+    expect(after).toContain('schema: ({ image }) =>');
+    expect(after).toContain('cover: image(),');
+  });
+
+  it('refuses a schemaForm that is neither form', async () => {
+    const h = await mount();
+    const r = await request(h, '/__dev-edit/collection/create', {
+      name: 'notes',
+      etag: etagOf(CONFIG),
+      schemaForm: 'arrow',
+      fields: [{ name: 'title', type: 'text', required: true }],
+    });
+    expect(r.status).toBe(400);
+    expect(await readConfig()).toBe(CONFIG);
   });
 
   it('refuses a directory outside the content roots, creating nothing', async () => {

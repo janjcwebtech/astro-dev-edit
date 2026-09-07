@@ -603,6 +603,13 @@ export interface DrawerOptions {
    *  layer. The settings drawer can open *above* the media modal (which sits at
    *  8), so it needs to ask for a higher one. */
   layer?: number;
+  /**
+   * A chip beside the name, qualifying the drawer as a whole — "experimental".
+   * It belongs on the title rather than in the body because it is true of every
+   * view the drawer navigates to, and the title is the one thing that survives
+   * that navigation. Build it with {@link badge}.
+   */
+  badge?: HTMLElement;
 }
 export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElement {
   const drawer = styled('div', 'atx-drawer', {
@@ -614,9 +621,14 @@ export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElemen
   // line, and an action corner that spans both rows. `[data-actions]` is only
   // set when a caller fills the slot — see `wireDrawerAction`.
   const bar = styled('div', 'atx-drawer-title');
+  // The name and anything qualifying it share a flex row: the title ellipsizes
+  // when the drawer is narrow and a badge beside it must not be what gets cut.
+  const barName = styled('div', 'atx-drawer-name');
   const barText = styled('span', 'atx-drawer-title-text');
   barText.textContent = title;
-  bar.append(barText);
+  barName.append(barText);
+  if (opts.badge) barName.append(opts.badge);
+  bar.append(barName);
   if (opts.description) {
     const sub = styled('span', 'atx-drawer-subtitle');
     sub.textContent = opts.description;
@@ -636,6 +648,26 @@ export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElemen
 
   drawer.append(bar, body, foot);
   return drawer;
+}
+
+/** Which voice a badge speaks in: `warn` for something the reader has to weigh
+ *  before acting, `muted` for a state that is merely worth saying. */
+export type BadgeTone = 'warn' | 'muted';
+
+/**
+ * A short chip qualifying whatever it sits beside — "experimental", "draft",
+ * "not registered". One word or two, radius `full`, and the only thing in the
+ * overlay that wears that radius.
+ *
+ * It is an outline rather than a fill on purpose: a filled chip beside a title
+ * competes with it for the eye, and a badge is a footnote to the name, not a
+ * second name.
+ */
+export function badge(label: string, tone: BadgeTone): HTMLElement {
+  const el = styled('span', 'atx-badge');
+  el.dataset.tone = tone;
+  el.textContent = label;
+  return el;
 }
 
 /**

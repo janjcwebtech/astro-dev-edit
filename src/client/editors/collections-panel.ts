@@ -6,12 +6,14 @@ import type {
   FieldOverride,
   FieldType,
   SchemaFieldSpec,
+  SchemaForm,
 } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { has } from '../features.ts';
 import { clearHighlight } from '../hover.ts';
 import { icon, type IconName } from '../icons.ts';
 import {
+  badge,
   buildTabs,
   footButton,
   inputEl,
@@ -81,6 +83,30 @@ const WIDGET_CHOICES: ReadonlyArray<[string, string]> = [
   ['image', 'Image'],
   ['json', 'Read-only JSON'],
 ];
+
+/** What the `image` option says while the collection can't hold one. Named
+ *  once: the select is rebuilt on render and re-labelled live by the switch. */
+const IMAGE_UNAVAILABLE = 'Image — turn on Image fields above';
+
+/**
+ * The Type choices for a schema half, with `image` kept **visible but
+ * unpickable** on a plain `z.object` schema rather than filtered out.
+ *
+ * `image()` is only in scope in the `({ image }) => z.object({ … })` form, so
+ * the patcher refuses it otherwise — but silently dropping the option leaves
+ * the reason nowhere the eye is looking. The select's popup is drawn by the
+ * browser over whatever sits beneath it, so a note under the form is behind the
+ * list at exactly the moment the question is asked. The disabled option says
+ * *that* there is a change to make and points down; the note below says what
+ * the change is, in full, once the popup is out of the way.
+ */
+function schemaTypeChoices(allowImage: boolean): Choice[] {
+  return SCHEMA_TYPES.map((t) =>
+    t === 'image' && !allowImage
+      ? ([t, IMAGE_UNAVAILABLE, true] as Choice)
+      : ([t, TYPE_LABEL[t]] as Choice),
+  );
+}
 
 const TYPE_LABEL: Record<string, string> = {
   text: 'Text',
@@ -232,6 +258,10 @@ export function openCollectionsPanel(opts: CollectionsPanelOptions = {}): void {
   const shell = openDrawer('Collections', {
     isDirty: () => pane.isDirty(),
     discardMessage: 'Discard unsaved collection changes?',
+    // On the title rather than in a view, because it is true of the whole
+    // designer — the list, a collection's fields and the create form alike —
+    // and the title is the one thing that survives navigating between them.
+    badge: badge('experimental', 'muted'),
     // Wider than the default drawer: a field row carries both stores' controls
     // side by side, and wrapping them would hide the split the legend explains.
     width: 'min(max(560px, 48vw), 96vw)',
@@ -258,9 +288,50 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
   let editors: FieldEditor[] = [];
   let queuedAdds: SchemaFieldSpec[] = [];
   let removals = new Set<string>();
+  /** The schema form staged by the detail view's Image fields switch, or null
+   *  while it still matches what the config says. Staged like every other schema
+   *  edit and written by Save changes — a switch that wrote on flip would be the
+   *  one control in this drawer that commits without being asked to. */
+  let formChange: SchemaForm | null = null;
+  /** The same switch on the create form, which has no config to compare to. */
+  let createForm: SchemaForm = 'object';
   /** Field specs typed into the create form. */
   let newFields: SchemaFieldSpec[] = [];
   let createDirty = false;
+  /**
+   * Type selects that must re-answer "can this be an image?" when the switch
+   * moves. Re-rendering the view instead would be simpler and wrong: it rebuilds
+   * the field editors from the server's copy, throwing away every other staged
+   * edit — so the switch would silently undo work.
+   */
+  let imageAvailability: Array<(allow: boolean) => void> = [];
+
+  /**
+   * Keep one Type select in step with the switch. `keepOwn` is for a field that
+   * is *already* an image: its own type stays selectable whatever the switch
+   * says, so the control can never fail to show the value it holds.
+   */
+  function bindImageChoice(sel: HTMLSelectElement, keepOwn = false): HTMLSelectElement {
+    const opt = [...sel.options].find((o) => o.value === 'image');
+    if (opt) {
+      imageAvailability.push((allow) => {
+        const on = allow || (keepOwn && sel.value === 'image');
+        opt.disabled = !on;
+        opt.textContent = on ? TYPE_LABEL.image : IMAGE_UNAVAILABLE;
+      });
+    }
+    return sel;
+  }
+
+  const setImageAvailable = (allow: boolean): void => {
+    for (const fn of imageAvailability) fn(allow);
+  };
+
+  /** What a collection's schema form *would* be if the pending edits were saved.
+   *  Every Type control asks this rather than `c.schemaForm`, so ticking the
+   *  switch makes Image pickable in the same sitting rather than after a save. */
+  const wantedForm = (c: CollectionSummary): SchemaForm =>
+    formChange ?? c.schemaForm ?? 'object';
   /** Consumed by the first load, so a later navigation isn't hijacked. */
   let initial = opts.initialCollection ?? null;
 
@@ -268,14 +339,18 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     editors = [];
     queuedAdds = [];
     removals = new Set();
+    formChange = null;
+    createForm = 'object';
     newFields = [];
     createDirty = false;
+    imageAvailability = [];
   };
 
   const isDirty = (): boolean =>
     !busy &&
     (queuedAdds.length > 0 ||
       removals.size > 0 ||
+      formChange !== null ||
       createDirty ||
       newFields.length > 0 ||
       editors.some((e) => e.dirty()));
@@ -331,8 +406,11 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     opts.onPrimary?.(null);
     // The editor list belongs to the DOM this call is about to build. Without
     // clearing it, a return to this view would leave detached editors from the
-    // previous render in the dirty check and in the next save's payload.
+    // previous render in the dirty check and in the next save's payload. The
+    // image-availability hooks are per-render for the same reason: they close
+    // over selects this call is about to replace.
     editors = [];
+    imageAvailability = [];
     if (!data) return;
     if (creating) root.append(renderCreate(data));
     else if (selected) {
@@ -480,6 +558,24 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       );
     }
     fieldsPane.append(legend());
+
+    // Above the fields, because it decides what a field is allowed to be. The
+    // switch is a schema write like any other, so `schemaEditor: false` and an
+    // unreadable schema lock it for the same reasons they lock a type.
+    if (c.schemaForm !== null) {
+      fieldsPane.append(
+        imageSwitch(
+          wantedForm(c),
+          writable
+            ? null
+            : 'Schema editing is off, so the form of this schema can’t be changed here.',
+          (form) => {
+            formChange = form === c.schemaForm ? null : form;
+            refreshSave();
+          },
+        ),
+      );
+    }
 
     const list = styled('div', 'atx-collections-fields');
     for (const f of c.fields) {
@@ -690,10 +786,15 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     const stores = styled('div', 'atx-collections-stores');
 
     // --- schema half ---------------------------------------------------------
-    const typeSel = select(
-      SCHEMA_TYPES.map((t) => [t, TYPE_LABEL[t]] as [string, string]),
-      SCHEMA_TYPES.includes(f.type) ? f.type : '',
-      fire,
+    const typeSel = bindImageChoice(
+      select(
+        // A field that is *already* an image stays pickable whatever the form
+        // says, so its own type can't become unselectable underneath it.
+        schemaTypeChoices(wantedForm(c) === 'function' || f.type === 'image'),
+        SCHEMA_TYPES.includes(f.type) ? f.type : '',
+        fire,
+      ),
+      true,
     );
     if (!SCHEMA_TYPES.includes(f.type)) {
       // e.g. a `json` field: offer the choices without claiming the current one.
@@ -828,7 +929,9 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       if (next !== undefined) overrides[e.name] = next;
     }
     const remove = [...removals];
-    if (update.length + remove.length + queuedAdds.length === 0 && Object.keys(overrides).length === 0) {
+    const form = formChange;
+    const schemaEdits = update.length + remove.length + queuedAdds.length + (form ? 1 : 0);
+    if (schemaEdits === 0 && Object.keys(overrides).length === 0) {
       showError(error, 'Nothing has changed yet.');
       return;
     }
@@ -836,14 +939,14 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     busy = true;
     // Set before the request, because the reload the write triggers can arrive
     // before its response does. Corrected below if nothing was in fact written.
-    const willReload = update.length + remove.length + queuedAdds.length > 0;
+    const willReload = schemaEdits > 0;
     if (willReload) remember(c.name);
     try {
       const result = await api.applyCollectionSchema({
         collection: c.name,
         ...(data?.etag ? { etag: data.etag } : {}),
-        ...(update.length + remove.length + queuedAdds.length > 0
-          ? { schema: { update, remove, add: queuedAdds } }
+        ...(schemaEdits > 0
+          ? { schema: { ...(form ? { form } : {}), update, remove, add: queuedAdds } }
           : {}),
         ...(Object.keys(overrides).length > 0 ? { overrides } : {}),
       });
@@ -904,6 +1007,14 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
 
     const error = styled('p', 'atx-collections-error');
 
+    wrap.append(
+      imageSwitch(createForm, null, (form) => {
+        createForm = form;
+        createDirty = true;
+        refresh();
+      }),
+    );
+
     const fieldList = styled('div', 'atx-collections-newfields');
     const repaintFields = (): void => {
       fieldList.textContent = '';
@@ -954,6 +1065,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
           name: nameInput.value.trim(),
           ...(dirInput.value.trim() ? { dir: dirInput.value.trim() } : {}),
           ...(patternInput.value.trim() ? { pattern: patternInput.value.trim() } : {}),
+          schemaForm: createForm,
           fields: newFields,
           ...(d.etag ? { etag: d.etag } : {}),
         });
@@ -974,6 +1086,49 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
   }
 
   /**
+   * The Image fields switch — the one control that decides which schema form is
+   * written, on both the create form and an existing collection.
+   *
+   * It exists because the form used to be *inferred*: adding an image field to a
+   * new collection quietly emitted the function form, and an existing plain
+   * collection had no way to reach it at all. Inference is a poor fit here — the
+   * form is a visible property of the user's own committed source, and which one
+   * they get should be something they chose, not something they triggered.
+   *
+   * `onFlip` receives the form now wanted. Nothing is written: the detail view
+   * stages it for Save changes, the create form holds it until Create.
+   */
+  function imageSwitch(
+    current: SchemaForm,
+    locked: string | null,
+    onFlip: (form: SchemaForm) => void,
+  ): HTMLElement {
+    const c = card({
+      title: 'Image fields',
+      description:
+        'Writes the schema as ({ image }) => z.object({ … }), which is the only form ' +
+        'Astro gives its image() helper. Turn this on to add image fields.',
+    });
+    const box = checkbox(
+      'Image fields',
+      current === 'function',
+      () => {
+        const form: SchemaForm = box.input.checked ? 'function' : 'object';
+        setImageAvailable(form === 'function');
+        onFlip(form);
+      },
+      ['On', 'Off'],
+    );
+    if (locked) {
+      box.input.disabled = true;
+      c.body.append(box.root, note([icon('lock', 12), textNode(locked)], 'muted'));
+    } else {
+      c.body.append(box.root);
+    }
+    return c.root;
+  }
+
+  /**
    * The one form used for both "add a field" and a new collection's starter
    * fields, so the two paths can't drift in what they accept.
    */
@@ -985,13 +1140,14 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     wrap.append(caption('Add field'));
 
     const nameInput = input('', 'subtitle', () => {});
-    // image() needs the function schema form; offering it against a plain
-    // z.object would only produce a refusal on save.
-    const allowImage = c === null || c.schemaForm === 'function';
-    const types = SCHEMA_TYPES.filter((t) => t !== 'image' || allowImage);
-    const typeSel = select(types.map((t) => [t, TYPE_LABEL[t]] as [string, string]), 'text', () => {
-      optionsRow.toggleAttribute('data-hidden', typeSel.value !== 'select');
-    });
+    // Both views ask the same question — what will the schema form be when this
+    // is saved — so neither has a rule of its own about image().
+    const allowImage = (c === null ? createForm : wantedForm(c)) === 'function';
+    const typeSel = bindImageChoice(
+      select(schemaTypeChoices(allowImage), 'text', () => {
+        optionsRow.toggleAttribute('data-hidden', typeSel.value !== 'select');
+      }),
+    );
     const requiredBox = checkbox('Required', true, () => {});
     const defaultInput = input('', 'no default', () => {});
     const optionsInput = input('', 'Option, Option, …', () => {});
@@ -1005,21 +1161,6 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       controlRow('Default', [defaultInput]),
       optionsRow,
     );
-    if (c && c.schemaForm !== 'function') {
-      wrap.append(
-        note(
-          [
-            textNode(
-              'Image fields need Astro’s image() helper, which only a ' +
-                '`({ image }) => z.object({ … })` schema receives. Convert this collection’s ' +
-                'schema by hand to add one.',
-            ),
-          ],
-          'muted',
-        ),
-      );
-    }
-
     const addBtn = footButton('Add', 'outline', () => {
       const name = nameInput.value.trim();
       if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
@@ -1064,8 +1205,8 @@ interface FieldEditor {
 
 // --- small DOM helpers ------------------------------------------------------
 
-/** Which of the two voices a badge or a note speaks in: `warn` for something
- *  the user has to act on, `muted` for a state that is merely worth saying. */
+/** Which of the two voices a note speaks in: `warn` for something the user has
+ *  to act on, `muted` for a state that is merely worth saying. */
 type Tone = 'warn' | 'muted';
 
 /** Two-store legend. The one piece of chrome that explains the whole drawer. */
@@ -1122,16 +1263,20 @@ function input(value: string, placeholder: string, onChange: () => void): HTMLIn
   return el;
 }
 
+/** A choice: value, label, and whether it is shown but unpickable. */
+type Choice = readonly [value: string, label: string, disabled?: boolean];
+
 function select(
-  choices: ReadonlyArray<[string, string]>,
+  choices: ReadonlyArray<Choice>,
   value: string,
   onChange: () => void,
 ): HTMLSelectElement {
   const el = inputEl('select', 'atx-collections-select');
-  for (const [v, label] of choices) {
+  for (const [v, label, disabled] of choices) {
     const opt = document.createElement('option');
     opt.value = v;
     opt.textContent = label;
+    if (disabled) opt.disabled = true;
     el.append(opt);
   }
   el.value = value;
@@ -1143,15 +1288,18 @@ function checkbox(
   label: string,
   checked: boolean,
   onChange: () => void,
+  /** The words beside the box. A required flag reads Yes/No; a switch that turns
+   *  a capability on reads On/Off, because "Yes" answers nothing there. */
+  words: readonly [on: string, off: string] = ['Yes', 'No'],
 ): { root: HTMLElement; input: HTMLInputElement } {
   const wrap = styled('span', 'atx-collections-checkbox');
   const box = styled('input', 'atx-collections-check');
   box.type = 'checkbox';
   box.checked = checked;
   const hint = styled('span', 'atx-collections-check-hint');
-  hint.textContent = checked ? 'Yes' : 'No';
+  hint.textContent = checked ? words[0] : words[1];
   box.addEventListener('change', () => {
-    hint.textContent = box.checked ? 'Yes' : 'No';
+    hint.textContent = box.checked ? words[0] : words[1];
     onChange();
   });
   wrap.append(box, hint);
@@ -1194,13 +1342,6 @@ function backLink(onClick: () => void): HTMLButtonElement {
   // The chevron is the forward one, turned around — one path, two directions.
   btn.prepend(icon('chevronRight', 16));
   return btn;
-}
-
-function badge(label: string, tone: Tone): HTMLElement {
-  const el = styled('span', 'atx-collections-badge');
-  el.dataset.tone = tone;
-  el.textContent = label;
-  return el;
 }
 
 /** The collection list's corner action, the same shape the entry drawer's

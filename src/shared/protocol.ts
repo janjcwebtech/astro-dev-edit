@@ -264,6 +264,13 @@ export interface ErrorResponse {
 
 // --- Entry editor (spec: CMS panel for content-collection entries) -----------
 
+/**
+ * How a collection's `schema:` is written. Only `function` —
+ * `({ image }) => z.object({…})` — has Astro's `image()` helper in scope, which
+ * is the whole of the difference the designer cares about.
+ */
+export type SchemaForm = 'object' | 'function';
+
 /** Widget/type a frontmatter field renders as in the entry panel. */
 export type FieldType =
   | 'text'
@@ -647,7 +654,7 @@ export interface CollectionSummary {
   expressions: Record<string, string>;
   /** How the `schema:` is written. Null when the designer couldn't read it — the
    *  panel then offers "open source" instead of controls. */
-  schemaForm: 'object' | 'function' | null;
+  schemaForm: SchemaForm | null;
   /** Why the schema isn't patchable, when it isn't. */
   unrecognized?: string;
   /** Whether the const is registered in `export const collections`. */
@@ -682,9 +689,14 @@ export interface CollectionSchemaApplyRequest {
   /** {@link CollectionsResponse.etag} as the panel read it. Required whenever
    *  `schema` is present; a stale one is refused rather than merged. */
   etag?: string;
-  /** Schema edits. Applied removes → updates → adds, all against one in-memory
-   *  copy, and written once — so a refusal anywhere leaves the file untouched. */
+  /** Schema edits. Applied form → removes → updates → adds, all against one
+   *  in-memory copy, and written once — so a refusal anywhere leaves the file
+   *  untouched. The form goes first because turning image support on and adding
+   *  an image field are one save, and the field cannot render until it has. */
   schema?: {
+    /** Switch the `schema:` between `z.object({…})` and `({ image }) =>
+     *  z.object({…})`. Omitted means leave it as it is. */
+    form?: SchemaForm;
     add?: SchemaFieldSpec[];
     update?: SchemaFieldSpec[];
     remove?: string[];
@@ -764,6 +776,10 @@ export interface CollectionCreateRequest {
   dir?: string;
   /** Glob pattern for the loader. Defaults to `**\/*.md`. */
   pattern?: string;
+  /** Which form to write the schema in. `function` puts Astro's `image()`
+   *  helper in scope. Defaults to `object`; a spec holding an image field is
+   *  promoted whatever this says, since the other combination cannot compile. */
+  schemaForm?: SchemaForm;
   fields: SchemaFieldSpec[];
   etag?: string;
 }

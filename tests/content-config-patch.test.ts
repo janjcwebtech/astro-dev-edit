@@ -9,6 +9,7 @@ import {
   readCollectionBlocks,
   removeField,
   renderZodField,
+  setSchemaForm,
   updateField,
   type SchemaField,
 } from '../src/patcher/content-config.ts';
@@ -333,6 +334,91 @@ export const collections = { tags };
   it('refuses an unknown field', () => {
     const r = removeField(FIXTURE, 'blog', 'nope');
     expect(r.ok === false && r.code).toBe('missing');
+  });
+});
+
+describe('setSchemaForm', () => {
+  it('promotes a plain object schema without moving any other line', () => {
+    const r = setSchemaForm(FIXTURE, 'blog', 'function');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const diff = lineDiff(FIXTURE, r.newSource);
+    expect(diff.removed).toEqual(['  schema: z.object({']);
+    expect(diff.added).toEqual(['  schema: ({ image }) => z.object({']);
+    // The field list, its comment and its indentation are untouched.
+    expect(r.newSource).toContain('    // The teaser, shown on the index page.');
+    expect(r.newSource).toContain('    title: z.string(),');
+  });
+
+  it('makes image() renderable where it was refused before', () => {
+    const before = addField(FIXTURE, 'blog', field({ name: 'cover', type: 'image' }));
+    expect(before.ok).toBe(false);
+
+    const promoted = setSchemaForm(FIXTURE, 'blog', 'function');
+    expect(promoted.ok).toBe(true);
+    if (!promoted.ok) return;
+    const after = addField(promoted.newSource, 'blog', field({ name: 'cover', type: 'image' }));
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+    expect(after.newSource).toContain('cover: image().optional(),');
+  });
+
+  it('demotes a function schema that holds no image() field', () => {
+    // The image() fields have to go first — that is the guard below.
+    let src = FIXTURE;
+    for (const name of ['cover', 'thumbnail']) {
+      const step = removeField(src, 'works', name);
+      expect(step.ok).toBe(true);
+      if (!step.ok) return;
+      src = step.newSource;
+    }
+    const r = setSchemaForm(src, 'works', 'object');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain('schema: z.object({');
+    expect(r.newSource).not.toContain('({ image })');
+  });
+
+  it('refuses to demote while a field still uses image(), naming the fields', () => {
+    const r = setSchemaForm(FIXTURE, 'works', 'object');
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe('unsupported');
+    expect(r.error).toContain('cover, thumbnail');
+    expect(r.error).toContain('image()');
+  });
+
+  it('is a no-op when the form already matches', () => {
+    const r = setSchemaForm(FIXTURE, 'blog', 'object');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toBe(FIXTURE);
+  });
+
+  it('round-trips: promote then demote returns the original bytes', () => {
+    const up = setSchemaForm(FIXTURE, 'blog', 'function');
+    expect(up.ok).toBe(true);
+    if (!up.ok) return;
+    const down = setSchemaForm(up.newSource, 'blog', 'object');
+    expect(down.ok).toBe(true);
+    if (!down.ok) return;
+    expect(down.newSource).toBe(FIXTURE);
+  });
+
+  it('refuses a collection it cannot read, and one that is not there', () => {
+    const helper = `import { defineCollection, z } from 'astro:content';
+const posts = defineCollection({ schema: buildSchema() });
+export const collections = { posts };
+`;
+    const unreadable = setSchemaForm(helper, 'posts', 'function');
+    expect(unreadable.ok).toBe(false);
+    if (unreadable.ok) return;
+    expect(unreadable.code).toBe('unrecognized');
+
+    const missing = setSchemaForm(FIXTURE, 'nope', 'function');
+    expect(missing.ok).toBe(false);
+    if (missing.ok) return;
+    expect(missing.code).toBe('missing');
   });
 });
 

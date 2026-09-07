@@ -1,4 +1,8 @@
-import type { FieldType, SchemaFieldSpec } from '../shared/protocol.ts';
+import type {
+  FieldType,
+  SchemaFieldSpec,
+  SchemaForm as WireSchemaForm,
+} from '../shared/protocol.ts';
 
 /**
  * Reads and patches a project's `content.config.ts` — the schema half of the
@@ -66,9 +70,9 @@ export interface RawSchemaField {
   expr: string;
 }
 
-/** How a collection's `schema:` is written. Only the function form has Astro's
- *  `image()` helper in scope. */
-export type SchemaForm = 'object' | 'function';
+/** How a collection's `schema:` is written. The wire shape is the only shape,
+ *  the same way {@link SchemaField} is. */
+export type SchemaForm = WireSchemaForm;
 
 export interface CollectionBlock {
   /** The `const` name, which is also the key the registry uses. */
@@ -93,6 +97,12 @@ export interface NewCollection {
   dir: string;
   /** Glob pattern for the loader. Defaults to `**\/*.md`. */
   pattern?: string;
+  /** Which form to write the schema in. Stated, not inferred from the fields:
+   *  a collection may want `image()` in scope before it has an image field, and
+   *  the designer's own switch is what says so. Defaults to `object`, and a
+   *  spec that holds an image field is promoted regardless — that combination
+   *  cannot compile otherwise. */
+  schemaForm?: SchemaForm;
   fields: SchemaField[];
 }
 
@@ -349,6 +359,15 @@ function parseKey(code: string, start: number, end: number): { name: string | nu
 // --- Locating ----------------------------------------------------------------
 
 interface LocatedBlock extends Omit<CollectionBlock, 'line'> {
+  /** First character of the `schema:` value, when the schema was recognized.
+   *  On the function form this is the `(` of the parameter list. */
+  schemaValueStart: number;
+  /** Where `z.object` begins — the same offset on both forms, since the
+   *  function form is exactly the object form with a prefix. The span between
+   *  this and {@link schemaValueStart} *is* the arrow function's head, which is
+   *  what makes switching between the forms an insert or a delete of one span
+   *  rather than a rewrite. */
+  zodObjectAt: number;
   /** `{` of the field object, when the schema was recognized. */
   fieldsOpen: number;
   /** matching `}` of the field object. */
@@ -393,6 +412,8 @@ function locate(source: string): Located {
         schemaForm: null,
         fields: [],
         unrecognized: 'the defineCollection(…) call is unbalanced',
+        schemaValueStart: -1,
+        zodObjectAt: -1,
         fieldsOpen: -1,
         fieldsClose: -1,
         entries: [],
@@ -411,6 +432,8 @@ function unreadable(reason: string): SchemaPart {
     schemaForm: null,
     fields: [],
     unrecognized: reason,
+    schemaValueStart: -1,
+    zodObjectAt: -1,
     fieldsOpen: -1,
     fieldsClose: -1,
     entries: [],
@@ -475,7 +498,15 @@ function readSchema(source: string, code: string, argOpen: number, argClose: num
     e.name = name;
     fields.push({ name, expr: source.slice(e.valueStart, e.end) });
   }
-  return { schemaForm: form, fields, fieldsOpen, fieldsClose, entries };
+  return {
+    schemaForm: form,
+    fields,
+    schemaValueStart: schemaEntry.valueStart,
+    zodObjectAt: at,
+    fieldsOpen,
+    fieldsClose,
+    entries,
+  };
 }
 
 /** Index of the `=>` that separates an arrow function's params from its body, at
@@ -757,6 +788,64 @@ export function updateField(
 }
 
 /**
+ * Switch a collection's schema between the two forms.
+ *
+ * The forms differ by exactly one span — the arrow function's head — so this is
+ * an insert or a delete at a located offset, never a rewrite. Promoting leaves
+ * every existing field expression, comment and line break where it was; the
+ * `z.object({` that followed `schema:` simply now follows `({ image }) =>`.
+ *
+ * Demoting is refused while any field still calls `image()`, because that
+ * helper would go out of scope and the collection would stop building. The
+ * refusal names the fields, since "remove them first" is only actionable if you
+ * know which they are.
+ *
+ * Neither direction re-indents the field list. A demoted schema's fields keep
+ * the deeper indentation the function form gave them — cosmetic, visible in
+ * `git diff`, and preferable to moving lines this patch was not asked to touch.
+ */
+export function setSchemaForm(
+  source: string,
+  collection: string,
+  form: SchemaForm,
+): ConfigPatchResult {
+  const target = patchable(source, collection);
+  if (!target.ok) return target;
+  const { found } = target;
+  if (found.schemaForm === form) {
+    return { ok: true, newSource: source };
+  }
+  if (form === 'function') {
+    return {
+      ok: true,
+      newSource:
+        source.slice(0, found.zodObjectAt) + '({ image }) => ' + source.slice(found.zodObjectAt),
+    };
+  }
+  const users = found.fields.filter((f) => usesImageHelper(f.expr)).map((f) => f.name);
+  if (users.length > 0) {
+    return {
+      ok: false,
+      code: 'unsupported',
+      error:
+        `${collection}: ${users.join(', ')} ${users.length === 1 ? 'uses' : 'use'} image(), ` +
+        'which only the function schema form provides. Remove or retype ' +
+        `${users.length === 1 ? 'it' : 'them'} first.`,
+    };
+  }
+  return {
+    ok: true,
+    newSource: source.slice(0, found.schemaValueStart) + source.slice(found.zodObjectAt),
+  };
+}
+
+/** Whether a field expression calls Astro's `image()` helper. Read off the
+ *  blanked copy so an `image()` inside a string or a comment doesn't count. */
+function usesImageHelper(expr: string): boolean {
+  return /(^|[^\w$.])image\s*\(/.test(blankNonCode(expr));
+}
+
+/**
  * Remove a field from a collection's schema.
  *
  * The field's own line goes; a comment on the line above stays. Deleting a
@@ -837,7 +926,12 @@ export function addCollection(source: string, spec: NewCollection): ConfigPatchR
     }
   }
 
-  const form: SchemaForm = spec.fields.some((f) => f.type === 'image') ? 'function' : 'object';
+  // The switch decides, except that an image field forces the function form —
+  // there is no valid config in which one is asked for and the other applies.
+  const form: SchemaForm =
+    spec.schemaForm === 'function' || spec.fields.some((f) => f.type === 'image')
+      ? 'function'
+      : 'object';
   const lines: string[] = [];
   for (const f of spec.fields) {
     if (!validName(f.name)) {

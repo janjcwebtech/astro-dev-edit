@@ -239,6 +239,16 @@ button {
   grid-template-columns: 1fr auto;
 }
 
+/* The name and anything qualifying it. min-width: 0 so the title inside can
+   still ellipsize -- a grid item defaults to min-content, which would let the
+   name push the header wider instead of shortening. */
+.atx-drawer-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 /* 16px/500 is the only type at that size in a drawer, which is what makes it
    read as the name of the thing rather than as the first of the labels. */
 .atx-drawer-title-text {
@@ -416,6 +426,32 @@ button {
   height: 1px;
   flex: 0 0 auto;
   background: var(--atx-border);
+}
+
+/* A footnote to the title beside it, so it never takes the slack and never
+   wraps: whatever it qualifies is the thing allowed to ellipsize.
+
+   Borrowed from the outline button -- the same 1px input border over the same
+   faint fill -- because a chip that reads as chrome sits quietly beside a name,
+   where a tone-coloured outline shouted the qualifier louder than the thing it
+   qualifies. Muted ink, not foreground: this is text being read, not pressed.
+   Radius stays "full", which is the ladder's rule for a badge and the one thing
+   keeping it from being mistaken for the button it is coloured like. */
+.atx-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-full);
+  background: var(--atx-control-bg);
+  color: var(--atx-muted-fg);
+  font: 500 12px/1.4 var(--atx-font-ui);
+  white-space: nowrap;
+}
+
+/* The one tone that departs from chrome: something the reader has to act on. */
+.atx-badge[data-tone='warn'] {
+  border-color: var(--atx-warning);
+  color: var(--atx-warning);
 }
 
 /* == Items ================================================================
@@ -2221,12 +2257,6 @@ input[type='checkbox']:focus-visible {
   transform: rotate(180deg);
 }
 
-.atx-collections-badge {
-  padding: 1px 6px;
-  border-radius: var(--atx-radius-full);
-  font: 11px var(--atx-font-ui);
-}
-
 .atx-collections-blurb {
   margin: 0 0 12px;
   color: var(--atx-muted-fg);
@@ -2241,22 +2271,12 @@ input[type='checkbox']:focus-visible {
   font: 12px/1.5 var(--atx-font-ui);
 }
 
-.atx-collections-badge[data-tone='warn'],
 .atx-collections-note[data-tone='warn'] {
   color: var(--atx-warning);
 }
 
-.atx-collections-badge[data-tone='muted'],
 .atx-collections-note[data-tone='muted'] {
   color: var(--atx-muted-fg);
-}
-
-.atx-collections-badge[data-tone='warn'] {
-  border: 1px solid var(--atx-warning);
-}
-
-.atx-collections-badge[data-tone='muted'] {
-  border: 1px solid var(--atx-muted-fg);
 }
 
 /* == Image panel and asset picker ==========================================

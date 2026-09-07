@@ -167,6 +167,11 @@ still get the file written/removed — only the navigation guess differs.
 
 ## Collections — the collection designer
 
+> **Experimental** — a badge on the drawer title says so. It writes committed
+> source, its test coverage is thinner than the rest of the tool's, and it has
+> known rough edges, so commit before you use it and read the diff to
+> `src/content.config.ts` after a save. `schemaEditor: false` keeps it read-only.
+
 **Collections** in the admin bar's overflow menu lists every collection your
 content config declares, opens one into its field table, and can append a new one.
 It is its own drawer, alongside Settings rather than inside it: an option is a
@@ -213,10 +218,25 @@ Worth knowing before you use it:
 -   **Long text is a widget, not a schema type.** Set the schema type to *Text*
     and the widget to *Textarea* — the schema stays `z.string()` and the drawer
     renders the bigger control.
--   **`image()` needs the function schema form.** Only
-    `schema: ({ image }) => z.object({ … })` receives Astro's helper, so an image
-    field is offered for collections written that way and refused, with that
-    explanation, for a plain `z.object({ … })`.
+-   **Image fields are a switch, not a syntax.** Astro only hands a collection its
+    `image()` helper when the schema is written as a function, so an **Image
+    fields** switch sits above the field list on both a new collection and an
+    existing one. It is what decides which form gets written:
+
+    ```js
+    // off
+    schema: z.object({ … })
+    // on
+    schema: ({ image }) => z.object({ … })
+    ```
+
+    Turning it on stages the change like any other schema edit — **Save changes**
+    writes it, and the *Type* list offers **Image** the moment you tick it, not
+    after the save. Nothing between the braces moves either way. While it is off,
+    *Image* is listed greyed, reading *turn on Image fields above*.
+
+    Turning it back **off** is refused while any field still uses `image()`, and
+    the refusal names them: remove or retype those fields first.
 -   **A schema the designer can't prove, it won't touch.** Built by a helper,
     holding a spread, conditional — the row says so and offers *Open source*
     instead of controls.
