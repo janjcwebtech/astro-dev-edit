@@ -14,3 +14,7 @@ docs/ASTRO-COMPAT.md
 .env.*
 .astro-dev-edit.json
 .*.dev-edit-tmp-*
+
+# Real-site test fixtures cloned into examples/ (never committed)
+examples/airbnb/
+examples/sf-sf/

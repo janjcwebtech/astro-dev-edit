@@ -1,0 +1,20 @@
+{
+  "baselineFiles": 496,
+  "allBytesAndModesRestored": true,
+  "conflicts": [],
+  "restoredFiles": [
+    "src/components/approach/ApproachIntro.astro",
+    "src/components/approach/HowWeWork.astro",
+    "src/components/_global/Patterns.astro",
+    "src/content/notes/12-principles-of-animation.mdx",
+    "src/content/works/appcast.mdx"
+  ],
+  "removedFiles": [
+    ".astro-dev-edit.json",
+    "src/assets/notes/sf-probe-upload.png"
+  ],
+  "browserDeletedEntries": [
+    "sf-retest-disposable-20260906.mdx",
+    "sf-sibling-navigation-probe.mdx"
+  ]
+}

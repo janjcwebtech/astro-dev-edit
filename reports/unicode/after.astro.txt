@@ -1,0 +1,15 @@
+---
+import Base from '../layouts/Base.astro';
+const greeting = 'Bonjour à tous 日本語 😊';
+---
+<Base title="Unicode editing check">
+  <section class="section"><div class="container">
+    <h1>Unicode editing check</h1>
+    <p id="intro">Grüße äöü č é 日本語 😊</p><h2 id="same-line">Updated café 東京 😊</h2>
+    <p id="later">Later paragraph edited</p>
+    <p id="unicode">Příliš žluťoučký — 京都 😊</p>
+    <p id="markup">Grüße <strong>京都 😊</strong> č café</p>
+    <h3 id="expression">{greeting}</h3>
+    <p id="sentinel">Untouched closing paragraph.</p>
+  </div></section>
+</Base>
