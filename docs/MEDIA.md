@@ -40,6 +40,10 @@ The swap panel keeps a shortcut for the common case: a preview of the image you
 are editing, and a strip of the **six most recently added** images, with
 **Browse all** opening the full picker.
 
+![The media picker showing the Project tab with a grid of project images, a filter box, a sort select and an Upload file button](images/media-picker.png)
+
+![An image panel showing a preview, the file name and size, an alt text input, and a strip of recently added images](images/image-swap.png)
+
 ## Unsplash photo picker
 
 Off by default. Turn it on with `unsplash: {}` and the picker grows a second
@@ -64,6 +68,8 @@ Two things bound the feature:
 - **A strict `img-src` CSP on your dev page blocks the thumbnails.** The grid
   stays usable — credits still read and photos still import — but the tiles
   show a placeholder.
+
+![The Unsplash tab of the picker showing search results for mountains, each tile credited to its photographer, with shape and size selects](images/unsplash.jpg)
 
 ### Your access key
 

@@ -1,15 +1,32 @@
-# astro-dev-edit
+<div align="center">
+  <h1>astro-dev-edit</h1>
+  <h3>Click the text on the page, edit it, and the change lands in your source file.</h3>
+  <p>
+    <a href="https://www.npmjs.com/package/astro-dev-edit"><img src="https://img.shields.io/npm/v/astro-dev-edit?color=6144d7" alt="npm version"></a>
+    <a href="https://github.com/withastro/astro"><img src="https://img.shields.io/badge/astro-5%20%C2%B7%206%20%C2%B7%207-6144d7" alt="Astro 5, 6 and 7"></a>
+    <img src="https://img.shields.io/badge/scope-dev%20server%20only-444" alt="Dev server only">
+    <a href="LICENSE"><img src="https://img.shields.io/npm/l/astro-dev-edit?color=444" alt="MIT license"></a>
+  </p>
+  <p>
+    <a href="https://youtu.be/sa0TdkoybAk"><b>Watch the demo</b></a> ·
+    <a href="https://jcweb.tech/visual-editing-for-astro-development/">Why I built it</a> ·
+    <a href="docs/EDITING.md">Docs</a> ·
+    <a href="CHANGELOG.md">Changelog</a>
+  </p>
+</div>
 
-In-browser visual content editing for the Astro **dev server**. Turn on edit mode, click text or an image in the rendered page, and the change is written straight to the source file. Astro's HMR refreshes the preview. Hold **Ctrl** (**⌥ Option** on macOS) and a click on links navigates as usual, so you can move around the site without leaving edit mode.
+https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356
 
-**Development-focused by design.** The integration registers nothing for `astro build` / `astro preview`, so it can never reach a production bundle. It ships TypeScript source, and your Astro project compiles it like any other `.ts`.
+I have always preferred coding websites over using a page builder, but the quick ad hoc changes after the main work was done always took longer than they should have, because each one started with hunting for the file the text lived in. So I built the tool I was missing.
 
-[https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356](https://github.com/user-attachments/assets/ac4a1864-daec-4ab6-b7e5-5ee0839f5356)
+`astro-dev-edit` is an integration for the Astro dev server. You turn on edit mode, click a piece of text or an image on the rendered page, change it, and the change is written into the source file it came from. Astro's hot reload refreshes the preview, and `git diff` shows exactly what changed. Hold Ctrl (Option on macOS) and links work as usual, so you can move around the site without leaving edit mode.
+
+It registers nothing for `astro build` or `astro preview`, so it can never reach a production bundle, and every endpoint refuses anything that is not localhost. There is no build step: the package ships TypeScript, and your project compiles it like its own.
 
 ## Install
 
 ```bash
-npm install --save-dev "github:janjcwebtech/astro-dev-edit"
+npm install --save-dev astro-dev-edit
 ```
 
 ```js
@@ -22,100 +39,79 @@ export default defineConfig({
 });
 ```
 
-Run `npm run dev` and click **Edit page** in the admin bar across the top of the page.
+Run `npm run dev` and click **Edit page** in the admin bar.
 
-**Astro 5.x to 7.x.** Everything rides on the `data-astro-source-*` attributes Astro puts on elements in dev. Astro 5 and 6 emit them from the compiler, but only while the dev toolbar is enabled, so keep `devToolbar.enabled` on or set `sourceAnnotations: 'force'`. From Astro 7 the Rust compiler doesn't emit them ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)), so the integration injects them itself and there is nothing to configure.
+It works on Astro 5 through 7. On Astro 5 and 6 the source annotations come from the compiler, but only while the dev toolbar is enabled, so keep `devToolbar.enabled` on or set `sourceAnnotations: 'force'`. From Astro 7 the Rust compiler stopped emitting them ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)), so the integration injects them itself.
 
-## What it does
+## What you can edit
 
-- **Text, edited in place.** Click a literal string in an `.astro` template and type. The pill above it names the file and line the change will land in. Hit enter to save, escape to cancel.
+- **Literal text in a template.** Click it and type. The pill above the element names the file and the line the change will land in. Enter saves, escape cancels.
+- **Strings that arrive through an expression.** A value pulled from the frontmatter is followed back to the string that produced it, and you edit that string, with the trace of where it came from.
+- **Text carrying inline markup.** A heading broken by a `<br>`, or a sentence with a `<strong>` in it, opens over the raw source with a row of insertable tags: `br`, `strong`, `em`, `b`, `i`, `u`, `a`, `span`, `code`, `small`, `sup`, `sub`.
+- **Images.** Click one and you get a preview, the file name and size, the alt text, and the six images most recently added to the project. The full picker lists everything in your asset directories, with a filter, an upload button and an Unsplash tab if you add an access key.
+- **Markdown and MDX entries.** On a page rendered from a content collection, **Edit entry** opens a drawer of typed form fields generated from your own zod schema, and the body as rich text or as raw markdown. It looks like a small CMS panel, but it reads and writes the entry file directly. You can create and delete entries from here too.
+- **Collection schemas.** The designer lists every collection you declare and lets you add a field, retype one, remove one, or build a collection from scratch. Those edits patch your `content.config.ts`.
+- **Nothing it cannot prove.** Components, `set:html`, nested block markup, untraceable expressions and anything a package renders get a notice explaining the reason and a button that opens the source instead.
 
-  ![A heading in edit mode with the hover pill above it reading index.astro:22:13 · editable, and open and copy buttons](docs/images/edit-text.png)
+Both drawers need one line of setup: a dev-only `<meta name="astro-dev-edit:page-source">` tag naming the file behind the page. See [Entry editor and collection designer](docs/ENTRY-EDITOR.md).
 
-- **Text carrying inline markup.** A heading broken by a `<br>`, or a sentence with a `<strong>` in it, opens a popup over the element's raw source, with a safelist of inline tags to insert. Text that comes from frontmatter, like `{expression}`, is traced back to the string that produced it.
+### A look at it
 
-  ![A markup popup showing the raw source of an h2 with a br in it, above a row of insertable tags: br, strong, em, b, i, u, a, span, code, small, sup, sub](docs/images/markup.png)
+<img src="docs/images/edit-text.png" alt="A heading in edit mode with the hover pill above it naming the file and line" width="900">
 
-- **If something is not editable with the tool, it points you to the source.** For components, `set:html`, block-level nested markup, expressions that can't be traced and anything rendered by a package, you get a notice explaining why, plus a jump to the source, rather than a write the tool can't prove is correct.
+Editing a heading in place. The pill names the file, the line and the column, and it stays there while you type.
 
-  ![A notice reading Can't edit this here, explaining the text comes from a template expression, with the source location and Open template and Edit page content buttons](docs/images/refusal.png)
+<img src="docs/images/body-editor.png" alt="The body field of the entry drawer showing a formatting toolbar above rendered headings, paragraphs and a code block" width="900">
 
-- **Images.** Click an image to swap its `src` and edit its `alt`, with a preview and the six most recently added images to hand.
+The body of a markdown entry in the rich text editor. The toolbar covers headings, emphasis, lists, quotes, code, links, images and horizontal rules, and you can switch to the raw markdown at any point.
 
-  ![An image panel showing a preview, the file name and size, an alt text input, and a strip of recently added images](docs/images/image-swap.png)
+<img src="docs/images/unsplash.jpg" alt="The Unsplash tab of the picker showing search results for mountains, each tile credited to its photographer, with shape and size selects" width="900">
 
-- **Unsplash integration.** Insert your Unsplash API key to import images directly from Unsplash.
+With an Unsplash access key, a second tab in the picker searches Unsplash from inside your own site and imports the photo you pick at the width you choose.
 
-  ![The Unsplash tab of the picker showing search results for mountains, each tile credited to its photographer, with shape and size selects](docs/images/unsplash.jpg)
+<img src="docs/images/css-inspector.png" alt="The hover pill showing class chips for btn and btn-primary, with a popup listing the CSS rules applied by btn-primary and the file they are written in" width="900">
 
-- **Content-collection entries editing.** **Edit entry** opens a drawer of typed fields generated from your own zod schema. A save is validated against the schema and etag-guarded against a lost update, and it is surgical: comments, key order and quoting survive byte-for-byte. You can create and delete entries here too.
+The class chips on the pill show which CSS rules apply to the element and which file they are written in, so adjusting a transition is one click rather than a search.
 
-  ![The entry drawer showing title, excerpt, date, read time, author, category, draft and image fields for a markdown entry](docs/images/entry-editor.png)
+<img src="docs/images/copy-context.png" alt="The pill's copy button, next to a Claude Code prompt filled with the element context: source location, page URL, DOM path and applied CSS" width="900">
 
-- **The markdown body as rich text.** The same drawer edits the body either in a WYSIWYG editor (headings, emphasis, lists, quotes, code, links, images) or as raw markdown, whichever you prefer.
+**Copy** puts the whole context of the element on your clipboard: the source location, the page URL, the DOM path, the rendered HTML and the CSS rules that apply to it. Your AI agent starts at the change instead of spending turns working all of that out.
 
-  ![The body field of the entry drawer showing a formatting toolbar above rendered headings, paragraphs and a code block](docs/images/body-editor.png)
+## Configuration
 
-- **Collection schemas.** A designer lists every collection you declare and edits its fields: adding, retyping and removing them patches your `content.config.ts` directly. Each field says which half of it is schema (your committed source) and which is editor-only.
+Everything is optional. Pass what you want to `devEdit({ … })`, or set it from the **Settings** drawer, which saves your choices in `.astro-dev-edit.json` and applies them to the next request without a restart. Anything you set in `astro.config.mjs` wins over that file and renders read-only in the drawer, with a note saying where the value came from.
 
-  ![The collection designer showing the blog collection's title field, split into a Schema group with type, required and default, and an Editor group with widget, label and hidden](docs/images/collection-designer.png)
+Gitignore `.astro-dev-edit.json`, since it also holds your Unsplash key. The drawer warns you when you have not.
 
-  Both drawers need one opt-in: a dev-only `<meta name="astro-dev-edit:page-source">` tag naming the file that backs the page. See [Entry editor and collection designer](docs/ENTRY-EDITOR.md).
+Every option, with its default and what it does: [Configuration reference](docs/CONFIGURATION.md).
 
-- **Markup and CSS source peek.** The hover pill's location opens a syntax-highlighted peek of the file around the element, and **Open in editor** jumps to the exact line. An element tree lists everything annotated on the page, and the pill's class chips show which CSS rules apply and where they are written.
+## Your git tree is the undo button
 
-  ![A source peek showing syntax-highlighted Astro source with line numbers and the element's own line focused, above Close and Open in editor buttons](docs/images/source-peek.png)
+Every save writes the file on disk immediately. There is no undo button and no edit history, which is deliberate: your working tree already does that job better than a second history system inside an overlay would. Start a session from a clean tree, review with `git diff`, and throw an edit away with `git checkout <file>` if you need to. You can also undo in your editor, if you open the file you just edited.
 
-- **Settings, without a restart.** Every option below is editable from a Settings drawer, which stores your choices in `.astro-dev-edit.json` and applies them to the next request. Options you set in `astro.config.mjs` render read-only there, with a note saying where the value came from.
-
-  ![The Settings drawer with General, Editing, Media and Unsplash tabs, showing controls for integration enabled, source annotations, content roots and editable extensions](docs/images/settings.png)
-
-## Options
-
-All are optional. Pass what you want to `devEdit({ … })`, or set it from the Settings drawer.
-
-| Option             | Default                   | What it does                                                                                      |
-| ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------- |
-| enabled            | true                      | Kill switch. Config-only — read before the dev server exists.                                     |
-| assetDirs          | ['src/assets', 'public']  | Dirs the image picker scans.                                                                      |
-| uploadDir          | 'public'                  | Where uploads land. Must be web-servable.                                                         |
-| imageUploadDir     | 'src/assets'              | Fallback for uploads backing an image() field. Must be under src/.                                |
-| editableExtensions | ['.astro', '.md', '.mdx'] | Extensions the patcher may write.                                                                 |
-| contentRoots       | ['src', 'public']         | Writes are confined to these, symlinks resolved.                                                  |
-| openInEditor       | true                      | The "Open source" / jump-to-file buttons.                                                         |
-| cssInspector       | true                      | The hover pill's class/ID CSS inspector.                                                          |
-| sourceAnnotations  | 'auto'                    | Who emits data-astro-source-\*: 'auto', 'force', 'off'. Config-only — it registers a Vite plugin. |
-| entryEditor        | {}                        | The entry drawer; false disables it.                                                              |
-| schemaEditor       | true                      | Whether the designer may write your content.config.ts.                                            |
-| unsplash           | false                     | The Unsplash source; {} turns it on. Sub-options: accessKey, appName, perPage, importWidth.       |
-
-Precedence, highest first: **`astro.config.mjs` → `.astro-dev-edit.json` → the defaults above.** `astro.config.mjs` wins because it is code you wrote deliberately, it is committed, and `astro build` reads it. The two config-only options are consumed before a dev server exists, so they can come only from that file. `.astro-dev-edit.json` **should be gitignored**, because it also holds your Unsplash access key, and the drawer warns when it isn't.
-
-### Save your work with git
-
-**Every save writes the source file on disk immediately.** There is no undo button and no history at the moment: the safety model is your **git working tree**. Start an editing session from a clean tree so `git diff` shows exactly what changed, and revert with `git checkout <file>`. Writes are atomic (temp file + rename) and verified first: the server confirms the source still matches what the page showed, so a stale click fails safe instead of corrupting the file. Treat it like editing the files directly, because that is what it does.
+The writes themselves are careful. Each one is atomic, and the server confirms the source still matches what the page showed before touching anything, so a stale click fails instead of corrupting the file.
 
 ## Limits
 
-- **Dev and localhost only.** Nothing runs in build or preview, and every endpoint rejects non-localhost requests.
-- **Content, never structure.** Inline-edited text is escaped so it cannot introduce a tag, an expression or an entity. The markup popup lets tags through, but only the inline safelist, only with presentational attributes, and only well-nested.
-- **The rich body editor covers a markdown subset**: headings, emphasis, lists, quotes, code, links, images, hr. Anything past it (tables, raw HTML/MDX, footnotes, nested lists) stays editable as markdown source.
-- **The collection designer reads only the schema shapes it can prove**: `schema: z.object({ … })` and `schema: ({ image }) => z.object({ … })` with a plain field list. It reports anything else as unreadable and offers _Open source_ instead.
-- **Unsplash is free-tier only**, and a photo is importable only while the dev server that searched for it is still running.
+- Content, never structure. Inline edited text is escaped so it cannot introduce a tag, an expression or an entity. The markup popup lets tags through, but only the inline safelist, only with presentational attributes, and only well nested.
+- The rich body editor covers a markdown subset. Anything past it, so tables, raw HTML or MDX, footnotes and nested lists, stays editable as markdown source.
+- The collection designer reads only the schema shapes it can prove: `schema: z.object({ … })` and `schema: ({ image }) => z.object({ … })` with a plain field list. Anything else is reported as unreadable, with *Open source* offered instead.
+- Unsplash is free tier only, and a photo is importable only while the dev server that searched for it is still running.
 
-### Documentation (Maintained by agent)
+## Documentation
 
-| Doc                                  | What's in it                                                |
-| ------------------------------------ | ----------------------------------------------------------- |
-| Editing reference                    | Everything the overlay can edit, and every surface it draws |
-| Entry editor and collection designer | The CMS drawer, the meta tag, schema editing                |
-| Media picker and Unsplash            | Choosing, uploading and importing images                    |
-| Styling reference                    | The atx-\* hooks and how to override them                   |
-| Changelog                            | What changed, release by release                            |
+| Doc | What's in it |
+| --- | --- |
+| [Editing reference](docs/EDITING.md) | Everything the overlay can edit, and every surface it draws |
+| [Entry editor and collection designer](docs/ENTRY-EDITOR.md) | The CMS drawer, the meta tag, schema editing |
+| [Media picker and Unsplash](docs/MEDIA.md) | Choosing, uploading and importing images |
+| [Configuration reference](docs/CONFIGURATION.md) | Every option, the Settings drawer, and which source wins |
+| [Styling reference](docs/STYLING.md) | The `--atx-*` properties and `::part()` names you can theme |
+| [Changelog](CHANGELOG.md) | What changed, release by release |
 
 ## Credits
 
-The technique of snapshotting Astro's `data-astro-source-*` attributes into a private JS property the instant they appear, before the dev-toolbar runtime strips them from the live DOM, is borrowed from [`astro-click-to-source`](https://www.npmjs.com/package/astro-click-to-source) by **invisible1988** (MIT). Thanks to that project for the approach.
+The technique of snapshotting Astro's `data-astro-source-*` attributes into a private JS property the instant they appear, before the dev toolbar runtime strips them from the live DOM, is borrowed from [`astro-click-to-source`](https://www.npmjs.com/package/astro-click-to-source) by **invisible1988** (MIT). If source navigation is all you want, that is the lighter tool for the job.
 
 ## License
 

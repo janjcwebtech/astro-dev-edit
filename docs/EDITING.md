@@ -69,6 +69,12 @@ The [README](../README.md) has the short version; this is the whole of it.
   your own component instead. Package paths are never writable: `contentRoots`
   does not include `node_modules`, and widening it is not a supported fix.
 
+![A markup popup showing the raw source of an h2 with a br in it, above a row of insertable tags: br, strong, em, b, i, u, a, span, code, small, sup, sub](images/markup.png)
+
+![A value editor titled Value · benefits[].title, editing the string in index.astro that the expression resolves to](images/expression.png)
+
+![A notice reading Can't edit this here, explaining the text comes from a template expression, with the source location and Open template and Edit page content buttons](images/refusal.png)
+
 ## The hover pill and source peek
 
 In edit mode, hovering an element draws a box a couple of pixels clear of it
@@ -86,6 +92,8 @@ context) — while the **open** button next to it jumps to the location in your
 editor. The refusal notice's location line opens the same peek, so you can
 see *why* something refused without leaving the browser. The peek's footer
 has its own **Open in editor** jump-out.
+
+![A source peek showing syntax-highlighted Astro source with line numbers and the element's own line focused, above Close and Open in editor buttons](images/source-peek.png)
 
 ## Copy context for an AI assistant
 
@@ -117,6 +125,8 @@ refuses clipboard access (reaching the dev server over a network address is not
 a secure context, so the API is simply absent) the text opens in a panel,
 preselected, to copy by hand.
 
+![The pill's copy button, next to an AI agent prompt filled with the element context: source location, page URL, DOM path and applied CSS](images/copy-context.png)
+
 ## CSS inspector
 
 The pill also lists the element's **classes and ID** as chips (turn this off
@@ -128,6 +138,8 @@ editor to (near) the rule; rules from cross-origin/CDN stylesheets or an inline
 `<style>` still show their CSS but have no jump. The jump also honours
 `openInEditor`, and reaches `.css` files as well as `.astro` `<style>` blocks
 (still confined to `contentRoots`, so `node_modules`/external CSS is excluded).
+
+![The hover pill showing class chips for btn and btn-primary, with a popup listing the CSS rules applied by btn-primary and the file they are written in](images/css-inspector.png)
 
 ## The admin bar
 
@@ -152,7 +164,7 @@ Every global control lives in a slim bar across the top of the page:
   components opens the page rather than the busiest component, and a URL that
   matches no route says so instead of guessing;
   *Collections*, the [collection and field designer](ENTRY-EDITOR.md#collections--the-collection-designer);
-  and *Settings*, where [every integration option](../README.md#options) — including the
+  and *Settings*, where [every integration option](CONFIGURATION.md) — including the
   [Unsplash access key](MEDIA.md#unsplash-photo-picker) — is editable.
 
 The bar **overlays** the page rather than pushing it down: the top edge is where
@@ -179,6 +191,8 @@ edit away stays deliberate: press **Escape** while editing.
 Tab cycles through its own controls and wraps, the page behind it and the bar
 above it are out of reach, Escape closes it, and focus returns to whatever you
 were on when it opened. Each announces itself as a dialog, named by its title.
+
+![The Settings drawer with General, Editing, Media and Unsplash tabs, showing controls for integration enabled, source annotations, content roots and editable extensions](images/settings.png)
 
 ## Element tree
 

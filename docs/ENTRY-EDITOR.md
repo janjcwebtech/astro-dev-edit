@@ -57,6 +57,10 @@ like a CMS would:
   extension the new entry follows it (an all-`.mdx` collection gets `.mdx`),
   and mixed or empty collections fall back to `.md`.
 
+![The entry drawer showing title, excerpt, date, read time, author, category, draft and image fields for a markdown entry](images/entry-editor.png)
+
+![The body field of the entry drawer showing a formatting toolbar above rendered headings, paragraphs and a code block](images/body-editor.png)
+
 ### Setup per project
 
 1. Add the integration (above).
@@ -221,6 +225,8 @@ Worth knowing before you use it:
     `contentRoots` like any other write. A value that would need quoting to be
     written safely is refused rather than quoted, which keeps every expression
     the patcher writes a shape it can read back.
+
+![The collection designer showing the blog collection's title field, split into a Schema group with type, required and default, and an Editor group with widget, label and hidden](images/collection-designer.png)
 
 ### Items
 
