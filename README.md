@@ -23,6 +23,8 @@ I have always preferred coding websites over using a page builder, but the quick
 
 It registers nothing for `astro build` or `astro preview`, so it can never reach a production bundle, and every endpoint refuses anything that is not localhost. There is no build step: the package ships TypeScript, and your project compiles it like its own.
 
+**Disclaimer:** The author is not responsible for any data loss. Back up your work before using this tool.
+
 ## Install
 
 ```bash
@@ -107,11 +109,18 @@ The writes themselves are careful. Each one is atomic, and the server confirms t
 | [Media picker and Unsplash](docs/MEDIA.md) | Choosing, uploading and importing images |
 | [Configuration reference](docs/CONFIGURATION.md) | Every option, the Settings drawer, and which source wins |
 | [Styling reference](docs/STYLING.md) | The `--atx-*` properties and `::part()` names you can theme |
+| [Architecture](docs/ARCHITECTURE.md) | How the layers fit together, and where a new capability goes |
+| [Design system](docs/DESIGN-SYSTEM.md) | The tokens, sizes and rules behind the overlay's own look |
+| [Working on this repo](docs/WORKFLOW.md) | Commands, verification, issues, doc rules, releases |
 | [Changelog](CHANGELOG.md) | What changed, release by release |
 
 ## Credits
 
 The technique of snapshotting Astro's `data-astro-source-*` attributes into a private JS property the instant they appear, before the dev toolbar runtime strips them from the live DOM, is borrowed from [`astro-click-to-source`](https://www.npmjs.com/package/astro-click-to-source) by **invisible1988** (MIT). If source navigation is all you want, that is the lighter tool for the job.
+
+## Contributing
+
+Bug reports and pull requests are welcome. Everything is reviewed and merged by me, and commits need a `Signed-off-by` line (`git commit -s`). [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md).
 
 ## License
 
