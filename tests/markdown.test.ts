@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canRichEdit, markdownToHtml } from '../src/client/markdown.ts';
+import { canRichEdit, markdownToHtml, mdDestination } from '../src/client/markdown.ts';
 
 describe('markdownToHtml', () => {
   it('renders headings h1–h6', () => {
@@ -33,6 +33,18 @@ describe('markdownToHtml', () => {
   it('renders links and images', () => {
     expect(markdownToHtml('[x](https://e.com)')).toBe('<p><a href="https://e.com">x</a></p>');
     expect(markdownToHtml('![alt](/img/a.png)')).toBe('<p><img alt="alt" src="/img/a.png"></p>');
+  });
+
+  it('reads an angle-bracketed destination, so a path with a space stays an image', () => {
+    expect(markdownToHtml('![alt](</brand/Logo Miramar.png>)'))
+      .toBe('<p><img alt="alt" src="/brand/Logo Miramar.png"></p>');
+    expect(markdownToHtml('[x](<https://e.com/a b>)'))
+      .toBe('<p><a href="https://e.com/a b">x</a></p>');
+  });
+
+  it('still reads a percent-encoded bare destination', () => {
+    expect(markdownToHtml('![alt](/brand/Logo%20Miramar.png)'))
+      .toBe('<p><img alt="alt" src="/brand/Logo%20Miramar.png"></p>');
   });
 
   it('renders flat lists', () => {
@@ -81,5 +93,30 @@ describe('canRichEdit', () => {
     ['unclosed fences', '```js\ncode'],
   ])('rejects %s', (_name, md) => {
     expect(canRichEdit(md)).toBe(false);
+  });
+});
+
+describe('mdDestination', () => {
+  it('leaves a destination that needs no wrapper alone', () => {
+    expect(mdDestination('/img/a.png')).toBe('/img/a.png');
+    expect(mdDestination('/brand/Logo%20Miramar.png')).toBe('/brand/Logo%20Miramar.png');
+    expect(mdDestination('https://e.com/a?b=1#c')).toBe('https://e.com/a?b=1#c');
+  });
+
+  it('wraps a destination whose spaces or parens would end it early', () => {
+    // Unwrapped, CommonMark stops the destination at the space and the whole
+    // ![…](…) stops being an image the next time the body is parsed.
+    expect(mdDestination('/brand/Logo Miramar.png')).toBe('</brand/Logo Miramar.png>');
+    expect(mdDestination('/img/a(1).png')).toBe('</img/a(1).png>');
+  });
+
+  it('encodes the two characters the wrapper cannot carry raw', () => {
+    expect(mdDestination('/img/a <b>.png')).toBe('</img/a %3Cb%3E.png>');
+  });
+
+  it('round-trips a wrapped destination back through the parser', () => {
+    const src = mdDestination('/brand/Logo Miramar.png');
+    expect(markdownToHtml(`![alt](${src})`))
+      .toBe('<p><img alt="alt" src="/brand/Logo Miramar.png"></p>');
   });
 });

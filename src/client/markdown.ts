@@ -20,6 +20,35 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * A link/image destination, in both the forms CommonMark writes it: bare, or
+ * wrapped in angle brackets. A bare destination ends at the first space or
+ * paren, so a path holding either can only be written wrapped — which is how
+ * `/brand/Logo Miramar horizontal.png` survives being a destination at all.
+ *
+ * `escapeHtml` has already run by the time these match, so the brackets arrive
+ * as entities. The wrapped form is read lazily up to the first `&gt;`, which is
+ * the one character CommonMark does not allow raw inside it.
+ */
+const DESTINATION = String.raw`(?:&lt;(.*?)&gt;|([^()\s]+))`;
+const IMAGE_RE = new RegExp(String.raw`!\[([^\]]*)\]\(${DESTINATION}\)`, 'g');
+const LINK_RE = new RegExp(String.raw`\[([^\]]+)\]\(${DESTINATION}\)`, 'g');
+
+/**
+ * Write a URL as a markdown destination, wrapping it when it holds a character
+ * that would otherwise end it early.
+ *
+ * Without this an `<img>` whose src has a space serializes to
+ * `![alt](/a b.png)`, which is not an image: the next parse reads it as
+ * literal text, and the save after that replaces the image with its own
+ * markdown source. The image is gone and nothing reported a failure.
+ */
+export function mdDestination(url: string): string {
+  if (!/[\s()<>]/.test(url)) return url;
+  // `<` and `>` are the two characters the wrapper cannot carry raw.
+  return `<${url.replace(/</g, '%3C').replace(/>/g, '%3E')}>`;
+}
+
 /** Inline markdown → inline HTML. Input is raw text; output is escaped. */
 function inlineHtml(text: string): string {
   let s = escapeHtml(text);
@@ -29,8 +58,10 @@ function inlineHtml(text: string): string {
     codes.push(`<code>${c}</code>`);
     return `\u0000${codes.length - 1}\u0000`;
   });
-  s = s.replace(/!\[([^\]]*)\]\(([^()\s]+)\)/g, '<img alt="$1" src="$2">');
-  s = s.replace(/\[([^\]]+)\]\(([^()\s]+)\)/g, '<a href="$2">$1</a>');
+  s = s.replace(IMAGE_RE, (_, alt: string, wrapped?: string, bare?: string) =>
+    `<img alt="${alt}" src="${wrapped ?? bare ?? ''}">`);
+  s = s.replace(LINK_RE, (_, text: string, wrapped?: string, bare?: string) =>
+    `<a href="${wrapped ?? bare ?? ''}">${text}</a>`);
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
   s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
@@ -195,9 +226,9 @@ function inlineMd(node: Node): string {
     if (tag === 'BR') {
       out += '\n';
     } else if (tag === 'IMG') {
-      out += `![${el.getAttribute('alt') ?? ''}](${el.getAttribute('src') ?? ''})`;
+      out += `![${el.getAttribute('alt') ?? ''}](${mdDestination(el.getAttribute('src') ?? '')})`;
     } else if (tag === 'A') {
-      out += `[${inlineMd(el)}](${el.getAttribute('href') ?? ''})`;
+      out += `[${inlineMd(el)}](${mdDestination(el.getAttribute('href') ?? '')})`;
     } else if (tag === 'CODE') {
       out += `\`${el.textContent ?? ''}\``;
     } else if (tag === 'STRONG' || tag === 'B') {
@@ -270,7 +301,7 @@ function blockToMd(node: Node): string | null {
   if (tag === 'BR') return null;
   // A bare image between blocks (no <p> wrapper) is still content.
   if (tag === 'IMG') {
-    return `![${el.getAttribute('alt') ?? ''}](${el.getAttribute('src') ?? ''})`;
+    return `![${el.getAttribute('alt') ?? ''}](${mdDestination(el.getAttribute('src') ?? '')})`;
   }
   // P, DIV, and anything unrecognized serialize as a paragraph.
   const inner = inlineMd(el).trim();

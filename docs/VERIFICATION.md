@@ -111,7 +111,7 @@ the loc rules in `astro.ts`.
 
 | Functionality | Test file |
 | --- | --- |
-| `markdown.ts` — `markdownToHtml` rendering subset, `canRichEdit` accept/refuse | `tests/markdown.test.ts` |
+| `markdown.ts` — `markdownToHtml` rendering subset (bare and angle-bracketed destinations), `mdDestination` wrapping/encoding, `canRichEdit` accept/refuse | `tests/markdown.test.ts` |
 | `editors/markup-insert.ts` — tag palette: pair wraps and keeps the selection, empty pair at the caret, void tag replaces rather than wraps, `<a href="">` caret inside the quotes, palette matches the patcher's safelist | `tests/markup-insert.test.ts` |
 | `classify-cache.ts` — verdict caching per file\|loc\|tag, in-flight dedupe, failure retry, HMR invalidation (incl. mid-flight) | `tests/classify-cache.test.ts` |
 | `unsplash-search.ts` — the DOM-free search controller: debounce collapsing keystrokes to one request, blank/whitespace staying idle with no fetch, immediate reset on clear, `retry()` bypassing the debounce, stale responses (and stale errors) discarded, zero results as `empty` not an empty `ready`, error code/retryability surfaced, `loadMore` appending and bumping the page, discarded when the query or orientation changed mid-flight, a failed page keeping the shown results via `moreError`, orientation re-running immediately, `dispose()` cancelling | `tests/unsplash-search.test.ts` |
@@ -468,6 +468,11 @@ into a nested asset dir. `/works/ledger` leaves `thumbnail` unset.)
       `/articles/text-editors-vs-visual-editors`, which contains a table).
 - [ ] Clicking an image inside the rich editor opens the replace picker; alt
       is auto-suggested from the filename and preserved on swap.
+- [ ] An image whose **filename holds a space** survives a save and a reopen as
+      an image, not as literal text: pick it, save, reopen the body. The written
+      markdown carries a percent-encoded destination, and a hand-written
+      `![a](/a b.png)` already in the file comes back as `![a](</a b.png>)`
+      rather than being flattened to a paragraph.
 
 **Media picker**
 

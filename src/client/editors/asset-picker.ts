@@ -18,11 +18,25 @@ import { openMediaModal } from './media-modal.ts';
  * are disjoint, so a field can never be handed a path of the wrong shape.
  */
 
+/**
+ * Where a value handed to `onChange` came from.
+ *
+ * A `picked` value describes a **file** — it comes out of the media picker, so
+ * it carries that filename's own characters, a space among them. A `stored`
+ * value is the field's initial value or one typed into the path input: already
+ * in whatever form it is meant to be written in.
+ *
+ * A caller that has to turn the value into a URL can only tell the two apart if
+ * the field says which it was — `webPathToUrl` is deliberately not idempotent,
+ * so encoding a value that was already encoded turns `%20` into `%2520`.
+ */
+export type ImageValueOrigin = 'picked' | 'stored';
+
 export interface ImageFieldOptions {
   /** The field's current stored value (a web path, or entry-relative). */
   initial: string;
   /** Called with the new stored value on every change. */
-  onChange: (value: string) => void;
+  onChange: (value: string, origin: ImageValueOrigin) => void;
   /**
    * Set for a field backed by Astro's `image()` helper: values are paths
    * relative to `entryFile`, so previews resolve through it and picks are
@@ -97,11 +111,11 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
       showThumb(false);
     }
   };
-  const set = (next: string, fresh = false): void => {
+  const set = (next: string, origin: ImageValueOrigin, fresh = false): void => {
     value = next;
     pathInput.value = next;
     showImage(previewSrc(next), fresh);
-    onChange(next);
+    onChange(next, origin);
   };
 
   /**
@@ -123,15 +137,15 @@ export function buildImageField(opts: ImageFieldOptions): HTMLElement {
       toast('That image cannot back an image() field — it must live under src/.', 'err');
       return;
     }
-    set(next, pick.origin !== 'existing');
+    set(next, 'picked', pick.origin !== 'existing');
   };
 
-  set(initial);
+  set(initial, 'stored');
 
   pathInput.addEventListener('input', () => {
     value = pathInput.value;
     showImage(previewSrc(value));
-    onChange(value);
+    onChange(value, 'stored');
   });
 
   browse.addEventListener('click', () => void browseImages());

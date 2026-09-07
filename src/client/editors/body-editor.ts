@@ -3,6 +3,7 @@ import { COLOR, FONT, PAPER, RADIUS, basename, hexToRgba, inputEl, isolateScroll
 import { mountLight } from '../shadow.ts';
 import { icon, type IconName } from '../icons.ts';
 import { buildImageField } from './asset-picker.ts';
+import { webPathToUrl } from '../../shared/asset-path.ts';
 
 /**
  * WYSIWYG markdown body editor for the entry drawer: a contenteditable
@@ -314,8 +315,14 @@ export function buildBodyEditor(initial: string): BodyEditor {
     // resolves against the site, not the entry file (unlike an image() field).
     imageFieldSlot.append(buildImageField({
       initial: prefill,
-      onChange: (v) => {
-        imageValue = v;
+      onChange: (v, origin) => {
+        // The picker hands back a path describing a file, so it carries the
+        // filename's own characters. What goes into an `<img src>` — and from
+        // there into a markdown destination — is a URL, so a picked path is
+        // encoded on the way in. A value already stored or typed by hand is
+        // taken as written; re-encoding it would turn its `%20` into `%2520`.
+        imageValue = origin === 'picked' ? webPathToUrl(v) : v;
+        // Alt is suggested from the file's real name, not from the URL.
         if (!altTouched) altInput.value = altFromPath(v);
       },
     }));
