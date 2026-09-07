@@ -145,6 +145,44 @@ describe('applyEntryChanges', () => {
     expect(r.newSource).toContain(`excerpt: ${long}\n`);
   });
 
+  it('leaves untouched flow arrays byte-identical, padded or not', () => {
+    const src = `---\ntitle: Old\ncategories: [Campaign, Digital]\nsector: [ Health & Fitness, Technology ]\n---\n\nBody.\n`;
+    const r = applyEntryChanges(src, { frontmatter: { title: 'New' } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain('title: New\n');
+    // Neither array was in the change set, so neither may be re-spaced —
+    // in either direction.
+    expect(r.newSource).toContain('categories: [Campaign, Digital]\n');
+    expect(r.newSource).toContain('sector: [ Health & Fitness, Technology ]\n');
+  });
+
+  it('re-emits a flow array that was actually changed', () => {
+    const src = `---\ntitle: Old\ncategories: [Campaign, Digital]\n---\n\nBody.\n`;
+    const r = applyEntryChanges(src, { frontmatter: { categories: ['Campaign', 'Print'] } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain('Print');
+    expect(r.newSource).not.toContain('Digital');
+  });
+
+  it('keeps an untouched block collection\'s own indentation', () => {
+    const src = `---\ntitle: Old\nnested:\n    a: 1\n    b: 2\n---\n\nBody.\n`;
+    const r = applyEntryChanges(src, { frontmatter: { title: 'New' } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain('nested:\n    a: 1\n    b: 2\n');
+  });
+
+  it('preserves an inline comment after an untouched key', () => {
+    const src = `---\ntitle: Old\ndraft: false # keep this note\ntags: [a, b]\n---\n\nBody.\n`;
+    const r = applyEntryChanges(src, { frontmatter: { title: 'New' } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain('draft: false # keep this note\n');
+    expect(r.newSource).toContain('tags: [a, b]\n');
+  });
+
   it('writes tags arrays', () => {
     const r = applyEntryChanges(SAMPLE, { frontmatter: { tags: ['a', 'b'] } });
     if (!r.ok) throw new Error(r.error);

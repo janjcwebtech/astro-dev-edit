@@ -1,4 +1,4 @@
-import { Document, parseDocument } from 'yaml';
+import { Document, isMap, isNode, isPair, isScalar, parseDocument } from 'yaml';
 
 /**
  * Frontmatter entry parsing and patching for the CMS entry panel — pure
@@ -98,6 +98,87 @@ function splitGap(raw: string): { body: string; bodyGap: string } {
   return m ? { body: raw.slice(m[0].length), bodyGap: m[0] } : { body: raw, bodyGap: '' };
 }
 
+/** Byte span of one top-level `key: value` pair, from the key's first
+ *  character to the end of its value — excluding any trailing inline comment
+ *  and the line break after it. */
+interface PairSpan {
+  start: number;
+  end: number;
+}
+
+/**
+ * Index a mapping's top-level pairs by key name. A key that is not a plain
+ * string, that appears twice, or whose value carries no source range maps to
+ * `null`: without a single unambiguous span there is nothing to copy back.
+ */
+function pairSpans(doc: Document): Map<string, PairSpan | null> {
+  const spans = new Map<string, PairSpan | null>();
+  if (!isMap(doc.contents)) return spans;
+  for (const item of doc.contents.items) {
+    if (!isPair(item)) continue;
+    const key = item.key;
+    if (!isScalar(key) || typeof key.value !== 'string') continue;
+    if (spans.has(key.value)) {
+      spans.set(key.value, null); // duplicate key
+      continue;
+    }
+    const start = key.range?.[0];
+    const end = isNode(item.value) ? item.value.range?.[1] : undefined;
+    spans.set(
+      key.value,
+      start !== undefined && end !== undefined && end > start ? { start, end } : null,
+    );
+  }
+  return spans;
+}
+
+/**
+ * Copy every untouched pair's original bytes back over the re-emitted ones.
+ *
+ * Re-serializing the document normalizes keys nobody asked about: long plain
+ * scalars get re-folded (which `lineWidth: 0` answers), flow collections gain
+ * padding inside their brackets (`[a, b]` becomes `[ a, b ]`), a four-space
+ * block indent becomes two. Each is a separate stringify option, and chasing
+ * them one at a time only ever fixes the instance in front of you — so the
+ * bytes are restored wholesale instead, which is what this module's contract
+ * has always promised. Keys the caller changed, added or deleted keep the
+ * serializer's output, since for those there is no original to preserve.
+ */
+function restoreUntouchedPairs(
+  before: string,
+  beforeSpans: Map<string, PairSpan | null>,
+  after: string,
+  changed: Set<string>,
+): string {
+  const afterDoc = parseDocument(after);
+  if (afterDoc.errors.length > 0) return after;
+
+  const edits: { start: number; end: number; text: string }[] = [];
+  for (const [name, afterSpan] of pairSpans(afterDoc)) {
+    if (afterSpan === null || changed.has(name)) continue;
+    const beforeSpan = beforeSpans.get(name);
+    if (!beforeSpan) continue;
+    const original = before.slice(beforeSpan.start, beforeSpan.end);
+    const emitted = after.slice(afterSpan.start, afterSpan.end);
+    if (original === emitted) continue;
+    // A pair's span ends at its last character for a plain scalar, but at the
+    // newline closing its final line for a block collection. Keep whichever
+    // terminator the emitted text had so the bytes after the span still line up.
+    const body = original.replace(/\n$/, '');
+    edits.push({
+      start: afterSpan.start,
+      end: afterSpan.end,
+      text: emitted.endsWith('\n') ? `${body}\n` : body,
+    });
+  }
+
+  // Back to front, so an earlier edit cannot shift a later one's offsets.
+  edits.sort((a, b) => b.start - a.start);
+  let out = after;
+  for (const edit of edits) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
+  return out;
+}
+
 /**
  * Apply field/body changes to an entry source. Untouched frontmatter keys,
  * comments, and ordering survive; a body-only change leaves the frontmatter
@@ -119,9 +200,11 @@ export function applyEntryChanges(source: string, changes: EntryChanges): EntryP
     if (parsed.yamlError) {
       return { ok: false, error: `frontmatter YAML is invalid: ${parsed.yamlError}` };
     }
-    const doc = parsed.hasFrontmatter && frontmatterText.trim() !== ''
-      ? parseDocument(frontmatterText)
-      : new Document({});
+    const hadMapping = parsed.hasFrontmatter && frontmatterText.trim() !== '';
+    const doc = hadMapping ? parseDocument(frontmatterText) : new Document({});
+    // Spans are read before the edits, while every node still carries the
+    // range it parsed from.
+    const beforeSpans = hadMapping ? pairSpans(doc) : new Map<string, PairSpan | null>();
     for (const [key, value] of Object.entries(fmChanges)) {
       if (value === null) doc.delete(key);
       else doc.set(key, value);
@@ -129,6 +212,14 @@ export function applyEntryChanges(source: string, changes: EntryChanges): EntryP
     // lineWidth 0 disables wrapping: without it, untouched long plain scalars
     // get re-folded across lines just by round-tripping through toString().
     frontmatterText = doc.toString({ lineWidth: 0 });
+    if (hadMapping) {
+      frontmatterText = restoreUntouchedPairs(
+        parsed.frontmatterText,
+        beforeSpans,
+        frontmatterText,
+        new Set(fmKeys),
+      );
+    }
     if (frontmatterText === '{}\n') frontmatterText = ''; // emptied mapping
     hasFrontmatter = true;
   }
