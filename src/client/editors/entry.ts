@@ -192,7 +192,10 @@ function showEditDrawer(entry: EntryResponse): void {
   if (entry.collection) {
     shell.actions.append(
       newEntryButton(() => {
-        shell.teardown();
+        // Hand off through the dirty gate, not around it: teardown() is
+        // unconditional, so a draft in this drawer would go without being
+        // asked about — and there is no in-app undo to get it back.
+        if (!shell.close()) return;
         showCreateDrawer(entry);
       }),
     );

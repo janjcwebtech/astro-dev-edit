@@ -415,6 +415,9 @@ whichever sections your change touches; run the whole list before a release.
       preserved in the entry file.
 - [ ] Dirty-close asks for confirmation; a concurrent external file edit then
       save → etag conflict surfaced, file not clobbered.
+- [ ] **New** on a dirty drawer asks the same question before handing off to
+      the create form — every path that replaces the drawer goes through the
+      dirty gate, not around it.
 - [ ] Every field is named by its own label: clicking the label focuses the
       input (and ticks a checkbox), and `input.labels[0]` is the visible field
       name — including a checkbox, whose state word is its description, not its
