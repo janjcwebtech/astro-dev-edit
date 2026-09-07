@@ -418,6 +418,12 @@ whichever sections your change touches; run the whole list before a release.
 - [ ] **New** on a dirty drawer asks the same question before handing off to
       the create form — every path that replaces the drawer goes through the
       dirty gate, not around it.
+- [ ] Creating from a **cross-collection** Items drawer stays put: from a
+      detail page in collection A, open Collections → B → Items → an entry →
+      **New**, create it, and the browser does not leave the page for a
+      sibling route of A that 404s. The toast names the file that was written.
+      From a detail page in the entry's *own* collection, the sibling route is
+      still followed once the content layer resyncs.
 - [ ] Every field is named by its own label: clicking the label focuses the
       input (and ticks a checkbox), and `input.labels[0]` is the visible field
       name — including a checkbox, whose state word is its description, not its

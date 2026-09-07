@@ -2,6 +2,7 @@ import type { EntryResponse, FieldDescriptor } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { EntryApplyError } from '../api.ts';
 import { slugify } from '../../shared/slug.ts';
+import { pageSource } from '../page-source.ts';
 import * as state from '../state.ts';
 import { basename, footButton, toast } from '../ui.ts';
 import { card, fieldGroup } from '../group.ts';
@@ -273,11 +274,35 @@ export interface EntrySeed {
    *  infer from. */
   fields: FieldDescriptor[];
   /**
-   * What to do once the file exists. The default navigates to the sibling
-   * detail route, which is right when the create started from a rendered page
-   * and wrong when it started from the Collections tab — hence the hook.
+   * What to do once the file exists, **including saying so** — a hook owns the
+   * whole outcome, because two toasts would stack on top of each other.
+   *
+   * The default navigates to the sibling detail route, which is right when the
+   * create started from a rendered page and wrong when it started anywhere
+   * else — the Collections tab, or an Items drawer showing another
+   * collection's entry. Hence the hook.
    */
   afterCreate?(file: string, slug: string): void;
+}
+
+/**
+ * Whether a sibling route is a defensible guess for a new entry alongside this
+ * one.
+ *
+ * The default post-create destination is derived from the browser's current
+ * path, on the assumption that the entry being created is a sibling of the
+ * page you are looking at. That holds only while the drawer is showing the
+ * entry that *backs* this page. Opened through Collections → Items it is
+ * showing an entry in some other collection entirely, and the "sibling" would
+ * be a route in the current page's family — a 404 for a create that fully
+ * succeeded, which reads as a failure and sends the author hunting for a file
+ * already on disk.
+ *
+ * A page that declares no backing entry can only have reached this drawer
+ * through Items, so a null reading is the same answer.
+ */
+function backsCurrentPage(file: string): boolean {
+  return pageSource() === file;
 }
 
 function showCreateDrawer(entry: EntryResponse): void {
@@ -286,6 +311,12 @@ function showCreateDrawer(entry: EntryResponse): void {
     collectionDir: entry.collectionDir,
     file: entry.file,
     fields: entry.fields,
+    // Same rule the server keeps for Open page source: a destination that
+    // cannot be justified is refused, not guessed. Say where the file landed
+    // and stay put.
+    ...(backsCurrentPage(entry.file)
+      ? {}
+      : { afterCreate: (file: string) => toast(`Created ${file}`, 'ok') }),
   });
 }
 
@@ -372,11 +403,11 @@ export function openEntryCreatePanel(entry: EntrySeed): void {
     createBtn.textContent = 'Creating…';
     try {
       const { file } = await api.createEntry({ collection, slug, frontmatter, body: bodyEditor.value() });
-      toast(`Created ${basename(file)}`, 'ok');
       shell.teardown();
       if (entry.afterCreate) {
         entry.afterCreate(file, slug);
       } else {
+        toast(`Created ${basename(file)}`, 'ok');
         // Detail routes are conventionally siblings of the current page; the
         // fresh route 404s until Astro's content layer syncs the new file.
         void navigateWhenReady(siblingPath(slug));
