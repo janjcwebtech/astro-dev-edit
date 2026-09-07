@@ -41,7 +41,6 @@ const FULL: ElementContext = {
     lines: ['<section class="hero">', '  <h1 class="hero-title">{title}</h1>', '</section>'],
   },
   sourceUnavailable: null,
-  box: 'display: block · 720×58 px · font: 700 56px/1.05 Inter · color: rgb(34, 34, 44)',
 };
 
 function peek(overrides: Partial<PeekResponse> = {}): PeekResponse {
@@ -62,7 +61,7 @@ describe('formatContext', () => {
     expect(out).toContain('- **Element** `<h1 class="hero-title">`');
     expect(out).toContain('- **Page** http://localhost:4321/');
     expect(out).toContain('- **DOM path** body > main > section.hero > h1.hero-title');
-    const order = ['## Rendered HTML', '## Source —', '## CSS that applies', '## Rendered box & type'];
+    const order = ['## Rendered HTML', '## Source —', '## CSS that applies'];
     const positions = order.map((heading) => out.indexOf(heading));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -166,9 +165,32 @@ describe('formatContext', () => {
     ).toContain('## CSS that applies (2 rules)');
   });
 
-  it('omits the rendered box line when it could not be measured', () => {
-    const out = formatContext({ ...FULL, box: null });
-    expect(out).not.toContain('## Rendered box & type');
+  it('never emits rendered geometry — it is not something to act on in source', () => {
+    const out = formatContext(FULL);
+    expect(out).not.toContain('Rendered box');
+    expect(out).not.toMatch(/display:|font: \d/);
+  });
+
+  it('announces a trimmed rule set rather than dropping rules silently', () => {
+    const out = formatContext({ ...FULL, rulesDropped: 9 });
+    expect(out).toContain('## CSS that applies (1 of 10 rules)');
+    expect(out).toContain('_Truncated — 9 further matching rules._');
+  });
+
+  it('keeps everything that identifies the element', () => {
+    const out = formatContext({ ...FULL, entryFile: 'src/content/blog/post.mdx' });
+    expect(out).toContain('- **Content entry** src/content/blog/post.mdx');
+    for (const section of [
+      '- **Element**',
+      '- **Source**',
+      '- **Page**',
+      '- **DOM path**',
+      '## Rendered HTML',
+      '## Source —',
+      '## CSS that applies',
+    ]) {
+      expect(out).toContain(section);
+    }
   });
 });
 
@@ -203,6 +225,20 @@ describe('relativize', () => {
 });
 
 describe('windowAround', () => {
+  it('defaults to a tight window — the payload identifies one element, not a file', () => {
+    // 107 lines, the element on line 30: the old ±30 quoted more than half the
+    // file around a one-line subject.
+    const lines = Array.from({ length: 107 }, (_, i) => `l${i + 1}`);
+    const w = windowAround({
+      file: 'src/pages/index.astro', startLine: 1, focusLine: 30, totalLines: 107, lines,
+    });
+    expect(w.startLine).toBe(25);
+    expect(w.lines).toHaveLength(11);
+    expect(w.lines[w.lines.length - 1]).toBe('l35');
+    // …and the heading still says what was left out.
+    expect(w.totalLines).toBe(107);
+  });
+
   it('keeps `context` lines either side of the focus line', () => {
     const w = windowAround(peek(), 2);
     expect(w.startLine).toBe(3);

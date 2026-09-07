@@ -90,13 +90,17 @@ const tooltipOpen = pillButton(
 // block, for pasting into an AI assistant. Its label swaps through
 // copying…/copied, so it holds a fixed width — the pill must not resize
 // mid-interaction (the verdict slot next to it exists for the same reason).
-const COPY_IDLE = "copy";
+//
+// The width is the widest of the three labels, which is the idle one: 12
+// characters of 11px/600 UI text (~68px) plus the pill's own 12px icon, 4px
+// gap and 2×7px padding, rounded up for a font that measures wider.
+const COPY_IDLE = "copy context";
 const copyIcon = icon("copy", 12);
 const tooltipCopy = pillButton(
   "atx-tooltip-copy",
   COPY_IDLE,
-  "Copy this element's HTML, CSS and source as context for an AI assistant",
-  { minWidth: "86px" },
+  "Copy this element's source, HTML and CSS as context for an AI assistant",
+  { minWidth: "108px" },
   copyIcon,
 );
 tooltipRow.append(tooltipLabel, tooltipOpen, tooltipCopy);

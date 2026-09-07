@@ -1,7 +1,7 @@
 import type { ClassifyResult, PeekResponse, SourceLoc } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { classifyCached } from './classify-cache.ts';
-import { rulesForElement, type MatchedRule } from './css-inspect.ts';
+import { narrowRules, rulesForElement, type MatchedRule } from './css-inspect.ts';
 import { pageSource } from './page-source.ts';
 
 /**
@@ -28,12 +28,21 @@ import { pageSource } from './page-source.ts';
 /** Cap on the copied outerHTML. Big enough for a real component, small enough
  *  that hovering a page wrapper doesn't paste a whole document. */
 const HTML_MAX = 4000;
-/** Cap on copied CSS rules — a heavily-styled element can match dozens. */
-const RULES_MAX = 40;
+/** Cap on copied CSS rules. A heavily-styled element can match dozens, most of
+ *  them site-wide defaults it merely happens to match — `narrowRules` drops
+ *  those first, so what survives the cap is what names this element. */
+const RULES_MAX = 12;
 /** Source lines kept either side of the element's own line. /peek returns the
  *  whole file (its own cap is ~1000 lines each way); this is the paste-sized
- *  window cut out of it. */
-const SOURCE_CONTEXT = 30;
+ *  window cut out of it.
+ *
+ *  Deliberately tight. The payload's job is to identify *one* element, and a
+ *  wide window buries it: at ±30 a one-line `<a>` on line 30 of a 107-line file
+ *  quoted more than half the file, comment blocks and unrelated arrays
+ *  included, with the three lines that matter near the top. What the window
+ *  leaves out is named on the section heading, and the whole file is one
+ *  `/peek` away. */
+const SOURCE_CONTEXT = 5;
 /** Deepest DOM-path segments kept, counting from the element itself. */
 const PATH_MAX = 8;
 
@@ -74,8 +83,6 @@ export interface ElementContext {
   source: SourceWindow | null;
   /** Why `source` is null (a server refusal or a failed read), when it is. */
   sourceUnavailable: string | null;
-  /** One-line computed box + type summary; null when unavailable. */
-  box: string | null;
 }
 
 // --- Formatting (pure) -------------------------------------------------------
@@ -156,8 +163,6 @@ export function formatContext(ctx: ElementContext): string {
   } else {
     out.push('## CSS that applies', '_No stylesheet rule matches this element directly (it may inherit from an ancestor, or its stylesheets are cross-origin)._', '');
   }
-
-  if (ctx.box) out.push('## Rendered box & type', ctx.box, '');
 
   return `${out.join('\n').trimEnd()}\n`;
 }
@@ -248,25 +253,6 @@ function verdictOf(result: ClassifyResult): string {
   return `${what} — ${result.reason}`;
 }
 
-/** Resolved box + type, the one part of the payload that is rendered truth
- *  rather than source truth. */
-function boxSummary(el: HTMLElement): string | null {
-  const cs = getComputedStyle(el);
-  if (!cs.display) return null;
-  const rect = el.getBoundingClientRect();
-  const family = cs.fontFamily.split(',')[0].replace(/["']/g, '').trim();
-  const bits = [
-    `display: ${cs.display}`,
-    `${Math.round(rect.width)}×${Math.round(rect.height)} px`,
-    `font: ${cs.fontWeight} ${cs.fontSize}/${cs.lineHeight} ${family}`,
-    `color: ${cs.color}`,
-  ];
-  if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent') {
-    bits.push(`background: ${cs.backgroundColor}`);
-  }
-  return bits.join(' · ');
-}
-
 async function sourceFor(
   src: SourceLoc,
   root: string | null,
@@ -296,6 +282,7 @@ export async function collectContext(
 ): Promise<ElementContext> {
   const { html, dropped } = renderedHtml(el);
   const matched = rulesForElement(el);
+  const kept = narrowRules(el, matched, RULES_MAX);
 
   let verdict: string | null = null;
   try {
@@ -314,9 +301,8 @@ export async function collectContext(
     domPath: domPathOf(el),
     html,
     htmlDropped: dropped,
-    rules: matched.slice(0, RULES_MAX),
-    rulesDropped: Math.max(0, matched.length - RULES_MAX),
+    rules: kept,
+    rulesDropped: matched.length - kept.length,
     ...(await sourceFor(src, root)),
-    box: boxSummary(el),
   };
 }

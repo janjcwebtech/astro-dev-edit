@@ -89,7 +89,7 @@ has its own **Open in editor** jump-out.
 
 ## Copy context for an AI assistant
 
-Next to `open` the pill has a **`copy`** button. It puts everything the
+Next to `open` the pill has a **`copy context`** button. It puts what the
 overlay knows about that element on your clipboard as one markdown block,
 shaped for pasting into an assistant along with what you want changed:
 
@@ -97,18 +97,22 @@ shaped for pasting into an assistant along with what you want changed:
   the **page URL**, its **DOM path**, and the page's **content entry** when it
   declares one;
 - the **rendered HTML** of the element (the overlay's own nodes stripped out);
-- the **source lines** around it — 30 either side, with `>` marking the
+- the **source lines** around it — five either side, with `>` marking the
   element's own line — read through the same `/peek` endpoint the source peek
   uses. A location the server won't serve (an `astro:assets` `<Image>`, say)
   says so here instead, and the rest is still copied;
 - **the CSS rules that apply to it**, with the stylesheet each came from —
   read from the browser, so only rules matching *this* element are listed, not
-  ones it inherits from an ancestor;
-- a one-line summary of its **rendered box and type** (display, size, font,
-  colors).
+  ones it inherits from an ancestor.
 
-The copy is capped — 4 000 characters of HTML and 40 rules — and says in the
-payload when a cap applied, so nothing is silently left out. If your browser
+It is a short block on purpose: its job is to say *which* element and *where*,
+tightly enough that the subject is the first thing read. Open the source peek
+when you want the surrounding file, and the CSS inspector when you want every
+rule.
+
+The copy is capped — 4 000 characters of HTML and 12 rules, the rules naming
+this element kept ahead of the site-wide ones it merely matches — and says in
+the payload when a cap applied, so nothing is silently left out. If your browser
 refuses clipboard access (reaching the dev server over a network address is not
 a secure context, so the API is simply absent) the text opens in a panel,
 preselected, to copy by hand.
