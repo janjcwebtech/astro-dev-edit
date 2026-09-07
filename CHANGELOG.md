@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## \[Unreleased\]
 
+## \[0.8.0\] - 2026-09-07
+
 ### Added
 
 -   **Watch the files change while you edit the page.** *Settings → Editing* gains a **Show changed files in editor** switch (`revealWrites`, off by default) that opens every text file the tool writes in your external editor around the save, so an edit is visible landing in the source and not only in the browser. An existing file is opened at the first line that differs and the write follows after **Delay before writing (ms)** (`revealWriteDelayMs`, 1000 by default, `0`–`10000`, and refused rather than clamped outside that); a new file is written whole and opened afterwards, since there is nothing to watch until it exists. Every text write is covered — page edits, entry saves and creations, collection schemas, a new collection, and the overrides and options in `.astro-dev-edit.json`, with a collection save revealing each of its two stores immediately before its own write — while uploads, imports and deletions are left alone. The launcher is the one behind *Open source*, but the switch is independent of `openInEditor` and cannot confirm that a tab is actually visible, so the timing is best-effort: changes arrive as whole saves, a slow editor wants a longer delay, and a launch failure logs a warning and saves anyway. Saves queue and re-verify at the last moment, so a file you edit yourself during the pause is refused rather than overwritten
