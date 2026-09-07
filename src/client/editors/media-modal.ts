@@ -323,6 +323,9 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     ): MediaPane & { reload(): Promise<void> } {
       const relative = modal.assetRef === 'relative';
       let assets: AssetInfo[] = [];
+      /** Named in the refusal a non-servable tile carries, so the message says
+       *  the project's own directory rather than a hardcoded `public/`. */
+      let publicDir = 'public';
       let sort: SortKey = 'newest';
       let showAll = false;
       let failure: string | null = null;
@@ -355,14 +358,37 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
 
       el.append(filterInput, scopeToggle, sortSelect);
 
-      /** Everything listed that suits this mode. The two modes take disjoint
-       *  halves: a plain `<img src>` cannot reference `/src/`, and an `image()`
-       *  field can only take `src/`. */
-      const suitable = (): AssetInfo[] =>
-        assets.filter((a) => a.path.startsWith('/src/') === relative);
+      /**
+       * Why this asset cannot be used in this mode, or null when it can.
+       *
+       * The two modes ask different questions and neither is the other's
+       * complement. An `image()` field needs a file Astro can *import*, which
+       * means under `src/`. Everything else — a plain `<img src>`, a markdown
+       * destination — needs a URL the **built** site actually has, which only
+       * the public dir gives; `/src/assets/hero.svg` is a truthful dev URL and
+       * a 404 in production, which is the whole of issue #9. Servability is the
+       * server's answer, carried per file, not something inferred here from a
+       * path prefix. */
+      const refusal = (a: AssetInfo): { short: string; full: string } | null => {
+        if (relative) {
+          if (a.path.startsWith('/src/')) return null;
+          return {
+            short: 'Not importable',
+            full: `${a.path} — an image() field imports its asset, so the file has to live under src/.`,
+          };
+        }
+        if (a.servable) return null;
+        return {
+          short: 'Dev only',
+          full: `${a.path} — served in dev only. A build copies just ${publicDir}/, so this path would 404 in the built site.`,
+        };
+      };
+
+      /** Everything listed that suits this mode. */
+      const suitable = (): AssetInfo[] => assets.filter((a) => refusal(a) === null);
 
       const visible = (): AssetInfo[] => {
-        let list = suitable();
+        let list = assets;
         const scope = modal.scopeDir;
         if (scope && !showAll) {
           const scoped = list.filter((a) => a.path.startsWith('/' + scope + '/'));
@@ -371,9 +397,14 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
         }
         const needle = filterInput.value.trim().toLowerCase();
         if (needle) list = list.filter((a) => a.path.toLowerCase().includes(needle));
-        return [...list].sort((a, b) =>
-          sort === 'newest' ? b.mtime - a.mtime : a.path.localeCompare(b.path),
-        );
+        // Usable first, then the chosen sort. The unusable ones stay on screen
+        // to be explained, but a "Newest" listing that opens on six tiles you
+        // cannot click is worse than not showing them at all.
+        return [...list].sort((a, b) => {
+          const usable = Number(refusal(b) === null) - Number(refusal(a) === null);
+          if (usable) return usable;
+          return sort === 'newest' ? b.mtime - a.mtime : a.path.localeCompare(b.path);
+        });
       };
 
       const paint = (): void => {
@@ -401,6 +432,12 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
               label: asset.path,
               current: asset.path === modal.currentWebPath,
               caption: { kind: 'name', text: basename(asset.path), title: asset.path },
+              ...(refusal(asset)
+                ? {
+                    disabledReason: refusal(asset)!.short,
+                    disabledTitle: refusal(asset)!.full,
+                  }
+                : {}),
             }),
           ),
         );
@@ -411,7 +448,9 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
         failure = null;
         deps.grid.showSkeletons();
         try {
-          assets = await api.getAssets();
+          const listing = await api.getAssets();
+          assets = listing.files;
+          publicDir = listing.publicDir;
         } catch (err) {
           failure = `Could not load the image list: ${err instanceof Error ? err.message : 'unknown error'}`;
         }
@@ -425,13 +464,25 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
         reload: load,
         status() {
           if (failure) return '';
-          const shown = visible().length;
+          const list = visible();
+          const usable = list.filter((a) => refusal(a) === null).length;
           const total = suitable().length;
-          if (!total) return relative ? 'No importable images under src/' : 'No images in the asset directories';
-          return shown === total ? `${total} image${total === 1 ? '' : 's'}` : `${shown} of ${total}`;
+          // The count is of what can be picked; anything listed but refused is
+          // named separately rather than folded into a number that would then
+          // overstate the choice.
+          const blocked = list.length - usable;
+          const tail = blocked ? ` · ${blocked} not usable here` : '';
+          if (!total) {
+            return relative
+              ? `No importable images under src/${tail}`
+              : `No images in the asset directories${tail}`;
+          }
+          const head =
+            usable === total ? `${total} image${total === 1 ? '' : 's'}` : `${usable} of ${total}`;
+          return head + tail;
         },
         renderRail(into, key) {
-          const asset = key === null ? null : suitable().find((a) => a.path === key) ?? null;
+          const asset = key === null ? null : assets.find((a) => a.path === key) ?? null;
           if (!asset) {
             into.append(railEmpty('Select an image to see its details.'));
             return;

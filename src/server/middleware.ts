@@ -46,6 +46,13 @@ interface MiddlewareDeps {
   /** Project root (fsPath). Every served path is confined to this. */
   root: string;
   /**
+   * Astro's `publicDir`, root-relative — the one directory a *build* copies
+   * verbatim. It decides both the URL a listed or uploaded asset is reported at
+   * and whether that URL survives the build (`AssetInfo.servable`). Project
+   * config rather than an option, so it is a value and not a thunk: changing it
+   * needs a dev-server restart anyway. Defaults to `public`. */
+  publicDir?: string;
+  /**
    * The live option resolver. **A thunk, not the values** — options come from
    * `astro.config.mjs`, the settings file the Settings panel writes, and the
    * defaults, in that order, and the panel can change the middle layer at any
@@ -134,6 +141,7 @@ function isLocalRequest(req: Connect.IncomingMessage): boolean {
 
 export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFunction {
   const { logger, root, optionsResolver, routeManifest, schemaProvider, unsplash } = deps;
+  const publicDir = deps.publicDir ?? 'public';
   const textWrites = createTextWrites({ root, optionsResolver, logger });
   const writeText = textWrites.write;
 
@@ -191,7 +199,10 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       label: 'asset listing',
       handler: async () => ({
         status: 200,
-        body: { files: await listAssets(root, (await opts()).assetDirs) },
+        body: {
+          files: await listAssets(root, (await opts()).assetDirs, publicDir),
+          publicDir,
+        },
       }),
       onError: () => ({ status: 500, body: { error: 'could not list assets' } }),
     },
@@ -225,7 +236,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
               `directory — writing to "${dir}" instead`,
           );
         }
-        const { webPath } = await saveUpload(root, dir, req);
+        const { webPath } = await saveUpload(root, dir, req, publicDir);
         logger.info(`uploaded image -> ${webPath}`);
         return { status: 200, body: { webPath } };
       },
@@ -423,6 +434,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     ...createUnsplashRoutes({
       logger,
       root,
+      publicDir,
       dirs: async () => assetTargetDirs(await opts()),
       unsplash,
     }),

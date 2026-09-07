@@ -94,6 +94,9 @@ export interface UnsplashRouteDeps {
   logger: AstroIntegrationLogger;
   /** Project root (fsPath). Downloads are confined to it. */
   root: string;
+  /** Astro's `publicDir`, root-relative — what an imported photo's returned web
+   *  path is measured against. Defaults to `public`. */
+  publicDir?: string;
   /** Where an imported photo may land — the same rule `/upload` uses. A thunk,
    *  because the directories come from options the Settings panel can change
    *  without a dev-server restart. */
@@ -231,6 +234,7 @@ function reshape(raw: RawPhoto, appName: string): UnsplashPhoto {
 
 export function createUnsplashRoutes(deps: UnsplashRouteDeps): Route[] {
   const { logger, root, dirs, unsplash } = deps;
+  const publicDir = deps.publicDir ?? 'public';
   const doFetch: typeof fetch = (...args) => (unsplash?.fetchImpl ?? globalThis.fetch)(...args);
 
   // Both caches are per-middleware, so a test's tree never sees another's.
@@ -464,11 +468,16 @@ export function createUnsplashRoutes(deps: UnsplashRouteDeps): Route[] {
         }
 
         const stem = slugify(photo.description || photo.photographer || 'photo');
-        const saved = await saveBuffer(root, dir, {
-          mime: 'image/jpeg',
-          data,
-          filename: `unsplash-${stem || 'photo'}-${slugify(id)}.jpg`,
-        });
+        const saved = await saveBuffer(
+          root,
+          dir,
+          {
+            mime: 'image/jpeg',
+            data,
+            filename: `unsplash-${stem || 'photo'}-${slugify(id)}.jpg`,
+          },
+          publicDir,
+        );
         logger.info(`imported Unsplash photo -> ${saved.webPath}`);
         return { status: 200, body: saved };
       },

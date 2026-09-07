@@ -27,14 +27,24 @@ Two things about how it behaves:
   **Use image** is what hands it back to the field. **Cancel** or **Escape**
   writes nothing at all — which matters, because this modal can open on top of
   the entry drawer, and closing it must never disturb the fields underneath.
+- **A file the field cannot take is shown, dimmed, with the reason.** `assetDirs`
+  spans both `public/` and `src/assets`, because the two kinds of image field
+  need opposite halves of it. An `image()` field needs a file Astro can import,
+  which means under `src/`. A plain `<img src>` or a markdown `![](…)` needs a
+  URL the **built** site has, which only your public directory gives —
+  `/src/assets/hero.svg` is served in dev and absent from `dist/`. So the tile
+  stays on screen and says which one it is rather than disappearing, and it
+  cannot be selected. The rule is applied at pick time, where it is still cheap
+  to choose something else.
 
 Uploading works from the **Upload file…** button or by dropping a file anywhere
 on the modal. Uploads land in `uploadDir` — or, for an `image()` field, beside
 the field's existing asset. `uploadDir` has to be somewhere the browser can
-fetch from, which in practice means under `public/`: a file there becomes a
-plain `<img src>`, so a `src/`-relative directory works in dev and 404s in a
-production build. A preflight warning fires at startup if the configured
-directory isn't web-servable.
+fetch from, which means under your public directory (`public/`, unless your
+Astro config sets `publicDir`): a file there becomes a plain `<img src>`, so a
+`src/`-relative directory works in dev and 404s in a production build. A
+preflight warning fires at startup if the configured directory isn't
+web-servable.
 
 The swap panel keeps a shortcut for the common case: a preview of the image you
 are editing, and a strip of the **six most recently added** images, with

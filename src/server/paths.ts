@@ -63,13 +63,49 @@ export function resolveAssetTarget(
   return { dir, redirected: Boolean(req.targetDir) && dir !== req.targetDir };
 }
 
-/** Map an absolute file under the project root to its web-servable path:
- *  `public/` maps to the site root; everything else keeps its project path. */
-export function toWebPath(root: string, absFile: string): string {
-  const relToRoot = relative(root, absFile).split(sep).join('/');
-  return relToRoot.startsWith('public/')
-    ? '/' + relToRoot.slice('public/'.length)
-    : '/' + relToRoot;
+/** Root-relative path of a file, in posix form regardless of platform. */
+function relPosix(root: string, absFile: string): string {
+  return relative(root, absFile).split(sep).join('/');
+}
+
+/**
+ * The project's public directory as a root-relative posix prefix, with no
+ * trailing slash. Astro's `publicDir` is configurable (and reaches us as a
+ * resolved fs path), so every rule below is written against this rather than a
+ * literal `public/` — a project on `publicDir: 'static'` is otherwise told its
+ * served files live at a URL the site does not have.
+ */
+function publicPrefix(root: string, publicDir: string): string {
+  return relPosix(root, resolve(root, publicDir)).replace(/\/+$/, '');
+}
+
+/**
+ * Whether the **built** site will serve `absFile` at its {@link toWebPath} URL.
+ *
+ * Only the public directory is copied verbatim into the output. Everything else
+ * under the project root — `src/assets` above all — is served by Vite in dev and
+ * simply absent from a build, so a path pointing at it is a dev-only URL. That
+ * distinction is a property of the file, not something each call site can be
+ * trusted to re-derive; it travels to the client on `AssetInfo.servable`.
+ */
+export function isServableAsset(root: string, absFile: string, publicDir = 'public'): boolean {
+  const rel = relPosix(root, absFile);
+  if (rel.startsWith('../') || rel === '..') return false;
+  const prefix = publicPrefix(root, publicDir);
+  // A publicDir that *is* the root makes everything under it public; one that
+  // escapes the root can serve nothing.
+  if (prefix === '') return true;
+  if (prefix.startsWith('../')) return false;
+  return rel.startsWith(prefix + '/');
+}
+
+/** Map an absolute file under the project root to the path it is served at:
+ *  the public directory maps to the site root; everything else keeps its
+ *  project path (truthful in dev, and {@link isServableAsset} is what says so). */
+export function toWebPath(root: string, absFile: string, publicDir = 'public'): string {
+  const rel = relPosix(root, absFile);
+  const prefix = publicPrefix(root, publicDir);
+  return '/' + (prefix && rel.startsWith(prefix + '/') ? rel.slice(prefix.length + 1) : rel);
 }
 
 /** Why a path was refused. `outside-roots` is a *normal answer* for read-only

@@ -1,7 +1,7 @@
 import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import type { AssetInfo, UploadRequest } from '../shared/protocol.ts';
-import { insideRoot, toWebPath } from './paths.ts';
+import { insideRoot, isServableAsset, toWebPath } from './paths.ts';
 
 /**
  * Asset handling: read-only image listing for the swap panel, and image
@@ -31,10 +31,19 @@ async function walk(dir: string): Promise<string[]> {
   return found;
 }
 
-/** List image files under the configured asset dirs, as web-servable paths with
- *  size and mtime. Read-only. Every directory is confined to the project root.
- *  Sorted by path; the client re-sorts (by recency, by default). (spec §6.3, §8) */
-export async function listAssets(root: string, assetDirs: string[]): Promise<AssetInfo[]> {
+/** List image files under the configured asset dirs, as the paths they are
+ *  served at, with size, mtime and whether a *build* will still serve them.
+ *  Read-only. Every directory is confined to the project root. Sorted by path;
+ *  the client re-sorts (by recency, by default). (spec §6.3, §8)
+ *
+ *  `assetDirs` deliberately spans both worlds — `src/assets` has to be listed
+ *  for `image()` fields — so servability is carried per file rather than left
+ *  for each picker to infer from the path. (issue #9) */
+export async function listAssets(
+  root: string,
+  assetDirs: string[],
+  publicDir = 'public',
+): Promise<AssetInfo[]> {
   // A Map because asset dirs may nest (e.g. public/photos inside public), so
   // the same file can be reached twice — keyed by web path, first one wins.
   const out = new Map<string, AssetInfo>();
@@ -51,13 +60,18 @@ export async function listAssets(root: string, assetDirs: string[]): Promise<Ass
     for (const file of entries) {
       const ext = file.slice(file.lastIndexOf('.')).toLowerCase();
       if (!IMAGE_EXT.has(ext)) continue;
-      const path = toWebPath(root, file);
+      const path = toWebPath(root, file, publicDir);
       if (out.has(path)) continue;
       // Statted after the extension filter, so non-images cost nothing. A file
       // deleted between the readdir and the stat is simply left out.
       try {
         const info = await stat(file);
-        out.set(path, { path, size: info.size, mtime: info.mtimeMs });
+        out.set(path, {
+          path,
+          size: info.size,
+          mtime: info.mtimeMs,
+          servable: isServableAsset(root, file, publicDir),
+        });
       } catch {
         continue;
       }
@@ -109,6 +123,7 @@ export async function saveBuffer(
   root: string,
   uploadDir: string,
   file: { mime: string; data: Buffer; filename: string },
+  publicDir = 'public',
 ): Promise<{ webPath: string; filename: string }> {
   const fallbackExt = EXT_BY_MIME[file.mime];
   if (!fallbackExt) throw new Error(`unsupported image type: ${file.mime}`);
@@ -134,7 +149,7 @@ export async function saveBuffer(
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, file.data);
 
-  return { webPath: toWebPath(root, target), filename: basename(target) };
+  return { webPath: toWebPath(root, target, publicDir), filename: basename(target) };
 }
 
 /**
@@ -145,7 +160,8 @@ export async function saveUpload(
   root: string,
   uploadDir: string,
   payload: UploadRequest,
+  publicDir = 'public',
 ): Promise<{ webPath: string }> {
   const { mime, data } = parseDataUrl(payload.dataUrl);
-  return saveBuffer(root, uploadDir, { mime, data, filename: payload.filename });
+  return saveBuffer(root, uploadDir, { mime, data, filename: payload.filename }, publicDir);
 }

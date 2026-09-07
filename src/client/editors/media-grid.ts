@@ -38,6 +38,19 @@ export interface GridTile {
   caption: TileCaption;
   /** Marks the value the field already holds. */
   current?: boolean;
+  /**
+   * Why this tile cannot be picked *here*. Shown on the tile and as its title,
+   * and the pick button goes inert.
+   *
+   * Disabled rather than hidden on purpose: an asset dir listing that quietly
+   * drops half its files reads as "you have no images" when the real answer is
+   * "not this one, and here is why" — the stance the collection designer takes
+   * with a disabled field type. (issue #9)
+   */
+  disabledReason?: string;
+  /** The long form of that reason, for the tile's title. The band on the tile
+   *  is a few words over a thumbnail; the whole sentence belongs on hover. */
+  disabledTitle?: string;
 }
 
 export interface MediaGridHandle {
@@ -101,7 +114,9 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   };
 
   /** Arrow keys walk the grid. The column count is read from the laid-out
-   *  tiles rather than assumed, so it stays right at any modal width. */
+   *  tiles rather than assumed, so it stays right at any modal width. A
+   *  disabled tile still counts, or the geometry the count describes would be
+   *  the wrong grid. */
   const columns = (): number => {
     const tiles = [...buttons.values()];
     if (tiles.length < 2) return 1;
@@ -112,8 +127,12 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
 
   const moveFocus = (from: HTMLButtonElement, delta: number): void => {
     const tiles = [...buttons.values()];
-    const at = tiles.indexOf(from);
-    const next = tiles[at + delta];
+    // Step past anything inert — a disabled tile cannot take focus, so landing
+    // on one would strand the keyboard where the mouse can still go.
+    const step = delta > 0 ? 1 : -1;
+    let at = tiles.indexOf(from) + delta;
+    while (tiles[at]?.disabled) at += step;
+    const next = tiles[at];
     if (next) next.focus();
   };
 
@@ -172,6 +191,21 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
       const chip = styled('span', 'atx-media-current');
       chip.textContent = 'Current';
       pick.append(chip);
+    }
+
+    if (tile.disabledReason) {
+      wrap.toggleAttribute('data-off', true);
+      pick.disabled = true;
+      // The reason replaces the label as the title: "why can't I click this"
+      // is the only question a dimmed tile raises.
+      pick.title = tile.disabledTitle ?? tile.disabledReason;
+      pick.setAttribute(
+        'aria-label',
+        `${tile.label} — ${tile.disabledTitle ?? tile.disabledReason}`,
+      );
+      const note = styled('span', 'atx-media-reason');
+      note.textContent = tile.disabledReason;
+      pick.append(note);
     }
 
     pick.addEventListener('click', () => select(tile.key));

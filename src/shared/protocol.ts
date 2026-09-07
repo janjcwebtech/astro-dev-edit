@@ -81,10 +81,25 @@ export interface AssetInfo {
   size: number;
   /** Last-modified time, epoch ms — the sort key behind "Newest first". */
   mtime: number;
+  /**
+   * Whether a **production build** still serves the file at {@link path}.
+   *
+   * The asset dirs span two worlds on purpose — `src/assets` has to be listed
+   * so `image()` fields have somewhere to browse — but only the project's
+   * `publicDir` is copied into the output. `/src/assets/hero.svg` is a truthful
+   * *dev* URL and a 404 in the built site, so a picker filling a plain
+   * `<img src>` or a markdown destination has to refuse it at pick time. The
+   * server decides this from the configured public dir; no client re-derives it
+   * from the path.
+   */
+  servable: boolean;
 }
 export interface AssetsResponse {
   /** Images under the configured asset dirs, sorted by path. */
   files: AssetInfo[];
+  /** The project's public directory, root-relative — what a picker names when
+   *  it explains why a non-servable file cannot be used. */
+  publicDir: string;
 }
 
 // --- POST /upload ------------------------------------------------------------

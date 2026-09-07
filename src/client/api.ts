@@ -1,6 +1,5 @@
 import type {
   ApplyRequestWire,
-  AssetInfo,
   AssetsResponse,
   ClassifyRequest,
   ClassifyResult,
@@ -74,8 +73,10 @@ export async function health(): Promise<HealthResponse | null> {
   }
 }
 
-/** List the project's swap-candidate images, with size and mtime. */
-export async function getAssets(): Promise<AssetInfo[]> {
+/** List the project's swap-candidate images, with size, mtime and whether a
+ *  build still serves them — plus the public dir the last of those is measured
+ *  against, so a picker can name it when it refuses a file. */
+export async function getAssets(): Promise<AssetsResponse> {
   const res = await fetch(`${API}/assets`);
   if (!res.ok) throw new Error(`server returned ${res.status}`);
   const ct = res.headers.get('content-type') ?? '';
@@ -84,7 +85,13 @@ export async function getAssets(): Promise<AssetInfo[]> {
     // HTML — tells us exactly what went wrong instead of a vague message.
     throw new Error('endpoint returned non-JSON (middleware not reached?)');
   }
-  return ((await res.json()) as AssetsResponse).files;
+  const body = (await res.json()) as AssetsResponse;
+  // A server that predates `servable` listed nothing but web-path candidates,
+  // so treating an absent flag as true keeps such a listing usable.
+  return {
+    files: body.files.map((f) => ({ ...f, servable: f.servable ?? true })),
+    publicDir: body.publicDir || 'public',
+  };
 }
 
 /** Upload an image (as a data URL); returns its web-servable path. */

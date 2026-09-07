@@ -40,8 +40,9 @@ Run in this order; each is cheaper than the next.
 | **Option resolution** (`options.ts`) — precedence `astro.config.mjs` > settings file > `DEFAULTS`; a config `false` reads as *set* rather than absent (what `locked` rests on); an option the config is silent about stays writable; `enabled`/`sourceAnnotations` never taken from the file and absent from the writable-key list; malformed or wrong-shaped settings file degrades to config + defaults; `entryEditor` deep-merged per collection *per field* with the config leaf winning | `tests/options-resolve.test.ts` |
 | **Option patching** (`options.ts`) — type coercion and refusals per option kind (unknown / config-only / mistyped / empty string / empty list), patch ordered by the option table so a feature toggle precedes the sub-options it gates, merge-not-replace, a feature's detail surviving an off/on cycle, the access key never persisted through the option path, and the caller's document never mutated | `tests/options-resolve.test.ts` |
 | `GET`/`POST /settings` **(options half)** — every option described well enough to render a control (label/help/type/group/value/source/locked, `choices` for a select), config-set marked locked and config-only marked restart-requiring, a read touching no filesystem; a sparse patch stored and answered with full new state, visible to the very next request with no restart, biting on the gate it controls (`/inspect/open` 403) and on write confinement (`contentRoots` narrowing → `/apply` refused), merge-not-replace, fixed root path `0600` with no temp file, locked/config-only/unknown/mistyped keys refused **whole** with `fieldErrors` and nothing written, empty body 400, and the fresh-project case: the Unsplash source switched on from the panel with no config edit | `tests/settings-routes.test.ts` |
-| `GET /assets` — asset dirs listed as sorted web paths, `public/` mapped to `/` | `tests/middleware.test.ts` |
-| `listAssets` — `AssetInfo` shape (`path`/`size`/`mtime`), mtime ordering for the newest-first sort, extension filter, dedupe across nested asset dirs, escaping/nonexistent dirs skipped | `tests/assets.test.ts` |
+| `GET /assets` — asset dirs listed as sorted web paths, the public dir mapped to `/`, each file marked `servable` and the response naming `publicDir` | `tests/middleware.test.ts` |
+| `listAssets` — `AssetInfo` shape (`path`/`size`/`mtime`/`servable`), mtime ordering for the newest-first sort, extension filter, dedupe across nested asset dirs, escaping/nonexistent dirs skipped, and `servable` decided from a `publicDir` other than `public/` | `tests/assets.test.ts` |
+| `toWebPath` / `isServableAsset` (`paths.ts`) — the configured public dir stripped rather than a literal `public/`, an absolute `publicDir` as Astro resolves it, `src/assets` marked non-servable, a root `publicDir` serving everything, and a file or public dir escaping the root serving nothing | `tests/paths.test.ts` |
 | `POST /upload` — data-URL write into the configured `uploadDir`, clash suffixing, traversal sanitising, mime/payload rejection (the `saveBuffer`/`resolveAssetTarget` extractions are pinned by these passing unedited) | `tests/middleware.test.ts` |
 | `POST /open` — disabled-by-config 403; path gate matches `/classify`/`/apply` (out-of-content-roots, out-resolving symlink, bad extension, nonexistent, missing field → 400) | `tests/middleware.test.ts` |
 | `POST /page-source` + `route-manifest.ts` — route-manifest lookup: static and dynamic (`[slug]`, `[...slug]`) routes, index-beats-catch-all priority (first hit in Astro's own sorted order), both trailing-slash styles via the slash-flip variant and the variants-outer ordering, `base` stripped incl. unnormalized `docs` / `/docs/` and a lookalike prefix, percent-encoded non-ASCII, non-`page` types skipped, package-owned / outside-root / absent entrypoints refused by kind, junk normalized, a live routes thunk seeing a page added mid-session; route gating (`openInEditor: false` → 403), missing `pathname` → 400, and each refusal answered 200 with `file: null` | `tests/page-source.test.ts` |
@@ -455,7 +456,9 @@ into a nested asset dir. `/works/ledger` leaves `thumbnail` unset.)
       browse", and a hint naming the file the value is relative to.
 - [ ] Browse… opens scoped to the field's own asset dir (count reads `N of M ·
       src/assets/works/onvero`); the filter narrows; "Show all" widens.
-- [ ] **No `public/` assets appear** in the list for these fields.
+- [ ] **`public/` assets are listed but not pickable** for these fields: the
+      tile is dimmed and captioned *Not importable by an image() field — it must
+      live under src/*, and a click does not select it.
 - [ ] Picking an asset in a *different* directory stores a relative value
       (`../../assets/works/atlas-cover.svg`) and the preview follows it.
 - [ ] Save, then confirm the markdown holds the relative path and the page
@@ -467,7 +470,7 @@ into a nested asset dir. `/works/ledger` leaves `thumbnail` unset.)
       pointer to `public/`.
 - [ ] **Regression:** on `/articles/…` (whose `image` is a plain string forced
       to the `image` widget) the field stays web-shaped — no relative hint, no
-      scope toggle, `/src/` assets absent from the list, uploads to `uploadDir`.
+      scope toggle, `/src/` assets not pickable, uploads to `uploadDir`.
 
 **Body editor**
 
@@ -487,6 +490,14 @@ into a nested asset dir. `/works/ledger` leaves `thumbnail` unset.)
 
 **Media picker**
 
+- [ ] **A `src/assets` file cannot be picked for a web path.** In the body
+      editor's image panel and in the swap panel's **Browse all**, a
+      `src/assets` tile is visible, dimmed and banded **Dev only** (hover for
+      the whole sentence); it does not select, and the footer count reads
+      `N images · M not usable here`. In an `image()` field the same tile is
+      pickable and a `public/` one is banded **Not importable**. (issue #9)
+- [ ] The swap panel's **Recently added** strip holds only `public/` files —
+      a `src/assets` upload never appears there.
 - [ ] With no `unsplash` option, the modal has **one** tab, no source strip, and
       `/health` reports `unsplash: false` — a pure grid upgrade for projects that
       never opt in.

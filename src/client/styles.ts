@@ -2485,6 +2485,7 @@ input[type='checkbox']:focus-visible {
 }
 
 .atx-media-pick {
+  position: relative;
   display: block;
   width: 100%;
   padding: 0;
@@ -2507,6 +2508,30 @@ input[type='checkbox']:focus-visible {
   opacity: 0.45;
   pointer-events: none;
   cursor: progress;
+}
+
+/* A tile that cannot be picked *here* -- an image() asset in a web-path picker
+   or the reverse. It stays on screen and says why: the dimming is the shared
+   :disabled rule above, and this is only the band that carries the reason.
+   Text over the thumbnail, so it needs its own scrim rather than a token. */
+.atx-media-reason {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 3px 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--atx-foreground);
+  font: 500 11px/1.4 var(--atx-font-ui);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* The caption belongs to the same tile, so it dims with it -- the :disabled
+   rule above only reaches the button, and a full-strength filename under a
+   greyed-out thumbnail reads as a rendering fault. */
+.atx-media-tile[data-off] .atx-media-cap {
+  opacity: 0.5;
 }
 
 .atx-media-thumb {

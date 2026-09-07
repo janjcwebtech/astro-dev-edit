@@ -63,6 +63,11 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
   let active = false;
   let projectRoot = '';
   let base = '/';
+  /** Astro's `publicDir`, root-relative and posix-shaped. The one directory a
+   *  build copies verbatim, so it is what decides both the URL an asset is
+   *  served at and whether that URL survives the build. Read from the config
+   *  rather than assumed to be `public`. */
+  let publicDir = 'public';
   /** Astro's own route table, for "which file is this page written in". Replaced
    *  wholesale on every `astro:routes:resolved` and read through a thunk, never
    *  captured: the hook re-fires on any change under `srcDir`, so a page added
@@ -85,12 +90,14 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         // Not normalized by Astro's schema — 'docs', '/docs' and '/docs/' are
         // all possible, and route-manifest.ts tolerates all three.
         base = config.base ?? '/';
+        publicDir =
+          relative(projectRoot, fileURLToPath(config.publicDir)).split(sep).join('/') || 'public';
 
         // Upload-directory preflight. Only warns about what the *config* says:
         // the panel enforces the same two rules on the value it stores, and a
         // startup warning about a value the user is about to change from the UI
         // would be noise.
-        warnAboutUploadDirs(projectRoot, userOptions, logger);
+        warnAboutUploadDirs(projectRoot, publicDir, userOptions, logger);
 
         // The whole feature rides on `data-astro-source-file` / `-loc`
         // attributes. On Astro 5/6 the compiler emits them (dev toolbar on);
@@ -160,6 +167,7 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
           createMiddleware({
             logger,
             root: projectRoot,
+            publicDir,
             optionsResolver,
             // Always constructed: the entry editor can now be switched on from
             // the panel, so a provider built only when it started enabled would
@@ -248,17 +256,19 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
  */
 function warnAboutUploadDirs(
   projectRoot: string,
+  publicDir: string,
   userOptions: DevEditOptions,
   logger: { warn(message: string): void },
 ): void {
   const uploadDir = userOptions.uploadDir;
   if (uploadDir !== undefined) {
     const rel = relative(projectRoot, resolve(projectRoot, uploadDir));
-    if (!(rel === 'public' || rel.startsWith('public' + sep))) {
+    const pub = relative(projectRoot, resolve(projectRoot, publicDir));
+    if (!(rel === pub || rel.startsWith(pub + sep))) {
       logger.warn(
-        `uploadDir "${uploadDir}" is not under public/ — uploaded images are ` +
-          'served in dev but will 404 in a production build. Point uploadDir ' +
-          'at a folder under public/.',
+        `uploadDir "${uploadDir}" is not under ${publicDir}/ — uploaded images ` +
+          'are served in dev but will 404 in a production build. Point uploadDir ' +
+          `at a folder under ${publicDir}/.`,
       );
     }
   }

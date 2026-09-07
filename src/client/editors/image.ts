@@ -207,11 +207,13 @@ export async function beginImageEdit(
 
   async function loadRecents(): Promise<void> {
     try {
-      const files = await api.getAssets();
+      const { files } = await api.getAssets();
       // Same rule as the modal's project pane: a plain `<img src>` can only
-      // reference paths that exist in the built site.
+      // reference paths that exist in the built site. The strip is six tiles of
+      // shortcut, so an unusable file is left out rather than shown disabled —
+      // the explaining is Browse all's job. (issue #9)
       recents = files
-        .filter((f) => !f.path.startsWith('/src/'))
+        .filter((f) => f.servable)
         .sort((a, b) => b.mtime - a.mtime)
         .slice(0, RECENTS);
       // The current image's own metadata, now that we have the listing.

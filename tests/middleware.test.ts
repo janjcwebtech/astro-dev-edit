@@ -202,6 +202,17 @@ describe('GET /assets', () => {
       '/sub/b.png',
     ]);
   });
+
+  // The response is what a picker filling a plain <img src> refuses on: a
+  // src/assets path is a dev-only URL. (issue #9)
+  it('marks each file servable or not, and names the public dir', async () => {
+    const r = await request({ method: 'GET', url: '/__dev-edit/assets' });
+    const servable = Object.fromEntries(
+      r.body.files.map((f: AssetInfo) => [f.path, f.servable]),
+    );
+    expect(servable).toEqual({ '/a.jpg': true, '/sub/b.png': true, '/src/assets/c.webp': false });
+    expect(r.body.publicDir).toBe('public');
+  });
 });
 
 describe('POST /upload', () => {

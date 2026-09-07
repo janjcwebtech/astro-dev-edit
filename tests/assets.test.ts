@@ -86,4 +86,30 @@ describe('listAssets', () => {
     const files = await listAssets(root, ['../..', 'does/not/exist', 'public']);
     expect(files.map((f) => f.path)).toEqual(['/a.jpg', '/photos/b.png']);
   });
+
+  // The asset dirs span two worlds on purpose — src/assets has to be listed so
+  // image() fields have somewhere to browse — so each file has to say which one
+  // it is in. Without it a web-path picker offers /src/assets/… , which the dev
+  // server serves and a build never emits. (issue #9)
+  it('flags a public/ file servable and a src/assets file not', async () => {
+    const files = await listAssets(root, ['public', 'src/assets']);
+    const servable = Object.fromEntries(files.map((f) => [f.path, f.servable]));
+    expect(servable).toEqual({
+      '/a.jpg': true,
+      '/photos/b.png': true,
+      '/src/assets/c.webp': false,
+    });
+  });
+
+  it('honours a configured publicDir other than public/', async () => {
+    // With publicDir: 'src/assets', c.webp is the one file a build copies —
+    // and it is served from the site root, not from /src/assets/.
+    const files = await listAssets(root, ['public', 'src/assets'], 'src/assets');
+    const servable = Object.fromEntries(files.map((f) => [f.path, f.servable]));
+    expect(servable).toEqual({
+      '/public/a.jpg': false,
+      '/public/photos/b.png': false,
+      '/c.webp': true,
+    });
+  });
 });
