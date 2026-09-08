@@ -27,6 +27,7 @@ Writing an entry — one line, past tense, no essay:
 - The collection designer carries an **experimental** badge on its drawer title
 - The Astro 5/6/7 source-annotation setup moved out of the README into [Configuration reference](documentation/CONFIGURATION.md#astro-versions-and-source-annotations); the README keeps a one-line pointer
 - The README's "Your git is the undo button" section is now a single bullet under **Limits**
+- Every in-repo README link is an absolute `github.com/…/blob/main/` URL, so the docs, changelog, contributing guide, security policy and licence resolve from npmjs.com and from an unpacked `node_modules` copy, neither of which holds anything but `src/`, `README.md` and `LICENSE`
 - README screenshots are links to `documentation/images/` again, not inlined base64, and the hero carries a banner image. The URLs are absolute `raw.githubusercontent.com` ones so they also render on npmjs.com, where `documentation/` is not shipped
 - The version and license badges read the repository (`shields.io/github/...`) instead of the npm registry, which 404s until the package is published, and a **beta** badge sits beside them
 - Turning image fields back off is refused while any field still uses `image()`, and the refusal names them

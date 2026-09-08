@@ -6,9 +6,9 @@
 
 ### Click the text on the page, edit it, and the change lands in your source file.
 
-[![version](https://img.shields.io/github/v/tag/janjcwebtech/astro-dev-edit?color=6144d7&label=version)](https://github.com/janjcwebtech/astro-dev-edit/releases) ![status: beta](https://img.shields.io/badge/status-beta-f59e0b) [![Astro 5, 6 and 7](https://img.shields.io/badge/astro-5%20%C2%B7%206%20%C2%B7%207-6144d7)](https://github.com/withastro/astro) ![Dev server only](https://img.shields.io/badge/scope-dev%20server%20only-444) [![MIT license](https://img.shields.io/github/license/janjcwebtech/astro-dev-edit?color=444)](LICENSE)
+[![version](https://img.shields.io/github/v/tag/janjcwebtech/astro-dev-edit?color=6144d7&label=version)](https://github.com/janjcwebtech/astro-dev-edit/releases) ![status: beta](https://img.shields.io/badge/status-beta-f59e0b) [![Astro 5, 6 and 7](https://img.shields.io/badge/astro-5%20%C2%B7%206%20%C2%B7%207-6144d7)](https://github.com/withastro/astro) ![Dev server only](https://img.shields.io/badge/scope-dev%20server%20only-444) [![MIT license](https://img.shields.io/github/license/janjcwebtech/astro-dev-edit?color=444)](https://github.com/janjcwebtech/astro-dev-edit/blob/main/LICENSE)
 
-[**Watch the demo**](https://youtu.be/sa0TdkoybAk) · [Why I built it](https://jcweb.tech/visual-editing-for-astro-development/) · [Docs](documentation/EDITING.md) · [Changelog](CHANGELOG.md)
+[**Watch the demo**](https://youtu.be/sa0TdkoybAk) · [Why I built it](https://jcweb.tech/visual-editing-for-astro-development/) · [Docs](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/EDITING.md) · [Changelog](https://github.com/janjcwebtech/astro-dev-edit/blob/main/CHANGELOG.md)
 
 </div>
 
@@ -41,7 +41,7 @@ export default defineConfig({
 
 Run `npm run dev` and click **Edit page** in the admin bar.
 
-Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6 need, are in [Astro versions and source annotations](documentation/CONFIGURATION.md#astro-versions-and-source-annotations).
+Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6 need, are in [Astro versions and source annotations](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/CONFIGURATION.md#astro-versions-and-source-annotations).
 
 ## What you can edit
 
@@ -88,7 +88,7 @@ Everything is optional. Pass what you want to `devEdit({ … })`, or set it from
 
 Gitignore `.astro-dev-edit.json`, since it also holds your Unsplash key. The drawer warns you when you have not.
 
-Every option, with its default and what it does: [Configuration reference](documentation/CONFIGURATION.md).
+Every option, with its default and what it does: [Configuration reference](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/CONFIGURATION.md).
 
 ## Limits
 
@@ -118,7 +118,7 @@ The technique of snapshotting Astro's `data-astro-source-*` attributes into a pr
 
 ## Contributing
 
-Bug reports and pull requests are welcome. Everything is reviewed and merged by me, and commits need a `Signed-off-by` line (`git commit -s`). [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md).
+Bug reports and pull requests are welcome. Everything is reviewed and merged by me, and commits need a `Signed-off-by` line (`git commit -s`). [Contributing guide](https://github.com/janjcwebtech/astro-dev-edit/blob/main/CONTRIBUTING.md) · [Security policy](https://github.com/janjcwebtech/astro-dev-edit/blob/main/SECURITY.md).
 
 ## License
 
