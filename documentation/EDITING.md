@@ -12,62 +12,43 @@ The [README](../README.md) has the short version; this is the whole of it.
 
 ## What it can edit
 
-- **Literal text in `.astro` templates** — an element whose children are only
-  plain text. Click → inline edit → Enter/blur to save, Esc to cancel.
-- **Literal text carrying inline markup** — a heading broken by a `<br>`, a
-  sentence with a `<strong>` or a link in it. Inline editing can't serve these
-  (it escapes `<`, which would turn the tag into visible punctuation), so a
-  click opens a **markup popup** showing the element's source instead. Save
-  with the button or Cmd/Ctrl+Enter; **open** in the title bar jumps to the
-  file in your editor without closing the popup. Only these inline tags are allowed —
-  `<a> <b> <br> <code> <em> <i> <small> <span> <strong> <sub> <sup> <u>` — with
-  presentational attributes (`class`, `id`, `title`, `lang`, `dir`, plus
-  `href`/`target`/`rel` on links); attributes already in your source are kept
-  as they are. Anything else, including unbalanced tags, is refused rather
-  than written — and a refusal is shown **in the popup**, which stays open with
-  your markup intact so you can fix it and retry. Each allowed tag is a **button** under the box: with text
-  selected it wraps the selection (and keeps it selected, so tags stack),
-  otherwise it drops an empty pair at the caret. `<br>` inserts alone, and
-  `<a>` arrives as `<a href="">` with the caret already inside the quotes.
-- **Text rendered through an `{expression}`** — a frontmatter const
-  (`<h1>{title}</h1>`), or one item of an array a `.map()` loops over
-  (`{benefits.map((b) => <h3>{b.title}</h3>)}`). Clicking opens a **value
-  popup** titled with where the string lives (`benefits[].title`), and the edit
-  is written to that string in the frontmatter — the template itself is never
-  touched. Its title bar carries the same **open** jump to your editor. Plain text only: `{value}` renders escaped, so tags typed here would
-  show as punctuation rather than markup.
+| Click on | What opens | What is written |
+| --- | --- | --- |
+| Literal text in an `.astro` template | inline edit — Enter or blur saves, Esc cancels | the element's text |
+| Text carrying inline markup | a **markup popup** | the element's source |
+| Text rendered through an `{expression}` | a **value popup** | the string in the frontmatter |
+| A static `<img>` | the **image panel** | `src` and `alt` |
+| A page declaring a backing `.md`/`.mdx` | the **Edit entry** drawer — see [Entry editor](ENTRY-EDITOR.md) | frontmatter fields and body |
+| Anything else | a notice with the reason and an *Open source* jump | nothing |
 
-  Every card in a loop shares one source location, so **which item you clicked
-  is identified by the text on the page**: the item whose value equals what you
-  saw is the one patched. Two items reading exactly the same way refuse rather
-  than guess, as do computed expressions (`{n + 1}`), template literals with
-  `${…}` in them, `.filter().map()` chains, nested access (`{b.meta.label}`),
-  and arrays imported from another file.
-- **Images in `.astro`** — swap a static `src` from the project's images (with
-  thumbnails) or upload a new file, and edit `alt`. Only statically-quoted
-  attributes are editable; `src={…}` / `<Image>` are treated as dynamic.
-- **Content-collection entries** — on a detail page that declares its backing
-  `.md`/`.mdx` file, an **Edit entry** drawer edits the frontmatter as typed
-  form fields (generated from your own zod schema) plus the markdown body, and
-  can create or delete entries. See [Entry editor](ENTRY-EDITOR.md).
-- Everything else **refuses safely** with a reason and an "Open source" jump to
-  the editor. Expressions that can't be traced to a string, components,
-  `set:html`, and block-level nested markup all fall here — on
-  detail pages the refusal notice offers "Edit page content", which opens the
-  entry drawer.
-- **Something a component or a slot rendered** has no source location of its
-  own — Astro annotates only what is written in the file — so a click on it is
-  answered about the nearest element that *is*. The notice says so, naming the
-  tag you clicked, because the reason then belongs to that ancestor: a one-word
-  button can be refused for "containing nested markup" that lives in the
-  wrapper around it, not in the button.
-- **Package-rendered elements** refuse the same quiet way. Astro's
-  `astro:assets` `<Image>` renders through
-  `node_modules/astro/components/Image.astro`, and that is the path its source
-  annotation carries — so those elements report "rendered by a package
-  component" rather than pointing at your file. Edit the `<Image>` usage in
-  your own component instead. Package paths are never writable: `contentRoots`
-  does not include `node_modules`, and widening it is not a supported fix.
+### Inline markup
+
+A heading broken by a `<br>`, or a sentence carrying a `<strong>` or a link. Inline editing cannot serve these — it escapes `<`, which would turn the tag into visible punctuation — so a click opens a popup on the element's source instead.
+
+- **Save** with the button or Cmd/Ctrl+Enter. **open** in the title bar jumps to the file without closing the popup.
+- **Allowed tags:** `<a> <b> <br> <code> <em> <i> <small> <span> <strong> <sub> <sup> <u>`, with the presentational attributes `class`, `id`, `title`, `lang`, `dir`, plus `href`, `target` and `rel` on links. Attributes already in your source are kept as they are.
+- **Anything else is refused rather than written**, unbalanced tags included. The refusal shows *in the popup*, which stays open with your markup intact.
+- **Each allowed tag is a button** under the box. With text selected it wraps the selection and keeps it selected, so tags stack; otherwise it drops an empty pair at the caret. `<br>` inserts alone, and `<a>` arrives as `<a href="">` with the caret inside the quotes.
+
+### Expressions
+
+A frontmatter const (`<h1>{title}</h1>`), or one item of an array a `.map()` loops over (`{benefits.map((b) => <h3>{b.title}</h3>)}`). The popup is titled with where the string lives (`benefits[].title`), and the edit is written to that string — the template itself is never touched.
+
+- **Plain text only.** `{value}` renders escaped, so a tag typed here shows as punctuation.
+- **Which loop item you clicked is identified by the text on the page** — every card shares one source location, so the item whose value equals what you saw is the one patched.
+- **Refused rather than guessed:** two items reading exactly the same way, computed expressions (`{n + 1}`), template literals containing `${…}`, `.filter().map()` chains, nested access (`{b.meta.label}`), and arrays imported from another file.
+
+### Images
+
+Swap a static `src` from the project's images (with thumbnails) or upload a new file, and edit `alt`. Only statically-quoted attributes are editable — `src={…}` and `<Image>` are treated as dynamic.
+
+### What refuses, and why
+
+Every refusal names its reason and offers an *Open source* jump. On a detail page it also offers **Edit page content**, which opens the entry drawer.
+
+- **Not traceable to a string** — an expression the AST cannot resolve, a component, `set:html`, or block-level nested markup.
+- **Rendered by a component or a slot** — it has no source location of its own, because Astro annotates only what is written in the file, so the click is answered about the nearest element that *has* one. The notice names the tag you clicked, since the reason belongs to that ancestor: a one-word button can be refused for "containing nested markup" that lives in the wrapper around it.
+- **Rendered by a package** — `astro:assets`' `<Image>` renders through `node_modules/astro/components/Image.astro`, and that is the path its annotation carries. Edit the `<Image>` usage in your own component instead. Package paths are never writable: `contentRoots` does not include `node_modules`, and widening it is not a supported fix.
 
 ![A markup popup showing the raw source of an h2 with a br in it, above a row of insertable tags: br, strong, em, b, i, u, a, span, code, small, sup, sub](images/markup.png)
 
@@ -209,16 +190,10 @@ came to edit). It's two-way linked to the page: hovering a row outlines the
 matching element (with the same verdict pill and class/ID chips), and hovering an
 element on the page highlights its row and scrolls the tree to it.
 
-Clicking a row **selects** the element — a persistent outline that stays put
-while you move the mouse onto the element to inspect it. The selection clears
-only when you press **Escape**, click elsewhere on the page, or select another
-row (plain hovering never changes it). **Double-click** a row to open the editor
-for that element, exactly as a page click would. Each row's **`line:col`** is a
-jump-out — click it to open that file at that line in your editor (the same
-`/open` the hover pill's **open** button uses). The tree collapses per node, rebuilds
-itself after each save, and is overlaid by the entry drawer when that's open.
-Leaving edit mode hides it. Closing it with its ✕ while still editing leaves the
-left-edge tab that brings it back — as does **Elements** on the bar. Whether it
-was open is remembered for the session, so a save-triggered reload restores it
-the way you left it.
+- **Click a row** to select the element — a persistent outline that stays put while you move the mouse onto the element to inspect it. Plain hovering never changes it; the selection clears on **Escape**, a click elsewhere on the page, or another row.
+- **Double-click a row** to open the editor for that element, exactly as a page click would.
+- **Click a row's `line:col`** to open that file at that line in your editor — the same `/open` the hover pill's **open** button uses.
+- The tree collapses per node, rebuilds after each save, and is overlaid by the entry drawer while that is open.
+- Leaving edit mode hides it. Closing it with its ✕ while still editing leaves the left-edge tab that brings it back, as does **Elements** on the bar.
+- Whether it was open is remembered for the session, so a save-triggered reload restores it the way you left it.
 

@@ -118,7 +118,7 @@ Every piece of chrome the overlay draws lives in one shadow root. `shadow.ts` ow
 - **`state.ts`** — a single token-based interaction controller. **`hover.ts`**, **`api.ts`** (typed `fetch` wrappers — nothing else in the client calls `fetch`), **`ui.ts`** (styled DOM helpers: the `COLOR`/`RADIUS`/`FONT`/`INPUT_STYLE` tokens, the `footButton` primitive every panel and drawer button goes through, and the `atx-*` classes and IDs — **internal** hooks for the stylesheet and DOM lookups, not a theming API, since user CSS cannot match across the boundary).
 - **`styles.ts`** — `overlayCss()`, the single stylesheet the root adopts. It opens with the `:host { all: initial }` inheritance guard and **generates** the `--atx-*` custom-property block from `ui.ts`'s tokens; hand-writing that block would leave `tests/contrast.test.ts` guarding a copy the UI does not use. It is a function, not a constant, because `ui.ts → shadow.ts → styles.ts → ui.ts` is an import cycle and reading `COLOR` at module-evaluation time would hit the TDZ.
 
-Theming is `--atx-*` plus a deliberately small `::part()` set (`bar`, `panel`, `drawer`, `backdrop`, `pill`, `toast`), assigned centrally from `PARTS` in `ui.ts::styled`. A new part is an API commitment — add one only on demand. Both tables are documented in [Styling reference](STYLING.md); the internal rules behind the look are [Design system](DESIGN-SYSTEM.md).
+Theming is `--atx-*` plus a deliberately small `::part()` set (`bar`, `panel`, `drawer`, `backdrop`, `pill`, `toast`), assigned centrally from `PARTS` in `ui.ts::styled`. A new part is an API commitment — add one only on demand. Both tables are documented in [Styling reference](STYLING.md).
 
 ## Editing model
 
@@ -141,8 +141,8 @@ Every extension point is a registry or a factory. Expansion means adding a file 
 
 ## Tests
 
-[Verification map](VERIFICATION.md) lists every feature area with the test file that pins it, plus the manual playground checklist for the client layer (which has no unit tests beyond `markdown.ts`).
+Vitest characterization tests pin patcher and middleware behavior — they are the spec of current behavior. The client layer has no unit tests beyond `markdown.ts`; it is covered by a manual checklist.
 
-Vitest characterization tests pin patcher and middleware behavior — they are the spec of current behavior. `tests/helpers.ts::locOf` computes the `line:col` an element would be annotated with, mirroring the loc rules in `astro.ts`; use it to build classify and apply requests.
+`tests/helpers.ts::locOf` computes the `line:col` an element would be annotated with, mirroring the loc rules in `astro.ts`; use it to build classify and apply requests.
 
 Deliberate behavior quirks — entity decoding, verify strictness, partial-failure windows — are tracked as [`deferral`-labelled issues](https://github.com/janjcwebtech/astro-dev-edit/issues?q=is%3Aissue+label%3Adeferral), not bugs.

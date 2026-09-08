@@ -1,7 +1,6 @@
 # Configuration reference
 
 Every option the integration takes, where you can set it, and which source wins.
-The [README](../README.md) has the short version; this is the whole of it.
 
 - [Options](#options)
 - [Where a value can come from](#where-a-value-can-come-from)

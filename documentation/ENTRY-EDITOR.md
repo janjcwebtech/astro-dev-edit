@@ -18,44 +18,40 @@ it's a one-click CMS action), and in edit mode clicking any collection-driven
 text offers **"Edit page content"**. Both open a drawer that edits the entry
 like a CMS would:
 
-- **Frontmatter as typed form fields** — the field list, types, requiredness,
-  defaults, and enum options are **introspected from your own
-  `content.config.ts` zod schema** (loaded through the dev server, always
-  fresh). `z.string()` → text, `z.coerce.date()`/`z.date()` → native date
-  picker, `z.number()` → number, `z.boolean()` → checkbox, `z.enum` → select,
-  `z.array(z.string())` → tags, and so on. Both zod majors are read: v3 (Astro
-  5/6) and v4 (Astro 7, whose `astro/zod` re-exports `zod/v4`). No schema
-  resolvable? Field types are inferred from the entry's own values instead (a
-  `YYYY-MM-DD` value infers as a date) — the panel always works. Every control is
-  **named by the label above it** — clicking that label focuses the field (and
-  ticks a checkbox), and a screen reader reads the field's own name, with its
-  help line, its error and a checkbox's "not set" as the description. The same
-  renderer draws the Settings drawer, so both behave alike.
-- **Markdown body in a WYSIWYG editor** — a white writing surface with a
-  sticky formatting toolbar: bold / italic / strikethrough, heading levels
-  (H1–H6 dropdown), bulleted and numbered lists, quote, code block, inline
-  code, links, and image insert (upload, browse existing assets, or type a
-  path) with an alt-text field auto-suggested from the file name. Clicking an
-  image inside the body reopens the same panel to replace it. The **MD** button flips to raw-markdown source; bodies using markdown
-  the rich view can't represent losslessly (tables, raw HTML/MDX, footnotes,
-  nested lists, indented code) open in source mode, and the switch back to
-  rich is refused rather than performed lossily. The body is only rewritten
-  when you actually change it — opening the drawer never reformats the file.
-- **Atomic, surgical saves** — one request writes everything at once. The YAML
-  is patched in place: comments, key order, quoting, and keys you didn't touch
-  survive byte-for-byte. Changed values are validated against your zod schema
-  *before* the write (inline per-field errors), and every write is etag-guarded
-  — if the file changed on disk since the panel opened, you get a conflict and
-  a fresh reload instead of a lost update.
-- **Create** (the **New** button in the drawer's header — slug auto-suggested from the title,
-  never overwrites) and **Delete** (confirmed; undo is git). A field you leave
-  alone is **left out of the file**, so your schema's default is what applies —
-  including a boolean, whose unticked box means "not set" and says so, naming
-  the default it will take.
-  New entries take the collection's file extension: the per-collection
-  `extension` config wins; otherwise, when every existing entry shares one
-  extension the new entry follows it (an all-`.mdx` collection gets `.mdx`),
-  and mixed or empty collections fall back to `.md`.
+**Frontmatter as typed form fields.** The field list, types, requiredness, defaults and enum options are **introspected from your own `content.config.ts` zod schema**, loaded through the dev server so it is always fresh.
+
+| Schema | Control |
+| --- | --- |
+| `z.string()` | text |
+| `z.coerce.date()`, `z.date()` | native date picker |
+| `z.number()` | number |
+| `z.boolean()` | checkbox |
+| `z.enum` | select |
+| `z.array(z.string())` | tags |
+
+- Both zod majors are read — v3 on Astro 5/6, v4 on Astro 7, whose `astro/zod` re-exports `zod/v4`.
+- **No schema resolvable?** Types are inferred from the entry's own values instead (a `YYYY-MM-DD` value infers as a date), so the panel always works.
+- Every control is **named by the label above it**: clicking the label focuses the field and ticks a checkbox, and a screen reader reads the field's name with its help line, its error, and a checkbox's "not set" as the description. The same renderer draws the Settings drawer.
+
+**Markdown body in a WYSIWYG editor.** A white writing surface under a sticky formatting toolbar.
+
+- **Toolbar:** bold, italic, strikethrough, heading levels (H1–H6 dropdown), bulleted and numbered lists, quote, code block, inline code, links, and image insert — upload, browse existing assets, or type a path — with alt text auto-suggested from the file name.
+- Clicking an image inside the body reopens the same panel to replace it.
+- The **MD** button flips to raw-markdown source. Bodies using markdown the rich view cannot represent losslessly — tables, raw HTML or MDX, footnotes, nested lists, indented code — open in source mode, and the switch back to rich is refused rather than performed lossily.
+- The body is rewritten only when you actually change it. Opening the drawer never reformats the file.
+
+**Atomic, surgical saves.** One request writes everything at once.
+
+- The YAML is patched in place: comments, key order, quoting and keys you did not touch survive byte-for-byte.
+- Changed values are validated against your zod schema *before* the write, with inline per-field errors.
+- Every write is etag-guarded. If the file changed on disk since the panel opened you get a conflict and a fresh reload, not a lost update.
+
+**Create and delete.**
+
+- **New** sits in the drawer's header. The slug is auto-suggested from the title and never overwrites an existing entry.
+- **Delete** is confirmed. Undo is git.
+- A field you leave alone is **left out of the file**, so your schema's default is what applies — including a boolean, whose unticked box means "not set" and says so, naming the default it will take.
+- New entries take the collection's file extension: the per-collection `extension` config wins; otherwise, when every existing entry shares one extension the new entry follows it, and mixed or empty collections fall back to `.md`.
 
 ![The entry drawer showing title, excerpt, date, read time, author, category, draft and image fields for a markdown entry](images/entry-editor.png)
 
