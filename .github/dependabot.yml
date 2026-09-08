@@ -1,0 +1,67 @@
+# Dependency updates for both tracked npm trees.
+#
+# There are two: the package root, and examples/playground (which resolves its
+# own astro alongside the file: link to the root, so a transitive fix in one
+# tree does not reach the other). Every other examples/* directory is
+# gitignored and deliberately absent.
+#
+# Minor and patch updates are grouped per tree into a single PR. Ungrouped,
+# each one rewrites the whole lockfile, so a batch lands as several PRs that
+# conflict with or silently supersede one another. Majors stay separate: they
+# are reviewed one at a time, never merged on sight.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # A library: keep the declared ranges in package.json as wide as they are,
+    # and widen one only when the update genuinely needs it.
+    versioning-strategy: increase-if-necessary
+    labels:
+      - dependencies
+      - chore
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      root-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      root-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /examples/playground
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - chore
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      playground-minor-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      playground-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
