@@ -40,7 +40,7 @@ export default defineConfig({
 
 Run `npm run dev` and click **Edit page** in the admin bar.
 
-It works on Astro 5 through 7. On Astro 5 and 6 the source annotations come from the compiler, but only while the dev toolbar is enabled, so keep `devToolbar.enabled` on or set `sourceAnnotations: 'force'`. From Astro 7 the Rust compiler stopped emitting them ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)), so the integration injects them itself.
+Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6 need, are in [Astro versions and source annotations](documentation/CONFIGURATION.md#astro-versions-and-source-annotations).
 
 ## What you can edit
 
@@ -89,16 +89,9 @@ Gitignore `.astro-dev-edit.json`, since it also holds your Unsplash key. The dra
 
 Every option, with its default and what it does: [Configuration reference](documentation/CONFIGURATION.md).
 
-## Your git is the undo button
-
-Every save writes the file on disk immediately. There is no undo button and no edit history, which is deliberate: your working tree already does that job better than a second history system inside an overlay would. Start a session from a clean tree, review with `git diff`, and throw an edit away with `git checkout <file>` if you need to.
-
-You can also undo in your editor, if you open the file you just edited — and a setting will open each file for you as it is written, if you would rather watch the changes land in the source.
-
-The writes themselves are careful. Each one is atomic, and the server confirms the source still matches what the page showed before touching anything, so a stale click fails instead of corrupting the file.
-
 ## Limits
 
+-   No undo and no edit history. Every save writes the file immediately, so your git tree is the safety net: start from a clean tree, review with `git diff`, discard with `git checkout <file>`. Writes are atomic and verified against what the page showed, so a stale click fails rather than corrupting the file.
 -   Content, never structure. Inline edited text is escaped so it cannot introduce a tag, an expression or an entity. The markup popup lets tags through, but only the inline safelist, only with presentational attributes, and only well nested.
 -   The rich body editor covers a markdown subset. Anything past it, so tables, raw HTML or MDX, footnotes and nested lists, stays editable as markdown source.
 -   The collection designer reads only the schema shapes it can prove: `schema: z.object({ … })` and `schema: ({ image }) => z.object({ … })` with a plain field list. Anything else is reported as unreadable, with _Open source_ offered instead.

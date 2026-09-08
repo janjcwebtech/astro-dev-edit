@@ -4,6 +4,7 @@ Every option the integration takes, where you can set it, and which source wins.
 
 - [Options](#options)
 - [Where a value can come from](#where-a-value-can-come-from)
+- [Astro versions and source annotations](#astro-versions-and-source-annotations)
 - [The Settings drawer](#the-settings-drawer)
 - [The settings file](#the-settings-file)
 - [Watching writes in your editor](#watching-writes-in-your-editor)
@@ -53,6 +54,23 @@ deliberately, it is committed, and `astro build` reads it.
 `enabled` and `sourceAnnotations` are the two config only options. Both are
 consumed in `astro:config:setup`, before a dev server exists, so the settings
 file cannot reach them. They render read-only in the drawer.
+
+## Astro versions and source annotations
+
+Astro 5, 6 and 7 are supported. What differs between them is who emits the
+`data-astro-source-*` attributes the overlay reads.
+
+On **Astro 5 and 6** they come from the compiler, but only while the dev
+toolbar is enabled. Keep `devToolbar.enabled` on, or set
+`sourceAnnotations: 'force'` to have the integration emit them regardless.
+
+From **Astro 7** the Rust compiler stopped emitting them
+([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)),
+so the integration always injects them itself.
+
+`'auto'`, the default, picks the right regime for the running version. `'off'`
+disables injection entirely, which leaves the overlay dependent on whatever the
+compiler provides.
 
 ## The Settings drawer
 

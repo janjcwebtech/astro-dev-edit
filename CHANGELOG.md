@@ -24,6 +24,9 @@ Writing an entry — one line, past tense, no essay:
 
 - `docs/` is now `documentation/`, holding public reference only. Maintainer material — design system, workflow, verification map, Astro compatibility — moved to a gitignored `internal-documentation/`
 - The collection designer carries an **experimental** badge on its drawer title
+- The Astro 5/6/7 source-annotation setup moved out of the README into [Configuration reference](documentation/CONFIGURATION.md#astro-versions-and-source-annotations); the README keeps a one-line pointer
+- The README's "Your git is the undo button" section is now a single bullet under **Limits**
+- README screenshots are relative links to `documentation/images/` again, not inlined base64, and the hero carries a banner image
 - Turning image fields back off is refused while any field still uses `image()`, and the refusal names them
 
 ## [0.8.0] - 2026-09-07
