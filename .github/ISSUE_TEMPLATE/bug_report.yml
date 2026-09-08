@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in the overlay or the write path behaves against the docs.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Some behaviour that looks wrong is deliberate and filed as a `deferral` issue.
+        Please search the [open ones](https://github.com/janjcwebtech/astro-dev-edit/issues?q=is%3Aissue+is%3Aopen+label%3Adeferral) first.
+        Do not paste a client's source here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you clicked, what you expected, and what you got. Paste the refusal notice if the overlay showed one.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      description: The smallest markup or entry file that shows it.
+      render: astro
+  - type: input
+    id: astro
+    attributes:
+      label: Astro version
+      placeholder: "7.1.0"
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: astro-dev-edit and Node versions
+      placeholder: "0.8.0, Node 22.11"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where it happens
+      options:
+        - Inline text or image editing
+        - Entry drawer or collection designer
+        - Media picker or Unsplash
+        - Settings drawer
+        - Somewhere else / not sure

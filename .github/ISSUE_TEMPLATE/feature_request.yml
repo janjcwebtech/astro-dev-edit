@@ -1,0 +1,20 @@
+name: Feature request
+description: Something the tool should be able to do and cannot.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The editing job you got stuck on, not the implementation you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How you would like it to work
+  - type: markdown
+    attributes:
+      value: |
+        Worth knowing before you build it: this is a one-person project and the scope is
+        deliberately narrow, so please wait for a reply on the issue before opening a PR.
