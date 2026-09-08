@@ -23,8 +23,10 @@ There is also a **quick source preview** for HTML and CSS and allows you to give
 
 ## Install
 
+Not on npm yet. While it is in beta, install it from GitHub:
+
 ```bash
-npm install --save-dev astro-dev-edit
+npm install --save-dev github:janjcwebtech/astro-dev-edit
 ```
 
 ```js

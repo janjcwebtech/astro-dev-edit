@@ -22,6 +22,7 @@ Writing an entry — one line, past tense, no essay:
 
 ### Changed
 
+- The README's install command is the `github:` spec while the package is unpublished, and says so; `npm install astro-dev-edit` 404s until the first publish
 - `docs/` is now `documentation/`, holding public reference only. Maintainer material — design system, workflow, verification map, Astro compatibility — moved to a gitignored `internal-documentation/`
 - The collection designer carries an **experimental** badge on its drawer title
 - The Astro 5/6/7 source-annotation setup moved out of the README into [Configuration reference](documentation/CONFIGURATION.md#astro-versions-and-source-annotations); the README keeps a one-line pointer
