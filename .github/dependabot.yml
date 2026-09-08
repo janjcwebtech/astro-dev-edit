@@ -65,3 +65,16 @@ updates:
         applies-to: security-updates
         patterns:
           - "*"
+
+  # Only the actions pinned by .github/workflows/ci.yml. Majors here change the
+  # runner contract, so they are never grouped.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - chore
+    commit-message:
+      prefix: ci
