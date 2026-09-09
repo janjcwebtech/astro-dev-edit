@@ -5,6 +5,7 @@ import { UNSPLASH_DEFAULT_IMPORT_WIDTH } from './shared/unsplash.ts';
 import { createAnnotatePlugin } from './server/annotate.ts';
 import { createSchemaProvider } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
+import { createPrivateFilesPlugin } from './server/private-files.ts';
 import { createRouteManifest, type ResolvedRouteLike } from './server/route-manifest.ts';
 import {
   createOptionsResolver,
@@ -81,6 +82,16 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         // Dev server only. Bail for `astro build` / `astro preview` so nothing
         // ships to production. (spec §4.1, §8)
         if (command !== 'dev') return;
+
+        // Ahead of the `enabled` bail on purpose: a project that turned the
+        // editor off still has `.astro-dev-edit.json` sitting in a directory
+        // Vite serves, so "disabled" must mean no editor, not no protection.
+        // Like `createAnnotatePlugin` below this is an ordering problem, but in
+        // the middleware stack rather than the transform one — see the header
+        // of `private-files.ts` for why `configureServer` is the only seam and
+        // `server.fs.deny` is not.
+        updateConfig({ vite: { plugins: [createPrivateFilesPlugin()] } });
+
         if (!enabled) {
           logger.info('disabled via options.enabled — skipping');
           return;

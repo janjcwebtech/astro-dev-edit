@@ -93,6 +93,11 @@ come back out of it in a response.
 **Gitignore it.** The drawer warns you while the file is not ignored, and the
 warning clears as soon as you add it to `.gitignore`.
 
+The dev server does not serve it. A request for `/.astro-dev-edit.json`, in any
+spelling — through `/@fs/`, with a query, percent-encoded — is refused with a
+403, as is any of the temporary files a save writes alongside it. That also
+means project source cannot `import` the file.
+
 ## Watching writes in your editor
 
 **Show changed files in editor** in *Settings → Editing* (`revealWrites`) opens

@@ -14,6 +14,7 @@ This is a one-person project, so give it a few days for a first reply. If a fix 
 - A write landing outside the project root or the configured `contentRoots`, including through a symlink.
 - Anything that registers the integration during `astro build` or `astro preview`.
 - An Unsplash key, or anything else from the secret half of `.astro-dev-edit.json`, appearing in a response.
+- The dev server serving `.astro-dev-edit.json`, or one of the `.<name>.dev-edit-tmp-<pid>` files a save writes alongside it — including through `/@fs/`.
 - A crafted page or content file that makes the patcher write source it cannot read back.
 
 Editing a file you pointed the tool at is what the tool is for, so that on its own is not a vulnerability.
