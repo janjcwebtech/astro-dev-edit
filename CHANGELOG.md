@@ -14,6 +14,8 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-09
+
 ### Added
 
 - Contributing guide, security policy, and issue/PR templates — `CONTRIBUTING.md`, `SECURITY.md`, `.github/`. Commits need a `Signed-off-by` line; suspected vulnerabilities go through GitHub's private reporting rather than a public issue
