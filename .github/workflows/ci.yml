@@ -1,0 +1,39 @@
+# The build-equivalent gate.
+#
+# There is no build step — consumers compile the TypeScript themselves — so
+# `tsc --noEmit` is the only thing that proves the published source is sound.
+# It runs on every pull request, and on main after a merge.
+#
+# `npm ci` installs the astro peer dependency from the lockfile, so a run is
+# pinned to whichever Astro version the lockfile holds. The 5/6/7 matrix stays
+# a manual pass: the two annotation regimes need a real dev server, not tsc.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A second push to the same branch supersedes the first; nothing here needs the
+# older run to finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
