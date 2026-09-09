@@ -522,10 +522,25 @@ export interface UnsplashErrorResponse {
 }
 
 // --- GET/POST /settings ------------------------------------------------------
-/** Where a resolved access key came from. Config beats env beats the file the
- *  Settings panel writes; the panel disables its input for the first two, since
- *  silently accepting a value that does nothing is worse than saying so. */
-export type SettingsSource = 'config' | 'env' | 'file';
+/**
+ * Where a resolved access key came from, highest precedence first:
+ *
+ * - `config` — `unsplash.accessKey` in `astro.config.mjs`.
+ * - `env-shell` — an exported `UNSPLASH_ACCESS_KEY`. Vite's own env loader lets
+ *   `process.env` override every `.env` file, so this outranks all of them.
+ * - `env-file` — `UNSPLASH_ACCESS_KEY` in a `.env` file. **This is the Settings
+ *   panel's own store**: it writes `.env.local`, which Vite already refuses to
+ *   serve. Within this source the files rank `.env` < `.env.local` <
+ *   `.env.development` < `.env.development.local`, so the panel can override
+ *   the first but not the last two — {@link SettingsResponse} reports which.
+ * - `file` — a legacy `unsplash.accessKey` in `.astro-dev-edit.json`. Read for
+ *   back-compat only, and stripped the next time a key is saved.
+ *
+ * Not the same union as {@link OptionDescriptor.source}, which also has a
+ * `'file'` member — there it means the live settings file, here it means the
+ * legacy key inside it. `settings-panel.ts` consumes both.
+ */
+export type SettingsSource = 'config' | 'env-shell' | 'env-file' | 'file';
 
 /** Which Settings tab an option is grouped under. */
 export type OptionGroup = 'general' | 'editing' | 'media' | 'unsplash';
@@ -565,33 +580,60 @@ export interface OptionDescriptor {
 
 /**
  * The access key itself is **never** in this shape. Only whether one resolved,
- * where from, and a masked fragment.
+ * where from, whether the panel may change it, and a masked fragment.
  */
 export interface SettingsResponse {
   /** Every option, in the order the panel should render them. Absent from a
    *  server that predates the option editor, so the panel must tolerate it. */
   options?: OptionDescriptor[];
+  /**
+   * Files holding settings or the access key that the project's `.gitignore`
+   * does not cover, project-relative, in the order the panel should name them.
+   * Absent when everything is covered.
+   *
+   * Top-level rather than inside `unsplash`, because it is a fact about files:
+   * `.astro-dev-edit.json` exists as soon as any tab saves an option and has
+   * nothing to do with the photo source, while `.env.local` is only listed once
+   * it exists. The panel repeats it because this integration cannot edit a
+   * consuming project's ignore rules.
+   */
+  gitignoreWarning?: string[];
   unsplash: {
     /** Whether the option is enabled at all, independent of a key. */
     enabled: boolean;
     configured: boolean;
     source: SettingsSource | null;
+    /** The file the key resolved from, project-relative — `.env.local`,
+     *  `.env.development`, `.astro-dev-edit.json`. Absent for `config` and
+     *  `env-shell`, which have no file, and when nothing is configured. */
+    sourceFile?: string;
     /** Masked tail, e.g. `••••••••Ab3d`. Absent when nothing is configured. */
     hint?: string;
-    /** True when the settings file is not covered by the project's .gitignore
-     *  — a warning the panel repeats, since this integration cannot fix a
-     *  consuming project's ignore rules. It reads as a fact about the file
-     *  rather than about the key, and is reported whatever `enabled` says: the
-     *  file exists as soon as any tab saves an option, key or no key. It rides
-     *  in this block because the key is what makes an untracked settings file
-     *  dangerous, not because the warning belongs to the photo source. */
-    gitignoreWarning?: boolean;
+    /**
+     * Whether a save would actually take effect. False when something that
+     * outranks `.env.local` supplies the key — the Astro config, an exported
+     * shell variable, or `.env.development[.local]`.
+     *
+     * Server-computed rather than derived from `source`, because the answer
+     * depends on which *file* within `env-file` won; the panel cannot know the
+     * precedence and should not encode a copy of it.
+     */
+    writable: boolean;
+    /** Whether **Clear** can actually clear it. False for a key in `.env`,
+     *  which a save can override but a removal from `.env.local` cannot unset. */
+    clearable: boolean;
+    /** A legacy `unsplash.accessKey` is still in `.astro-dev-edit.json` while
+     *  something else wins. The next key save strips it; until then the panel
+     *  nudges, since that file sits in the project's own tree. */
+    staleStoredKey?: true;
   };
 }
 
 export interface SettingsUpdateRequest {
   unsplash?: {
-    /** The access key to store. An empty string clears it. */
+    /** The access key to store, written to `.env.local`. An empty string clears
+     *  it. Either may be **refused** — see `writable` / `clearable` on
+     *  {@link SettingsResponse}. */
     accessKey: string;
   };
   /**

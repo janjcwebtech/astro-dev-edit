@@ -29,26 +29,38 @@ import { applyFieldErrors, buildControl, collectChanges, type FieldControl } fro
  *
  * **`locked` is rendered, not hidden.** An option `astro.config.mjs` sets cannot
  * be changed from here, because config wins at resolve time. The control renders
- * disabled and says where the value came from — the same refusal this panel has
- * always made for a config-supplied Unsplash access key, now generalized to
- * every option. Hiding those rows would be worse: the user would wonder why the
- * option they can see in their config isn't listed.
+ * disabled and says where the value came from. Hiding those rows would be worse:
+ * the user would wonder why the option they can see in their config isn't listed.
+ *
+ * **The access key has two axes, not one.** `locked` is a single bit; a key can
+ * be *writable but not clearable* — one in `.env` is overridden by the
+ * `.env.local` a save writes, yet removing a line from `.env.local` cannot unset
+ * it. So the server sends `writable` and `clearable` separately and this panel
+ * renders them, rather than re-deriving either from `source`: which env file won
+ * decides the answer, and a second copy of that precedence here would drift.
  *
  * **The access key stays one-way.** It is never pre-filled — a read returns only
  * a masked hint — the input is `type="password"` with an explicit reveal, and the
  * value goes straight to the localhost-gated `/settings` endpoint. That POST is
  * the one moment the key crosses the wire in plaintext, unavoidable for a
- * paste-it-here UI and no worse than the `.env` alternative on a dev machine.
+ * paste-it-here UI, and its destination is the same `.env.local` a developer
+ * would otherwise have opened in their editor.
  */
 
 const UNSPLASH_APPS_URL = 'https://unsplash.com/oauth/applications';
 
-/** Where a resolved key came from, in words. */
+/** Where a resolved key came from, in words. `env-file` prefers the actual
+ *  filename the server reported, since which file it is decides what the user
+ *  has to do about it. */
 const SOURCE_LABEL: Record<string, string> = {
   config: 'astro.config.mjs',
-  env: 'the environment (.env or a shell variable)',
-  file: '.astro-dev-edit.json',
+  'env-shell': 'an exported shell variable',
+  'env-file': 'a .env file',
+  file: '.astro-dev-edit.json (older location)',
 };
+
+const sourceLabel = (u: SettingsResponse['unsplash']): string =>
+  (u.source === 'env-file' && u.sourceFile) || SOURCE_LABEL[u.source ?? ''] || 'stored settings';
 
 /** Tabs, in render order. A group with no options is dropped, so a server that
  *  predates a group simply shows fewer tabs. */
@@ -232,47 +244,61 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     keySection.toggleAttribute('data-off', false);
 
     if (u.configured) {
-      keyStatus.append(
-        icon('check', 16),
-        text(`Configured via ${SOURCE_LABEL[u.source ?? ''] ?? 'stored settings'}`, 'ok'),
-      );
+      keyStatus.append(icon('check', 16), text(`Configured via ${sourceLabel(u)}`, 'ok'));
       if (u.hint) keyStatus.append(text(u.hint, 'muted', true));
     } else {
       keyStatus.append(icon('dot', 16), text('Not configured', 'muted'));
     }
 
-    // Config and env win at resolve time, so storing a key here would do
-    // nothing. Say so instead of accepting it.
-    const overridden = u.source === 'config' || u.source === 'env';
+    // `writable` is the server's answer, not ours — see the header.
+    const overridden = !u.writable;
     keyInput.disabled = overridden;
     setButtonEnabled(reveal, !overridden);
     keyInput.placeholder = overridden
       ? 'Overridden — remove the other key first'
       : 'Paste your Unsplash access key';
-    keyHint.textContent = overridden
-      ? `A key from ${SOURCE_LABEL[u.source!]} takes precedence over anything stored here. ` +
-        'Remove it to manage the key from this panel.'
-      : 'Stored in .astro-dev-edit.json at the project root, readable only by you (0600). ' +
-        'It is never sent back to the browser.';
-    clearKeyBtn.toggleAttribute('data-hidden', !(u.configured && u.source === 'file'));
+
+    if (overridden) {
+      keyHint.textContent =
+        `A key from ${sourceLabel(u)} takes precedence over the .env.local this panel ` +
+        'writes. Remove it to manage the key from here.';
+    } else if (u.staleStoredKey) {
+      // The one case worth nagging about: a secret in a file that is not where
+      // secrets go any more. Saving anything moves it.
+      keyHint.textContent =
+        'An older copy of your key is still stored in .astro-dev-edit.json. Save a key here ' +
+        'to move it into .env.local and remove that copy.';
+    } else if (!u.clearable && u.configured) {
+      keyHint.textContent =
+        `A key is also set in ${u.sourceFile ?? '.env'}. Saving here writes .env.local, which ` +
+        'takes precedence — remove that one when you are ready.';
+    } else {
+      keyHint.textContent =
+        'Saved to .env.local at your project root as UNSPLASH_ACCESS_KEY, readable only by ' +
+        'you (0600). It is never sent back to the browser.';
+    }
+    clearKeyBtn.toggleAttribute('data-hidden', !(u.configured && u.clearable));
   };
 
   /**
    * The uncommitted-secret warning, painted from `paint` rather than from
-   * `paintKey`: it is a fact about the settings file, which every tab writes,
-   * not about the key. Scoping it to the key left it unreachable in exactly the
-   * case it is for — the photo source off, so `paintKey` returns early, while
-   * the file already sits untracked on disk holding whatever General or Media
-   * last saved. It lives under the tab host for the same reason, so it is on
-   * screen whichever tab is open.
+   * `paintKey`: it is a fact about files, not about the key. Scoping it to the
+   * key left it unreachable in exactly the case it is for — the photo source
+   * off, so `paintKey` returns early, while a file already sits untracked on
+   * disk holding whatever General or Media last saved. It lives under the tab
+   * host for the same reason, so it is on screen whichever tab is open.
+   *
+   * The server sends the list, because whether `.env.local` is even present is
+   * a question only it can answer.
    */
   const paintWarning = (data: SettingsResponse): void => {
-    if (data.unsplash.gitignoreWarning) {
+    const files = data.gitignoreWarning ?? [];
+    if (files.length > 0) {
+      const subject = files.length === 1 ? `${files[0]} is not listed` : `${files.join(' and ')} are not listed`;
       warning.textContent =
-        '.astro-dev-edit.json is not listed in this project’s .gitignore. It holds your ' +
-        'settings and, once you add one, your Unsplash access key — add it to your ignore ' +
-        'rules before that key can be committed. (This integration cannot edit your ' +
-        'ignore rules for you.)';
+        `${subject} in this project’s .gitignore. They hold your settings and your Unsplash ` +
+        'access key — add them to your ignore rules before either can be committed. ' +
+        '(This integration cannot edit your ignore rules for you.)';
       warning.toggleAttribute('data-on', true);
     } else {
       warning.toggleAttribute('data-on', false);

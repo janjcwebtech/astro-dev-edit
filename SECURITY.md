@@ -13,7 +13,8 @@ This is a one-person project, so give it a few days for a first reply. If a fix 
 - A request from outside localhost reaching the `/__dev-edit` endpoints, or getting past the Origin check.
 - A write landing outside the project root or the configured `contentRoots`, including through a symlink.
 - Anything that registers the integration during `astro build` or `astro preview`.
-- An Unsplash key, or anything else from the secret half of `.astro-dev-edit.json`, appearing in a response.
+- An Unsplash key, or anything else out of `.env.local` or another `.env` file, appearing in a response.
+- A file holding an access key written at anything other than `0600`, including for the moment between a write and its rename.
 - The dev server serving `.astro-dev-edit.json`, or one of the `.<name>.dev-edit-tmp-<pid>` files a save writes alongside it — including through `/@fs/`.
 - A crafted page or content file that makes the patcher write source it cannot read back.
 

@@ -9,7 +9,7 @@ import type { Connect } from 'vite';
 import { createMiddleware } from '../src/server/middleware.ts';
 import type { DevEditOptions } from '../src/server/options.ts';
 import { stubOptions } from './helpers.ts';
-import { resolveUnsplashKey, SETTINGS_FILE } from '../src/server/settings.ts';
+import { ENV_TARGET, resolveUnsplashKey, SETTINGS_FILE } from '../src/server/settings.ts';
 import type { UnsplashConfig } from '../src/server/unsplash-routes.ts';
 
 /**
@@ -644,7 +644,8 @@ describe('/settings', () => {
     const saved = await put('SECRETKEY123456Ab3d', via);
     expect(saved.status).toBe(200);
     expect(saved.body.unsplash.configured).toBe(true);
-    expect(saved.body.unsplash.source).toBe('file');
+    expect(saved.body.unsplash.source).toBe('env-file');
+    expect(saved.body.unsplash.sourceFile).toBe(ENV_TARGET);
     expect(saved.body.unsplash.hint).toBe('••••••••Ab3d');
 
     const read = await get(via);
@@ -654,16 +655,101 @@ describe('/settings', () => {
     expect(read.raw).not.toContain('SECRETKEY123456');
   });
 
-  it('writes the settings file at the fixed root path, owner-only', async () => {
+  it('writes the key to .env.local at the fixed root path, owner-only', async () => {
     await put('abcd1234', live());
-    const target = join(root, SETTINGS_FILE);
+    const target = join(root, ENV_TARGET);
     expect(existsSync(target)).toBe(true);
-    expect(JSON.parse(await readFile(target, 'utf8'))).toEqual({
-      unsplash: { accessKey: 'abcd1234' },
-    });
+    expect(await readFile(target, 'utf8')).toContain('UNSPLASH_ACCESS_KEY=abcd1234');
     if (process.platform !== 'win32') {
       expect((await stat(target)).mode & 0o777).toBe(0o600);
     }
+    // The secret does not go anywhere near the file the dev server used to serve.
+    expect(existsSync(join(root, SETTINGS_FILE))).toBe(false);
+  });
+
+  it('refuses a key that could not read back as written, touching nothing', async () => {
+    const r = await put('abc 123 $HOME', live());
+    expect(r.status).toBe(422);
+    expect(r.body.code).toBe('validation');
+    expect(r.body.fieldErrors.accessKey).toMatch(/letters, digits/);
+    expect(existsSync(join(root, ENV_TARGET))).toBe(false);
+  });
+
+  it('migrates a legacy stored key into .env.local, keeping the options', async () => {
+    await writeFile(
+      join(root, SETTINGS_FILE),
+      JSON.stringify({ unsplash: { accessKey: 'legacy-key' }, options: { revealWrites: true } }),
+    );
+    const via = live();
+    // It still resolves, so an existing project keeps working before any save…
+    const before = await get(via);
+    expect(before.body.unsplash.source).toBe('file');
+
+    const saved = await put('brand-new-key', via);
+    expect(saved.status).toBe(200);
+    expect(saved.body.unsplash.source).toBe('env-file');
+    expect(await readFile(join(root, ENV_TARGET), 'utf8')).toContain('UNSPLASH_ACCESS_KEY=brand-new-key');
+    // …and the copy in the served file is gone, while the options survive.
+    const settings = JSON.parse(await readFile(join(root, SETTINGS_FILE), 'utf8'));
+    expect(settings.unsplash).toBeUndefined();
+    expect(settings.options).toEqual({ revealWrites: true });
+  });
+
+  it('reports a legacy key that something else is shadowing', async () => {
+    await writeFile(join(root, SETTINGS_FILE), JSON.stringify({ unsplash: { accessKey: 'legacy' } }));
+    const r = await get(live('from-config-key'));
+    expect(r.body.unsplash.source).toBe('config');
+    expect(r.body.unsplash.staleStoredKey).toBe(true);
+  });
+
+  it('refuses to store a key an exported shell variable would override', async () => {
+    process.env.UNSPLASH_ACCESS_KEY = 'exported';
+    try {
+      const via = live();
+      const r = await get(via);
+      expect(r.body.unsplash.source).toBe('env-shell');
+      expect(r.body.unsplash.writable).toBe(false);
+
+      const rejected = await put('would-be-ignored', via);
+      expect(rejected.status).toBe(409);
+      expect(rejected.body.error).toMatch(/exported/);
+      expect(existsSync(join(root, ENV_TARGET))).toBe(false);
+    } finally {
+      delete process.env.UNSPLASH_ACCESS_KEY;
+    }
+  });
+
+  it('refuses to store a key .env.development would override', async () => {
+    await writeFile(join(root, '.env.development'), 'UNSPLASH_ACCESS_KEY=dev-key\n');
+    const via = live();
+    const r = await get(via);
+    expect(r.body.unsplash.source).toBe('env-file');
+    expect(r.body.unsplash.sourceFile).toBe('.env.development');
+    expect(r.body.unsplash.writable).toBe(false);
+
+    const rejected = await put('would-be-ignored', via);
+    expect(rejected.status).toBe(409);
+    expect(rejected.body.error).toMatch(/\.env\.development/);
+  });
+
+  it('saves over a .env key, but refuses to clear one', async () => {
+    await writeFile(join(root, '.env'), 'UNSPLASH_ACCESS_KEY=team-key\n');
+    const via = live();
+    const r = await get(via);
+    expect(r.body.unsplash.sourceFile).toBe('.env');
+    expect(r.body.unsplash.writable).toBe(true);
+    expect(r.body.unsplash.clearable).toBe(false);
+
+    // Clearing cannot work: removing a line from .env.local cannot unset .env.
+    expect((await put('', via)).status).toBe(409);
+
+    // Saving does, because .env.local outranks .env.
+    const saved = await put('mine-wins', via);
+    expect(saved.status).toBe(200);
+    expect(saved.body.unsplash.sourceFile).toBe(ENV_TARGET);
+    expect(await readFile(join(root, ENV_TARGET), 'utf8')).toContain('UNSPLASH_ACCESS_KEY=mine-wins');
+    // The team's .env is left exactly as it was.
+    expect(await readFile(join(root, '.env'), 'utf8')).toBe('UNSPLASH_ACCESS_KEY=team-key\n');
   });
 
   it('leaves no temp file behind', async () => {
@@ -694,16 +780,29 @@ describe('/settings', () => {
 
     const rejected = await put('would-be-ignored', via);
     expect(rejected.status).toBe(409);
-    expect(existsSync(join(root, SETTINGS_FILE))).toBe(false);
+    expect(existsSync(join(root, ENV_TARGET))).toBe(false);
   });
 
-  it('ranks config above env above the stored file', async () => {
-    await put('file-key', live());
-    expect((await resolveUnsplashKey(root)).source).toBe('file');
+  it('ranks config above a shell variable above a .env file above the legacy key', async () => {
+    await writeFile(join(root, SETTINGS_FILE), JSON.stringify({ unsplash: { accessKey: 'legacy' } }));
+    expect(await resolveUnsplashKey(root)).toEqual({
+      key: 'legacy',
+      source: 'file',
+      file: SETTINGS_FILE,
+    });
+
+    await writeFile(join(root, ENV_TARGET), 'UNSPLASH_ACCESS_KEY=file-key\n');
+    expect(await resolveUnsplashKey(root)).toEqual({
+      key: 'file-key',
+      source: 'env-file',
+      file: ENV_TARGET,
+    });
 
     process.env.UNSPLASH_ACCESS_KEY = 'env-key';
     try {
-      expect(await resolveUnsplashKey(root)).toEqual({ key: 'env-key', source: 'env' });
+      // Vite's loadEnv copies process.env over everything it parsed from files,
+      // so an exported variable really does outrank all four of them.
+      expect(await resolveUnsplashKey(root)).toEqual({ key: 'env-key', source: 'env-shell' });
       expect(await resolveUnsplashKey(root, 'config-key')).toEqual({
         key: 'config-key',
         source: 'config',
@@ -713,11 +812,30 @@ describe('/settings', () => {
     }
   });
 
-  it('warns when the settings file is not gitignored, and stops once it is', async () => {
+  it('names every uncovered secret file, and stops once they are ignored', async () => {
     const via = live();
-    expect((await get(via)).body.unsplash.gitignoreWarning).toBe(true);
-    await writeFile(join(root, '.gitignore'), 'node_modules/\n.astro-dev-edit.json\n');
-    expect((await get(via)).body.unsplash.gitignoreWarning).toBeUndefined();
+    await put('abcd1234', live());
+    expect((await get(via)).body.gitignoreWarning).toEqual([ENV_TARGET, SETTINGS_FILE]);
+
+    // A literal line covers .env.local; the settings file is still uncovered.
+    await writeFile(join(root, '.gitignore'), 'node_modules/\n.env.local\n');
+    expect((await get(via)).body.gitignoreWarning).toEqual([SETTINGS_FILE]);
+
+    await writeFile(join(root, '.gitignore'), 'node_modules/\n.env.local\n.astro-dev-edit.json\n');
+    expect((await get(via)).body.gitignoreWarning).toBeUndefined();
+  });
+
+  it('accepts the .env* glob real projects actually ship', async () => {
+    // Astro's own starters gitignore `.env*`. Reading that as "not covered"
+    // would put a permanent, undismissable warning on nearly every project.
+    await put('abcd1234', live());
+    await writeFile(join(root, '.gitignore'), '.env*\n.astro-dev-edit.json\n');
+    expect((await get(live())).body.gitignoreWarning).toBeUndefined();
+  });
+
+  it('does not nag about .env.local before one exists', async () => {
+    await writeFile(join(root, '.gitignore'), '.astro-dev-edit.json\n');
+    expect((await get(live())).body.gitignoreWarning).toBeUndefined();
   });
 
   it('reports the feature disabled without touching the filesystem', async () => {

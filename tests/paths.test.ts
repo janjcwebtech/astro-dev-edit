@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { isServableAsset, toWebPath } from '../src/server/paths.ts';
+import { atomicWrite, isServableAsset, SECRET_MODE, toWebPath } from '../src/server/paths.ts';
 
 /**
  * The public-directory rules. Both functions answer questions about a *built*
@@ -51,5 +53,56 @@ describe('isServableAsset', () => {
   it('serves nothing when the file or the public dir escapes the root', () => {
     expect(isServableAsset(root, '/tmp/elsewhere/hero.png')).toBe(false);
     expect(isServableAsset(root, join(root, 'public/hero.png'), '../shared')).toBe(false);
+  });
+});
+
+/**
+ * `atomicWrite`'s mode. The parameter exists because chmod-ing after the rename
+ * leaves the content on disk at the process umask first — for `.env.local`,
+ * that is the access key world-readable for the length of a write.
+ */
+describe('atomicWrite', () => {
+  let dir: string;
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'atx-paths-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  it('writes the content and leaves no temp file behind', async () => {
+    const target = join(dir, 'note.txt');
+    await atomicWrite(target, 'hello\n');
+    expect(await readFile(target, 'utf8')).toBe('hello\n');
+    expect((await readdir(dir)).filter((f) => f.includes('dev-edit-tmp'))).toEqual([]);
+  });
+
+  it.runIf(process.platform !== 'win32')('applies the mode through the rename', async () => {
+    const target = join(dir, 'secret.env');
+    await atomicWrite(target, 'K=v\n', SECRET_MODE);
+    expect((await stat(target)).mode & 0o777).toBe(SECRET_MODE);
+  });
+
+  it.runIf(process.platform !== 'win32')('tightens a file that already exists loosely', async () => {
+    const target = join(dir, 'secret.env');
+    await writeFile(target, 'K=old\n', { mode: 0o644 });
+    await atomicWrite(target, 'K=new\n', SECRET_MODE);
+    // rename carries the temp inode's mode onto the target, so the loose one goes.
+    expect((await stat(target)).mode & 0o777).toBe(SECRET_MODE);
+  });
+
+  it.runIf(process.platform !== 'win32')('re-tightens a leftover temp from a crashed run', async () => {
+    // writeFile's own `mode` is honoured only on create, so a temp file left
+    // behind at a loose mode would otherwise carry that mode onto the target
+    // through the rename. The explicit chmod is what covers it.
+    const target = join(dir, '.env.local');
+    const leftover = join(dir, `..env.local.dev-edit-tmp-${process.pid}`);
+    await writeFile(leftover, 'stale\n', { mode: 0o666 });
+
+    await atomicWrite(target, 'K=v\n', SECRET_MODE);
+
+    // Proves the temp name too: if it were spelled differently, this leftover
+    // would still be sitting in the directory. Both `.gitignore` files pin
+    // `.*.dev-edit-tmp-*` and `private-files.ts` refuses the same shape, so a
+    // rename here breaks two things silently.
+    expect(await readdir(dir)).toEqual(['.env.local']);
+    expect(await readFile(target, 'utf8')).toBe('K=v\n');
+    expect((await stat(target)).mode & 0o777).toBe(SECRET_MODE);
   });
 });

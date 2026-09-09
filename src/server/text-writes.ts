@@ -4,8 +4,30 @@ import { launchInEditor } from './editor.ts';
 import type { OptionsResolver, ResolvedOptions } from './options.ts';
 import { atomicWrite, insideRoot } from './paths.ts';
 
-/** null means a new file; undefined snapshots the current contents. */
-export type TextWriter = (target: string, content: string, original?: string | null) => Promise<void>;
+/**
+ * The injected write seam.
+ *
+ * `original`: null means a new file; undefined snapshots the current contents.
+ * `mode`: file mode for the write, applied to the temp file so a secret is
+ * never briefly world-readable — pass `SECRET_MODE` for anything holding the
+ * access key, and omit it otherwise.
+ */
+export type TextWriter = (
+  target: string,
+  content: string,
+  original?: string | null,
+  mode?: number,
+) => Promise<void>;
+
+/**
+ * The default when no write seam is injected.
+ *
+ * Deliberately not `atomicWrite` itself: its third parameter is the file mode
+ * and {@link TextWriter}'s is the verified original, so a bare assignment
+ * typechecks in some positions while silently passing one as the other.
+ */
+export const directWrite: TextWriter = (target, content, _original, mode) =>
+  atomicWrite(target, content, mode);
 
 async function contents(target: string): Promise<string | null> {
   try {
@@ -16,7 +38,8 @@ async function contents(target: string): Promise<string | null> {
   }
 }
 
-/** One instance per middleware. Entire requests queue, including settings merges. */
+/** One instance per middleware. Entire requests queue, including a settings save
+ *  that writes both `.env.local` and the settings file. */
 export function createTextWrites(deps: {
   root: string;
   optionsResolver: OptionsResolver;
@@ -38,11 +61,12 @@ export function createTextWrites(deps: {
     try { await launch(`${target}:${line}:1`, warn); } catch { warn(); }
   }
 
-  const write: TextWriter = async (target, content, original) => {
+  const write: TextWriter = async (target, content, original, mode) => {
     const options = active ?? (await deps.optionsResolver.resolve()).options;
     const before = original === undefined ? await contents(target) : original;
     if (before === content) return;
-    // Callers retain their content/config/fixed-settings path gates. Pin the
+    // Callers retain their content / config / fixed-path gates (the settings
+    // file and `.env.local` are both fixed targets). Pin the
     // resolved target and parent as well, so a symlink swap during the pause fails.
     const root = await realpath(deps.root);
     const parent = await realpath(dirname(target));
@@ -63,7 +87,7 @@ export function createTextWrites(deps: {
         await contents(target) !== before) {
       throw new Error('file changed on disk before saving; reopen it and try again');
     }
-    await atomicWrite(target, content);
+    await atomicWrite(target, content, mode);
     if (options.revealWrites && before === null) await reveal(target, 1);
   };
 

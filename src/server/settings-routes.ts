@@ -9,11 +9,13 @@ import {
 } from './options.ts';
 import type { Route, RouteResult } from './router.ts';
 import {
-  checkGitignored,
+  hasStaleStoredKey,
+  keyWritable,
   maskKey,
   readStoredOptions,
   saveStoredOptions,
   saveUnsplashKey,
+  uncoveredSecretFiles,
 } from './settings.ts';
 import type { UnsplashConfig } from './unsplash-routes.ts';
 
@@ -26,23 +28,31 @@ import type { UnsplashConfig } from './unsplash-routes.ts';
  * split as the moment a second, unrelated setting arrived. That moment is the
  * option editor.
  *
- * Two compartments, deliberately different in kind:
+ * Two things, deliberately different in kind, and now in two different files:
  *
- * - **`options`** — ordinary values, read back in full. The panel needs the
- *   effective value *and* its provenance, because an option `astro.config.mjs`
- *   sets cannot be changed from here and the panel must say so instead of
- *   accepting input that resolution would discard.
- * - **`unsplash.accessKey`** — a secret. It is never in a response: a read
- *   reports only whether one resolved, from where, and a masked fragment. It
- *   must never enter a log line or an error message either.
+ * - **`options`** — ordinary values in `.astro-dev-edit.json`, read back in
+ *   full. The panel needs the effective value *and* its provenance, because an
+ *   option `astro.config.mjs` sets cannot be changed from here and the panel
+ *   must say so instead of accepting input that resolution would discard.
+ * - **the access key** — a secret, written to `.env.local`. It is never in a
+ *   response: a read reports only whether one resolved, from where, whether the
+ *   panel may change it, and a masked fragment. It must never enter a log line
+ *   or an error message either.
  *
- * **Writes are all-or-nothing.** A patch naming any unknown, config-only or
- * locked key is refused whole, with per-key messages, before anything reaches
- * disk — so a partly-valid patch can never leave the file half-updated. This is
- * the same property `/apply`'s verify-all-then-write-once loop has.
+ * **An option patch is all-or-nothing.** A patch naming any unknown,
+ * config-only or locked key is refused whole, with per-key messages, before
+ * anything reaches disk — so a partly-valid patch can never leave the file
+ * half-updated. This is the same property `/apply`'s verify-all-then-write-once
+ * loop has.
  *
- * Both endpoints write a **fixed path** (`.astro-dev-edit.json` at the project
- * root, never client-supplied), which is why they bypass
+ * That does **not** extend across the two halves of a combined save: options
+ * are written before the key is validated, so a save carrying both can store
+ * the options and still refuse the key. Options first is the deliberate order —
+ * the key half is the one with precedence rules that can refuse, and losing an
+ * accepted option patch because a key was rejected would be the worse trade.
+ *
+ * Both halves write a **fixed path** (`.astro-dev-edit.json` and `.env.local`
+ * at the project root, never client-supplied), which is why they bypass
  * `paths.ts::validateEditablePath` — see the header of `settings.ts` for the
  * full rationale.
  */
@@ -58,7 +68,8 @@ export interface SettingsRouteDeps {
    * The Unsplash config, for its key resolver **only**.
    *
    * Deliberately not re-deriving the key here: `resolveUnsplashKey` has its own
-   * precedence (config → env → file) that `/unsplash/search` already reads
+   * precedence (config → shell → env file → legacy stored) that
+   * `/unsplash/search` already reads
    * through this seam, and a second call site would be a second place for that
    * order to drift. It is also the seam tests inject through, so a duplicate
    * would make this route disagree with the searches it reports on.
@@ -84,18 +95,23 @@ export function createSettingsRoutes(deps: SettingsRouteDeps): Route[] {
 
     // Only asked for when the feature is on, so a disabled source reports
     // "not enabled" without touching the filesystem at all.
-    const { key, source } = unsplashOn
-      ? await unsplash!.resolve()
-      : { key: '', source: null };
+    const resolved = unsplashOn ? await unsplash!.resolve() : { key: '', source: null };
+    const { key, source } = resolved;
+    const { writable, clearable } = keyWritable(resolved);
+    const uncovered = await uncoveredSecretFiles(root);
 
     return {
       options: described.map(toWire),
+      ...(uncovered.length > 0 ? { gitignoreWarning: uncovered } : {}),
       unsplash: {
         enabled: unsplashOn,
         configured: Boolean(key),
         source,
+        ...(resolved.file ? { sourceFile: resolved.file } : {}),
         ...(key ? { hint: maskKey(key) } : {}),
-        ...((await checkGitignored(root)) ? {} : { gitignoreWarning: true }),
+        writable,
+        clearable,
+        ...((await hasStaleStoredKey(root, resolved)) ? { staleStoredKey: true as const } : {}),
       },
     };
   }
@@ -178,28 +194,35 @@ export function createSettingsRoutes(deps: SettingsRouteDeps): Route[] {
         body: { error: 'the Unsplash photo source is disabled', code: 'disabled' },
       };
     }
-    // A config or env key wins at resolve time, so storing one here would be a
-    // value that silently does nothing. Refuse and say why.
-    const { source } = await unsplash.resolve();
-    if (source === 'config' || source === 'env') {
+    // Anything that outranks the file this panel writes would make the save a
+    // value that silently does nothing. Refuse, and name the file to edit.
+    const resolved = await unsplash.resolve();
+    const { writable, clearable, reason } = keyWritable(resolved);
+    const clearing = !accessKey.trim();
+    if (!writable || (clearing && !clearable)) {
+      return { status: 409, body: { error: reason!, code: 'conflict' } };
+    }
+
+    const saved = await saveUnsplashKey(root, accessKey, deps.writeText);
+    if (!saved.ok) {
       return {
-        status: 409,
+        status: 422,
         body: {
-          error:
-            source === 'config'
-              ? 'An access key is set in your Astro config, which takes precedence. ' +
-                'Remove `unsplash.accessKey` from astro.config.mjs first.'
-              : 'UNSPLASH_ACCESS_KEY is set in the environment, which takes ' +
-                'precedence. Unset it (or clear it from .env) first.',
-          code: 'conflict',
+          error: 'the access key was refused',
+          code: 'validation',
+          fieldErrors: { accessKey: saved.reason },
         },
       };
     }
-    await saveUnsplashKey(root, accessKey, deps.writeText);
+    if (saved.staleStoredKey) {
+      logger.warn(
+        `saved the Unsplash access key to ${saved.file}, but could not remove the ` +
+          'older copy from .astro-dev-edit.json — saving again will retry.',
+      );
+    }
     logger.info(
-      accessKey.trim()
-        ? 'stored an Unsplash access key in .astro-dev-edit.json'
-        : 'cleared the stored Unsplash access key',
+      (clearing ? `cleared the Unsplash access key from ${saved.file}` : `stored an Unsplash access key in ${saved.file}`) +
+        (saved.migrated ? ', and removed the older copy from .astro-dev-edit.json' : ''),
     );
     return null;
   }

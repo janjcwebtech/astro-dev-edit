@@ -19,8 +19,8 @@ export default defineConfig({
       uploadDir: 'public/images',
       // Turn the Unsplash photo source on in the media picker. No key here on
       // purpose: this file is committed and is read by `astro build`. Add one
-      // from the overlay's Settings panel (admin bar → Settings), or put
-      // UNSPLASH_ACCESS_KEY in this directory's gitignored .env.
+      // from the overlay's Settings panel (admin bar → Settings), which writes
+      // UNSPLASH_ACCESS_KEY into this directory's gitignored .env.local.
       unsplash: {},
       // Entry-editor field tweaks: the schema drives everything else; these
       // just pick nicer widgets than the plain-string default.

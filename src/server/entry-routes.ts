@@ -1,4 +1,4 @@
-import type { TextWriter } from './text-writes.ts';
+import { directWrite, type TextWriter } from './text-writes.ts';
 import type { AstroIntegrationLogger } from 'astro';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -15,7 +15,7 @@ import type {
 import { slugify } from '../shared/slug.ts';
 import type { EntryCollectionInfo, EntrySchemaProvider } from './content-config.ts';
 import type { OptionsResolver } from './options.ts';
-import { atomicWrite, validateEditablePath } from './paths.ts';
+import { validateEditablePath } from './paths.ts';
 import type { Route } from './router.ts';
 import {
   inferFields,
@@ -102,7 +102,7 @@ function assembleFields(
 
 export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
   const { logger, root, optionsResolver, schemaProvider } = deps;
-  const writeText: TextWriter = deps.writeText ?? atomicWrite;
+  const writeText: TextWriter = deps.writeText ?? directWrite;
 
   /** The effective options, plus the entry-specific extension allowlist derived
    *  from them: same confinement as edits, but only markdown-family files are

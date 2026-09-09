@@ -1,4 +1,4 @@
-import { realpath, rename, writeFile } from 'node:fs/promises';
+import { chmod, realpath, rename, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 
 /**
@@ -191,9 +191,29 @@ export async function validateEditablePath(
   return check.abs;
 }
 
-/** Write atomically: temp file in the same directory, then rename. (spec §10) */
-export async function atomicWrite(target: string, content: string): Promise<void> {
+/** Owner-only. The mode for any file holding the Unsplash access key. */
+export const SECRET_MODE = 0o600;
+
+/**
+ * Write atomically: temp file in the same directory, then rename. (spec §10)
+ *
+ * `mode` rides the **temp file**, not the finished one. Chmod-ing after the
+ * rename leaves a window in which the content — for a secret-bearing file, the
+ * access key — sits on disk at the process umask, typically world-readable.
+ * `rename` then carries the temp inode's mode onto the target, so a
+ * pre-existing loose file is tightened rather than left as it was. The chmod is
+ * belt-and-braces over `writeFile`'s `mode`, which is honoured only on create:
+ * a crashed run can leave a temp file behind for this one to reuse.
+ */
+export async function atomicWrite(target: string, content: string, mode?: number): Promise<void> {
   const tmp = join(dirname(target), `.${basename(target)}.dev-edit-tmp-${process.pid}`);
-  await writeFile(tmp, content, 'utf8');
+  await writeFile(tmp, content, mode === undefined ? 'utf8' : { encoding: 'utf8', mode });
+  if (mode !== undefined) {
+    try {
+      await chmod(tmp, mode);
+    } catch {
+      // Non-POSIX filesystem; the content is written either way.
+    }
+  }
   await rename(tmp, target);
 }

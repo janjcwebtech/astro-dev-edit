@@ -6,7 +6,7 @@ Every option the integration takes, where you can set it, and which source wins.
 - [Where a value can come from](#where-a-value-can-come-from)
 - [Astro versions and source annotations](#astro-versions-and-source-annotations)
 - [The Settings drawer](#the-settings-drawer)
-- [The settings file](#the-settings-file)
+- [Where settings and your key are stored](#where-settings-and-your-key-are-stored)
 - [Watching writes in your editor](#watching-writes-in-your-editor)
 
 ## Options
@@ -84,14 +84,23 @@ where the value came from, because the drawer writes the settings file and the
 config file outranks it. The drawer is server declared: the endpoint sends the
 option records and the panel renders whatever arrives.
 
-## The settings file
+## Where settings and your key are stored
 
-`.astro-dev-edit.json` sits in your project root and holds two separate things:
-the options the drawer writes, and your Unsplash access key. Access keys never
-come back out of it in a response.
+Two files, because one of them holds a secret and the other does not.
 
-**Gitignore it.** The drawer warns you while the file is not ignored, and the
-warning clears as soon as you add it to `.gitignore`.
+`.astro-dev-edit.json` sits in your project root and holds the options the
+drawer writes plus the entry drawer's per-field editor overrides.
+
+Your Unsplash access key goes to **`.env.local`** instead, as
+`UNSPLASH_ACCESS_KEY`, written at `0600` — see
+[the access key](MEDIA.md#your-access-key) for the full resolution order and
+what the drawer can and cannot change. A key written by an older version, in
+`.astro-dev-edit.json`, still works and is moved across the next time you save
+one. Access keys never come back out of either file in a response.
+
+**Gitignore both.** The drawer names any of them your ignore rules miss, and the
+warning clears as soon as they are covered. A `.env*` line counts, which is what
+Astro's own starters ship.
 
 The dev server does not serve it. A request for `/.astro-dev-edit.json`, in any
 spelling — through `/@fs/`, with a query, percent-encoded — is refused with a
@@ -114,11 +123,12 @@ opens nothing.
 
 Every text write is covered: text and image edits made on the page, entry saves
 and creations, a collection's schema, a new collection, and the field overrides
-and options in `.astro-dev-edit.json`. A collection save that writes both stores
-reveals each file immediately before its own write — `src/content.config.ts`,
-then the settings file. Uploaded and imported images, deleted entries and
-Astro's own generated files are left alone. Bear in mind that the settings file
-holds your Unsplash access key, so it is one you may not want on screen.
+and options in `.astro-dev-edit.json`, and `.env.local` when you save an access
+key. A collection save that writes both stores reveals each file immediately
+before its own write — `src/content.config.ts`, then the settings file.
+Uploaded and imported images, deleted entries and Astro's own generated files
+are left alone. Bear in mind that `.env.local` holds your access key, so it is
+one you may not want on screen.
 
 The timing is best-effort by nature. The launcher is the one behind *Open
 source*, and it cannot report that your editor has actually brought the file
