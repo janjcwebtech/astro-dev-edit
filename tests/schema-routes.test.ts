@@ -3,7 +3,7 @@ vi.mock('../src/server/editor.ts', () => ({ launchInEditor: vi.fn(async () => {}
 import type { AstroIntegrationLogger } from 'astro';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -501,6 +501,14 @@ describe('POST /collection/entries', () => {
         },
       }),
     );
+    // The endpoint orders by mtime, and three writes this close together can
+    // land in the same millisecond — on a fast filesystem the sort is then a
+    // tie and falls back to the alphabetical readdir order. Stamp them a second
+    // apart so "newest first" is actually what this asserts.
+    for (const [name, offset] of [['one', 0], ['two', 1], ['three', 2]] as const) {
+      const when = new Date(Date.now() + offset * 1000);
+      await utimes(join(root, `src/content/blog/${name}.md`), when, when);
+    }
     const r = await request(h, '/__dev-edit/collection/entries', { collection: 'blog' });
     expect(r.status).toBe(200);
     expect(r.body.dir).toBe('src/content/blog');
