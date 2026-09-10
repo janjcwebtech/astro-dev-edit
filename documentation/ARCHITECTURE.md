@@ -49,13 +49,14 @@ Each feature group is a `create<Feature>Routes(deps): Route[]` factory.
 
 - `isLocalRequest` rejects non-localhost and bad Origin at the middleware door, covering every route automatically.
 - `paths.ts::validateEditablePath` is the one gate every edit path passes: realpath (symlinks resolved) ∈ project root ∈ configured `contentRoots`, with an allowed extension. `/classify`, `/apply` and `/open` alike go through it.
-- Writes go through `atomicWrite` (temp file + rename).
+- Writes go through `atomicWrite` (temp file + rename). Its `mode` rides the **temp** file, so a secret is never briefly readable at the umask before the rename.
 
-### Three classes of write, and only the first uses that gate
+### Four classes of write, and only the first uses that gate
 
 1. **Content** — confined by `validateEditablePath`.
 2. **The settings file** (`.astro-dev-edit.json`) — a *fixed* path; see `settings.ts`'s header.
-3. **The project's `content.config.ts`** — `validateEditablePath` cannot cover it, since `.ts` is not an editable extension. Its path is **discovered server-side** from `EntrySchemaProvider.configPath` and a request names a *collection*, never a path, so there is nothing to smuggle; `schema-routes.ts::configTarget` re-checks realpath ∈ root and a config-shaped extension anyway. That module's header states the four rules that hold it in.
+3. **`.env.local`** — a fixed path too, holding the Unsplash access key. A secret does not belong in a file inside the directory Vite serves, and `.env`/`.env.*` are already denied by Vite itself. Written at `0600` through `patcher/dotenv.ts`, which upserts one variable by line slicing and **refuses** any value that would need dotenv quoting rather than escaping it.
+4. **The project's `content.config.ts`** — `validateEditablePath` cannot cover it, since `.ts` is not an editable extension. Its path is **discovered server-side** from `EntrySchemaProvider.configPath` and a request names a *collection*, never a path, so there is nothing to smuggle; `schema-routes.ts::configTarget` re-checks realpath ∈ root and a config-shaped extension anyway. That module's header states the four rules that hold it in.
 
 Anything reaching generated source — collection name, field name, directory, glob pattern — is **validated, not escaped**: a value that would need quoting is refused, which keeps every expression the patcher writes a shape it can read back.
 
@@ -66,7 +67,7 @@ Anything reaching generated source — collection name, field name, directory, g
 - It **re-verifies at the last moment** — parent realpath, file identity, byte contents — because `revealWrites` opens the destination in the user's editor and then *pauses* before writing, which makes the window between a handler's gate and the write real rather than theoretical.
 - `run()` wraps every text-mutating POST (the `textMutationPaths` set), serializing whole requests and pinning the resolved options for the duration, so a save that switches the mode off still behaves the way it started.
 
-A handler that writes project text takes `writeText` from its deps (defaulting to `atomicWrite`, which is how tests skip the seam), passes the `original` it verified against (`null` for a create), and adds its path to that set. Uploads, imports and deletions stay outside the seam on purpose.
+A handler that writes project text takes `writeText` from its deps (defaulting to `text-writes.ts::directWrite`, which is how tests skip the seam — not `atomicWrite` itself, whose third parameter is the file mode where `TextWriter`'s is the original), passes the `original` it verified against (`null` for a create), an optional file mode, and adds its path to that set. Uploads, imports and deletions stay outside the seam on purpose.
 
 ### Impure dependencies are injected
 
@@ -76,14 +77,16 @@ A handler that writes project text takes `writeText` from its deps (defaulting t
 
 ## Patchers — `src/patcher/`
 
-Pure string transforms. `Patcher` (`types.ts`) is string-in/string-out with **no fs access** — the middleware reads and writes. Two methods:
+Pure string transforms with **no fs access** — the middleware reads and writes. `Patcher` (`types.ts`) is the loc-based interface behind the registry, and has two methods; `frontmatter.ts`, `content-config.ts` and `dotenv.ts` are pure in the same way but target named keys rather than source locs, so they implement none of it:
 
 - `classify(source, {loc, tag})` returns AST-truth about the element at a source loc.
 - `apply(source, req)` does **verify-then-patch**: it confirms the source still matches the `original` the client saw, then returns new source or a typed refusal.
 
 `registry.ts` maps a file extension to its patcher; `astro.ts` is the `.astro` implementation over the `@astrojs/compiler` AST. `frontmatter.ts` is the separate YAML path for content-collection entries — surgical edits that preserve comments, key order and quoting, via the `yaml` lib.
 
-`content-config.ts` is the third, non-registry patcher: it reads and patches the project's `content.config.ts` for the collection designer, **with no JS parser, deliberately**. Vite's re-exported `parseAst` is a *JavaScript* parser and throws on the TypeScript a real config contains, and the failure mode has to be refusal anyway. Instead `blankNonCode` blanks every string, template, comment and regex literal to spaces (offsets preserved), and everything downstream is plain character matching on the blanked copy while slicing the original. It anchors only on shapes it can prove — `schema: z.object({…})`, `schema: ({ image }) => z.object({…})`, `export const collections = {…}` — and reports anything else as `unrecognized`, so the UI offers *Open source* instead of guessing.
+`dotenv.ts` upserts one variable in a `.env` document for the settings panel — line slicing only, so comments, ordering and every other variable survive, and a value outside `[A-Za-z0-9_-]` is refused rather than quoted.
+
+`content-config.ts` is the third non-registry patcher: it reads and patches the project's `content.config.ts` for the collection designer, **with no JS parser, deliberately**. Vite's re-exported `parseAst` is a *JavaScript* parser and throws on the TypeScript a real config contains, and the failure mode has to be refusal anyway. Instead `blankNonCode` blanks every string, template, comment and regex literal to spaces (offsets preserved), and everything downstream is plain character matching on the blanked copy while slicing the original. It anchors only on shapes it can prove — `schema: z.object({…})`, `schema: ({ image }) => z.object({…})`, `export const collections = {…}` — and reports anything else as `unrecognized`, so the UI offers *Open source* instead of guessing.
 
 Two invariants:
 
@@ -139,7 +142,7 @@ Every extension point is a registry or a factory. Expansion means adding a file 
 | **A client editor or panel** | A module under `client/editors/`, opened from `client/router.ts`'s classification switch. Claim the interaction slot with `state.begin({kind: 'panel', close})` and release via `state.releaseIf`; for drawer-shaped UI use `editors/drawer.ts::openDrawer` and `ui.ts::footButton`. Build DOM through `ui.ts::styled` and `group.ts`, reusing `COLOR`/`FONT`/`INPUT_STYLE` |
 | **An integration option** | **One entry in `OPTION_SPECS` (`src/server/options.ts`)**, carrying the default, wire label and help, control, Settings tab, and how to read it out of a partial config. It drives resolution, the `/settings` payload **and** the panel's control, so no client change is needed. Set `configOnly: true` only for something consumed in `astro:config:setup`, before a dev server exists. Read it off `await deps.options()`; do not add a field to `MiddlewareDeps`, which carries one options thunk |
 | **Server logic needing the dev server or project config** | Follow `content-config.ts`: a small interface, injected, returning `null` on every failure path so the feature degrades instead of erroring, stubbed in tests |
-| **A user setting that is not an integration option** | `.astro-dev-edit.json` has two deliberately separate compartments (`settings.ts`): `options`, an ordinary `Partial<DevEditOptions>` the panel writes, and the secret compartment holding `unsplash.accessKey`. A secret gets its own compartment with its own resolution and never enters a response; anything else is an option and belongs in `OPTION_SPECS` |
+| **A user setting that is not an integration option** | If it is not a secret, it goes in `.astro-dev-edit.json` (`settings.ts`) beside `options` — an ordinary `Partial<DevEditOptions>` — or it is an option and belongs in `OPTION_SPECS`. **A secret does not go in that file at all**: it goes to `.env.local` through `patcher/dotenv.ts`, at `0600`, with its own resolution, and never enters a response — only whether one resolved, where from, and whether the panel may change it. It also joins `uncoveredSecretFiles`, so the panel can warn when the project's ignore rules miss it |
 
 ## Tests
 

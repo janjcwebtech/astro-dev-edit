@@ -10,7 +10,7 @@ import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
 import { createMiddleware } from '../src/server/middleware.ts';
 import type { DevEditOptions } from '../src/server/options.ts';
-import { SETTINGS_FILE } from '../src/server/settings.ts';
+import { ENV_TARGET, SETTINGS_FILE } from '../src/server/settings.ts';
 import type { UnsplashConfig } from '../src/server/unsplash-routes.ts';
 import { stubOptions } from './helpers.ts';
 
@@ -317,7 +317,10 @@ describe('write reveal settings', () => {
     expect(launchInEditor).toHaveBeenCalledTimes(2);
     await put({ cssInspector: true }, via);
     expect(launchInEditor).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(await readFile(join(root, SETTINGS_FILE), 'utf8')).unsplash.accessKey).toBe('example-key');
+    // The key rides the same queued request as the options, but lands in the
+    // other file — and never in the one this suite's other cases read.
+    expect(await readFile(join(root, ENV_TARGET), 'utf8')).toContain('UNSPLASH_ACCESS_KEY=example-key');
+    expect(JSON.parse(await readFile(join(root, SETTINGS_FILE), 'utf8')).unsplash).toBeUndefined();
   });
 
   it('preserves both concurrent sparse settings patches', async () => {

@@ -19,7 +19,7 @@ Fork the repo, work on a branch, and open a pull request. I review and merge eve
 Two things I will always check:
 
 - It stays dev-only. `astro:config:setup` bails unless `command === 'dev'`, so nothing in here can reach a production bundle, and any new hook work has to keep that guard.
-- It writes nothing outside the confinement. Every edited path goes through `validateEditablePath`, and every write is atomic and verified against the source the page actually showed.
+- It writes nothing outside the confinement. Every *client-supplied* path goes through `validateEditablePath`, and every write is atomic and verified against the source the page actually showed. The handful of fixed targets — the settings file, `.env.local`, the project's `content.config.ts` — are constants in server source rather than anything a request can name, and a file holding a secret is written `0600`.
 
 [Architecture](documentation/ARCHITECTURE.md) is the tour. It will save you reading the whole `src/` tree to work out where your change belongs, and most extensions are one entry in a registry rather than a new branch in an existing module.
 

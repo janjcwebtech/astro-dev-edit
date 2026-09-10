@@ -16,10 +16,15 @@ Writing an entry — one line, past tense, no essay:
 
 ### Security
 
+- `.env.local` and the settings file are written `0600` from the temporary file onwards, closing the moment in which a new file's contents sat at the process umask before being renamed into place.
 - The dev server no longer serves `.astro-dev-edit.json`, or the temporary files written alongside it. Vite serves the project root, so the settings file was readable at `/.astro-dev-edit.json` and through `/@fs/` — including any Unsplash access key it held.
 
 ### Changed
 
+- The Settings drawer saves the Unsplash access key to `.env.local` as `UNSPLASH_ACCESS_KEY` rather than into `.astro-dev-edit.json`. A key already stored in the settings file keeps working and is moved across the next time one is saved.
+- The drawer can replace a key in `.env`, and refuses one set in `.env.development`, `.env.development.local` or an exported shell variable, naming the file that wins. Clearing is refused for a key in `.env`, which removing a line from `.env.local` cannot unset.
+- An access key containing anything outside letters, digits, hyphens and underscores is refused rather than quoted, since dotenv would not read it back as written.
+- The uncommitted-secret warning names every file the project's `.gitignore` misses, `.env.local` included, and accepts the `.env*` form real projects ship.
 - Project source can no longer `import` `.astro-dev-edit.json`; the request is refused with a 403 like any other.
 
 ## [0.9.0] - 2026-09-09

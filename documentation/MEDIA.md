@@ -91,15 +91,27 @@ application for production (then 1000). Resolution order, highest first:
 | Where | Notes |
 | --- | --- |
 | `unsplash.accessKey` in `astro.config.mjs` | An escape hatch for programmatic config, **not recommended**: that file is committed *and* is read by `astro build`, so the key travels with the repo. |
-| `UNSPLASH_ACCESS_KEY` in the environment | For teams and CI. Read through Vite's own env loader, so a `.env` file works — note that `astro dev` does **not** copy `.env` into `process.env` itself. |
-| The **Settings** drawer (admin bar → the purple mark → *Settings* → *Unsplash*) | The recommended path. Writes `.astro-dev-edit.json` at your project root, `0600`. |
+| An exported `UNSPLASH_ACCESS_KEY` | For CI. A shell variable overrides every `.env` file, so nothing in the project can replace it. |
+| `UNSPLASH_ACCESS_KEY` in a `.env` file | Read through Vite's own env loader — note that `astro dev` does **not** copy `.env` into `process.env` itself. Among these files the later wins: `.env`, then `.env.local`, then `.env.development`, then `.env.development.local`. |
+| The **Settings** drawer (admin bar → the purple mark → *Settings* → *Unsplash*) | The recommended path, and not a fourth place: it writes `UNSPLASH_ACCESS_KEY` into **`.env.local`** at your project root, `0600`. |
 
-**Gitignore `.astro-dev-edit.json` and your `.env`.** The Settings panel warns
-if the first isn't covered, but this integration cannot edit your ignore rules
-for you. The key is never sent back to the browser: a read reports only whether
-one resolved, from where, and a masked fragment like `••••••••Ab3d`. When a key
-comes from the config or the environment the panel's field is disabled and says
-so, rather than accepting a value that would be ignored.
+Because the drawer writes `.env.local`, it can replace a key you keep in `.env`
+but not one in `.env.development`, `.env.development.local`, or your shell —
+those outrank it. The panel says which file wins and disables its field rather
+than accepting a value that would be ignored. A key in `.env` is the one
+in-between case: saving over it works, **Clear** does not, since removing a line
+from `.env.local` cannot unset one in `.env`.
+
+A key stored by an older version, in `.astro-dev-edit.json`, still works. The
+next time you save one the drawer moves it into `.env.local` and removes the old
+copy; until then it says so.
+
+**Gitignore `.env.local`.** The Settings panel names any file it writes that
+your `.gitignore` does not cover — a plain `.env*` line covers it, as Astro's own
+starters ship — but this integration cannot edit your ignore rules for you. The
+key is never sent back to the browser: a read reports only whether one resolved,
+from where, whether the panel may change it, and a masked fragment like
+`••••••••Ab3d`.
 
 ### Import size
 

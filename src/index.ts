@@ -238,8 +238,8 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
             logger.warn(
               'unsplash.accessKey is set in your Astro config. That file is ' +
                 'committed and is read by `astro build`, so the key travels ' +
-                'with the repo — prefer the overlay’s Settings panel or ' +
-                'UNSPLASH_ACCESS_KEY.',
+                'with the repo — prefer UNSPLASH_ACCESS_KEY in .env.local, ' +
+                'which the overlay’s Settings panel writes for you.',
             );
           }
           logger.info(

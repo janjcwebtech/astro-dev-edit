@@ -1,4 +1,4 @@
-import type { TextWriter } from './text-writes.ts';
+import { directWrite, type TextWriter } from './text-writes.ts';
 import type { AstroIntegrationLogger } from 'astro';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -36,7 +36,7 @@ import type {
 import { launchInEditor } from './editor.ts';
 import { ENTRY_EXTENSIONS } from './entry-routes.ts';
 import type { OptionsResolver, StoredOptions } from './options.ts';
-import { atomicWrite, insideRoot } from './paths.ts';
+import { insideRoot } from './paths.ts';
 import type { Route, RouteResult } from './router.ts';
 import { FIELD_TYPES, inferFields, zodToFields } from './schema-introspect.ts';
 import { readStoredOptions, saveStoredOptions } from './settings.ts';
@@ -133,7 +133,7 @@ function refuse(code: CollectionRefusal, error: string): RouteResult {
 
 export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
   const { logger, root, optionsResolver, schemaProvider } = deps;
-  const writeText: TextWriter = deps.writeText ?? atomicWrite;
+  const writeText: TextWriter = deps.writeText ?? directWrite;
 
   /** The gate every route in this group starts at. */
   async function gate(): Promise<{

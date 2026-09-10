@@ -102,8 +102,8 @@ export interface DevEditOptions {
    * modal renders as a single-source project-asset grid.
    *
    * Every user brings their own access key. The recommended way to give one is
-   * the overlay's own Settings panel (admin bar → Settings), which stores it
-   * outside the repo — see `accessKey` for why not here.
+   * the overlay's own Settings panel (admin bar → Settings), which writes it to
+   * a gitignored `.env.local` — see `accessKey` for why not here.
    */
   unsplash?: false | UnsplashOptions;
 }
@@ -114,8 +114,9 @@ export interface UnsplashOptions {
    * Access key, as an escape hatch for programmatic config. **Not the
    * recommended path:** `astro.config.mjs` is committed *and* is read by
    * `astro build`, so a key here travels with the repo. Prefer the Settings
-   * panel, or `UNSPLASH_ACCESS_KEY` in the environment. When set, it wins over
-   * both and the Settings panel says so rather than accepting a value that
+   * panel, which writes `UNSPLASH_ACCESS_KEY` into `.env.local` — the same
+   * place you would put it by hand. When set here it wins over every other
+   * source, and the Settings panel says so rather than accepting a value that
    * would do nothing.
    */
   accessKey?: string;

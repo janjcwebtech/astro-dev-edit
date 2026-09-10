@@ -86,7 +86,7 @@ _**Copy Context** puts the whole context of the element on your clipboard: the s
 
 Everything is optional. Pass what you want to `devEdit({ … })`, or set it from the **Settings** drawer, which saves your choices in `.astro-dev-edit.json` and applies them to the next request without a restart. Anything you set in `astro.config.mjs` wins over that file and renders read-only in the drawer, with a note saying where the value came from.
 
-Gitignore `.astro-dev-edit.json`, since it also holds your Unsplash key. The drawer warns you when you have not.
+Your Unsplash key goes somewhere else: the drawer writes it to `.env.local` at `0600`. Gitignore that and `.astro-dev-edit.json` — the drawer names either one your ignore rules miss.
 
 Every option, with its default and what it does: [Configuration reference](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/CONFIGURATION.md).
 

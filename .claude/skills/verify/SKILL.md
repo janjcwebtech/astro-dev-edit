@@ -89,10 +89,11 @@ curl -s -H 'Content-Type: application/json' -H 'Origin: http://localhost:4321' \
 
 ### Restore the fixtures
 
-Overlay edits write into the playground's own source. Three things get dirtied and only the first shows in `git status`:
+Overlay edits write into the playground's own source. Four things get dirtied and only the first shows in `git status`:
 
 - entry files and `src/content.config.ts` → `git checkout --`
 - **empty directories** the collection designer created (`src/content/<name>`) → `rmdir` by name
 - `.astro-dev-edit.json` (gitignored) → reset by hand after testing overrides or settings
+- `.env.local` (gitignored) → **delete it** after testing the access key. This is the one holding a real credential, so it is the one worth not forgetting
 
 `/collections`' `etag` returns to its original value once the config is byte-identical again.
