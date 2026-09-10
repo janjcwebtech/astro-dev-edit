@@ -12,12 +12,12 @@ const { Content } = await render(post);
 const fmt = (d: Date) =>
   d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
-// Repo-relative path to the markdown source, so the editor can offer a jump to
-// where this page's title/body actually live. `filePath` comes from the glob
-// loader; fall back to reconstructing it from the entry id if ever absent.
-const pageSource = post.filePath ?? `src/content/blog/${post.id}.md`;
+// Deliberately emits **no** pageSource prop, unlike /works. This route is the
+// auto-detection fixture: switch `blog` on in the Collections drawer and the
+// entry drawer has to appear here with nothing declaring the backing file.
+// /works keeps the meta tag, so one manual pass exercises both regimes.
 ---
-<Base title={`${post.data.title} · Copydesk`} description={post.data.excerpt} pageSource={pageSource}>
+<Base title={`${post.data.title} · Copydesk`} description={post.data.excerpt}>
   <article class="section">
     <div class="container prose">
       <a href="/articles" style="color:var(--accent);text-decoration:none;font-size:0.9rem;">&larr; All articles</a>

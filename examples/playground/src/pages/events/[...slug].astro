@@ -1,0 +1,42 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const events = await getCollection('events');
+  return events.map((event) => ({ params: { slug: event.id }, props: { event } }));
+}
+
+const { event } = Astro.props;
+const { Content } = await render(event);
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+// No pageSource prop, and no `events` block in astro.config.mjs either. This is
+// the fresh-install route: the entry drawer has to reach this page's markdown
+// through /entry/resolve alone — route manifest → the getCollection('events')
+// call above → the id in the URL. If Edit entry does not appear here once the
+// collection's Content editor switch is on, auto-detection is broken.
+---
+<Base title={`${event.data.title} · Copydesk`} description={event.data.summary}>
+  <article class="section">
+    <div class="container prose">
+      <a href="/events" style="color:var(--accent);text-decoration:none;font-size:0.9rem;">&larr; All events</a>
+      <p class="eyebrow" style="margin-top:1rem;">{event.data.format}</p>
+      <h1>{event.data.title}</h1>
+      <p class="meta" style="color:var(--grey);">
+        {fmt(event.data.date)} · {event.data.location} · {event.data.seats} seats
+        {event.data.soldOut && ' · sold out'}
+      </p>
+      <p class="lead">{event.data.summary}</p>
+      <Content />
+      <!-- Literal template copy, so this route also has something the text
+           editor can take directly — the detail pages elsewhere are almost
+           entirely frontmatter and markdown body. -->
+      <p style="margin-top:2rem;">
+        Tickets go on sale a month ahead. Reply to the newsletter if you want a
+        seat held.
+      </p>
+    </div>
+  </article>
+</Base>

@@ -14,6 +14,8 @@ import type {
 import { dataUrlMime, listAssets, saveUpload } from './assets.ts';
 import type { EntrySchemaProvider } from './content-config.ts';
 import { launchInEditor } from './editor.ts';
+import { createDetailRoutes } from './entry-detect.ts';
+import { createEntryResolveRoutes } from './entry-resolve-routes.ts';
 import { createEntryRoutes } from './entry-routes.ts';
 import { createInspectRoutes } from './inspect-routes.ts';
 import type { OptionsResolver, ResolvedOptions } from './options.ts';
@@ -424,12 +426,25 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
   // see `MiddlewareDeps.optionsResolver`. A client that asks about a disabled
   // feature gets an explicit `disabled` refusal rather than a 404 it would have
   // to guess the meaning of.
+  // Built here rather than injected: it is derived entirely from two deps this
+  // function already holds, and it owns a cache that should live as long as the
+  // route table does. Two groups share the one instance so they share the cache.
+  const detailRoutes = createDetailRoutes({ root, routeManifest });
+
   const routes: Route[] = [
     ...coreRoutes,
     ...createInspectRoutes({ logger, root, optionsResolver }),
     ...createPageSourceRoutes({ logger, optionsResolver, routeManifest }),
     ...createEntryRoutes({ writeText, logger, root, optionsResolver, schemaProvider }),
-    ...createSchemaRoutes({ writeText, logger, root, optionsResolver, schemaProvider }),
+    ...createEntryResolveRoutes({
+      logger,
+      root,
+      optionsResolver,
+      schemaProvider,
+      routeManifest,
+      detailRoutes,
+    }),
+    ...createSchemaRoutes({ writeText, logger, root, optionsResolver, schemaProvider, detailRoutes }),
     ...createSettingsRoutes({ writeText, logger, root, optionsResolver, unsplash }),
     ...createUnsplashRoutes({
       logger,
@@ -442,7 +457,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
 
   const textMutationPaths = new Set([
     '/apply', '/entry/apply', '/entry/create', '/entry/delete',
-    '/collection/schema/apply', '/collection/create', '/settings',
+    '/collection/schema/apply', '/collection/create', '/collection/page-editing', '/settings',
   ]);
   for (const route of routes) {
     if (route.method !== 'POST' || !textMutationPaths.has(route.path)) continue;

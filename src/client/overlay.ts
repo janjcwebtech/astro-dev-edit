@@ -33,7 +33,7 @@ import { openSettingsPanel } from './editors/settings-panel.ts';
 import { collectContext, formatContext } from './element-context.ts';
 import { has, setFeatures } from './features.ts';
 import { clearHighlight, initHover } from './hover.ts';
-import { pageSource } from './page-source.ts';
+import { onPageSourceChange, pageSource, resolvePageSource } from './page-source.ts';
 import { initRouter } from './router.ts';
 import { cacheSourceMappings, sourceFor, startCapture } from './source-map.ts';
 import { initTree } from './tree.ts';
@@ -394,6 +394,9 @@ if (import.meta.hot) {
     // annotations, preserving collapse + selection by their stable paths.
     if (editMode) tree.rebuild();
     bar.refresh(); // a navigation may have gained or lost a content entry
+    // …and the answer itself can have changed: an entry renamed, or a route
+    // added. The resolve refreshes the bar again when it lands.
+    void resolvePageSource();
   });
 }
 
@@ -419,6 +422,14 @@ async function boot(): Promise<void> {
     ...bar.elements,
   );
   bar.refresh();
+
+  // Which entry backs this page, for a project that hasn't emitted the meta tag.
+  // Deliberately not awaited before the bar is drawn: the bar must appear at
+  // once, and the entry button is the only thing this can add to it. Every later
+  // resolve — an HMR update, or the notice switching a collection on — reaches
+  // the bar through the same subscription.
+  onPageSourceChange(() => bar.refresh());
+  void resolvePageSource();
 
   // Restore edit mode — and whether the tree was open with it — across the
   // full-page reload that follows every save.

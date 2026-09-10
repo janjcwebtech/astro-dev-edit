@@ -720,3 +720,132 @@ it('reveals both collection stores in write order and reveals collection creatio
   expect(created.status).toBe(200);
   expect(launchInEditor).toHaveBeenCalledTimes(3);
 });
+
+/**
+ * The per-collection page-editing switch — the control that replaces
+ * hand-emitting the page-source meta tag.
+ *
+ * It is the editor half of the two stores, so the things worth pinning are that
+ * it never touches the content config, that `schemaEditor: false` does **not**
+ * gate it (that flag guards committed source, and this writes none), and that
+ * off is written by removing the key rather than storing `false` — the same
+ * "leave the file as it was" rule field overrides follow.
+ */
+describe('POST /collection/page-editing', () => {
+  const stored = async (): Promise<any> =>
+    JSON.parse(await readFile(join(root, '.astro-dev-edit.json'), 'utf8'));
+
+  it('switches a collection on, and reports it back through /collections', async () => {
+    const h = await mount();
+    const before = await request(h, '/__dev-edit/collections');
+    expect(before.body.collections[0]).toMatchObject({
+      pageEditing: false,
+      pageEditingLocked: false,
+      detailRoute: null,
+    });
+
+    const r = await request(h, '/__dev-edit/collection/page-editing', {
+      collection: 'blog',
+      enabled: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: true, pageEditing: true });
+    expect((await stored()).options.entryEditor.collections.blog.pageEditing).toBe(true);
+  });
+
+  it('writes off by removing the key, not by storing false', async () => {
+    const h = await mount();
+    await request(h, '/__dev-edit/collection/page-editing', { collection: 'blog', enabled: true });
+    await request(h, '/__dev-edit/collection/page-editing', { collection: 'blog', enabled: false });
+    // The whole collection entry goes with it: nothing else was in it, and an
+    // empty husk would be a file change that says nothing.
+    expect((await stored()).options.entryEditor.collections.blog).toBeUndefined();
+  });
+
+  it('keeps a collection entry that still carries a field override', async () => {
+    const h = await mount();
+    await request(h, '/__dev-edit/collection/schema/apply', {
+      collection: 'blog',
+      overrides: { title: { label: 'Display title' } },
+    });
+    await request(h, '/__dev-edit/collection/page-editing', { collection: 'blog', enabled: true });
+    await request(h, '/__dev-edit/collection/page-editing', { collection: 'blog', enabled: false });
+    const one = (await stored()).options.entryEditor.collections.blog;
+    expect(one.pageEditing).toBeUndefined();
+    expect(one.fields.title.label).toBe('Display title');
+  });
+
+  it('never touches the content config', async () => {
+    const h = await mount();
+    await request(h, '/__dev-edit/collection/page-editing', { collection: 'blog', enabled: true });
+    expect(await readConfig()).toBe(CONFIG);
+  });
+
+  it('is not gated by schemaEditor, which guards committed source only', async () => {
+    const h = await mount({ schemaEditor: false });
+    const r = await request(h, '/__dev-edit/collection/page-editing', {
+      collection: 'blog',
+      enabled: true,
+    });
+    expect(r.status).toBe(200);
+    expect((await stored()).options.entryEditor.collections.blog.pageEditing).toBe(true);
+  });
+
+  it('refuses when the entry editor is off', async () => {
+    const h = await mount({ entryEditor: false });
+    const r = await request(h, '/__dev-edit/collection/page-editing', {
+      collection: 'blog',
+      enabled: true,
+    });
+    expect(r.status).toBe(403);
+    expect(r.body).toMatchObject({ code: 'disabled' });
+    expect(existsSync(join(root, '.astro-dev-edit.json'))).toBe(false);
+  });
+
+  it('refuses when astro.config.mjs owns the flag, and says so', async () => {
+    // Storing a value resolution would ignore is the one thing the panel must
+    // never do — the same stance /settings takes for a config-owned option.
+    const h = await mount({ entryEditor: { collections: { blog: { pageEditing: true } } } });
+    const r = await request(h, '/__dev-edit/collection/page-editing', {
+      collection: 'blog',
+      enabled: false,
+    });
+    expect(r.status).toBe(403);
+    expect(r.body.error).toMatch(/astro\.config\.mjs/);
+    expect(existsSync(join(root, '.astro-dev-edit.json'))).toBe(false);
+  });
+
+  it('reports a config-owned flag as locked', async () => {
+    // The effective value reaches the summary through the provider, which
+    // resolves config over stored — so the stub reports what the real one would.
+    const h = await mount(
+      { entryEditor: { collections: { blog: { pageEditing: true } } } },
+      stubSchemaProvider({
+        async listCollections() {
+          return [
+            {
+              collection: 'blog',
+              dir: 'src/content/blog',
+              schema: blogSchema,
+              pageEditing: true,
+              fieldConfig: {},
+            },
+          ];
+        },
+        async configPath() {
+          return 'src/content.config.ts';
+        },
+      }),
+    );
+    const r = await request(h, '/__dev-edit/collections');
+    expect(r.body.collections[0]).toMatchObject({ pageEditing: true, pageEditingLocked: true });
+  });
+
+  it('rejects a request with no collection or a non-boolean state', async () => {
+    const h = await mount();
+    expect((await request(h, '/__dev-edit/collection/page-editing', { enabled: true })).status).toBe(400);
+    expect(
+      (await request(h, '/__dev-edit/collection/page-editing', { collection: 'blog' })).status,
+    ).toBe(400);
+  });
+});

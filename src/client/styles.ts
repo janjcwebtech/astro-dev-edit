@@ -952,6 +952,92 @@ input[type='checkbox']:focus-visible {
   box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
 }
 
+/* == Switch =================================================================
+   ui.ts::switchControl. The same input[type=checkbox] underneath, repainted as
+   a track and a thumb — so every rule above has to be overridden here, and the
+   selector carries the type and the attribute as well as the class to outrank
+   it rather than relying on source order.
+
+   Geometry is shadcn's, measured off the live reference: a 32x18 track and 14px
+   of travel. The thumb is 14px inset 2px rather than the reference's 16px inset
+   1px -- at this track height a 1px inset survives on the flat top and bottom
+   but is eaten by the pill's corner curve at each end, so the checked thumb
+   reads as touching the track. 2px is the smallest inset that still shows at
+   the ends, and the travel is unchanged (32 - 14 - 2 - 2). The colours are this overlay's own: the
+   unchecked track is the full-strength input fill every small control is made
+   of, and the checked track is the near-white primary that the confirm button
+   and a ticked checkbox already wear -- the brand purple the reference uses
+   here is spoken for, and means "this element on your page is editable". */
+.atx-switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.atx-switch-label {
+  color: var(--atx-muted-fg);
+  font: 500 12px/1.4 var(--atx-font-ui);
+  user-select: none;
+}
+
+input[type='checkbox'].atx-switch {
+  position: relative;
+  display: inline-flex;
+  place-content: unset;
+  align-items: center;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  border-radius: var(--atx-radius-full);
+  background: var(--atx-input);
+}
+
+/* The thumb. ::before is the checkbox's tick slot, reused — there is one
+   pseudo-element to spend and a switch has one moving part. */
+input[type='checkbox'].atx-switch::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--atx-radius-full);
+  background: var(--atx-foreground);
+  transform: none;
+  transition: transform 150ms ease-out, background 150ms;
+  -webkit-mask: none;
+  mask: none;
+}
+
+input[type='checkbox'].atx-switch:checked {
+  border-color: transparent;
+  background: var(--atx-primary);
+}
+
+/* Travel = track - thumb - both insets. Moving the thumb rather than animating
+   left keeps it on the compositor. */
+input[type='checkbox'].atx-switch:checked::before {
+  background: var(--atx-primary-fg);
+  transform: translateX(14px);
+}
+
+/* Disabled is handled here rather than inherited: the shared [data-input]
+   baseline this control opts out of is what usually carries it. The label dims
+   with the track, so the pair reads as one thing switched off. */
+input[type='checkbox'].atx-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.atx-switch-row:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.atx-switch-row:has(input:disabled) .atx-switch-label {
+  opacity: 0.5;
+}
+
 [data-pill] {
   display: inline-flex;
   align-items: center;
@@ -1964,19 +2050,17 @@ input[type='checkbox']:focus-visible {
 }
 
 /* Monospaced, because it is a path and two counts -- data about the row, not
-   prose. Same size as any other item description. */
+   prose. Same size as any other item description.
+
+   It wraps rather than ellipsing, unlike every other item description: the
+   switch and its label take real width out of this row, and a truncated
+   directory tells you less than a wrapped one. The separators are spaces, so a
+   wrap lands between two facts rather than inside a path. */
 .atx-collections-row .atx-item-desc {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
   font-family: var(--atx-font-mono);
-}
-
-/* The chevron is the row's affordance, not an action: muted at rest, and it
-   steps up with the row under the pointer. */
-.atx-collections-row .atx-item-actions {
-  color: var(--atx-muted-fg);
-}
-
-.atx-collections-row:hover .atx-item-actions {
-  color: var(--atx-foreground);
 }
 
 .atx-collections-item-meta {
@@ -2222,6 +2306,43 @@ input[type='checkbox']:focus-visible {
 .atx-collections-check-hint {
   color: var(--atx-muted-fg);
   font: 14px var(--atx-font-ui);
+}
+
+/* The Content editor switch rides in a collection row's action slot, beside the
+   chevron. Its label is a fixed two words, so nothing shifts as it flips. */
+.atx-collections-pageedit {
+  flex: 0 0 auto;
+}
+
+/* The detail route a collection was matched to. Its own line under the
+   description, one step quieter, because it answers a different question: not
+   what this collection is, but where the switch beside it takes effect. */
+.atx-collections-route {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  color: var(--atx-faint-fg);
+  font: 11px/1.4 var(--atx-font-mono);
+}
+
+/* The meta-tag snippet a collection with no detected route offers. The note is
+   a row of icon + text until it carries one; then the block and its copy button
+   each take a line of their own. */
+.atx-collections-note-snippet {
+  flex-wrap: wrap;
+}
+
+.atx-collections-snippet {
+  flex: 1 0 100%;
+  margin: 8px 0 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-background);
+  color: var(--atx-foreground);
+  font: 11px/1.55 var(--atx-font-mono);
+  white-space: pre;
 }
 
 /* A field typed into the add form but not yet written. Outlined in the brand

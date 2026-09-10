@@ -40,4 +40,26 @@ const works = defineCollection({
     }),
 });
 
-export const collections = { blog, works };
+// Third collection, and the deliberately *un-touched* one. `blog` has field
+// overrides in astro.config.mjs and `works` still emits the page-source meta
+// tag; this one has neither — no integration config, no meta tag, nothing in
+// .astro-dev-edit.json. It is the fresh-install fixture: everything the entry
+// drawer offers here has to come from this schema and from auto-detection
+// alone. Keep it that way, or the fixture stops being one.
+//
+// The field types are the plain zod terminals on purpose (no image() helper,
+// no .optional()) so a failure here is a failure of detection, not of a widget.
+const events = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/events' }),
+  schema: z.object({
+    title: z.string(),
+    summary: z.string(),
+    date: z.coerce.date(),
+    location: z.string(),
+    format: z.enum(['Workshop', 'Talk', 'Meetup']).default('Talk'),
+    seats: z.number().default(40),
+    soldOut: z.boolean().default(false),
+  }),
+});
+
+export const collections = { blog, works, events };

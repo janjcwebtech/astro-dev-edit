@@ -159,6 +159,38 @@ describe('entryEditor merging', () => {
     expect(ee.collections!.notes.dir).toBe('src/data/notes');
   });
 
+  it('merges pageEditing per collection, config winning, without disturbing siblings', async () => {
+    // The page-editing switch is a new sibling key inside the same per-collection
+    // object as `fields` and `dir`, and it rides the same merge — which is why
+    // adding it needed no resolver change. What has to hold is that the config
+    // owns the collections it names and only those.
+    const { options } = await resolve(
+      { entryEditor: { collections: { blog: { pageEditing: false } } } },
+      {
+        entryEditorEnabled: true,
+        entryEditor: {
+          collections: {
+            blog: { pageEditing: true, fields: { title: { label: 'Headline' } } },
+            works: { pageEditing: true },
+          },
+        },
+      },
+    );
+    const ee = options.entryEditor as Exclude<typeof options.entryEditor, false>;
+    // The config speaks about blog, so it wins — even saying "off".
+    expect(ee.collections!.blog.pageEditing).toBe(false);
+    // ...and the panel's own field override beside it is untouched.
+    expect(ee.collections!.blog.fields!.title.label).toBe('Headline');
+    // A collection the config says nothing about keeps what the panel stored.
+    expect(ee.collections!.works.pageEditing).toBe(true);
+  });
+
+  it('leaves pageEditing absent when nothing sets it, so off is the default', async () => {
+    const { options } = await resolve({}, { entryEditorEnabled: true, entryEditor: { collections: { blog: {} } } });
+    const ee = options.entryEditor as Exclude<typeof options.entryEditor, false>;
+    expect(ee.collections!.blog.pageEditing).toBeUndefined();
+  });
+
   it('drops the merged detail when the feature resolves off', async () => {
     const { options } = await resolve(
       { entryEditor: false },

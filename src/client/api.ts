@@ -9,6 +9,8 @@ import type {
   CollectionEntriesRequest,
   CollectionEntriesResponse,
   CollectionOpenRequest,
+  CollectionPageEditingRequest,
+  CollectionPageEditingResponse,
   CollectionSchemaApplyRequest,
   CollectionsResponse,
   EntryApplyRequest,
@@ -22,6 +24,8 @@ import type {
   InspectOpenRequest,
   InspectOpenResponse,
   OpenRequest,
+  EntryResolveRequest,
+  EntryResolveResponse,
   PageSourceRequest,
   PageSourceResponse,
   PeekRequest,
@@ -116,6 +120,15 @@ export async function resolvePageSource(req: PageSourceRequest): Promise<PageSou
   const res = await post('/page-source', req);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `page-source failed (${res.status})`);
   return (await res.json()) as PageSourceResponse;
+}
+
+/** Which content entry backs `pathname`, when the tool can tell. What replaces
+ *  hand-emitting the page-source meta tag; `refusal` set means no entry, and
+ *  `not-enabled` additionally names the collection whose switch is off. */
+export async function resolveEntry(req: EntryResolveRequest): Promise<EntryResolveResponse> {
+  const res = await post('/entry/resolve', req);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `entry resolve failed (${res.status})`);
+  return (await res.json()) as EntryResolveResponse;
 }
 
 /** Open a CSS rule's source in the editor: the server best-effort locates the
@@ -338,6 +351,15 @@ export async function listCollectionEntries(
  *  is named. Carries no path — the server opens the config it discovered. */
 export async function openCollectionSource(req: CollectionOpenRequest): Promise<void> {
   await collectionPost<{ ok: true }>('/collection/open', req);
+}
+
+/** Switch one collection's in-page entry drawer on or off. Saves on the flip —
+ *  the list view it is drawn in has no Save button — and refuses when
+ *  `astro.config.mjs` owns the flag. */
+export async function setCollectionPageEditing(
+  req: CollectionPageEditingRequest,
+): Promise<CollectionPageEditingResponse> {
+  return collectionPost<CollectionPageEditingResponse>('/collection/page-editing', req);
 }
 
 /** Append a collection to the content config and make its entry directory. */
