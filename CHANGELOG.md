@@ -14,6 +14,14 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Security
+
+- The dev server no longer serves `.astro-dev-edit.json`, or the temporary files written alongside it. Vite serves the project root, so the settings file was readable at `/.astro-dev-edit.json` and through `/@fs/` — including any Unsplash access key it held.
+
+### Changed
+
+- Project source can no longer `import` `.astro-dev-edit.json`; the request is refused with a 403 like any other.
+
 ## [0.9.0] - 2026-09-09
 
 ### Added

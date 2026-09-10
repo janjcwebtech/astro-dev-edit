@@ -4,7 +4,9 @@ dist/
 *.log
 
 # Secrets — never commit. .astro-dev-edit.json is written by the Settings panel;
-# .*.dev-edit-tmp-* is atomicWrite's mid-write sibling.
+# .*.dev-edit-tmp-* is atomicWrite's mid-write sibling, and may briefly hold
+# whatever the file it is replacing holds — which is why the dev server refuses
+# to serve both patterns (src/server/private-files.ts).
 .env
 .env.*
 .astro-dev-edit.json

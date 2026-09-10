@@ -147,6 +147,15 @@ describe('routing & guards', () => {
     expect(r.nextCalled).toBe(true);
   });
 
+  it('passes a request for the settings file through too — the guard is elsewhere', async () => {
+    // Documenting, not aspirational. This middleware is mounted from
+    // astro:server:setup and lands *after* Vite's static and @fs handlers, so
+    // it cannot be what protects `.astro-dev-edit.json`. That is the Vite
+    // plugin in `private-files.ts`, registered from astro:config:setup.
+    const r = await request({ method: 'GET', url: '/.astro-dev-edit.json' });
+    expect(r.nextCalled).toBe(true);
+  });
+
   it('rejects non-localhost remote addresses with 403', async () => {
     const r = await request({ method: 'GET', url: '/__dev-edit/health', remoteAddress: '192.168.1.50' });
     expect(r.status).toBe(403);

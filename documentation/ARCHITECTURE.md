@@ -28,6 +28,7 @@ Dev middleware, mounted under `/__dev-edit`.
 | `entry-routes.ts` | `/entry*` — the CMS endpoints, etag guards, field assembly, schema validation |
 | `schema-routes.ts` | The collection designer — `/collections`, `/collection/schema/apply`, `/collection/create`, `/collection/entries`, `/collection/open` |
 | `inspect-routes.ts`, `page-source-routes.ts`, `settings-routes.ts`, `unsplash-routes.ts` | One feature group each |
+| `annotate.ts`, `private-files.ts` | The two injected Vite plugins, both ordering-critical: one annotates `.astro` source before the compiler, the other refuses to serve the files this integration writes |
 | `options.ts` | The option vocabulary, `OPTION_SPECS`, `DevEditOptions`, `DEFAULTS`, `createOptionsResolver` |
 | `paths.ts` | `validateEditablePath`, the one path gate |
 | `text-writes.ts` | The single write seam |
@@ -131,6 +132,7 @@ Every extension point is a registry or a factory. Expansion means adding a file 
 | Adding… | Where it goes |
 | --- | --- |
 | **An endpoint** | One `Route` entry. The core table in `middleware.ts` only if it serves the loc-based editing flow; anything feature-shaped gets its own `create<Feature>Routes(deps)` module, concatenated in `createMiddleware`. Define the wire shapes in `protocol.ts` first, add the typed wrapper in `client/api.ts`, give the route a `maxBytes` cap, and pass any file path through `validateEditablePath` and `atomicWrite` — or the injected `writeText` for project text |
+| **A project file that must never be served** | One entry in `PRIVATE_FILES` (`src/server/private-files.ts`). Vite serves the project root, so anything written there is reachable at `/<name>` and `/@fs/<abs>` unless listed. `server.fs.deny` is not the seam: an array in user config *replaces* Vite's defaults rather than extending them |
 | **An entry-panel widget** | The name in `FieldType` (`protocol.ts`) plus a builder in `CONTROL_BUILDERS` (`client/editors/fields.ts`) — builders get `{field, raw, initial, placeholder, root}` and return `{value, dirty}`; label and error chrome are added for you. To *derive* it from a zod schema, map it in `schema-introspect.ts` (`terminalType` for schema shapes, `inferType` for value inference); if it is only ever forced via `entryEditor.collections`'s `fields.widget`, the registry entry alone is enough. Unknown types render as read-only `json`, so old clients degrade safely |
 | **A collection-designer capability** | The schema half is `src/patcher/content-config.ts` plus one route in `src/server/schema-routes.ts`; the editor half is a `FieldOverride` key, which goes through `writeOverrides` into the settings file and never near the config. A new schema *shape* means a new anchor in the patcher and a case in `tests/content-config-patch.test.ts`; a new field *type* means `renderZodField` **and** `terminalType`, kept in step by the round-trip test |
 | **An editable file type** | One `Patcher` implementation (`src/patcher/types.ts`) plus an entry in `patcher/registry.ts`, and the extension in the `editableExtensions` default in `src/index.ts` |
@@ -141,7 +143,7 @@ Every extension point is a registry or a factory. Expansion means adding a file 
 
 ## Tests
 
-Vitest characterization tests pin patcher and middleware behavior — they are the spec of current behavior. The client layer has no unit tests beyond `markdown.ts`; it is covered by a manual checklist.
+Vitest characterization tests pin patcher and middleware behavior. The client layer has no unit tests beyond `markdown.ts`; it is covered by a manual checklist.
 
 `tests/helpers.ts::locOf` computes the `line:col` an element would be annotated with, mirroring the loc rules in `astro.ts`; use it to build classify and apply requests.
 
