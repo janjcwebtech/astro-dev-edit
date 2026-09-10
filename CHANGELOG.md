@@ -14,6 +14,8 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-10
+
 ### Security
 
 - `.env.local` and the settings file are written `0600` from the temporary file onwards, closing the moment in which a new file's contents sat at the process umask before being renamed into place.
