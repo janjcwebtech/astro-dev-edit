@@ -1,6 +1,9 @@
 import type { TextWriter } from './text-writes.ts';
 import { chmod, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+// Static, not a lazy import inside readEnvKey: see the note in editor.ts. A
+// deferred import() runs after the config-loading module runner has closed.
+import { loadEnv } from 'vite';
 import type { SettingsSource } from '../shared/protocol.ts';
 import { upsertEnvVar } from '../patcher/dotenv.ts';
 import type { StoredOptions } from './options.ts';
@@ -151,12 +154,11 @@ async function readEnvKey(
 
   let value = '';
   try {
-    const { loadEnv } = await import('vite');
     // Empty prefix: return unprefixed variables too (the default `VITE_` prefix
     // would hide UNSPLASH_ACCESS_KEY entirely).
     value = (loadEnv('development', root, '')[name] ?? '').trim();
   } catch {
-    // vite unresolvable, or the project has no readable .env — fall through.
+    // The project has no readable .env — fall through.
   }
   if (!value) return { key: '', origin: null };
 
