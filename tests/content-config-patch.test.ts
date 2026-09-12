@@ -64,6 +64,12 @@ const works = defineCollection({
 export const collections = { blog, works };
 `;
 
+/** {@link FIXTURE} with `blog`'s first field replaced by a spread — the shape a
+ *  project uses to share a block of fields between two collections. Everything
+ *  else about the block is unchanged, which is the point: the fields beside the
+ *  spread stay patchable. */
+const SPREAD_FIXTURE = FIXTURE.replace('title: z.string(),', '...shared,');
+
 const field = (over: Partial<SchemaField> = {}): SchemaField => ({
   name: 'subtitle',
   type: 'text',
@@ -147,11 +153,30 @@ export const collections = { posts };
     expect(block.unrecognized).toMatch(/not a plain z.object/);
   });
 
-  it('refuses a field list holding a spread', () => {
-    const spread = FIXTURE.replace('title: z.string(),', '...shared,');
-    const block = readCollectionBlocks(spread)[0];
-    expect(block.schemaForm).toBeNull();
-    expect(block.unrecognized).toMatch(/other than plain/);
+  it('reads around a spread instead of refusing the whole block', () => {
+    const block = readCollectionBlocks(SPREAD_FIXTURE)[0];
+    expect(block.schemaForm).toBe('object');
+    expect(block.unrecognized).toBeUndefined();
+    // The spread is skipped, the literal entries beside it survive intact.
+    expect(block.fields.map((f) => f.name)).toEqual(['excerpt', 'date', 'category', 'draft']);
+    expect(block.opaqueEntries).toEqual(['...shared']);
+  });
+
+  it('reports a computed key the same way, and both kinds together', () => {
+    const computed = FIXTURE.replace('title: z.string(),', '[key]: z.string(),');
+    expect(readCollectionBlocks(computed)[0].opaqueEntries).toEqual(['[key]: z.string()']);
+
+    const both = SPREAD_FIXTURE.replace('draft: z.boolean().default(false),', '...(flag ? a : b),');
+    const block = readCollectionBlocks(both)[0];
+    expect(block.schemaForm).toBe('object');
+    expect(block.fields.map((f) => f.name)).toEqual(['excerpt', 'date', 'category']);
+    // A conditional spread is no more readable than a plain one, and isn't guessed at.
+    expect(block.opaqueEntries).toEqual(['...shared', '...(flag ? a : b)']);
+  });
+
+  it('still refuses a schema it cannot anchor on at all', () => {
+    const unbalanced = FIXTURE.replace('schema: z.object({', 'schema: z.object({{');
+    expect(readCollectionBlocks(unbalanced)[0].schemaForm).toBeNull();
   });
 
   it('marks a block absent from the registry', () => {
@@ -212,8 +237,22 @@ describe('addField', () => {
     expect(dup.ok === false && dup.code).toBe('exists');
     const gone = addField(FIXTURE, 'notes', field());
     expect(gone.ok === false && gone.code).toBe('missing');
-    const spread = addField(FIXTURE.replace('title: z.string(),', '...shared,'), 'blog', field());
-    expect(spread.ok === false && spread.code).toBe('unrecognized');
+    const helper = addField(
+      FIXTURE.replace('schema: z.object({', 'schema: buildSchema({'),
+      'blog',
+      field(),
+    );
+    expect(helper.ok === false && helper.code).toBe('unrecognized');
+  });
+
+  it('appends past a spread, which is what makes the new field win', () => {
+    const r = addField(SPREAD_FIXTURE, 'blog', field());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(lineDiff(SPREAD_FIXTURE, r.newSource).added).toEqual([
+      '    subtitle: z.string().optional(),',
+    ]);
+    expect(r.newSource).toContain('    ...shared,');
   });
 
   it('keeps a single-line schema on one line', () => {
@@ -290,6 +329,23 @@ describe('updateField', () => {
     const r = updateField(FIXTURE, 'blog', field({ name: 'nope' }));
     expect(r.ok === false && r.code).toBe('missing');
   });
+
+  it('retypes a field written beside a spread', () => {
+    const r = updateField(SPREAD_FIXTURE, 'blog', field({ name: 'draft', type: 'text' }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain('    draft: z.string().optional(),');
+    expect(r.newSource).toContain('    ...shared,');
+  });
+
+  it('refuses a field the spread brings in, and says where to change it', () => {
+    const r = updateField(SPREAD_FIXTURE, 'blog', field({ name: 'title' }));
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe('missing');
+    expect(r.error).toContain('...shared');
+    expect(r.error).toMatch(/where it is declared/);
+  });
 });
 
 describe('removeField', () => {
@@ -335,6 +391,43 @@ export const collections = { tags };
   it('refuses an unknown field', () => {
     const r = removeField(FIXTURE, 'blog', 'nope');
     expect(r.ok === false && r.code).toBe('missing');
+  });
+
+  it('removes the entry after a spread, taking its comma and not the spread\'s', () => {
+    const r = removeField(SPREAD_FIXTURE, 'blog', 'excerpt');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const diff = lineDiff(SPREAD_FIXTURE, r.newSource);
+    expect(diff.added).toEqual([]);
+    expect(diff.removed).toEqual(['    excerpt: z.string(),']);
+    expect(r.newSource).toContain('    ...shared,\n    // The teaser');
+  });
+
+  it('removes the last entry after a spread without a dangling comma', () => {
+    const src = SPREAD_FIXTURE.replace(
+      'draft: z.boolean().default(false),',
+      'draft: z.boolean().default(false)',
+    );
+    const r = removeField(src, 'blog', 'draft');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain("category: z.enum(['Editing', 'Workflow']).default('Editing')\n  }),");
+  });
+
+  it('leaves a schema that is nothing but a spread', () => {
+    const src = `import { defineCollection, z } from 'astro:content';
+const tags = defineCollection({
+  schema: z.object({
+    ...shared,
+    name: z.string(),
+  }),
+});
+export const collections = { tags };
+`;
+    const r = removeField(src, 'tags', 'name');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain('    ...shared,\n  }),');
   });
 });
 
@@ -387,6 +480,25 @@ describe('setSchemaForm', () => {
     expect(r.code).toBe('unsupported');
     expect(r.error).toContain('cover, thumbnail');
     expect(r.error).toContain('image()');
+  });
+
+  it('promotes a schema holding a spread, which is safe in that direction', () => {
+    const r = setSchemaForm(SPREAD_FIXTURE, 'blog', 'function');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.newSource).toContain('  schema: ({ image }) => z.object({');
+    expect(r.newSource).toContain('    ...shared,');
+  });
+
+  it('refuses to demote a schema holding a spread, since image() could be in it', () => {
+    const up = setSchemaForm(SPREAD_FIXTURE, 'blog', 'function');
+    expect(up.ok).toBe(true);
+    if (!up.ok) return;
+    const down = setSchemaForm(up.newSource, 'blog', 'object');
+    expect(down.ok).toBe(false);
+    if (down.ok) return;
+    expect(down.code).toBe('unsupported');
+    expect(down.error).toContain('...shared');
   });
 
   it('is a no-op when the form already matches', () => {

@@ -760,7 +760,16 @@ export interface CollectionSummary {
   /** How the `schema:` is written. Null when the designer couldn't read it — the
    *  panel then offers "open source" instead of controls. */
   schemaForm: SchemaForm | null;
-  /** Why the schema isn't patchable, when it isn't. */
+  /**
+   * Entries of the schema object that aren't written as `name: schema` — a
+   * spread, a computed key — verbatim, when there are any. The fields they
+   * contribute are in {@link fields} (Astro resolved them) but carry no
+   * {@link expressions} entry, so the panel renders them read-only and names
+   * these as the reason. Absent on the ordinary case, and never set together
+   * with {@link unrecognized}, which is the all-or-nothing refusal.
+   */
+  opaqueEntries?: string[];
+  /** Why the schema isn't patchable at all, when it isn't. */
   unrecognized?: string;
   /** Whether the const is registered in `export const collections`. */
   registered: boolean;
