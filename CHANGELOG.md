@@ -14,6 +14,10 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Changed
+
+- The package is published on npm: `npm install --save-dev astro-dev-edit`, rather than the `github:` install spec.
+
 ## [0.11.0] - 2026-09-12
 
 ### Added
