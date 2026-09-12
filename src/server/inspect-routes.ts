@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { extname } from 'node:path';
 import type { InspectOpenRequest } from '../shared/protocol.ts';
 import { launchInEditor } from './editor.ts';
+import { locateSelector } from './inspect-locate.ts';
 import type { OptionsResolver } from './options.ts';
 import { checkEditablePath } from './paths.ts';
 import type { Route } from './router.ts';
@@ -81,8 +82,6 @@ export function createInspectRoutes(deps: InspectRouteDeps): Route[] {
           options.contentRoots,
           openableExtensions(options.editableExtensions),
         );
-        // Lazy import so the pure locator can be unit-tested without fs.
-        const { locateSelector } = await import('./inspect-locate.ts');
         const source = await readFile(abs, 'utf8');
         const hit = locateSelector(source, selector, extname(abs).toLowerCase() === '.astro');
         const loc = hit ? `${hit.line}:${hit.col}` : null;

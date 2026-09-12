@@ -14,6 +14,10 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Fixed
+
+- Open-in-editor, the CSS inspector's `/inspect/open`, and reading `UNSPLASH_ACCESS_KEY` out of a `.env` file no longer fail once the package is installed from npm rather than linked from a path. The three request-time `await import()` calls are static imports, so nothing is loaded through the config module runner Astro closes after reading `astro.config.mjs`.
+
 ## [0.11.0] - 2026-09-12
 
 ### Added
