@@ -26,7 +26,8 @@ Dev middleware, mounted under `/__dev-edit`.
 | `middleware.ts` | Composition point: the localhost gate, the core loc-based routes (health, assets, upload, open, classify, apply), and the concatenated feature route groups |
 | `router.ts` | The dispatcher — body reading, JSON parse, size caps, error mapping |
 | `entry-routes.ts` | `/entry*` — the CMS endpoints, etag guards, field assembly, schema validation |
-| `schema-routes.ts` | The collection designer — `/collections`, `/collection/schema/apply`, `/collection/create`, `/collection/entries`, `/collection/open` |
+| `entry-resolve-routes.ts` | `/entry/resolve` — URL → backing entry, so no meta tag is needed. Resolve-only; every failure is a named refusal |
+| `schema-routes.ts` | The collection designer — `/collections`, `/collection/schema/apply`, `/collection/create`, `/collection/entries`, `/collection/open`, `/collection/page-editing` |
 | `inspect-routes.ts`, `page-source-routes.ts`, `settings-routes.ts`, `unsplash-routes.ts` | One feature group each |
 | `annotate.ts`, `private-files.ts` | The two injected Vite plugins, both ordering-critical: one annotates `.astro` source before the compiler, the other refuses to serve the files this integration writes |
 | `options.ts` | The option vocabulary, `OPTION_SPECS`, `DevEditOptions`, `DEFAULTS`, `createOptionsResolver` |
@@ -34,7 +35,9 @@ Dev middleware, mounted under `/__dev-edit`.
 | `text-writes.ts` | The single write seam |
 | `content-config.ts` | Loads the project's `content.config.ts` through the dev server |
 | `schema-introspect.ts` | zod object schema → `FieldDescriptor`s; owns `FIELD_TYPES` |
-| `route-manifest.ts` | Which file a route is written in, from `astro:routes:resolved` |
+| `route-manifest.ts` | Which file a route is written in, from `astro:routes:resolved`; and which routes are dynamic |
+| `entry-detect.ts` | Which collection a page route renders — a `getCollection('x')` scan, cached per file mtime |
+| `collection-entries.ts` | A collection directory's entry files and their ids; the `contentRoots` check both readers share |
 
 Each feature group is a `create<Feature>Routes(deps): Route[]` factory.
 
@@ -137,6 +140,7 @@ Every extension point is a registry or a factory. Expansion means adding a file 
 | **An endpoint** | One `Route` entry. The core table in `middleware.ts` only if it serves the loc-based editing flow; anything feature-shaped gets its own `create<Feature>Routes(deps)` module, concatenated in `createMiddleware`. Define the wire shapes in `protocol.ts` first, add the typed wrapper in `client/api.ts`, give the route a `maxBytes` cap, and pass any file path through `validateEditablePath` and `atomicWrite` — or the injected `writeText` for project text |
 | **A project file that must never be served** | One entry in `PRIVATE_FILES` (`src/server/private-files.ts`). Vite serves the project root, so anything written there is reachable at `/<name>` and `/@fs/<abs>` unless listed. `server.fs.deny` is not the seam: an array in user config *replaces* Vite's defaults rather than extending them |
 | **An entry-panel widget** | The name in `FieldType` (`protocol.ts`) plus a builder in `CONTROL_BUILDERS` (`client/editors/fields.ts`) — builders get `{field, raw, initial, placeholder, root}` and return `{value, dirty}`; label and error chrome are added for you. To *derive* it from a zod schema, map it in `schema-introspect.ts` (`terminalType` for schema shapes, `inferType` for value inference); if it is only ever forced via `entryEditor.collections`'s `fields.widget`, the registry entry alone is enough. Unknown types render as read-only `json`, so old clients degrade safely |
+| **A per-collection editor setting** | A key on `EntryEditorOptions.collections[<name>]` — **not** an `OPTION_SPECS` entry, which is flat scalars only. `mergeEntryEditor` already merges new sibling keys per collection with the config leaf winning, so resolution needs no change; give it a route shaped like `writePageEditing` and read the config layer through `optionsResolver.entryEditorConfig()` to know whether it is locked |
 | **A collection-designer capability** | The schema half is `src/patcher/content-config.ts` plus one route in `src/server/schema-routes.ts`; the editor half is a `FieldOverride` key, which goes through `writeOverrides` into the settings file and never near the config. A new schema *shape* means a new anchor in the patcher and a case in `tests/content-config-patch.test.ts`; a new field *type* means `renderZodField` **and** `terminalType`, kept in step by the round-trip test |
 | **An editable file type** | One `Patcher` implementation (`src/patcher/types.ts`) plus an entry in `patcher/registry.ts`, and the extension in the `editableExtensions` default in `src/index.ts` |
 | **A client editor or panel** | A module under `client/editors/`, opened from `client/router.ts`'s classification switch. Claim the interaction slot with `state.begin({kind: 'panel', close})` and release via `state.releaseIf`; for drawer-shaped UI use `editors/drawer.ts::openDrawer` and `ui.ts::footButton`. Build DOM through `ui.ts::styled` and `group.ts`, reusing `COLOR`/`FONT`/`INPUT_STYLE` |

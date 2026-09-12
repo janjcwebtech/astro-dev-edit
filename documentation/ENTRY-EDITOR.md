@@ -6,17 +6,18 @@ when you'd reach for these; this is the reference.
 
 - [Entry editor](#entry-editor)
 - [Setup per project](#setup-per-project)
+- [Switching page editing on](#switching-page-editing-on)
+- [Declaring the entry by hand](#declaring-the-entry-by-hand)
 - [`image()` fields are relative to the entry file](#image-fields-are-relative-to-the-entry-file)
-- [The page-source meta tag](#the-page-source-meta-tag)
+- [After a create or a delete](#after-a-create-or-a-delete)
 - [Collections — the collection designer](#collections--the-collection-designer)
 
 ## Entry editor
 
-On a detail page that declares its backing content file (the meta tag below),
-an **Edit entry** button is always visible (no need to enter edit mode —
-it's a one-click CMS action), and in edit mode clicking any collection-driven
-text offers **"Edit page content"**. Both open a drawer that edits the entry
-like a CMS would:
+On a detail page backed by a collection you have switched on, an **Edit entry**
+button is always visible (no need to enter edit mode — it's a one-click CMS
+action), and in edit mode clicking any collection-driven text offers **"Edit
+page content"**. Both open a drawer that edits the entry like a CMS would:
 
 **Frontmatter as typed form fields.** The field list, types, requiredness, defaults and enum options are **introspected from your own `content.config.ts` zod schema**, loaded through the dev server so it is always fresh.
 
@@ -60,7 +61,8 @@ like a CMS would:
 ### Setup per project
 
 1. Add the integration (above).
-2. Emit the meta tag from your detail-page layout (below).
+2. Switch page editing on for the collections you want to edit in place —
+   admin bar → **Collections** (below). Nothing else.
 3. Optional: tune fields via `entryEditor` config.
 
 The file→collection mapping follows the `src/content/<name>/` convention.
@@ -72,6 +74,7 @@ devEdit({
     // configPath: 'src/content.config.ts',      // auto-detected normally
     collections: {
       blog: {
+        // pageEditing: true,                    // normally set from the Collections drawer
         // dir: 'content/posts',                 // if not src/content/blog
         // extension: '.mdx',                    // for new entries; default: inferred (see below)
         fields: {
@@ -89,6 +92,85 @@ Widgets: `text`, `textarea`, `date`, `number`, `boolean`, `select`, `tags`,
 `image`, `json` (read-only). Fields whose zod shape the panel can't edit
 (nested objects, unions) render read-only as `json` — including an `image()`
 nested inside an object, which is a known gap.
+
+### Switching page editing on
+
+**Page editing is off for every collection until you switch it on.** Open the
+admin bar's **Collections** drawer and each collection row carries a **Content
+editor** switch. Turn one on and its detail pages get the entry drawer
+immediately — no restart, no reload, and nothing added to your templates.
+
+Under each collection's name the row shows the route it was matched to
+(`/articles/[...slug]`), so you can see what turning the switch on will affect
+before you do.
+
+**How the entry is found.** Three things have to line up, and any of them
+failing means no button rather than the wrong one:
+
+1. The URL's route is **dynamic** — it renders one entry, not a list. A listing
+   route like `/articles` has no single backing file and correctly gets nothing.
+2. The page's own source names the collection, via `getCollection('blog')` or
+   `getEntry('blog', …)`. This is what tells `/articles/…` apart from
+   `/works/…` when both collections happen to hold a `hello-world.md`.
+3. The URL's last segment matches an entry id in that collection — the file
+   path under the collection directory, minus the extension, nested folders
+   included.
+
+If your route fetches entries through a helper, step 2 finds nothing and every
+switched-on collection stays a candidate; a unique id still resolves, and a tie
+is refused rather than guessed. If **no** route naming the collection is found
+at all, the row says *no detail route* and the collection's own view offers the
+meta tag to emit instead — see below.
+
+Switching a collection **off** removes only the in-page drawer. The collection
+stays in the Collections drawer, and its entries stay editable from the
+**Items** tab, which is also how you reach a draft no rendered page links to.
+
+Setting `pageEditing` in `astro.config.mjs` takes precedence and renders the
+switch read-only with a padlock, the same way any config-set value does.
+
+### Declaring the entry by hand
+
+Emitting the meta tag **still works and still wins**, which is what it is for:
+a data source the tool cannot walk, or a route it cannot match. Put one
+**dev-only** tag in `<head>`:
+
+```astro
+---
+import type { CollectionEntry } from 'astro:content';
+const { entry } = Astro.props as { entry: CollectionEntry<'posts'> };
+---
+<head>
+  {import.meta.env.DEV && (
+    <meta
+      name="astro-dev-edit:page-source"
+      content={entry.filePath}
+    />
+  )}
+</head>
+```
+
+Rules of the contract:
+
+- **`content` must be the repo-relative path** to the file whose copy backs the
+  page. For glob-loader content collections that's `entry.filePath`
+  (e.g. `src/content/posts/my-post.mdx`). For other data sources, supply the
+  equivalent path yourself.
+- **Gate it on `import.meta.env.DEV`** so it never ships to production.
+- **Emit it only on detail pages** — routes that render *one* entry. Archive /
+  listing routes render a *set* of entries with no single backing file; leave
+  the meta off and they correctly fall back to plain "Open source".
+- The tag is checked before anything is resolved, so a page carrying one needs
+  no collection switched on and behaves exactly as it did before this existed.
+  If your layout renders inside a wrapper layout, make sure the meta ends up in
+  the document `<head>` (e.g. via a named `head` slot).
+- Entries must live under a configured `contentRoots` dir (default `src`).
+
+The tool does **not** write this tag into your layout for you. Doing so would
+mean guessing the entry variable's name, how your layouts wrap, and where the
+document `<head>` lives — three guesses it takes nowhere else. A collection
+that is switched on with no detected route offers the snippet with a **Copy**
+button instead.
 
 ### `image()` fields are relative to the entry file
 
@@ -117,48 +199,15 @@ field forced to the `image` widget via config — keep the original behaviour:
 `astro:assets` metadata (width/height/format) remains out of scope; the field
 edits the path.
 
-### The page-source meta tag
-
-**Opt in per detail-page layout** by emitting one **dev-only** meta tag into
-`<head>`:
-
-```astro
----
-import type { CollectionEntry } from 'astro:content';
-const { entry } = Astro.props as { entry: CollectionEntry<'posts'> };
----
-<head>
-  {import.meta.env.DEV && (
-    <meta
-      name="astro-dev-edit:page-source"
-      content={entry.filePath}
-    />
-  )}
-</head>
-```
-
-Rules of the contract:
-
-- **`content` must be the repo-relative path** to the file whose copy backs the
-  page. For glob-loader content collections that's `entry.filePath`
-  (e.g. `src/content/posts/my-post.mdx`). For other data sources, supply the
-  equivalent path yourself.
-- **Gate it on `import.meta.env.DEV`** so it never ships to production.
-- **Emit it only on detail pages** — routes that render *one* entry. Archive /
-  listing routes render a *set* of entries with no single backing file; leave
-  the meta off and they correctly fall back to plain "Open source".
-- Nothing auto-detects detail pages. The meta tag **is** the opt-in — if it's
-  absent, the entry button simply doesn't appear. If your layout renders inside
-  a wrapper layout, make sure the meta ends up in the document `<head>` (e.g.
-  via a named `head` slot).
-- Entries must live under a configured `contentRoots` dir (default `src`).
+### After a create or a delete
 
 After a create the browser navigates to the sibling URL (`/articles/<new-slug>`
 by convention), polling it first until Astro's content layer has synced the
 new file (up to ~10s) so you land on the rendered page, not a 404 — and that
 wait survives the reload the sync itself causes, so the page you end up on is
-the new entry either way; after a delete, to the parent listing. Projects with non-conventional detail routes
-still get the file written/removed — only the navigation guess differs.
+the new entry either way; after a delete, to the parent listing. Projects with
+non-conventional detail routes still get the file written/removed — only the
+navigation guess differs.
 
 
 ## Collections — the collection designer
@@ -169,7 +218,8 @@ still get the file written/removed — only the navigation guess differs.
 > `src/content.config.ts` after a save. `schemaEditor: false` keeps it read-only.
 
 **Collections** in the admin bar's overflow menu lists every collection your
-content config declares, opens one into its field table, and can append a new one.
+content config declares, carries the [page-editing switch](#switching-page-editing-on)
+for each, opens one into its field table, and can append a new one.
 It is its own drawer, alongside Settings rather than inside it: an option is a
 switch on this tool, while a collection's shape is your own committed source. It is
 part of the [entry editor](#entry-editor)

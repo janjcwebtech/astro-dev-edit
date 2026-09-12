@@ -8,9 +8,13 @@ interface Props {
   /**
    * Repo-relative path to the markdown/MDX file backing this page, e.g.
    * `src/content/blog/post.md`. When set, we emit the
-   * `astro-dev-edit:page-source` meta tag the integration reads to offer an
-   * "Edit page content" jump on detail pages whose text lives in markdown
-   * rather than the .astro template. (integration spec §16.2)
+   * `astro-dev-edit:page-source` meta tag, which **declares** the backing entry
+   * rather than letting the integration resolve it from the URL.
+   *
+   * Kept on /works only, on purpose. The integration now finds the entry itself
+   * for any collection switched on in its Collections drawer, so /articles
+   * passes nothing and exercises that path; this one stays as the fixture for
+   * the declared path, which still wins wherever it is present.
    *
    * Emitted in dev only, as the contract requires: it exists for an editor
    * that never runs in a build, and a built page would be publishing its own

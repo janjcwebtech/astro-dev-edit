@@ -21,6 +21,8 @@ import type {
   CollectionEntriesRequest,
   CollectionEntryItem,
   CollectionOpenRequest,
+  CollectionPageEditingRequest,
+  CollectionPageEditingResponse,
   CollectionRefusal,
   CollectionSchemaApplyRequest,
   CollectionSummary,
@@ -33,6 +35,12 @@ import type {
   EntryEditorOptions,
   EntrySchemaProvider,
 } from './content-config.ts';
+import {
+  MAX_ENTRIES_LISTED,
+  inContentRoots,
+  listEntryFiles,
+} from './collection-entries.ts';
+import type { DetailRoutes } from './entry-detect.ts';
 import { launchInEditor } from './editor.ts';
 import { ENTRY_EXTENSIONS } from './entry-routes.ts';
 import type { OptionsResolver, StoredOptions } from './options.ts';
@@ -86,6 +94,9 @@ export interface SchemaRouteDeps {
   optionsResolver: OptionsResolver;
   /** Collection/schema lookup. Null → the panel is told there is no config. */
   schemaProvider: EntrySchemaProvider | null;
+  /** Which dynamic route renders which collection, for the page-editing status.
+   *  Null → the panel shows no detail route rather than a wrong one. */
+  detailRoutes: DetailRoutes | null;
 }
 
 /** Extensions a content config may have — the tail of `CONFIG_CANDIDATES`. */
@@ -97,11 +108,6 @@ const DIR_RE = /^[A-Za-z0-9_\-./]+$/;
 
 /** A glob pattern, conservatively. Same reason as {@link DIR_RE}. */
 const PATTERN_RE = /^[A-Za-z0-9_\-./*{}[\],!()]+$/;
-
-/** Cap on one Items listing. Each entry costs a stat and a frontmatter parse, so
- *  a pathological directory can't turn a panel open into a long scan. Exceeding
- *  it is reported, never hidden. */
-const MAX_ENTRIES_LISTED = 500;
 
 /** Frontmatter keys tried, in order, for an entry's display title. */
 const TITLE_KEYS = ['title', 'name', 'heading', 'label'];
@@ -132,7 +138,7 @@ function refuse(code: CollectionRefusal, error: string): RouteResult {
 }
 
 export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
-  const { logger, root, optionsResolver, schemaProvider } = deps;
+  const { logger, root, optionsResolver, schemaProvider, detailRoutes } = deps;
   const writeText: TextWriter = deps.writeText ?? directWrite;
 
   /** The gate every route in this group starts at. */
@@ -200,6 +206,13 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
      *  wrote from what the project's config owns. */
     storedFields: Record<string, FieldOverride>,
   ): Promise<CollectionSummary> {
+    // Read off the config layer directly rather than inferred by comparing
+    // effective against stored: a config and a stored value that agree are
+    // indistinguishable that way, and a switch the panel draws as writable while
+    // resolution ignores it is worse than one drawn locked.
+    const pageEditingLocked =
+      optionsResolver.entryEditorConfig()?.collections?.[info.collection]?.pageEditing !==
+      undefined;
     const { exists, count } = await countEntries(info.dir);
     // No resolvable schema: fall back to the field names the *source* names, so
     // the row isn't empty. Types are unknown, which `json` is the honest answer
@@ -231,6 +244,12 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
       lockedFields: Object.entries(info.fieldConfig)
         .filter(([name, effective]) => !sameOverride(effective, storedFields[name]))
         .map(([name]) => name),
+      pageEditing: info.pageEditing === true,
+      pageEditingLocked,
+      // Null is a real answer, not a missing one: a data collection no dynamic
+      // route renders has no detail route, and the panel says so rather than
+      // implying the switch will produce a button somewhere.
+      detailRoute: (await detailRoutes?.patternFor(info.collection)) ?? null,
     };
   }
 
@@ -301,6 +320,10 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
                 collection: block.name,
                 dir: `src/content/${block.name}`,
                 schema: null,
+                // The provider returns nothing for this name only when the
+                // config module failed to load *and* nothing configures it
+                // explicitly — so the stored layer is the whole answer here.
+                pageEditing: stored.collections?.[block.name]?.pageEditing === true,
                 fieldConfig: {},
               },
               block,
@@ -444,11 +467,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
         // conventional directory rather than answering "no such collection".
         const dir = info?.dir ?? `src/content/${collection}`;
         const dirAbs = resolve(root, dir);
-        const relDir = relative(root, dirAbs);
-        const inRoot = contentRoots.some(
-          (cr) => relDir === cr || relDir.startsWith(cr.endsWith(sep) ? cr : cr + sep),
-        );
-        if (!insideRoot(root, dirAbs) || !inRoot) {
+        if (!inContentRoots(root, dirAbs, contentRoots)) {
           return refuse('unsupported', `${dir} is outside the editable content roots.`);
         }
         if (!existsSync(dirAbs)) {
@@ -457,25 +476,61 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
 
         const { options } = await optionsResolver.resolve();
         const extensions = ENTRY_EXTENSIONS.filter((e) => options.editableExtensions.includes(e));
-        const names = (await readdir(dirAbs, { recursive: true }))
-          .map(String)
-          .filter((f) => extensions.some((e) => f.endsWith(e)))
-          .sort();
-        const truncated = names.length > MAX_ENTRIES_LISTED;
+        const { names, truncated } = await listEntryFiles(dirAbs, extensions);
         const entries: CollectionEntryItem[] = [];
-        for (const name of names.slice(0, MAX_ENTRIES_LISTED)) {
+        for (const name of names) {
           entries.push(await describeEntry(dir, dirAbs, name));
         }
         entries.sort((a, b) => b.mtime - a.mtime);
         if (truncated) {
-          logger.info(
-            `${collection}: listing the first ${MAX_ENTRIES_LISTED} of ${names.length} entries`,
-          );
+          logger.info(`${collection}: listing the first ${MAX_ENTRIES_LISTED} entries`);
         }
         return {
           status: 200,
           body: { collection, dir, entries, ...(truncated ? { truncated: true } : {}) },
         };
+      },
+    },
+
+    // Switch one collection's in-page entry drawer on or off. Its own route
+    // rather than a corner of /collection/schema/apply, whose `overrides` are
+    // keyed per field while this is one flag about the collection — and it saves
+    // on the flip, because the list view it is drawn in has no Save button.
+    //
+    // Gated on `entryEditor` and deliberately NOT on `schemaEditor`: this writes
+    // `.astro-dev-edit.json`, the local gitignored half, exactly as a widget or
+    // label does. No committed source is touched.
+    {
+      method: 'POST',
+      path: '/collection/page-editing',
+      maxBytes: 1024,
+      label: 'collection page editing',
+      handler: async (body) => {
+        const { enabled: on } = await gate();
+        if (!on) return refuse('disabled', 'The entry editor is disabled by configuration.');
+        const { collection, enabled } = (body ?? {}) as CollectionPageEditingRequest;
+        if (!collection || typeof collection !== 'string') {
+          throw new Error('collection is required');
+        }
+        if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
+
+        // Refusing to store a value resolution would ignore, the same stance
+        // `/settings` takes for a config-owned option and `writeAccessKey` takes
+        // for a config-supplied key.
+        if (
+          optionsResolver.entryEditorConfig()?.collections?.[collection]?.pageEditing !== undefined
+        ) {
+          return refuse(
+            'disabled',
+            `Page editing for ${collection} is set in astro.config.mjs, which takes precedence. ` +
+              'Remove it there to manage it from this panel.',
+          );
+        }
+
+        const result = await writePageEditing(collection, enabled);
+        if (!result.ok) return refuse('unsupported', result.error);
+        const response: CollectionPageEditingResponse = { ok: true, pageEditing: enabled };
+        return { status: 200, body: response };
       },
     },
 
@@ -589,6 +644,42 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
    * *removed* rather than stored, so reverting a row in the panel leaves the file
    * as it was instead of accumulating no-op entries.
    */
+  /**
+   * Switch a collection's page editing on or off in the stored options.
+   *
+   * Shaped exactly like {@link writeOverrides} — read-modify-write at every
+   * level, never replacing a sibling — with one addition: **off is written by
+   * removing the key**, not by storing `false`. Off is already the default, so a
+   * stored `false` would be a husk that says nothing, and the collection entry
+   * itself is dropped when nothing else is left in it.
+   */
+  async function writePageEditing(
+    collection: string,
+    enabled: boolean,
+  ): Promise<{ ok: true; changed: boolean } | { ok: false; error: string }> {
+    try {
+      const stored = await readStoredOptions(root);
+      const detail: EntryEditorOptions = stored.entryEditor || {};
+      const collections = { ...detail.collections };
+      const { pageEditing: _was, ...rest } = { ...collections[collection] };
+      if (enabled) collections[collection] = { ...rest, pageEditing: true };
+      else if (Object.keys(rest).length > 0) collections[collection] = rest;
+      else delete collections[collection];
+
+      const before = JSON.stringify(detail.collections ?? {});
+      if (before === JSON.stringify(collections)) return { ok: true, changed: false };
+
+      await saveStoredOptions(root, {
+        ...stored,
+        entryEditor: { ...detail, collections },
+      }, deps.writeText);
+      logger.info(`page editing ${enabled ? 'on' : 'off'}: ${collection}`);
+      return { ok: true, changed: true };
+    } catch (err) {
+      return { ok: false, error: `could not save page editing: ${String(err)}` };
+    }
+  }
+
   async function writeOverrides(
     collection: string,
     patch: Record<string, FieldOverride | null>,

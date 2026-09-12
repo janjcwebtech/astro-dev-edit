@@ -440,6 +440,19 @@ export interface OptionsResolver {
   /** Resolve for one request. Cheap — one small JSON read, the same cost
    *  `resolveUnsplashKey` already pays per request. */
   resolve(): Promise<OptionsResolution>;
+  /**
+   * The **config layer's** `entryEditor` alone, unmerged — what the project
+   * literally wrote in `astro.config.mjs`, or undefined when it wrote nothing.
+   *
+   * `resolve()` deliberately hands back only effective values, which cannot
+   * answer "does the config own this?" for a leaf inside `entryEditor`: a config
+   * and a stored value that happen to agree are indistinguishable there. The
+   * collection designer needs that answer per collection — a switch it renders
+   * as writable but resolution would ignore is worse than a locked one — so the
+   * layer is exposed rather than inferred. Synchronous: this is the value the
+   * dev server started with, and it cannot change without a restart.
+   */
+  entryEditorConfig(): EntryEditorOptions | undefined;
 }
 
 /** Deep-merge `entryEditor`, config leaf winning over stored leaf.
@@ -521,6 +534,11 @@ export function createOptionsResolver(deps: OptionsResolverDeps): OptionsResolve
   const { root, configOptions } = deps;
 
   return {
+    entryEditorConfig() {
+      // `false` is the kill switch, not a detail — it owns no per-collection leaf.
+      return configOptions.entryEditor === false ? undefined : configOptions.entryEditor;
+    },
+
     async resolve() {
       // Every failure inside degrades to "nothing stored", so a corrupt or
       // unreadable settings file falls back to config + defaults rather than

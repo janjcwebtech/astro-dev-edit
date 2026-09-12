@@ -59,9 +59,28 @@ export type RouteLookup =
   | { ok: true; file: string; pattern: string }
   | { ok: false; refusal: PageSourceRefusal };
 
+/** A page route that renders one thing per URL. */
+export interface DynamicPage {
+  /** The route pattern, e.g. "/articles/[...slug]". */
+  pattern: string;
+  /** Root-relative, forward-slashed entrypoint. */
+  file: string;
+}
+
 export interface RouteManifest {
   /** The file the given browser pathname's page is written in, or a refusal. */
   forPathname(pathname: string): RouteLookup;
+  /**
+   * Every **dynamic** page route whose entrypoint is a file in this project.
+   *
+   * "Dynamic" is read off the pattern rather than the regex: a bracketed
+   * segment is how Astro spells "this route renders one of a set", and it is
+   * the only routes worth asking which collection they render. Static pages are
+   * left out because a listing route has no single backing entry, and openable
+   * is filtered the same way {@link forPathname} filters it — a package-owned or
+   * absent entrypoint is nothing a caller can read.
+   */
+  dynamicPages(): DynamicPage[];
 }
 
 export interface RouteManifestConfig {
@@ -111,7 +130,29 @@ export function createRouteManifest(cfg: RouteManifestConfig): RouteManifest {
     return p.startsWith('/') ? p : `/${p}`;
   }
 
+  /** Root-relative, forward-slashed, or null when it is not a file we may read. */
+  function openable(entrypoint: string): string | null {
+    const abs = resolve(cfg.root, entrypoint.split('/').join(sep));
+    if (!insideRoot(cfg.root, abs) || isPackageOwned(abs)) return null;
+    if (!exists(abs)) return null;
+    return relative(cfg.root, abs).split(sep).join('/');
+  }
+
   return {
+    dynamicPages() {
+      const out: DynamicPage[] = [];
+      const seen = new Set<string>();
+      for (const route of cfg.routes()) {
+        if (route.type !== 'page') continue;
+        if (!route.pattern.includes('[')) continue;
+        const file = openable(route.entrypoint);
+        if (file === null || seen.has(route.pattern)) continue;
+        seen.add(route.pattern);
+        out.push({ pattern: route.pattern, file });
+      }
+      return out;
+    },
+
     forPathname(pathname) {
       const routes = cfg.routes();
       if (routes.length === 0) return { ok: false, refusal: 'no-routes' };

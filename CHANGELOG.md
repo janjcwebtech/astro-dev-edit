@@ -14,6 +14,16 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Added
+
+- Collections you switch on get the entry drawer on their detail pages with no `astro-dev-edit:page-source` meta tag: the backing entry is resolved from the URL. A **Content editor** switch per collection row in the Collections drawer, stored as `entryEditor.collections.<name>.pageEditing`, plus `POST /entry/resolve` and `POST /collection/page-editing`. The meta tag still works and still wins where it is present.
+- The refusal notice offers **Turn on for `<collection>`** when it can name the entry backing the page but that collection is switched off.
+- `ui.ts::switchControl` — a switch, for a named capability that is live rather than an answer waiting for Save. Track and thumb wear the `full` radius, which until now only a badge did.
+
+### Changed
+
+- A Collections list row carries no trailing chevron. The row's hover fill and focus ring are the affordance, and the space belongs to the **Content editor** switch that now sits there.
+
 ## [0.10.0] - 2026-09-10
 
 ### Security

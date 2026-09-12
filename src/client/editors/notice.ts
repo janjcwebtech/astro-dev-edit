@@ -1,9 +1,10 @@
 import type { SourceLoc } from '../../shared/protocol.ts';
 import { clearHighlight } from '../hover.ts';
-import { pageSource } from '../page-source.ts';
+import { pageEntryInfo, pageSource, resolvePageSource } from '../page-source.ts';
 import { trapFocus } from '../focus.ts';
 import * as state from '../state.ts';
-import { basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
+import { basename, buildBackdrop, buildPanel, styled, toast, wirePanelButtons } from '../ui.ts';
+import * as api from '../api.ts';
 import { openEntryPanel } from './entry.ts';
 import { mount } from '../shadow.ts';
 
@@ -12,6 +13,13 @@ import { mount } from '../shadow.ts';
  * nested markup, components). Offers "Open source" — and, when the page
  * declares a backing content file, a primary "Edit page content" action that
  * opens the CMS entry drawer for it.
+ *
+ * There is a third case between those two, and it is the one worth explaining.
+ * The server can often name the entry backing a page whose collection the user
+ * has **not** switched on — it knows the file, it knows the collection, and the
+ * only thing missing is permission. Saying nothing there would be the old
+ * silence this feature exists to end: you clicked text that plainly comes from
+ * somewhere, and the tool knows where. So the notice offers the switch by name.
  */
 
 export interface NoticeOptions {
@@ -75,6 +83,41 @@ export function showDynamicNotice(
     body.append(hint);
   }
 
+  // Found the entry, but its collection is switched off — and not by the config,
+  // which would make the offer a button that refuses.
+  const found = pageEntryInfo();
+  const offer =
+    !contentFile &&
+    found?.refusal === 'not-enabled' &&
+    found.collection &&
+    found.entryFile &&
+    !found.pageEditingLocked
+      ? { collection: found.collection, file: found.entryFile }
+      : null;
+  if (offer) {
+    const hint = styled('p', 'atx-notice-hint');
+    hint.textContent =
+      `This page's content is in ${basename(offer.file)}, from the ${offer.collection} ` +
+      'collection. Page editing is off for it — switch it on and this text is editable ' +
+      'as form fields.';
+    body.append(hint);
+  }
+
+  /** Switch the collection on, then open the drawer the user was after. The
+   *  re-resolve is what puts Edit entry in the admin bar, through the
+   *  page-source subscription. */
+  const enableAndEdit = async (collection: string, file: string): Promise<void> => {
+    try {
+      await api.setCollectionPageEditing({ collection, enabled: true });
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not switch page editing on', 'err');
+      return;
+    }
+    await resolvePageSource();
+    toast(`Page editing on for ${collection}`, 'ok');
+    void openEntryPanel(file);
+  };
+
   const close = (): void => {
     state.releaseIf(token);
     releaseFocus();
@@ -95,13 +138,15 @@ export function showDynamicNotice(
       close();
       if (contentFile) {
         void openEntryPanel(contentFile);
+      } else if (offer) {
+        void enableAndEdit(offer.collection, offer.file);
       } else {
         openSource(src);
       }
     },
-    contentFile
+    contentFile || offer
       ? {
-          confirmLabel: 'Edit page content',
+          confirmLabel: contentFile ? 'Edit page content' : `Turn on for ${offer!.collection}`,
           secondaryLabel: 'Open template',
           onSecondary: () => {
             openSource(src);

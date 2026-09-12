@@ -49,7 +49,7 @@ Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6
 - **Strings that arrive through an expression.** A value pulled from the frontmatter is followed back to the string that produced it, and you edit that string, with the trace of where it came from.
 - **Text carrying inline markup.** A heading broken by a `<br>`, or a sentence with a `<strong>` in it, opens over the raw source with a row of insertable tags: `br`, `strong`, `em`, `b`, `i`, `u`, `a`, `span`, `code`, `small`, `sup`, `sub`.
 - **Images.** Click one and you get a preview, the file name and size, the alt text, and the six images most recently added to the project. The full picker lists everything in your asset directories, with a filter, an upload button and an Unsplash tab if you add an access key.
-- **Markdown and MDX entries.** On a page rendered from a content collection, **Edit entry** opens a drawer of typed form fields generated from your own zod schema, and the body as rich text or as raw markdown. It looks like a small CMS panel, but it reads and writes the entry file directly. You can create and delete entries from here too.
+- **Markdown and MDX entries.** Switch a collection on in the **Collections** drawer and its pages get **Edit entry**: a drawer of typed form fields generated from your own zod schema, and the body as rich text or as raw markdown. It looks like a small CMS panel, but it reads and writes the entry file directly. The tool finds the backing entry from the URL, so there is nothing to add to your templates. You can create and delete entries from here too.
 - **Collection schemas.** The designer lists every collection you declare and lets you add a field, retype one, remove one, or build a collection from scratch. Those edits patch your `content.config.ts`.
 
 ## Other features
@@ -103,7 +103,7 @@ Every option, with its default and what it does: [Configuration reference](https
 | Doc                                  | What's in it                                                 |
 | ------------------------------------ | ------------------------------------------------------------ |
 | Editing reference                    | Everything the overlay can edit, and every surface it draws  |
-| Entry editor and collection designer | The CMS drawer, the meta tag, schema editing                 |
+| Entry editor and collection designer | The CMS drawer, switching it on per collection, schema editing |
 | Media picker and Unsplash            | Choosing, uploading and importing images                     |
 | Configuration reference              | Every option, the Settings drawer, and which source wins     |
 | Styling reference                    | The --atx-\* properties and ::part() names you can theme     |

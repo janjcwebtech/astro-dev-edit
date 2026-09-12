@@ -28,6 +28,13 @@ export interface EntryEditorOptions {
       /** Extension for entries created via the panel. When omitted it is
        *  inferred from the collection's existing entries (falling back to .md). */
       extension?: '.md' | '.mdx';
+      /**
+       * Offer the entry drawer on this collection's detail pages. Off by
+       * default: switching it on — from the Collections panel, or here — is
+       * what replaces hand-emitting the `astro-dev-edit:page-source` meta tag.
+       * Setting it here locks the panel's switch, like any other config value.
+       */
+      pageEditing?: boolean;
       fields?: Record<string, EntryFieldOverride>;
     }
   >;
@@ -42,6 +49,10 @@ export interface EntryCollectionInfo {
   /** Configured extension for new entries; when absent the create route
    *  infers one from the collection's existing entries. */
   extension?: '.md' | '.mdx';
+  /** Whether this collection's detail pages offer the entry drawer — the
+   *  effective value, config over stored. Absent reads as off, so a caller that
+   *  knows nothing about the switch (a test stub) leaves it off. */
+  pageEditing?: boolean;
   fieldConfig: Record<string, EntryFieldOverride>;
 }
 
@@ -148,6 +159,7 @@ export function createSchemaProvider(
       dir: collectionDir(explicit, name),
       schema: entry ? await resolveSchema(entry.schema) : null,
       extension: explicit[name]?.extension,
+      pageEditing: explicit[name]?.pageEditing === true,
       fieldConfig: explicit[name]?.fields ?? {},
     };
   }

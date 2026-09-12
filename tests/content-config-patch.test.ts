@@ -166,6 +166,7 @@ export const collections = { posts };
     expect(blocks.map((b) => [b.name, b.schemaForm])).toEqual([
       ['blog', 'object'],
       ['works', 'function'],
+      ['events', 'object'],
     ]);
     expect(blocks.every((b) => b.registered && !b.unrecognized)).toBe(true);
   });

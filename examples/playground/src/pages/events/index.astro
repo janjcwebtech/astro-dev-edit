@@ -1,0 +1,38 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+
+const events = (await getCollection('events')).sort(
+  (a, b) => a.data.date.valueOf() - b.data.date.valueOf(),
+);
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+---
+<Base title="Events · Copydesk">
+  <section class="section">
+    <div class="container">
+      <!-- Literal intro copy (editable) -->
+      <p class="eyebrow">Out and about</p>
+      <h1>Workshops, talks and one clinic</h1>
+      <p class="lead" style="max-width:55ch;">
+        Where we are talking about editing next. Small rooms, mostly, and
+        usually a site on the screen being changed in front of you.
+      </p>
+
+      <!-- Mapped over the collection, so these cards are the non-editable
+           path — the words belong to the markdown, not this template. -->
+      <div class="grid grid-3" style="margin-top:2.5rem;">
+        {events.map((event) => (
+          <a class="article-card" href={`/events/${event.id}`}>
+            <div class="body">
+              <p class="meta">{event.data.format} · {fmt(event.data.date)}</p>
+              <h3>{event.data.title}</h3>
+              <p>{event.data.summary}</p>
+              <p class="meta">{event.data.location}{event.data.soldOut ? ' · sold out' : ''}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Base>

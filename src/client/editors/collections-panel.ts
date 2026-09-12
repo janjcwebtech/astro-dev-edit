@@ -19,9 +19,11 @@ import {
   inputEl,
   setButtonEnabled,
   styled,
+  switchControl,
   toast,
 } from '../ui.ts';
 import { card, item, itemGroup } from '../group.ts';
+import { openCopyPanel } from './copy-panel.ts';
 import { openDrawer } from './drawer.ts';
 import { openEntryCreatePanel, openEntryPanel } from './entry.ts';
 
@@ -419,6 +421,57 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     } else root.append(renderList(data));
   }
 
+  /**
+   * The one control that decides whether a collection's detail pages offer the
+   * entry drawer — what replaces hand-emitting the page-source meta tag.
+   *
+   * It sits on the **list row** and **saves on the flip**, which is deliberate
+   * on both counts: this view has no Save button (`onPrimary(null)`), and
+   * switching several collections on is the first thing anyone does here.
+   *
+   * A row is its own hit target, so the switch has to stop its own events
+   * reaching it — otherwise every flip would also navigate into the collection.
+   */
+  function pageEditingSwitch(c: CollectionSummary): HTMLElement {
+    // A switch, not a checkbox: this is a live capability that is on or off
+    // right now, not an answer inside a form waiting for Save. It is named
+    // rather than labelled On/Off — "On" beside a collection says nothing about
+    // *what* is on, and the row has room for the two words that do.
+    const sw = switchControl(
+      'Content editor',
+      c.pageEditing,
+      (wanted) => {
+        sw.input.disabled = true;
+        void api.setCollectionPageEditing({ collection: c.name, enabled: wanted }).then(
+          () => {
+            toast(`Content editor ${wanted ? 'on' : 'off'} for ${c.name}`, 'ok');
+            // Reload rather than patch the row in place: the detected route and
+            // the "no detail route" badge are part of the same answer, and a row
+            // that kept a stale one would be worse than a brief spinner.
+            load();
+          },
+          (err: unknown) => {
+            sw.input.checked = !wanted;
+            sw.input.disabled = false;
+            toast(err instanceof Error ? err.message : 'Could not save', 'err');
+          },
+        );
+      },
+      // Every row says "Content editor"; the name has to say which one.
+      `Content editor for ${c.name}`,
+    );
+    sw.root.classList.add('atx-collections-pageedit');
+    if (c.pageEditingLocked) {
+      sw.input.disabled = true;
+      sw.root.append(icon('lock', 12));
+      sw.root.title = 'Set in astro.config.mjs, which takes precedence.';
+    }
+    // The row owns click and Enter/Space; without this every flip navigates.
+    sw.root.addEventListener('click', (e) => e.stopPropagation());
+    sw.root.addEventListener('keydown', (e) => e.stopPropagation());
+    return sw.root;
+  }
+
   function renderList(d: CollectionsResponse): HTMLElement {
     const wrap = styled('div', 'atx-collections-list');
 
@@ -461,8 +514,19 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         title: c.name,
         description: `${c.dir} · ${c.entryCount} ${c.entryCount === 1 ? 'entry' : 'entries'} · ${c.fields.length} fields`,
         media: icon('collections', 16),
-        actions: [icon('chevronRight', 16)],
+        actions: [pageEditingSwitch(c)],
       });
+      // The route the switch actually affects, on its own line rather than
+      // appended to the description: it answers a different question — not
+      // "what is this collection" but "where would turning this on show up" —
+      // and a dot-separated list that wraps leaves a separator dangling. Shown
+      // whether the switch is on or off, so you can see what it would do before
+      // you do it.
+      if (c.detailRoute) {
+        const route = styled('div', 'atx-collections-route');
+        route.append(icon('file', 11), textNode(c.detailRoute));
+        row.content.append(route);
+      }
       row.root.classList.add('atx-collections-row', `atx-collections-row-${c.name}`);
       // A row is the whole hit target, so it carries the button semantics
       // rather than nesting a button that would only cover its label.
@@ -474,6 +538,9 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         row.title.append(badge('schema not loaded', 'warn'));
       }
       if (!c.dirExists) row.title.append(badge('directory missing', 'warn'));
+      // Switched on with nothing to switch on *for*: worth saying, because the
+      // user has just asked for a button that will not appear anywhere.
+      if (c.pageEditing && !c.detailRoute) row.title.append(badge('no detail route', 'warn'));
       row.root.addEventListener('click', () => goDetail(c.name));
       row.root.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -485,6 +552,76 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     }
     listCard.body.append(list);
     return wrap;
+  }
+
+  /**
+   * What the switch on the list row means for *this* collection.
+   *
+   * A note rather than a second switch: two controls bound to one value is a
+   * source of disagreement, not convenience. What this adds instead is the
+   * detail the row has no space for — which route was detected, and, when none
+   * was, the meta tag that reaches these entries anyway.
+   *
+   * The tool deliberately does not write that tag into the project's layout: it
+   * would have to guess the entry variable's name, how the layout is wrapped,
+   * and where the document `<head>` lives — three guesses this project takes
+   * nowhere else. Handing over the snippet is the honest substitute.
+   */
+  function pageEditingNote(c: CollectionSummary): HTMLElement {
+    if (!c.pageEditing) {
+      return note(
+        [
+          icon('file', 12),
+          textNode(
+            'Content editor is off. Switch it on in the collections list and ' +
+              (c.detailRoute
+                ? `${c.detailRoute} gets an Edit entry button.`
+                : "this collection's detail pages get an Edit entry button."),
+          ),
+        ],
+        'muted',
+      );
+    }
+    if (c.detailRoute) {
+      return note(
+        [
+          icon('file', 12),
+          textNode(`Content editor is on — ${c.detailRoute} offers Edit entry, with no meta tag.`),
+        ],
+        'muted',
+      );
+    }
+    const snippet =
+      '{import.meta.env.DEV && (\n' +
+      '  <meta name="astro-dev-edit:page-source" content={entry.filePath} />\n' +
+      ')}';
+    const n = note(
+      [
+        icon('alert', 12),
+        textNode(
+          'Content editor is on, but no route naming this collection was found — it may ' +
+            "fetch its entries through a helper. Emit this in the detail page's <head>, " +
+            'with your own entry variable, and the drawer works there too:',
+        ),
+      ],
+      'warn',
+    );
+    const pre = styled('pre', 'atx-collections-snippet');
+    pre.textContent = snippet;
+    n.classList.add('atx-collections-note-snippet');
+    n.append(pre, cornerButton('Copy', 'copy', () => void copySnippet(c.name, snippet)));
+    return n;
+  }
+
+  async function copySnippet(collection: string, snippet: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(snippet);
+      toast(`Copied the meta tag for ${collection}`, 'ok');
+    } catch {
+      // The same fallback the copy-context flow takes: an insecure context has
+      // no clipboard API, and a panel the user can select from still works.
+      openCopyPanel(`${collection} page-source meta`, snippet);
+    }
   }
 
   function renderDetail(d: CollectionsResponse, c: CollectionSummary): HTMLElement {
@@ -512,6 +649,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       (c.schemaForm === 'function' ? ' · function schema (image() available)' : '') +
       (c.schemaForm === 'object' ? ' · plain z.object schema' : '');
     wrap.append(meta);
+    wrap.append(pageEditingNote(c));
 
     const items = buildItemsPane(c);
     const tabs = buildTabs(

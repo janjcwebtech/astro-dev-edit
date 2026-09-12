@@ -286,7 +286,9 @@ export const PAPER = {
  * - `md` (8px) — a small or icon button, a menu item, a tree row, a tab
  * - `lg` (10px) — a form control and a full-size button; the workhorse rung
  * - `xl` (14px) — a panel, a drawer, a card, a modal
- * - `full` — a badge or a status chip, and nothing else
+ * - `full` — a badge, a status chip, and a switch's track and thumb. A switch
+ *   is on the list because a pill *is* the shape that reads as one; nothing
+ *   else joins without the same argument
  *
  * A button and the field beside it share `lg`, which is what makes a row of
  * mixed controls line up as one object rather than as parts.
@@ -654,10 +656,68 @@ export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElemen
  *  before acting, `muted` for a state that is merely worth saying. */
 export type BadgeTone = 'warn' | 'muted';
 
+export interface SwitchControl {
+  /** The label + track, as one clickable unit. */
+  root: HTMLElement;
+  /** The underlying checkbox, for `checked` and `disabled`. */
+  input: HTMLInputElement;
+}
+
+/**
+ * A switch: a named capability that is on or off right now.
+ *
+ * **Not a checkbox, and the difference is the sentence each one completes.** A
+ * checkbox answers a question about the thing being edited — *is this field
+ * required?* — and takes effect when the form is saved. A switch flips
+ * something that is live, and it reads as its own label: *Content editor, on*.
+ * Reach for it when the control **is** the setting, and for a checkbox when the
+ * control is one answer inside a form.
+ *
+ * Built on a real `input[type=checkbox]` with `role="switch"` rather than a
+ * `<button>` carrying state in JS: `appearance: none` takes the painting and
+ * leaves every keyboard and assistive behaviour where it was — Space toggles,
+ * the label click works because a `<label>` wraps both halves, and `:checked`
+ * does the styling with no state to keep in step. `role="switch"` is what makes
+ * a screen reader say "switch, on" instead of "checkbox, checked".
+ *
+ * Geometry is shadcn's, measured off the live reference rather than remembered:
+ * a 32×18 track, a 16px thumb inset 1px, and 14px of travel.
+ */
+export function switchControl(
+  label: string,
+  checked: boolean,
+  onChange: (on: boolean) => void,
+  /**
+   * A fuller accessible name, for a switch whose visible label repeats down a
+   * list ("Content editor" on every collection row). It **must contain the
+   * visible label** — a speech user says what they see, so a name that replaced
+   * it rather than extending it would leave the control unreachable by voice
+   * (WCAG 2.5.3). Omit it wherever the visible label is already unique.
+   */
+  accessibleName?: string,
+): SwitchControl {
+  const root = styled('label', 'atx-switch-row');
+  const text = styled('span', 'atx-switch-label');
+  text.textContent = label;
+  // `styled`, not `inputEl`: the shared control baseline carries `min-height:
+  // 32px`, which no width or height here could win against. Every other
+  // checkbox in the overlay opts out the same way.
+  const input = styled('input', 'atx-switch');
+  input.type = 'checkbox';
+  input.role = 'switch';
+  input.checked = checked;
+  // Without this the wrapping <label> is the whole name, which is right until
+  // the same words appear on every row of a list.
+  if (accessibleName) input.ariaLabel = accessibleName;
+  input.addEventListener('change', () => onChange(input.checked));
+  root.append(text, input);
+  return { root, input };
+}
+
 /**
  * A short chip qualifying whatever it sits beside — "experimental", "draft",
- * "not registered". One word or two, radius `full`, and the only thing in the
- * overlay that wears that radius.
+ * "not registered". One word or two, radius `full`, which it shares only with a
+ * switch's track.
  *
  * It is an outline rather than a fill on purpose: a filled chip beside a title
  * competes with it for the eye, and a badge is a footnote to the name, not a

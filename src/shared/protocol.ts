@@ -345,7 +345,8 @@ export interface SchemaFieldSpec {
 
 // --- POST /entry -------------------------------------------------------------
 export interface EntryRequest {
-  /** Repo-relative path from the page-source meta tag. */
+  /** Repo-relative path — from the page-source meta tag, from `/entry/resolve`,
+   *  or from an Items row. */
   file: string;
 }
 export interface EntryResponse {
@@ -364,6 +365,68 @@ export interface EntryResponse {
   /** Markdown body, \n-normalized. */
   body: string;
   bodyEditable: boolean;
+}
+
+// --- POST /entry/resolve -----------------------------------------------------
+/**
+ * "Which content entry backs the page I am looking at?" — the meta tag's job,
+ * done by the server so a project need not emit one.
+ *
+ * Three layers narrow the answer, and each may refuse:
+ *
+ *  1. Astro's route manifest maps the pathname to a page file and a pattern. A
+ *     pattern with no dynamic segment renders a *set* of entries, so it is not
+ *     a detail page and gets no entry.
+ *  2. That page file is **scanned** for `getCollection('x')` / `getEntry('x'`,
+ *     which binds the route to a collection rather than inferring one from the
+ *     other. A route that fetches through a helper names nothing, and every
+ *     enabled collection stays a candidate.
+ *  3. The pathname's tail is matched against the candidates' entry ids.
+ *
+ * A refusal is an answer: the entry button stays hidden exactly as it does on a
+ * page with no meta tag today.
+ */
+export interface EntryResolveRequest {
+  /** `location.pathname` as the browser has it, base prefix included — the
+   *  server strips the configured base itself, as `/page-source` does. */
+  pathname: string;
+}
+
+/** Why no entry was resolved.
+ *  `disabled` — the entry editor is off; `no-routes` — the manifest is empty;
+ *  `no-match` — no page route matches; `not-detail` — the route is static, so it
+ *  renders a set rather than one entry; `not-enabled` — an entry *was* found and
+ *  its collection has page editing switched off; `no-entry` — nothing on disk
+ *  matches the pathname's tail (a dead URL a dynamic pattern still matched);
+ *  `ambiguous` — two collections hold that id and nothing chose between them. */
+export type EntryResolveRefusal =
+  | 'disabled'
+  | 'no-routes'
+  | 'no-match'
+  | 'not-detail'
+  | 'not-enabled'
+  | 'no-entry'
+  | 'ambiguous';
+
+export interface EntryResolveResponse {
+  /** Repo-relative entry file — exactly what `POST /entry` takes. Null unless
+   *  the entry resolved **and** its collection has page editing on. */
+  file: string | null;
+  /**
+   * The collection the page renders. Also set on `not-enabled`, together with
+   * {@link entryFile}, so the refusal notice can name what it is offering to
+   * switch on rather than saying "a collection".
+   */
+  collection: string | null;
+  /** The entry that was found while refusing `not-enabled`. Never editable —
+   *  it exists so the offer can name the file it would open. */
+  entryFile: string | null;
+  /** With `not-enabled`: whether `astro.config.mjs` owns the switch. True means
+   *  the offer is not made, because the write behind it would be refused. */
+  pageEditingLocked: boolean;
+  /** The route pattern that matched, e.g. "/articles/[...slug]". */
+  pattern: string | null;
+  refusal: EntryResolveRefusal | null;
 }
 
 // --- POST /entry/apply -------------------------------------------------------
@@ -711,6 +774,23 @@ export interface CollectionSummary {
    * `locked` honesty {@link OptionDescriptor} has, applied per field.
    */
   lockedFields: string[];
+  /**
+   * Whether this collection's detail pages offer the entry drawer. Off by
+   * default: switching it on is what replaces hand-emitting the page-source
+   * meta tag. Editor-half state — it lives in `.astro-dev-edit.json` beside the
+   * field overrides, never in the project's committed content config.
+   */
+  pageEditing: boolean;
+  /** True when `astro.config.mjs` owns {@link pageEditing}, so the row's switch
+   *  renders read-only for the same reason a config-set widget does. */
+  pageEditingLocked: boolean;
+  /**
+   * The route pattern whose page file names this collection, e.g.
+   * "/articles/[...slug]". Null when no dynamic page route was found to render
+   * it — a data collection, or a route that fetches through a helper. The panel
+   * says so rather than implying the switch will do nothing.
+   */
+  detailRoute: string | null;
 }
 
 export interface CollectionsResponse {
@@ -801,6 +881,27 @@ export interface CollectionEntriesResponse {
   /** True when the directory held more entries than the endpoint will read. The
    *  panel says so rather than presenting a partial list as complete. */
   truncated?: boolean;
+}
+
+// --- POST /collection/page-editing -------------------------------------------
+/**
+ * Switch a collection's in-page entry drawer on or off.
+ *
+ * Its own route rather than a corner of `/collection/schema/apply`, whose
+ * `overrides` are keyed **per field**: this is one flag about the collection.
+ * It writes the editor half (`.astro-dev-edit.json`), so it is gated on
+ * `entryEditor` and deliberately **not** on `schemaEditor` — no committed
+ * source is touched.
+ */
+export interface CollectionPageEditingRequest {
+  collection: string;
+  enabled: boolean;
+}
+
+export interface CollectionPageEditingResponse {
+  ok: boolean;
+  /** The value now in force, re-resolved after the write. */
+  pageEditing: boolean;
 }
 
 // --- POST /collection/open ---------------------------------------------------

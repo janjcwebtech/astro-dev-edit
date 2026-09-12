@@ -83,6 +83,35 @@ function manifest(routes: readonly ResolvedRouteLike[] = ROUTES, base = '/') {
   return createRouteManifest({ root, base, routes: () => routes });
 }
 
+describe('createRouteManifest().dynamicPages', () => {
+  // The reverse direction: not "which page serves this URL" but "which pages
+  // render one of a set", which is the only kind worth scanning for a
+  // getCollection() call. Static pages are left out because a listing route has
+  // no single backing entry to find.
+  it('lists dynamic page routes only, with their patterns', () => {
+    expect(manifest().dynamicPages()).toEqual([
+      { pattern: '/blog/[slug]', file: 'src/pages/blog/[slug].astro' },
+      { pattern: '/articles/[...slug]', file: 'src/pages/articles/[...slug].astro' },
+    ]);
+  });
+
+  it('skips endpoints, and entrypoints that are not files in this project', () => {
+    const routes = [
+      page('/api/[id]', /^\/api\/([^/]+?)$/, 'src/pages/api/[id].ts', 'endpoint'),
+      page('/gone/[id]', /^\/gone\/([^/]+?)$/, 'src/pages/gone/[id].astro'),
+      page('/ok/[id]', /^\/ok\/([^/]+?)$/, 'src/pages/blog/[slug].astro'),
+    ];
+    // /gone's entrypoint was never written to the temp root.
+    expect(manifest(routes).dynamicPages()).toEqual([
+      { pattern: '/ok/[id]', file: 'src/pages/blog/[slug].astro' },
+    ]);
+  });
+
+  it('is empty before the routes hook has fired', () => {
+    expect(manifest([]).dynamicPages()).toEqual([]);
+  });
+});
+
 describe('createRouteManifest().forPathname', () => {
   it('resolves static routes, with or without the trailing slash', () => {
     expect(manifest().forPathname('/')).toEqual({

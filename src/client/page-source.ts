@@ -1,18 +1,27 @@
+import type { EntryResolveRefusal } from '../shared/protocol.ts';
+import * as api from './api.ts';
+import { has } from './features.ts';
+
 /**
- * The content file backing a detail page, if the page declares one.
+ * The content file backing a detail page — where the page's real copy lives.
  *
  * Detail routes (e.g. `/area/<slug>/`) render a markdown/MDX entry through a
  * template, so their dynamic text — the title, body prose, etc. — lives in a
- * `.md`/`.mdx` file, not in the `.astro` the source loc points at. Editing that
- * text in place needs expression-following (spec §16.3), which isn't built. As
- * a fast interim (§16.2), a page can opt in by emitting
- *   <meta name="astro-dev-edit:page-source" content="src/content/…/x.mdx">
- * and we surface an "Edit page content" jump-to-source button on the refusal
- * notice, the entry pill, and the copied element context.
+ * `.md`/`.mdx` file, not in the `.astro` the source loc points at. Knowing that
+ * file is what turns the refusal into an "Edit page content" jump and puts the
+ * entry drawer in the admin bar.
+ *
+ * **Two ways to know it, and the page's own declaration wins.** A layout may
+ * emit `<meta name="astro-dev-edit:page-source" content="src/content/…/x.mdx">`,
+ * which needs no server round trip and covers data sources the tool cannot walk.
+ * Otherwise the server resolves it from the URL — see {@link resolvePageSource}
+ * — for every collection whose page editing is switched on. The meta tag is
+ * checked first on every call, so a page that declares one behaves exactly as it
+ * always has.
  *
  * Its own module rather than a corner of editors/notice.ts: it's a fact about
- * the page, read by three unrelated callers, and it must stay importable
- * without dragging in the overlay's DOM-side modules.
+ * the page, read by four unrelated callers, and it must stay importable without
+ * dragging in the overlay's DOM-side modules.
  */
 const META = 'astro-dev-edit:page-source';
 
@@ -42,7 +51,7 @@ function warnLegacyMeta(): void {
   );
 }
 
-export function pageSource(): string | null {
+function metaSource(): string | null {
   const meta = document.querySelector<HTMLMetaElement>(`meta[name="${META}"]`);
   const content = meta?.content?.trim();
   if (!content) {
@@ -50,4 +59,85 @@ export function pageSource(): string | null {
     return null;
   }
   return content;
+}
+
+/** What the server last said about this URL. Null until a resolve has landed. */
+export interface PageEntryInfo {
+  /** The collection the page renders, when one was identified. Set on a
+   *  `not-enabled` refusal too, which is what lets the notice name it. */
+  collection: string | null;
+  /** The entry that was found, editable or not. */
+  entryFile: string | null;
+  /** Whether `astro.config.mjs` owns the collection's page-editing switch. */
+  pageEditingLocked: boolean;
+  refusal: EntryResolveRefusal | null;
+}
+
+let resolved: string | null = null;
+let info: PageEntryInfo | null = null;
+
+/**
+ * Told whenever a resolve lands.
+ *
+ * This module owns the cached answer, so it is the only thing that knows when
+ * the answer changed — and the admin bar's entry button is the thing that has
+ * to notice. A subscription here beats every caller of {@link resolvePageSource}
+ * remembering to refresh the bar afterwards: the refusal notice re-resolves
+ * after switching a collection on, and that path gets the refresh for free.
+ */
+const listeners = new Set<() => void>();
+
+export function onPageSourceChange(fn: () => void): void {
+  listeners.add(fn);
+}
+
+/**
+ * The backing entry, or null.
+ *
+ * **Stays synchronous.** Its four callers — the admin bar's visibility
+ * predicate, the entry button's click, the refusal notice and the copied
+ * element context — all run inside code that cannot await, and the bar
+ * re-evaluates them on every `refresh()` anyway. So the async half writes into
+ * a cache and this reads it, rather than the callers changing shape.
+ */
+export function pageSource(): string | null {
+  return metaSource() ?? resolved;
+}
+
+/** What the last resolve found, for a caller that needs the refusal and not
+ *  just the file — the notice's offer to switch a collection on. */
+export function pageEntryInfo(): PageEntryInfo | null {
+  return info;
+}
+
+/**
+ * Ask the server which entry backs this URL, and cache the answer.
+ *
+ * Called at boot, after every HMR update, and after the refusal notice switches
+ * a collection on. Every listener is told when it lands, whichever of those it
+ * was.
+ *
+ * Skipped entirely when the page declares a meta tag (it would win regardless)
+ * or the entry editor is off. A failed request is a cleared cache, not a thrown
+ * error: not knowing the backing entry is the state this feature exists to
+ * improve on, and it is a state the overlay already handles everywhere.
+ */
+export async function resolvePageSource(): Promise<void> {
+  resolved = null;
+  info = null;
+  if (metaSource() === null && has('entryEditor')) {
+    try {
+      const res = await api.resolveEntry({ pathname: location.pathname });
+      resolved = res.file;
+      info = {
+        collection: res.collection,
+        entryFile: res.entryFile,
+        pageEditingLocked: res.pageEditingLocked,
+        refusal: res.refusal,
+      };
+    } catch {
+      /* no answer is the same as no meta tag: the entry surfaces stay hidden */
+    }
+  }
+  for (const fn of listeners) fn();
 }
