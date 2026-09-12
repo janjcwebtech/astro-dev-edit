@@ -680,6 +680,28 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         ),
       );
     }
+    if (c.opaqueEntries?.length) {
+      // Not a warning: the schema is fine and most of it is editable. This says
+      // which part isn't, so a disabled control reads as a boundary rather than
+      // as the designer being broken.
+      const what = c.opaqueEntries.join(', ');
+      fieldsPane.append(
+        note(
+          [
+            icon('lock', 12),
+            textNode(
+              `This schema builds ${c.opaqueEntries.length === 1 ? 'part' : 'parts'} of its field ` +
+                `list from ${what}, which is declared elsewhere. The fields ${
+                  c.opaqueEntries.length === 1 ? 'it brings' : 'they bring'
+                } in are ` +
+                'read-only here — edit them where they are declared. Every field written out in ' +
+                'this schema stays editable, and a new one can still be added.',
+            ),
+          ],
+          'muted',
+        ),
+      );
+    }
     if (c.fieldSource === 'source' && c.schemaForm !== null) {
       fieldsPane.append(
         note(
@@ -886,6 +908,10 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     // A field the schema doesn't declare (inferred, or absent from the source)
     // can't be retyped — there is nothing to patch. Its editor half still works.
     const inSchema = expr !== undefined;
+    // Astro resolved it, but the config text doesn't write it out: it arrives
+    // through an entry the patcher skipped. Saying "not in schema" about a field
+    // that plainly *is* in the schema would read as a bug in the panel.
+    const elsewhere = !inSchema && f.source === 'schema' && Boolean(c.opaqueEntries?.length);
     const schemaEditable = writable && inSchema && f.type !== 'json';
 
     const card = styled('div', `atx-collections-field atx-collections-field-${f.name}`);
@@ -894,7 +920,7 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
     const nameEl = styled('span', 'atx-collections-field-name');
     nameEl.textContent = f.name;
     head.append(nameEl);
-    if (!inSchema) head.append(badge('not in schema', 'muted'));
+    if (!inSchema) head.append(badge(elsewhere ? 'declared elsewhere' : 'not in schema', 'muted'));
     head.append(styled('span', 'atx-collections-spacer'));
 
     const listeners: Array<() => void> = [];

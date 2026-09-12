@@ -79,9 +79,19 @@ export interface CollectionBlock {
   name: string;
   /** Null when the schema key is absent or its shape wasn't recognized. */
   schemaForm: SchemaForm | null;
-  /** Fields in source order. Empty when the schema wasn't recognized. */
+  /** Fields written out as `name: schema`, in source order. Empty when the
+   *  schema wasn't recognized. */
   fields: RawSchemaField[];
-  /** Why the schema can't be patched, when it can't. */
+  /**
+   * Entries of the schema object that are not `name: schema` — a spread, a
+   * computed key — verbatim and whitespace-collapsed, in source order. The
+   * fields they contribute are real and Astro resolves them; this patcher
+   * cannot name them, let alone locate their bytes, so they are reported
+   * rather than guessed at. Present with a readable {@link schemaForm}: the
+   * block is patchable, just not exhaustively.
+   */
+  opaqueEntries: string[];
+  /** Why the schema can't be patched at all, when it can't. */
   unrecognized?: string;
   /** Whether the const appears in `export const collections`. */
   registered: boolean;
@@ -305,8 +315,10 @@ interface Entry {
 /**
  * Top-level `key: value` entries of the object literal whose `{` is at
  * `braceOpen`. Anything that isn't a plain key (a spread, a computed key, a
- * shorthand, a method) comes back with `name: null` — callers refuse rather than
- * patch a list they can't fully account for.
+ * shorthand, a method) comes back with `name: null`. Such an entry stays in the
+ * list — every span this module edits is measured against its neighbours — and
+ * each caller decides for itself: the registry refuses, the schema field list
+ * patches around it.
  */
 function readEntries(code: string, braceOpen: number, braceClose: number): Entry[] {
   const entries: Entry[] = [];
@@ -411,6 +423,7 @@ function locate(source: string): Located {
         ...base,
         schemaForm: null,
         fields: [],
+        opaqueEntries: [],
         unrecognized: 'the defineCollection(…) call is unbalanced',
         schemaValueStart: -1,
         zodObjectAt: -1,
@@ -431,6 +444,7 @@ function unreadable(reason: string): SchemaPart {
   return {
     schemaForm: null,
     fields: [],
+    opaqueEntries: [],
     unrecognized: reason,
     schemaValueStart: -1,
     zodObjectAt: -1,
@@ -488,12 +502,18 @@ function readSchema(source: string, code: string, argOpen: number, argClose: num
 
   const entries = readEntries(code, fieldsOpen, fieldsClose);
   const fields: RawSchemaField[] = [];
+  const opaqueEntries: string[] = [];
   for (const e of entries) {
     const name = e.name === '' ? readQuotedKey(source, e.start) : e.name;
+    // A spread or a computed key contributes fields whose names live in another
+    // expression — often another module. Skipping the entry keeps its bytes
+    // accounted for in `entries`, so every span this module edits is still
+    // correct, while the fields around it stay patchable. Refusing the whole
+    // block instead would disable the designer for a collection whose other
+    // fields are written out plainly right beside it.
     if (!name) {
-      return unreadable(
-        'the schema field list holds something other than plain `name: schema` entries',
-      );
+      opaqueEntries.push(source.slice(e.start, e.end).replace(/\s+/g, ' '));
+      continue;
     }
     e.name = name;
     fields.push({ name, expr: source.slice(e.valueStart, e.end) });
@@ -501,6 +521,7 @@ function readSchema(source: string, code: string, argOpen: number, argClose: num
   return {
     schemaForm: form,
     fields,
+    opaqueEntries,
     schemaValueStart: schemaEntry.valueStart,
     zodObjectAt: at,
     fieldsOpen,
@@ -568,6 +589,7 @@ export function readCollectionBlocks(source: string): CollectionBlock[] {
     name: b.name,
     schemaForm: b.schemaForm,
     fields: b.fields,
+    opaqueEntries: b.opaqueEntries,
     ...(b.unrecognized ? { unrecognized: b.unrecognized } : {}),
     registered: b.registered,
     line: source.slice(0, b.blockStart).split('\n').length,
@@ -693,6 +715,30 @@ function patchable(
   return { ok: true, found };
 }
 
+/**
+ * The refusal for a field the schema object doesn't write out. When the object
+ * also holds an entry this module skipped, the field may well exist — Astro
+ * resolves it — and the name is the one thing that can't be checked from here,
+ * so the message says where to look instead of insisting it isn't there.
+ */
+function noSuchField(
+  collection: string,
+  name: string,
+  found: LocatedBlock,
+): { ok: false; error: string; code: ConfigRefusalCode } {
+  if (found.opaqueEntries.length === 0) {
+    return { ok: false, code: 'missing', error: `${collection} has no "${name}" field.` };
+  }
+  return {
+    ok: false,
+    code: 'missing',
+    error:
+      `${collection} has no \`${name}:\` entry in its schema object. ` +
+      `It may come from ${found.opaqueEntries.join(' or ')}, which this designer can't edit — ` +
+      'change it where it is declared.',
+  };
+}
+
 /** Add a field to a collection's schema. */
 export function addField(source: string, collection: string, field: SchemaField): ConfigPatchResult {
   const target = patchable(source, collection);
@@ -776,9 +822,7 @@ export function updateField(
   if (!target.ok) return target;
   const { found } = target;
   const entry = found.entries.find((e) => e.name === field.name);
-  if (!entry) {
-    return { ok: false, code: 'missing', error: `${collection} has no "${field.name}" field.` };
-  }
+  if (!entry) return noSuchField(collection, field.name, found);
   const rendered = renderZodField(field, found.schemaForm ?? 'object');
   if (!rendered.ok) return { ok: false, code: 'unsupported', error: rendered.error };
   return {
@@ -822,6 +866,20 @@ export function setSchemaForm(
         source.slice(0, found.zodObjectAt) + '({ image }) => ' + source.slice(found.zodObjectAt),
     };
   }
+  // An entry this module skipped may contribute a field that calls image(),
+  // and there is no way to read one that lives in another module. Demoting on
+  // that guess would take the helper out of scope and stop the collection
+  // building, so the honest answer is to refuse and name the entry.
+  if (found.opaqueEntries.length > 0) {
+    return {
+      ok: false,
+      code: 'unsupported',
+      error:
+        `${collection}: ${found.opaqueEntries.join(', ')} ${found.opaqueEntries.length === 1 ? 'contributes' : 'contribute'} ` +
+        'fields this designer cannot read, so it cannot prove none of them uses image(). ' +
+        'Turn Image fields off in the config instead.',
+    };
+  }
   const users = found.fields.filter((f) => usesImageHelper(f.expr)).map((f) => f.name);
   if (users.length > 0) {
     return {
@@ -857,9 +915,7 @@ export function removeField(source: string, collection: string, name: string): C
   if (!target.ok) return target;
   const { found } = target;
   const idx = found.entries.findIndex((e) => e.name === name);
-  if (idx === -1) {
-    return { ok: false, code: 'missing', error: `${collection} has no "${name}" field.` };
-  }
+  if (idx === -1) return noSuchField(collection, name, found);
   const entry = found.entries[idx];
   const code = blankNonCode(source);
 
