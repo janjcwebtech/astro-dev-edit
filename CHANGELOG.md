@@ -14,6 +14,8 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-12
+
 ### Added
 
 - Collections you switch on get the entry drawer on their detail pages with no `astro-dev-edit:page-source` meta tag: the backing entry is resolved from the URL. A **Content editor** switch per collection row in the Collections drawer, stored as `entryEditor.collections.<name>.pageEditing`, plus `POST /entry/resolve` and `POST /collection/page-editing`. The meta tag still works and still wins where it is present.
