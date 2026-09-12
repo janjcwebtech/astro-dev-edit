@@ -999,7 +999,9 @@ input[type='checkbox'].atx-switch {
 input[type='checkbox'].atx-switch::before {
   content: '';
   position: absolute;
-  left: 2px;
+  /* Against the padding box, inside the 1px transparent border the shared
+     checkbox rule gives every box: 1px here is the 2px the thumb reads as. */
+  left: 1px;
   width: 14px;
   height: 14px;
   border-radius: var(--atx-radius-full);
