@@ -176,9 +176,12 @@ export async function checkEditablePath(
 }
 
 /**
- * Throwing form of {@link checkEditablePath} — the gate every *writing* or
- * file-launching route passes through. Unchanged in behavior: any refusal is
- * an Error. (spec §8)
+ * Throwing form of {@link checkEditablePath} — the gate every *writing* route
+ * passes through. Unchanged in behavior: any refusal is an Error. (spec §8)
+ *
+ * Read-only and editor-launching routes call `checkEditablePath` instead and
+ * answer an `outside-roots` path with a verdict; that path is real, it is just
+ * not ours, and the overlay offers affordances on such elements itself.
  */
 export async function validateEditablePath(
   root: string,

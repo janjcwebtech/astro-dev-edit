@@ -1092,6 +1092,13 @@ input[type='checkbox'].atx-switch:disabled {
   color: var(--atx-primary-fg);
 }
 
+/* A refusal, not a failure. The warning token is ink on a panel everywhere
+   else; as a fill it carries dark type, the way destructive does above. */
+.atx-toast-warn {
+  background: var(--atx-warning);
+  color: var(--atx-primary-fg);
+}
+
 /* The save veil's rect is measured off a host element, so its geometry is the
    one thing that stays inline. */
 .atx-veil {

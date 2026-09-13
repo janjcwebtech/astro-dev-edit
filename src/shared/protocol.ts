@@ -133,6 +133,19 @@ export interface OpenRequest {
   /** "line:col"; omitted or empty opens the file at its top. */
   loc?: string;
 }
+/**
+ * `ok` false with `refused` set is a **verdict, not a failure**: the path is
+ * real but outside the editable content roots — a package component, most
+ * often the `astro:assets` <Image>. The overlay offers *open* on exactly the
+ * elements /classify has already refused, so this answers in the same calm
+ * tone those do rather than erroring on an affordance it offered itself.
+ * Genuine anomalies (missing file, escaping the root, disallowed extension)
+ * still come back as a 400. No editor is launched either way.
+ */
+export interface OpenResponse {
+  ok: boolean;
+  refused?: string;
+}
 
 // --- POST /page-source -------------------------------------------------------
 /**

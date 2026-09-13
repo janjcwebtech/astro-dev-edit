@@ -261,9 +261,29 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
         if (!file) throw new Error('file is required');
         // Same gate as /classify and /apply: realpath ∈ root ∈ contentRoots,
         // allowed extension. /open only spawns an editor, but it takes the
-        // same client-supplied paths, and every legitimate caller targets a
-        // file that already passed this gate. (spec §8)
-        const abs = await validateEditablePath(root, o.contentRoots, o.editableExtensions, file);
+        // same client-supplied paths. (spec §8)
+        //
+        // Softened for `outside-roots` exactly as /peek and /classify are, and
+        // for the same reason: the hover pill offers *open* on an element
+        // /classify has just answered `dynamic` for with PACKAGE_OWNED_REASON,
+        // so the route has to answer that path with a verdict instead of
+        // erroring on an affordance the overlay offered itself. Every other
+        // refusal — missing, escaping the root, wrong extension — still throws.
+        const check = await checkEditablePath(root, o.contentRoots, o.editableExtensions, file);
+        if (!check.ok) {
+          if (check.code !== 'outside-roots') throw new Error(check.reason);
+          return {
+            status: 200,
+            body: {
+              ok: false,
+              refused:
+                check.abs && isPackageOwned(check.abs)
+                  ? PACKAGE_OWNED_REASON
+                  : OUT_OF_ROOT_REASON,
+            },
+          };
+        }
+        const abs = check.abs;
         const [line, col] = (loc ?? '').split(':');
         const spec = line ? `${abs}:${line}${col ? ':' + col : ''}` : abs;
         await launchInEditor(spec);
