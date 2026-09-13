@@ -24,3 +24,5 @@ temp/
 # Real-site test fixtures cloned into examples/ (never committed)
 examples/airbnb/
 examples/sf-sf/
+examples/01-example-site-2/
+examples/astro-cloudflare-starter/
