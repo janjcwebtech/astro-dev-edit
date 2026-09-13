@@ -14,6 +14,8 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-13
+
 ### Added
 
 - The refusal on an element rendered by a package names where the component was **used** — the nearest enclosing element written in your own source — and its button opens that file there. An `astro:assets` `<Image>` annotates to `node_modules/astro/components/Image.astro`, which is neither editable nor openable; the jump lands on the call site instead.
