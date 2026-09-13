@@ -800,6 +800,24 @@ export interface CollectionSummary {
    * says so rather than implying the switch will do nothing.
    */
   detailRoute: string | null;
+  /**
+   * What entry resolution's fallback will do on this collection's detail pages
+   * when {@link detailRoute} is null. Null when it isn't — a named route binds
+   * the collection outright and the question doesn't arise.
+   *
+   * A null {@link detailRoute} means *the scan could not prove which route*,
+   * not *no route exists*: the scan reads only string-literal
+   * `getCollection('x')` in the page file, so a route fetching through a helper
+   * defeats it. Resolution then treats every declared collection as a candidate
+   * and matches the URL's tail against entry ids, which answers fine — unless
+   * another collection holds an entry of the same id, where it refuses
+   * `ambiguous` and the page-source meta tag is the real answer.
+   *
+   * - `resolves` — entries exist and no id is shared. The drawer will work.
+   * - `ambiguous` — at least one id is shared with another collection.
+   * - `no-entries` — nothing to match against.
+   */
+  pageEditingFallback: 'resolves' | 'ambiguous' | 'no-entries' | null;
 }
 
 export interface CollectionsResponse {
