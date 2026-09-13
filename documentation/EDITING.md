@@ -48,7 +48,7 @@ Every refusal names its reason and offers an *Open source* jump. On a detail pag
 
 - **Not traceable to a string** — an expression the AST cannot resolve, a component, `set:html`, or block-level nested markup.
 - **Rendered by a component or a slot** — it has no source location of its own, because Astro annotates only what is written in the file, so the click is answered about the nearest element that *has* one. The notice names the tag you clicked, since the reason belongs to that ancestor: a one-word button can be refused for "containing nested markup" that lives in the wrapper around it.
-- **Rendered by a package** — `astro:assets`' `<Image>` renders through `node_modules/astro/components/Image.astro`, and that is the path its annotation carries. Edit the `<Image>` usage in your own component instead. Package paths are never writable: `contentRoots` does not include `node_modules`, and widening it is not a supported fix.
+- **Rendered by a package** — `astro:assets`' `<Image>` renders through `node_modules/astro/components/Image.astro`, and that is the path its annotation carries. Edit the `<Image>` usage in your own component instead. Package paths are never writable: `contentRoots` does not include `node_modules`, and widening it is not a supported fix. The *Open source* jump on such an element repeats the refusal rather than opening anything, so the answer is the same wherever you ask for it.
 
 ![A markup popup showing the raw source of an h2 with a br in it, above a row of insertable tags: br, strong, em, b, i, u, a, span, code, small, sup, sub](images/markup.png)
 

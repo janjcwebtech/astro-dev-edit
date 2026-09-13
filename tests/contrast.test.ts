@@ -150,10 +150,12 @@ describe('overlay colours that carry foreground text', () => {
     });
   }
 
-  // `primary` is near-white and `destructive` is a light red: both are loud
-  // fills that carry *dark* ink, which is the shadcn idiom and the opposite of
-  // the brand fill above. Getting this backwards is invisible until it ships.
-  for (const bg of ['primary', 'destructive'] as const) {
+  // `primary` is near-white, `destructive` a light red and `warning` a light
+  // amber: all three are loud fills that carry *dark* ink, which is the shadcn
+  // idiom and the opposite of the brand fill above. Getting this backwards is
+  // invisible until it ships. `warning` earns its place here because the
+  // refused-open toast fills with it; everywhere else it is ink on a panel.
+  for (const bg of ['primary', 'destructive', 'warning'] as const) {
     it(`primaryFg clears AA on ${bg}`, () => {
       expect(contrast(COLOR.primaryFg, COLOR[bg])).toBeGreaterThanOrEqual(AA_TEXT);
     });

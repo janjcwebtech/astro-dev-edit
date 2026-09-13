@@ -203,10 +203,17 @@ document.addEventListener('keydown', (e) => {
 // Wiring
 // ---------------------------------------------------------------------------
 
-/** Open a source location in the user's editor, reporting the result. */
+/** Open a source location in the user's editor, reporting the result. A
+ *  refusal is a verdict, not a failure — the pill offers *open* on package-owned
+ *  elements the classifier has already refused — so it gets the warn tone and
+ *  the server's own sentence, matching the notice shown one panel earlier. */
 async function openSource(src: SourceLoc): Promise<void> {
   try {
-    await api.open({ file: src.file, loc: src.loc });
+    const res = await api.open({ file: src.file, loc: src.loc });
+    if (!res.ok) {
+      toast(res.refused ?? `Can't open ${basename(src.file)} — it isn't yours to edit`, 'warn');
+      return;
+    }
     toast(`Opened ${basename(src.file)}:${src.loc} in your editor`, 'ok');
   } catch (err) {
     toast(`Could not open source — ${err instanceof Error ? err.message : 'unknown'}`, 'err');

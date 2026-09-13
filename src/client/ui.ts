@@ -486,8 +486,9 @@ export function lockElement(el: HTMLElement): () => void {
 }
 
 /** Bottom-center toast, lifted clear of a bottom-docked admin bar. `kind` sets
- *  the accent. Auto-dismisses. */
-export function toast(message: string, kind: 'ok' | 'err'): void {
+ *  the accent: `err` is something that went wrong, `warn` something the tool
+ *  declined to do on purpose. Auto-dismisses. */
+export function toast(message: string, kind: 'ok' | 'err' | 'warn'): void {
   const t = styled('div', `atx-toast atx-toast-${kind}`, {
     zIndex: String(Z_MODAL + 5),
     // The one runtime value: how far a bottom-docked admin bar pushes it up.

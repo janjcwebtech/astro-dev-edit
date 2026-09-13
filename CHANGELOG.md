@@ -14,6 +14,10 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Fixed
+
+- *Open source*, and the hover pill's **open**, on an element rendered by a package component no longer fail with a red `path is outside the editable content roots` error. `POST /open` answers such a path the way `/peek` and `/classify` already do — 200 with `refused` carrying the same sentence the refusal notice shows — and the toast takes a warn tone. No editor is launched on a refused path, and a missing file, one escaping the project root, or a disallowed extension still returns 400.
+
 ## [0.11.1] - 2026-09-13
 
 ### Changed
