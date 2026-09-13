@@ -14,6 +14,10 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Fixed
+
+- A collection whose glob loader declares a `base` that differs from its name — `useCases` over `src/content/use-cases/`, the shape Astro's own docs encourage — is no longer read as empty. The entry directory comes from the loader's `base` where the config writes it as a string literal, then from the `src/content/<name>` convention; an explicit `entryEditor.collections.<name>.dir` still outranks both. A `base` built from a variable or a template is refused rather than guessed at, and falls back to the convention.
+
 ## [0.12.0] - 2026-09-13
 
 ### Added

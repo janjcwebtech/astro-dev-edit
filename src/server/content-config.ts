@@ -1,6 +1,7 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ViteDevServer } from 'vite';
+import { readCollectionBlocks } from '../patcher/content-config.ts';
 import type { FieldOverride } from '../shared/protocol.ts';
 import { IMAGE_STUB_DESCRIPTION } from './schema-introspect.ts';
 
@@ -97,8 +98,54 @@ export function createSchemaProvider(
    */
   readOptions: () => Promise<EntryEditorOptions>,
 ): EntrySchemaProvider {
-  function collectionDir(explicit: Explicit, name: string): string {
-    return normalizeDir(explicit[name]?.dir ?? `src/content/${name}`);
+  /**
+   * Where a collection's entries live, most authoritative source first:
+   *
+   *  1. an explicit `entryEditor.collections.<name>.dir`
+   *  2. the glob loader's `base`, read off the config source
+   *  3. the `src/content/<name>` convention
+   *
+   * The loader's `base` is the project's own declaration of the directory, and
+   * deriving it from the *name* instead is silently wrong whenever the two
+   * differ — a camelCase name over a kebab-case folder is the ordinary way that
+   * happens, and Astro's docs encourage it. The failure had no symptom beyond
+   * `0 entries`, so it read as an empty collection rather than a lookup that
+   * never had a chance.
+   *
+   * `bases` is undefined when the config could not be read at all, and a name
+   * is absent from it when its `base` was not provable — either way the
+   * convention still answers, which is what every collection relied on before.
+   */
+  function collectionDir(explicit: Explicit, name: string, bases: Bases): string {
+    return normalizeDir(explicit[name]?.dir ?? bases[name] ?? `src/content/${name}`);
+  }
+
+  /**
+   * Loader `base` per collection, read from the config **source**.
+   *
+   * Source rather than the loaded module because `glob({ base })` captures the
+   * value in a closure: the `Loader` object the config exports carries a `name`
+   * and a `load`, and nothing that says where it reads from. The text is the
+   * only place the answer survives.
+   *
+   * Read per call and not cached: `ssrLoadModule` beside it is already
+   * per-request, Vite invalidates on change, and a stale directory here is the
+   * exact bug being fixed. A config that cannot be read yields `{}`, never a
+   * throw — every caller degrades to the convention.
+   */
+  function loaderBases(configPath: string | undefined): Bases {
+    const rel = findConfig(configPath);
+    if (!rel) return {};
+    try {
+      const source = readFileSync(join(root, rel), 'utf8');
+      const out: Bases = {};
+      for (const block of readCollectionBlocks(source)) {
+        if (block.loaderBase) out[block.name] = block.loaderBase;
+      }
+      return out;
+    } catch {
+      return {};
+    }
   }
 
   /** The content config that exists on disk, repo-relative; null when none does.
@@ -156,7 +203,7 @@ export function createSchemaProvider(
     if (!entry && !explicit[name]) return null;
     return {
       collection: name,
-      dir: collectionDir(explicit, name),
+      dir: collectionDir(explicit, name, loaderBases(options.configPath)),
       schema: entry ? await resolveSchema(entry.schema) : null,
       extension: explicit[name]?.extension,
       pageEditing: explicit[name]?.pageEditing === true,
@@ -191,11 +238,19 @@ export function createSchemaProvider(
     async forFile(relFile) {
       const options = await readOptions();
       const explicit = options.collections ?? {};
+      const bases = loaderBases(options.configPath);
       const posix = relFile.replace(/\\/g, '/');
-      // Explicit dirs win, then the src/content/<name>/ convention.
-      for (const name of Object.keys(explicit)) {
-        if (posix.startsWith(collectionDir(explicit, name) + '/')) return info(name);
+      // Every name whose directory is declared rather than assumed — an
+      // explicit `dir` or a loader `base`. Longest first, so a collection whose
+      // directory nests inside another's wins over the one containing it.
+      const declared = [...new Set([...Object.keys(explicit), ...Object.keys(bases)])]
+        .map((name) => ({ name, dir: collectionDir(explicit, name, bases) }))
+        .sort((a, b) => b.dir.length - a.dir.length);
+      for (const { name, dir } of declared) {
+        if (posix.startsWith(dir + '/')) return info(name);
       }
+      // Then the convention, which is the only answer left for a collection
+      // that declared neither.
       const m = posix.match(/^src\/content\/([^/]+)\//);
       return m ? info(m[1]) : null;
     },
@@ -204,6 +259,10 @@ export function createSchemaProvider(
 
 /** The `collections` map from {@link EntryEditorOptions}, non-optional. */
 type Explicit = NonNullable<EntryEditorOptions['collections']>;
+
+/** Loader `base` per collection name, for the names that declared a provable
+ *  one. An absent name means "fall through to the next source". */
+type Bases = Record<string, string>;
 
 function normalizeDir(dir: string): string {
   return dir.replace(/\\/g, '/').replace(/\/+$/, '');
