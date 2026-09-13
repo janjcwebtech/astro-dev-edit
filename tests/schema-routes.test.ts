@@ -760,6 +760,10 @@ describe('POST /collection/page-editing', () => {
       pageEditing: false,
       pageEditingLocked: false,
       detailRoute: null,
+      // No route scan is mounted here, so the scan proves nothing — and with
+      // two entries whose ids nothing else holds, resolution's fallback is what
+      // will answer. The panel must be told that, not warned at.
+      pageEditingFallback: 'resolves',
     });
 
     const r = await request(h, '/__dev-edit/collection/page-editing', {
@@ -865,5 +869,101 @@ describe('POST /collection/page-editing', () => {
     expect(
       (await request(h, '/__dev-edit/collection/page-editing', { collection: 'blog' })).status,
     ).toBe(400);
+  });
+});
+
+/**
+ * What the collection designer tells the user about a detail page, when the
+ * route scan could not name a route.
+ *
+ * `detailRoute: null` means *the scan could not prove which route*, not *no
+ * route exists* — it reads only a string-literal `getCollection('x')` in the
+ * page file, so a route fetching through a helper defeats it. Entry resolution
+ * has a fallback the scan does not: every declared collection stays a
+ * candidate and the URL's tail is matched against entry ids. The panel used to
+ * warn and hand over a page-source meta snippet in every one of these cases,
+ * including the ones where the drawer already worked — so what is pinned here
+ * is that the verdict tracks what resolution will actually do.
+ */
+describe('/collections page-editing fallback', () => {
+  const twoCollections = (secondDir: string) =>
+    stubSchemaProvider({
+      async listCollections() {
+        return [
+          { collection: 'blog', dir: 'src/content/blog', schema: blogSchema, fieldConfig: {} },
+          { collection: 'notes', dir: secondDir, schema: blogSchema, fieldConfig: {} },
+        ];
+      },
+      async configPath() {
+        return 'src/content.config.ts';
+      },
+    });
+
+  const verdicts = async (h: Connect.NextHandleFunction): Promise<Record<string, unknown>> => {
+    const r = await request(h, '/__dev-edit/collections');
+    return Object.fromEntries(
+      r.body.collections.map((c: any) => [c.name, c.pageEditingFallback]),
+    );
+  };
+
+  it("says 'resolves' when a collection's entry ids are its own alone", async () => {
+    await mkdir(join(root, 'src/content/notes'), { recursive: true });
+    await writeFile(join(root, 'src/content/notes/alpha.md'), '---\ntitle: A\n---\n');
+    const h = await mount({}, twoCollections('src/content/notes'));
+    expect(await verdicts(h)).toEqual({ blog: 'resolves', notes: 'resolves' });
+  });
+
+  // The case where the meta tag genuinely earns its place: layer 3 refuses
+  // `ambiguous` on a tie, so neither collection can be matched from the URL.
+  it("says 'ambiguous' for both collections sharing an entry id", async () => {
+    await mkdir(join(root, 'src/content/notes'), { recursive: true });
+    await writeFile(join(root, 'src/content/notes/one.md'), '---\ntitle: Clash\n---\n');
+    const h = await mount({}, twoCollections('src/content/notes'));
+    expect(await verdicts(h)).toEqual({ blog: 'ambiguous', notes: 'ambiguous' });
+  });
+
+  // A shared id only implicates the collections that hold it. `two.md` is
+  // still blog's alone, but one colliding id is enough to make the page-source
+  // tag the honest advice for the collection.
+  it('implicates only the collections holding the shared id', async () => {
+    await mkdir(join(root, 'src/content/notes'), { recursive: true });
+    await writeFile(join(root, 'src/content/notes/alpha.md'), '---\ntitle: A\n---\n');
+    await writeFile(join(root, 'src/content/notes/beta.md'), '---\ntitle: B\n---\n');
+    await mkdir(join(root, 'src/content/logs'), { recursive: true });
+    await writeFile(join(root, 'src/content/logs/alpha.md'), '---\ntitle: A\n---\n');
+    const h = await mount(
+      {},
+      stubSchemaProvider({
+        async listCollections() {
+          return [
+            { collection: 'blog', dir: 'src/content/blog', schema: blogSchema, fieldConfig: {} },
+            { collection: 'notes', dir: 'src/content/notes', schema: blogSchema, fieldConfig: {} },
+            { collection: 'logs', dir: 'src/content/logs', schema: blogSchema, fieldConfig: {} },
+          ];
+        },
+        async configPath() {
+          return 'src/content.config.ts';
+        },
+      }),
+    );
+    expect(await verdicts(h)).toEqual({
+      blog: 'resolves',
+      notes: 'ambiguous',
+      logs: 'ambiguous',
+    });
+  });
+
+  it("says 'no-entries' when there is nothing for a detail page to resolve to", async () => {
+    const h = await mount({}, twoCollections('src/content/missing'));
+    expect((await verdicts(h)).notes).toBe('no-entries');
+  });
+
+  // Confinement matches layer 3's: a collection pointed outside the content
+  // roots is skipped there, so its ids cannot collide with anything here.
+  it('ignores a collection pointed outside the content roots', async () => {
+    await mkdir(join(root, 'elsewhere'), { recursive: true });
+    await writeFile(join(root, 'elsewhere/one.md'), '---\ntitle: Clash\n---\n');
+    const h = await mount({}, twoCollections('elsewhere'));
+    expect(await verdicts(h)).toEqual({ blog: 'resolves', notes: 'no-entries' });
   });
 });
