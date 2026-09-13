@@ -21,6 +21,10 @@ temp/
 .astro-dev-edit.json
 .*.dev-edit-tmp-*
 
+# Visual plan artifacts — local scratch for reviewing a plan before it is built,
+# superseded by the issue and the PR that follow it
+visual-plans/
+
 # Real-site test fixtures cloned into examples/ (never committed)
 examples/airbnb/
 examples/sf-sf/
