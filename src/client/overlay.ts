@@ -203,10 +203,22 @@ document.addEventListener('keydown', (e) => {
 // Wiring
 // ---------------------------------------------------------------------------
 
-/** Open a source location in the user's editor, reporting the result. */
+/**
+ * Open a source location in the user's editor, reporting the result.
+ *
+ * A `refused` answer is not a failure: the file is real but is not the user's
+ * — the `astro:assets` `<Image>` lives in `node_modules`, and the hover pill
+ * offers this on it. Say what the server said, in the warn tone that means
+ * "nothing happened, and here is why", rather than the error tone that reads
+ * as the tool breaking on its own affordance.
+ */
 async function openSource(src: SourceLoc): Promise<void> {
   try {
-    await api.open({ file: src.file, loc: src.loc });
+    const res = await api.open({ file: src.file, loc: src.loc });
+    if (res.refused) {
+      toast(res.refused, 'warn');
+      return;
+    }
     toast(`Opened ${basename(src.file)}:${src.loc} in your editor`, 'ok');
   } catch (err) {
     toast(`Could not open source — ${err instanceof Error ? err.message : 'unknown'}`, 'err');

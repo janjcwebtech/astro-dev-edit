@@ -1092,6 +1092,17 @@ input[type='checkbox'].atx-switch:disabled {
   color: var(--atx-primary-fg);
 }
 
+/* "Nothing happened, and here is why" — a refusal the user asked for, not a
+   fault, so an untouchable package path does not read as the tool breaking.
+   Panel surface with warning *ink*, not a warning fill: --atx-warning is an ink
+   token, held to AA against the three surfaces and against nothing as a
+   background. Same idiom as every other warn tone in this sheet. */
+.atx-toast-warn {
+  background: var(--atx-elevated);
+  color: var(--atx-warning);
+  border: 1px solid var(--atx-border);
+}
+
 /* The save veil's rect is measured off a host element, so its geometry is the
    one thing that stays inline. */
 .atx-veil {

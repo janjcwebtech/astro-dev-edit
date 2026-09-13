@@ -14,6 +14,14 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Added
+
+- The refusal on an element rendered by a package names where the component was **used** — the nearest enclosing element written in your own source — and its button opens that file there. An `astro:assets` `<Image>` annotates to `node_modules/astro/components/Image.astro`, which is neither editable nor openable; the jump lands on the call site instead.
+
+### Fixed
+
+- `/open` answers a package-owned or out-of-root path with a refusal sentence instead of a 400, matching `/peek` and `/classify`. The hover pill offers *open* on an `astro:assets` `<Image>`, so the error it raised was the tool failing on its own affordance; no editor is launched either way.
+
 ## [0.11.1] - 2026-09-13
 
 ### Changed

@@ -7,7 +7,7 @@ import type { NoticeOptions } from './editors/notice.ts';
 import { showDynamicNotice } from './editors/notice.ts';
 import { beginTextEdit } from './editors/text.ts';
 import { isOwnUi } from './shadow.ts';
-import { nearestSource, sourceFor } from './source-map.ts';
+import { isPackageSource, nearestOwnSource, nearestSource, sourceFor } from './source-map.ts';
 import * as state from './state.ts';
 import { toast } from './ui.ts';
 
@@ -73,6 +73,16 @@ export function initRouter(deps: RouterDeps): RouterHandle {
       clicked instanceof Element && clicked !== el
         ? { clickedTag: clicked.tagName.toLowerCase() }
         : {};
+    // A package-owned loc refuses whatever the server says about it, and the
+    // file it names can be neither edited nor opened. Find the markup that
+    // used the component *before* asking, so the refusal arrives with the one
+    // place that is actually the user's to change. Walking from the parent,
+    // since `el` is the package-owned element itself.
+    if (isPackageSource(src)) {
+      const owner = el.parentElement && nearestOwnSource(el.parentElement);
+      const ownerSrc = owner ? sourceFor(owner) : undefined;
+      if (ownerSrc) via.usedAt = ownerSrc;
+    }
     // Claim the interaction slot synchronously: /classify is async, and without
     // this a rapid second click during the round-trip could open a second editor.
     const busy = state.begin({ kind: 'busy' });
