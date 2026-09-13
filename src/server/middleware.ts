@@ -8,6 +8,7 @@ import type {
   ApplyRequestWire,
   ClassifyRequest,
   OpenRequest,
+  OpenResponse,
   PeekRequest,
   UploadRequest,
 } from '../shared/protocol.ts';
@@ -259,15 +260,30 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
         }
         const { file, loc } = body as OpenRequest;
         if (!file) throw new Error('file is required');
-        // Same gate as /classify and /apply: realpath ∈ root ∈ contentRoots,
-        // allowed extension. /open only spawns an editor, but it takes the
-        // same client-supplied paths, and every legitimate caller targets a
-        // file that already passed this gate. (spec §8)
-        const abs = await validateEditablePath(root, o.contentRoots, o.editableExtensions, file);
+        // Same gate as /classify and /apply — realpath ∈ root ∈ contentRoots,
+        // allowed extension — and the same *soft* answer those two give a path
+        // that is merely not ours. The overlay offers this route on an element
+        // it has just classified as package-owned (the `astro:assets` <Image>
+        // annotates to node_modules/astro/components/Image.astro), so a thrown
+        // 400 there is the tool erroring on its own affordance. The refusal is
+        // unchanged — no editor is launched — only how it is reported. Genuine
+        // anomalies still throw. (spec §8)
+        const check = await checkEditablePath(root, o.contentRoots, o.editableExtensions, file);
+        if (!check.ok) {
+          if (check.code !== 'outside-roots') throw new Error(check.reason);
+          const refused: OpenResponse = {
+            ok: false,
+            refused:
+              check.abs && isPackageOwned(check.abs) ? PACKAGE_OWNED_REASON : OUT_OF_ROOT_REASON,
+          };
+          return { status: 200, body: refused };
+        }
+        const abs = check.abs;
         const [line, col] = (loc ?? '').split(':');
         const spec = line ? `${abs}:${line}${col ? ':' + col : ''}` : abs;
         await launchInEditor(spec);
-        return { status: 200, body: { ok: true } };
+        const opened: OpenResponse = { ok: true };
+        return { status: 200, body: opened };
       },
     },
 

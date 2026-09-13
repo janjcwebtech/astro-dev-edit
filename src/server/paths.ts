@@ -1,5 +1,6 @@
 import { chmod, realpath, rename, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
+import { isPackagePath } from '../shared/package-path.ts';
 
 /**
  * Path confinement and mapping helpers — the single home for every "may this
@@ -122,9 +123,13 @@ export type PathCheck =
 /** True when the path lives inside an installed package. Such files are real
  *  and readable but are never the user's own source — `astro:assets` renders
  *  every `<Image>` through `node_modules/astro/components/Image.astro`, and
- *  that is the path the source annotation carries. */
+ *  that is the path the source annotation carries.
+ *
+ *  Delegates to `shared/package-path.ts` because the client asks the same
+ *  question of the same annotation, and two copies of this would be free to
+ *  drift. */
 export function isPackageOwned(abs: string): boolean {
-  return abs.split(sep).includes('node_modules');
+  return isPackagePath(abs);
 }
 
 /**

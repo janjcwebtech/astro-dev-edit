@@ -36,6 +36,25 @@ export interface NoticeOptions {
    * plainly holds one word. Naming the substitution is the whole fix.
    */
   clickedTag?: string;
+
+  /**
+   * Where the package component that rendered this element was **used** — the
+   * nearest enclosing element written in the project's own source.
+   *
+   * Set only when `src` itself is package-owned, which is the one refusal that
+   * otherwise names a file the user can neither edit nor open: an
+   * `astro:assets` `<Image>` annotates to
+   * `node_modules/astro/components/Image.astro`. The reason already says "edit
+   * where the component is used instead"; this is that place, so the notice
+   * can offer it rather than leave the sentence as advice with nowhere to go.
+   *
+   * It is a **jump, not an edit**. The ancestor is the markup around the
+   * component, so opening it puts the cursor at the call site — where the
+   * props are written — rather than making this element editable in place.
+   * Editing an `<Image>`'s src or alt from the page would mean tracing them
+   * back through the component's props, which the patchers do not do.
+   */
+  usedAt?: SourceLoc;
 }
 
 export function showDynamicNotice(
@@ -48,6 +67,11 @@ export function showDynamicNotice(
   clearHighlight();
   const panel = buildPanel('Can’t edit this here');
   const body = panel.querySelector('[data-body]') as HTMLElement;
+
+  // A package-owned `src` cannot be opened — /open refuses it, the same way
+  // /peek and /classify do. So every jump this panel offers goes to the usage
+  // site when there is one, and the buttons below say which file that is.
+  const jumpTo = opts.usedAt ?? src;
 
   if (opts.clickedTag) {
     const lead = styled('p', 'atx-notice-lead');
@@ -72,6 +96,14 @@ export function showDynamicNotice(
   });
 
   body.append(msg, where);
+
+  if (opts.usedAt) {
+    const used = styled('p', 'atx-notice-hint');
+    used.textContent =
+      `It is used in ${basename(opts.usedAt.file)}:${opts.usedAt.loc} — open that to change ` +
+      'what the component is given. The props are edited there, not on the page.';
+    body.append(used);
+  }
 
   // On a detail page whose content lives in a markdown/MDX file, that file is
   // almost always the *right* place to edit this text — not the template line
@@ -141,7 +173,7 @@ export function showDynamicNotice(
       } else if (offer) {
         void enableAndEdit(offer.collection, offer.file);
       } else {
-        openSource(src);
+        openSource(jumpTo);
       }
     },
     contentFile || offer
@@ -149,11 +181,16 @@ export function showDynamicNotice(
           confirmLabel: contentFile ? 'Edit page content' : `Turn on for ${offer!.collection}`,
           secondaryLabel: 'Open template',
           onSecondary: () => {
-            openSource(src);
+            openSource(jumpTo);
             close();
           },
         }
-      : { confirmLabel: 'Open source' },
+      : {
+          // Naming the file is the point when it is not the one on the loc line
+          // above: "Open source" over a package path is the button that used to
+          // error.
+          confirmLabel: opts.usedAt ? `Open ${basename(opts.usedAt.file)}` : 'Open source',
+        },
   );
   mount(backdrop, panel);
   const releaseFocus = trapFocus(panel);

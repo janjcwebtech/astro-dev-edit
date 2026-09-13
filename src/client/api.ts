@@ -24,6 +24,7 @@ import type {
   InspectOpenRequest,
   InspectOpenResponse,
   OpenRequest,
+  OpenResponse,
   EntryResolveRequest,
   EntryResolveResponse,
   PageSourceRequest,
@@ -106,9 +107,10 @@ export async function upload(req: UploadRequest): Promise<UploadResponse> {
 }
 
 /** Open a source location in the user's editor. */
-export async function open(req: OpenRequest): Promise<void> {
+export async function open(req: OpenRequest): Promise<OpenResponse> {
   const res = await post('/open', req);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `open failed (${res.status})`);
+  return (await res.json()) as OpenResponse;
 }
 
 /** Which source file the route serving `pathname` is written in — the admin

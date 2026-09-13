@@ -14,7 +14,7 @@ Three layers meet at one type-only contract.
 
 `protocol.ts` is the single source of truth for every request and response shape on the `/__dev-edit` endpoints. Both client and server import it with `import type` (enforced by `verbatimModuleSyntax`), so it never reaches the client bundle, and a shape change breaks `typecheck` on the other side instead of at runtime. Changing what one side sends starts there.
 
-`protocol.ts` is types-only. The runtime shared modules are `slug.ts` (slug sanitizing) and `unsplash.ts` (the Unsplash import-width safelist), both the same shape: **client suggests, server re-runs as authority**. A runtime list that a type needs goes in a module like those, or server-side the way `FIELD_TYPES` does.
+`protocol.ts` is types-only. The runtime shared modules are `slug.ts` (slug sanitizing), `unsplash.ts` (the Unsplash import-width safelist) and `package-path.ts` (is this path inside an installed package?). The first two are the same shape — **client suggests, server re-runs as authority**; the third is a plain predicate both sides must answer identically about the same source annotation, since the client decides on hover whether to look past an element and the server decides whether to refuse it. A runtime list that a type needs goes in a module like those, or server-side the way `FIELD_TYPES` does.
 
 ## Server — `src/server/`
 

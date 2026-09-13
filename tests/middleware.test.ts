@@ -396,41 +396,57 @@ describe('POST /open', () => {
     expect(r.status).toBe(403);
   });
 
-  // Path validation matches /classify and /apply (validateEditablePath):
-  // realpath inside the project root and a content root, allowed extension.
-  it('rejects files outside the content roots with 400', async () => {
+  // Path validation matches /classify and /apply: realpath inside the project
+  // root and a content root, allowed extension. A path that merely isn't ours
+  // answers the way /classify and /peek answer it — a refusal *sentence*, not
+  // a thrown 400 — because the overlay offers this route on an element it has
+  // just classified as package-owned. What must not move is the refusal
+  // itself: no editor is launched for any of these.
+  it('refuses files outside the content roots without launching an editor', async () => {
+    vi.mocked(launchInEditor).mockClear();
     const r = await request({
       method: 'POST',
       url: '/__dev-edit/open',
       body: { file: 'outside.astro' },
       via: openHandler,
     });
-    expect(r.status).toBe(400);
-    expect(r.body.error).toContain('content roots');
+    expect(r.status).toBe(200);
+    expect(r.body.ok).toBe(false);
+    expect(r.body.refused).toContain('content roots');
+    expect(launchInEditor).not.toHaveBeenCalled();
   });
 
-  it('rejects a symlink that resolves outside the content roots with 400', async () => {
+  it('refuses a symlink that resolves outside the content roots', async () => {
+    vi.mocked(launchInEditor).mockClear();
     const r = await request({
       method: 'POST',
       url: '/__dev-edit/open',
       body: { file: 'src/pages/link.astro' },
       via: openHandler,
     });
-    expect(r.status).toBe(400);
-    expect(r.body.error).toContain('content roots');
+    expect(r.status).toBe(200);
+    expect(r.body.ok).toBe(false);
+    expect(r.body.refused).toContain('content roots');
+    expect(launchInEditor).not.toHaveBeenCalled();
   });
 
-  // The read-only routes softened for node_modules paths; the gate on routes
-  // that act on a file must NOT have. Package internals stay untouchable.
-  it('still rejects a package-owned node_modules path with 400', async () => {
+  // The hover pill offers "open" on an `astro:assets` <Image>, which annotates
+  // to node_modules/astro/components/Image.astro — so this path arrives from
+  // the tool's own affordance and must explain itself rather than error. The
+  // refusal is unchanged: package internals stay untouchable, which is what
+  // the launch assertion (not the status code) actually pins.
+  it('names the package when refusing a node_modules path, and launches nothing', async () => {
+    vi.mocked(launchInEditor).mockClear();
     const r = await request({
       method: 'POST',
       url: '/__dev-edit/open',
       body: { file: 'node_modules/astro/components/Image.astro' },
       via: openHandler,
     });
-    expect(r.status).toBe(400);
-    expect(r.body.error).toContain('content roots');
+    expect(r.status).toBe(200);
+    expect(r.body.ok).toBe(false);
+    expect(r.body.refused).toContain('package component');
+    expect(launchInEditor).not.toHaveBeenCalled();
   });
 
   it('rejects disallowed extensions with 400', async () => {
