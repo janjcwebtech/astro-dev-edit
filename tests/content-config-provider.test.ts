@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ViteDevServer } from 'vite';
+import { listEntryFiles } from '../src/server/collection-entries.ts';
 import { createSchemaProvider, type EntryEditorOptions } from '../src/server/content-config.ts';
+import { compilePattern } from '../src/server/entry-pattern.ts';
+import { entryExtensionsFor } from '../src/server/entry-routes.ts';
 
 /**
  * Where `createSchemaProvider` decides a collection's entries live.
@@ -166,5 +169,98 @@ export const collections = { docs, guides };
     const p = createSchemaProvider(stubServer(['docs', 'guides']), root, async () => ({}));
     expect((await p.forFile('src/content/docs/guides/start.md'))?.collection).toBe('guides');
     expect((await p.forFile('src/content/docs/intro.md'))?.collection).toBe('docs');
+  });
+});
+
+/**
+ * The loader's `pattern`, which decides *what counts as an entry* — and is what
+ * makes a `base` broader than the collection safe.
+ *
+ * Honouring the base while ignoring the pattern is not a smaller version of the
+ * right answer, it is a worse bug than the one it fixes: a collection based at
+ * `src/content` with `pattern: 'settings.yml'` claims every markdown file
+ * belonging to every other collection beneath it, and entry resolution then
+ * picks the wrong collection for a URL, because it sorts by id length and a
+ * swallowed `blog/one` is longer than `blog`'s own `one`.
+ */
+describe('loader pattern', () => {
+  const BROAD = `import { defineCollection, z } from 'astro:content';
+import { glob } from 'astro/loaders';
+
+const blog = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/blog' }),
+  schema: z.object({ title: z.string() }),
+});
+
+const settings = defineCollection({
+  loader: glob({ pattern: 'settings.yml', base: './src/content' }),
+  schema: z.object({ title: z.string() }),
+});
+
+const faqs = defineCollection({
+  loader: glob({ pattern: '**/*.json', base: './src/content/faqs' }),
+  schema: z.object({ q: z.string() }),
+});
+
+export const collections = { blog, settings, faqs };
+`;
+
+  async function broad() {
+    await mkdir(join(root, 'src/content/blog'), { recursive: true });
+    await mkdir(join(root, 'src/content/faqs'), { recursive: true });
+    await writeFile(join(root, 'src/content.config.ts'), BROAD);
+    await writeFile(join(root, 'src/content/settings.yml'), 'title: Site\n');
+    for (const n of ['one', 'two', 'three']) {
+      await writeFile(join(root, `src/content/blog/${n}.md`), '---\ntitle: X\n---\n');
+    }
+    await writeFile(join(root, 'src/content/faqs/a.json'), '{"q":"?"}');
+    await writeFile(join(root, 'src/content/faqs/b.json'), '{"q":"?"}');
+    const p = createSchemaProvider(
+      stubServer(['blog', 'settings', 'faqs']),
+      root,
+      async () => ({}),
+    );
+    const infos = await p.listCollections();
+    const ext = entryExtensionsFor(['.astro', '.md', '.mdx']);
+    return Object.fromEntries(
+      await Promise.all(
+        infos.map(async (c) => [
+          c.collection,
+          (
+            await listEntryFiles(join(root, c.dir), {
+              extensions: ext,
+              match: compilePattern(c.pattern),
+            })
+          ).names,
+        ]),
+      ),
+    );
+  }
+
+  it('reports the pattern alongside the dir', async () => {
+    await writeFile(join(root, 'src/content.config.ts'), BROAD);
+    const p = createSchemaProvider(stubServer(['blog', 'settings', 'faqs']), root, async () => ({}));
+    const byName = Object.fromEntries(
+      (await p.listCollections()).map((c) => [c.collection, [c.dir, c.pattern]]),
+    );
+    expect(byName).toEqual({
+      blog: ['src/content/blog', ['**/*.md']],
+      // The broad base, which only the pattern makes correct.
+      settings: ['src/content', ['settings.yml']],
+      faqs: ['src/content/faqs', ['**/*.json']],
+    });
+  });
+
+  it('stops a narrow pattern over a broad base from swallowing its siblings', async () => {
+    const claimed = await broad();
+    expect(claimed.settings).toEqual(['settings.yml']);
+    expect(claimed.blog).toEqual(['one.md', 'three.md', 'two.md']);
+  });
+
+  // The bug in its own right: a data collection reported 0 entries while its
+  // directory sat there full, and no `editableExtensions` value could admit it.
+  it('lists .json entries, which no configuration used to reach', async () => {
+    const claimed = await broad();
+    expect(claimed.faqs).toEqual(['a.json', 'b.json']);
   });
 });

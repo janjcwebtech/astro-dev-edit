@@ -967,3 +967,110 @@ describe('/collections page-editing fallback', () => {
     expect(await verdicts(h)).toEqual({ blog: 'resolves', notes: 'no-entries' });
   });
 });
+
+/**
+ * Data collections — `.json` / `.yml` entries, which Astro's content layer has
+ * taken since 5.0.
+ *
+ * Every one of them reported `0 entries`: the count filtered through a
+ * hardcoded `['.md', '.mdx']`, and `editableExtensions` could not widen it
+ * because the filter was an *intersection* — adding `.json` there yielded the
+ * empty set rather than admitting it. There was no configuration that made such
+ * a collection visible.
+ *
+ * They are listed but not openable, which the row states rather than implies:
+ * the drawer edits frontmatter plus a markdown body and a data entry has
+ * neither.
+ */
+describe('/collections with data entries', () => {
+  const dataProvider = () =>
+    stubSchemaProvider({
+      async listCollections() {
+        return [
+          { collection: 'blog', dir: 'src/content/blog', schema: blogSchema, fieldConfig: {} },
+          {
+            collection: 'faqs',
+            dir: 'src/content/faqs',
+            schema: blogSchema,
+            pattern: ['**/*.json'],
+            fieldConfig: {},
+          },
+          {
+            collection: 'mixed',
+            dir: 'src/content/mixed',
+            schema: blogSchema,
+            fieldConfig: {},
+          },
+        ];
+      },
+      async configPath() {
+        return 'src/content.config.ts';
+      },
+    });
+
+  async function seed(): Promise<void> {
+    await mkdir(join(root, 'src/content/faqs'), { recursive: true });
+    await writeFile(join(root, 'src/content/faqs/a.json'), '{"q":"?"}');
+    await writeFile(join(root, 'src/content/faqs/b.json'), '{"q":"?"}');
+    await mkdir(join(root, 'src/content/mixed'), { recursive: true });
+    await writeFile(join(root, 'src/content/mixed/note.md'), '---\ntitle: N\n---\n');
+    await writeFile(join(root, 'src/content/mixed/data.yml'), 'title: D\n');
+  }
+
+  const rows = async (): Promise<Record<string, [number, boolean]>> => {
+    const r = await request(await mount({}, dataProvider()), '/__dev-edit/collections');
+    return Object.fromEntries(
+      r.body.collections.map((c: any) => [c.name, [c.entryCount, Boolean(c.entriesReadOnly)]]),
+    );
+  };
+
+  it('counts .json and .yml entries, and both halves of a mixed collection', async () => {
+    await seed();
+    expect(await rows()).toEqual({
+      blog: [2, false],
+      // Was 0, with no configuration able to change it.
+      faqs: [2, true],
+      // Markdown and data side by side: both counted, and openable because at
+      // least one entry is markdown.
+      mixed: [2, false],
+    });
+  });
+
+  it('states why a data collection is read-only rather than leaving it implied', async () => {
+    await seed();
+    const r = await request(await mount({}, dataProvider()), '/__dev-edit/collections');
+    const faqs = r.body.collections.find((c: any) => c.name === 'faqs');
+    expect(faqs.entriesReadOnly).toContain('.json');
+    expect(faqs.entriesReadOnly).toContain('not editable yet');
+    // An empty collection is not "read-only" — there is nothing to say about it.
+    const blog = r.body.collections.find((c: any) => c.name === 'blog');
+    expect(blog.entriesReadOnly).toBeUndefined();
+  });
+
+  // The assertion the old intersection silently failed: narrowing
+  // `editableExtensions` must not be able to hide a data entry, because that
+  // option governs what the overlay patches from a click on the page, and a
+  // .json entry is never such a file.
+  it('admits data entries whatever editableExtensions says', async () => {
+    await seed();
+    const narrow = await request(
+      await mount({ editableExtensions: ['.astro'] }, dataProvider()),
+      '/__dev-edit/collections',
+    );
+    expect(narrow.body.collections.find((c: any) => c.name === 'faqs').entryCount).toBe(2);
+    // …while it still narrows the markdown family, which the overlay does patch.
+    expect(narrow.body.collections.find((c: any) => c.name === 'blog').entryCount).toBe(0);
+  });
+
+  it('lists a data entry in the Items tab', async () => {
+    await seed();
+    const r = await request(await mount({}, dataProvider()), '/__dev-edit/collection/entries', {
+      collection: 'faqs',
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.entries.map((e: any) => e.file).sort()).toEqual([
+      'src/content/faqs/a.json',
+      'src/content/faqs/b.json',
+    ]);
+  });
+});

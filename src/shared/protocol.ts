@@ -421,7 +421,11 @@ export type EntryResolveRefusal =
   | 'not-detail'
   | 'not-enabled'
   | 'no-entry'
-  | 'ambiguous';
+  | 'ambiguous'
+  /** The entry resolved, and it is a `.json`/`.yml` data entry. The drawer
+   *  edits frontmatter and a markdown body, and a data entry has neither, so
+   *  the button is withheld rather than offered and then refused. */
+  | 'data-entry';
 
 export interface EntryResolveResponse {
   /** Repo-relative entry file — exactly what `POST /entry` takes. Null unless
@@ -836,6 +840,15 @@ export interface CollectionSummary {
    * - `no-entries` — nothing to match against.
    */
   pageEditingFallback: 'resolves' | 'ambiguous' | 'no-entries' | null;
+  /**
+   * Why this collection's entries list but do not open, when they don't.
+   *
+   * Set for a **data** collection — `.json`, `.yml`, `.yaml` entries. The
+   * drawer edits frontmatter plus a markdown body and a data entry has neither,
+   * so the row reports its real count and says why, rather than reporting `0
+   * entries` and looking broken. Absent for every markdown collection.
+   */
+  entriesReadOnly?: string;
 }
 
 export interface CollectionsResponse {

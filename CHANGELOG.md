@@ -14,6 +14,15 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Added
+
+- Data collections — `.json`, `.yml` and `.yaml` entries — are listed and counted instead of reporting `0 entries`. They are not editable yet: the row says why, detail pages don't offer **Edit entry** for one, and `POST /entry` refuses one in words. `editableExtensions` no longer gates them, so no configuration can hide a data entry.
+
+### Fixed
+
+- A collection whose glob loader pairs a broad `base` with a narrow `pattern` — `glob({ pattern: 'settings.yml', base: './src/content' })` — no longer claims every file beneath that base as its own. The loader's `pattern` is read alongside its `base` and both are honoured; a pattern using anything beyond `**`, `*`, `?` and `{a,b}` is not read, and entries fall back to matching on extension. This affected 0.12.0 only.
+- Creating an entry in a collection whose pattern admits only data is refused, rather than writing a markdown file Astro would never load.
+
 ### Fixed
 
 - A collection whose glob loader declares a `base` that differs from its name — `useCases` over `src/content/use-cases/`, the shape Astro's own docs encourage — is no longer read as empty. The entry directory comes from the loader's `base` where the config writes it as a string literal, then from the `src/content/<name>` convention; an explicit `entryEditor.collections.<name>.dir` still outranks both. A `base` built from a variable or a template is refused rather than guessed at, and falls back to the convention.

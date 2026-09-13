@@ -65,8 +65,9 @@ page content"**. Both open a drawer that edits the entry like a CMS would:
    admin bar → **Collections** (below). Nothing else.
 3. Optional: tune fields via `entryEditor` config.
 
-A collection's entry directory is read from the glob loader's `base`, which is
-your config's own declaration of where entries live:
+A collection's entry directory and file set are read from the glob loader's
+`base` and `pattern`, which are your config's own declaration of where entries
+live and what counts as one:
 
 ```js
 const useCases = defineCollection({
@@ -75,10 +76,22 @@ const useCases = defineCollection({
 });
 ```
 
-A camelCase name over a kebab-case folder needs nothing further. Where there is
-no `base`, or it is written as a variable or a template rather than a plain
-string, the `src/content/<name>/` convention answers instead — a directory that
-cannot be read is never guessed at.
+A camelCase name over a kebab-case folder needs nothing further. The two are
+read together because they only mean anything together — a `base` broader than
+the collection is correct precisely because the pattern narrows it:
+
+```js
+const settings = defineCollection({
+  loader: glob({ pattern: 'settings.yml', base: './src/content' }),
+  schema: z.object({ title: z.string() }),
+});
+```
+
+Where there is no `base`, or it is written as a variable or a template rather
+than a plain string, the `src/content/<name>/` convention answers instead. A
+pattern written in anything beyond `**`, `*`, `?` and `{a,b}` is likewise not
+read, and entries are matched on extension alone — neither a directory nor a
+file set is ever guessed at.
 
 An explicit `dir` outranks both. Unconventional layouts and field tweaks go in
 the options:
@@ -143,6 +156,19 @@ will be, rather than assuming the worst:
 | the entry is matched from the URL instead | the drawer works, with nothing to add to your templates |
 | this collection has no entries yet | nothing to resolve to — add one and the drawer follows |
 | another collection holds an entry of the same name | resolution refuses rather than guess, and the meta tag below is the answer |
+
+### Data collections
+
+`.json`, `.yml` and `.yaml` entries — Astro's data collections — are listed and
+counted, and their fields render from the resolved schema. They are **not
+editable yet**: the drawer edits frontmatter plus a markdown body, and a data
+entry has neither. The collection's row says so, detail pages do not offer
+**Edit entry** for one, and creating an entry in a collection whose pattern
+admits only data is refused rather than writing a file Astro would not load.
+
+`editableExtensions` does not narrow these. That option governs which files the
+overlay patches from a click on a rendered page, and a `.json` entry is never
+one of those.
 
 Switching a collection **off** removes only the in-page drawer. The collection
 stays in the Collections drawer, and its entries stay editable from the

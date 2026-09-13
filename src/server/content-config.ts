@@ -50,6 +50,17 @@ export interface EntryCollectionInfo {
   /** Configured extension for new entries; when absent the create route
    *  infers one from the collection's existing entries. */
   extension?: '.md' | '.mdx';
+  /**
+   * The glob loader's `pattern`, when the config wrote one this scanner could
+   * prove. Absent means "match on extension alone", which is what every
+   * collection did before it was read.
+   *
+   * Load-bearing wherever {@link dir} is broader than the collection: the base
+   * and the pattern are only correct together, so a reader that takes the
+   * directory from one and ignores the other hands the collection every file
+   * beneath it.
+   */
+  pattern?: string[];
   /** Whether this collection's detail pages offer the entry drawer — the
    *  effective value, config over stored. Absent reads as off, so a caller that
    *  knows nothing about the switch (a test stub) leaves it off. */
@@ -116,8 +127,8 @@ export function createSchemaProvider(
    * is absent from it when its `base` was not provable — either way the
    * convention still answers, which is what every collection relied on before.
    */
-  function collectionDir(explicit: Explicit, name: string, bases: Bases): string {
-    return normalizeDir(explicit[name]?.dir ?? bases[name] ?? `src/content/${name}`);
+  function collectionDir(explicit: Explicit, name: string, decls: Decls): string {
+    return normalizeDir(explicit[name]?.dir ?? decls[name]?.base ?? `src/content/${name}`);
   }
 
   /**
@@ -133,14 +144,16 @@ export function createSchemaProvider(
    * exact bug being fixed. A config that cannot be read yields `{}`, never a
    * throw — every caller degrades to the convention.
    */
-  function loaderBases(configPath: string | undefined): Bases {
+  function loaderDecls(configPath: string | undefined): Decls {
     const rel = findConfig(configPath);
     if (!rel) return {};
     try {
       const source = readFileSync(join(root, rel), 'utf8');
-      const out: Bases = {};
+      const out: Decls = {};
       for (const block of readCollectionBlocks(source)) {
-        if (block.loaderBase) out[block.name] = block.loaderBase;
+        if (block.loaderBase || block.loaderPattern) {
+          out[block.name] = { base: block.loaderBase, pattern: block.loaderPattern };
+        }
       }
       return out;
     } catch {
@@ -201,9 +214,11 @@ export function createSchemaProvider(
     // A collection configured explicitly is usable even without a config module
     // (dir + overrides still apply; fields fall back to inference).
     if (!entry && !explicit[name]) return null;
+    const decls = loaderDecls(options.configPath);
     return {
       collection: name,
-      dir: collectionDir(explicit, name, loaderBases(options.configPath)),
+      dir: collectionDir(explicit, name, decls),
+      ...(decls[name]?.pattern ? { pattern: decls[name].pattern } : {}),
       schema: entry ? await resolveSchema(entry.schema) : null,
       extension: explicit[name]?.extension,
       pageEditing: explicit[name]?.pageEditing === true,
@@ -238,13 +253,13 @@ export function createSchemaProvider(
     async forFile(relFile) {
       const options = await readOptions();
       const explicit = options.collections ?? {};
-      const bases = loaderBases(options.configPath);
+      const decls = loaderDecls(options.configPath);
       const posix = relFile.replace(/\\/g, '/');
       // Every name whose directory is declared rather than assumed — an
       // explicit `dir` or a loader `base`. Longest first, so a collection whose
       // directory nests inside another's wins over the one containing it.
-      const declared = [...new Set([...Object.keys(explicit), ...Object.keys(bases)])]
-        .map((name) => ({ name, dir: collectionDir(explicit, name, bases) }))
+      const declared = [...new Set([...Object.keys(explicit), ...Object.keys(decls)])]
+        .map((name) => ({ name, dir: collectionDir(explicit, name, decls) }))
         .sort((a, b) => b.dir.length - a.dir.length);
       for (const { name, dir } of declared) {
         if (posix.startsWith(dir + '/')) return info(name);
@@ -260,9 +275,15 @@ export function createSchemaProvider(
 /** The `collections` map from {@link EntryEditorOptions}, non-optional. */
 type Explicit = NonNullable<EntryEditorOptions['collections']>;
 
-/** Loader `base` per collection name, for the names that declared a provable
- *  one. An absent name means "fall through to the next source". */
-type Bases = Record<string, string>;
+/**
+ * What a collection's glob loader declares, for the names that declared
+ * anything provable. An absent name — or an absent field on a present name —
+ * means "fall through to the next source".
+ *
+ * The two travel together because they only mean anything together: a `base`
+ * broader than the collection is correct exactly when the `pattern` narrows it.
+ */
+type Decls = Record<string, { base?: string; pattern?: string[] }>;
 
 function normalizeDir(dir: string): string {
   return dir.replace(/\\/g, '/').replace(/\/+$/, '');

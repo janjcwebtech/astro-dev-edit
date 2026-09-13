@@ -41,6 +41,23 @@ export function inContentRoots(root: string, dirAbs: string, contentRoots: strin
   );
 }
 
+/**
+ * What counts as one collection's entry file.
+ *
+ * `match` is the loader's `pattern`, compiled — when the config wrote one this
+ * scanner could prove. It is the narrower and more authoritative test, and it
+ * is what makes a `base` broader than the collection safe: without it, a
+ * collection based at `src/content` with `pattern: 'settings.yml'` claims every
+ * markdown file belonging to every other collection beneath it.
+ *
+ * `extensions` is the fallback, and still the floor. A pattern can admit an
+ * extension the entry editor has no reader for, so both must agree.
+ */
+export interface EntryFilter {
+  extensions: readonly string[];
+  match?: ((rel: string) => boolean) | null;
+}
+
 export interface EntryListing {
   /** Directory-relative, forward-slashed file names, sorted. */
   names: string[];
@@ -57,7 +74,7 @@ export interface EntryListing {
  */
 export async function listEntryFiles(
   dirAbs: string,
-  extensions: readonly string[],
+  filter: EntryFilter,
   readDir: ReadDirRecursive = defaultReadDir,
 ): Promise<EntryListing> {
   let all: string[];
@@ -68,7 +85,9 @@ export async function listEntryFiles(
   }
   const names = all
     .map((f) => f.split(sep).join('/'))
-    .filter((f) => extensions.some((e) => f.toLowerCase().endsWith(e)))
+    .filter((f) => filter.extensions.some((e) => f.toLowerCase().endsWith(e)))
+    // Both tests, not either: the pattern narrows, the extension list floors.
+    .filter((f) => !filter.match || filter.match(f))
     .sort();
   return { names: names.slice(0, MAX_ENTRIES_LISTED), truncated: names.length > MAX_ENTRIES_LISTED };
 }
