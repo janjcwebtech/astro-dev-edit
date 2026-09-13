@@ -98,6 +98,19 @@ export interface CollectionBlock {
   /** 1-based line of the `const <name> = defineCollection(` statement, so the
    *  panel's "open source" can jump to the block rather than the file top. */
   line: number;
+  /**
+   * The glob loader's `base`, repo-relative and normalized, when the config
+   * writes it as a string literal — the authoritative answer to "where do this
+   * collection's entries live", which the `src/content/<name>` convention only
+   * guesses at.
+   *
+   * Absent when there is no `loader: glob({ … })`, no `base` in it, or a `base`
+   * this scanner cannot prove: a variable, a template, a concatenation. Those
+   * are **refused rather than guessed**, the same way a non-literal collection
+   * name is — a wrong directory reads as an empty collection, which is worse
+   * than falling back to the convention.
+   */
+  loaderBase?: string;
 }
 
 /** The shape {@link addCollection} emits. */
@@ -433,7 +446,12 @@ function locate(source: string): Located {
       });
       continue;
     }
-    blocks.push({ ...base, ...readSchema(source, code, argOpen, argClose) });
+    const loaderBase = readLoaderBase(source, code, argOpen, argClose);
+    blocks.push({
+      ...base,
+      ...readSchema(source, code, argOpen, argClose),
+      ...(loaderBase ? { loaderBase } : {}),
+    });
   }
   return { code, blocks, registry };
 }
@@ -452,6 +470,103 @@ function unreadable(reason: string): SchemaPart {
     fieldsClose: -1,
     entries: [],
   };
+}
+
+/**
+ * An object entry's value when it is a plain string literal, else null.
+ *
+ * Neither {@link Entry.valueStart} nor {@link Entry.end} can be used here, and
+ * for the same reason: both are computed over the **blanked** copy, where a
+ * literal is a run of spaces. `valueStart` skips past the value rather than
+ * landing on it, and `end` trims back to the colon as though the entry had no
+ * value at all. So the colon is located in the blanked copy — where a colon
+ * inside a string cannot be mistaken for structure — and the value is read out
+ * of the original, bounded by the enclosing object's `}` at `limit`.
+ *
+ * The proof that the value *is* the literal and nothing more is structural, and
+ * needs both halves:
+ *
+ *  - everything between the colon and the literal's closing quote is blank in
+ *    the blanked copy, so nothing precedes it; and
+ *  - the next significant character after it is the entry separator — a comma,
+ *    or the object's own `}`.
+ *
+ * Without the second half `'src/' + name` would read as `src/`, which is
+ * exactly the confident wrong answer this module exists to avoid. A bare
+ * identifier, a call and a template are all refused too: the first two leave
+ * code behind that blanking keeps, and a template's delimiter is a backtick.
+ */
+function readQuotedValue(source: string, code: string, e: Entry, limit: number): string | null {
+  const colon = code.indexOf(':', e.start);
+  if (colon === -1 || colon >= limit) return null;
+
+  let i = colon + 1;
+  while (i < limit && /\s/.test(source[i])) i++;
+  const quote = source[i];
+  if (quote !== '"' && quote !== "'") return null;
+  const close = source.indexOf(quote, i + 1);
+  if (close === -1 || close >= limit) return null;
+  if (code.slice(colon + 1, close + 1).trim() !== '') return null;
+
+  let after = close + 1;
+  while (after < limit && /\s/.test(code[after])) after++;
+  if (after !== limit && code[after] !== ',') return null;
+
+  const raw = source.slice(i + 1, close);
+  return raw.includes('\\') ? null : raw;
+}
+
+/**
+ * The glob loader's `base` inside a `defineCollection(` argument list, when it
+ * is written as a string literal.
+ *
+ * Anchors only on the shape it can prove — `loader: glob({ …, base: '…' })` —
+ * and returns undefined for everything else, which is the same
+ * refuse-don't-guess stance the rest of this module takes. Astro's `glob` is
+ * the only loader with a `base`; a custom loader's directory is not knowable
+ * from the config text at all.
+ *
+ * `./src/content/x`, `src/content/x/` and `src/content/x` are the same
+ * directory written three ways, so the result is normalized to the last.
+ */
+function readLoaderBase(
+  source: string,
+  code: string,
+  argOpen: number,
+  argClose: number,
+): string | undefined {
+  const objOpen = skipSpace(code, argOpen + 1, argClose);
+  if (code[objOpen] !== '{') return undefined;
+  const objClose = matchBracket(code, objOpen);
+  if (objClose === -1) return undefined;
+
+  const loader = readEntries(code, objOpen, objClose).find((e) => e.name === 'loader');
+  if (!loader) return undefined;
+
+  // `glob(` as a call, not as a substring: `myGlob(` and `globbed` must not
+  // match, and the identifier has to be the callee.
+  const call = /(^|[^\w$.])glob[\s]*\(/.exec(code.slice(loader.valueStart, loader.end));
+  if (!call) return undefined;
+  const parenOpen = loader.valueStart + call.index + call[0].length - 1;
+  const parenClose = matchBracket(code, parenOpen);
+  if (parenClose === -1 || parenClose > loader.end) return undefined;
+
+  const globOpen = skipSpace(code, parenOpen + 1, parenClose);
+  if (code[globOpen] !== '{') return undefined;
+  const globClose = matchBracket(code, globOpen);
+  if (globClose === -1) return undefined;
+
+  const baseEntry = readEntries(code, globOpen, globClose).find((e) => e.name === 'base');
+  if (!baseEntry) return undefined;
+
+  const raw = readQuotedValue(source, code, baseEntry, globClose);
+  if (raw === null || raw.trim() === '') return undefined;
+  const normalized = raw
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\/+$/, '');
+  return normalized === '' ? undefined : normalized;
 }
 
 /** The `schema:` value inside a `defineCollection(` argument list. */
@@ -593,6 +708,7 @@ export function readCollectionBlocks(source: string): CollectionBlock[] {
     ...(b.unrecognized ? { unrecognized: b.unrecognized } : {}),
     registered: b.registered,
     line: source.slice(0, b.blockStart).split('\n').length,
+    ...(b.loaderBase ? { loaderBase: b.loaderBase } : {}),
   }));
 }
 

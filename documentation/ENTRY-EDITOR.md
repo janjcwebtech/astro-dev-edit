@@ -65,8 +65,23 @@ page content"**. Both open a drawer that edits the entry like a CMS would:
    admin bar → **Collections** (below). Nothing else.
 3. Optional: tune fields via `entryEditor` config.
 
-The file→collection mapping follows the `src/content/<name>/` convention.
-Unconventional layouts and field tweaks go in the options:
+A collection's entry directory is read from the glob loader's `base`, which is
+your config's own declaration of where entries live:
+
+```js
+const useCases = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/use-cases' }),
+  schema: z.object({ title: z.string() }),
+});
+```
+
+A camelCase name over a kebab-case folder needs nothing further. Where there is
+no `base`, or it is written as a variable or a template rather than a plain
+string, the `src/content/<name>/` convention answers instead — a directory that
+cannot be read is never guessed at.
+
+An explicit `dir` outranks both. Unconventional layouts and field tweaks go in
+the options:
 
 ```js
 devEdit({

@@ -195,6 +195,71 @@ export const collections = { posts };
     ]);
     expect(blocks.every((b) => b.registered && !b.unrecognized)).toBe(true);
   });
+
+  /**
+   * The glob loader's `base` — the authoritative answer to where a collection's
+   * entries live, which `src/content/<name>` only guesses at. A camelCase name
+   * over a kebab-case folder is the ordinary way the two disagree, and Astro's
+   * own docs encourage it.
+   *
+   * The refusals matter as much as the reads: a `base` this scanner cannot
+   * prove must come back undefined so the caller falls back to the convention.
+   * Guessing a directory wrong makes a full collection read as an empty one.
+   */
+  describe('loaderBase', () => {
+    const baseOf = (src: string): (string | undefined)[] =>
+      readCollectionBlocks(src).map((b) => b.loaderBase);
+
+    const wrap = (loader: string, schema = 'z.object({ title: z.string() })'): string =>
+      `const c = defineCollection({\n  ${loader},\n  schema: ${schema},\n});\n`;
+
+    it('reads a literal base, normalizing ./ and a trailing slash away', () => {
+      expect(baseOf(wrap("loader: glob({ pattern: '**/*.md', base: './src/content/use-cases' })")))
+        .toEqual(['src/content/use-cases']);
+      expect(baseOf(wrap("loader: glob({ pattern: '**/*.md', base: 'src/content/blog/' })")))
+        .toEqual(['src/content/blog']);
+      // Order inside the loader object is not significant.
+      expect(baseOf(wrap("loader: glob({ base: 'content/notes', pattern: '**/*.md' })")))
+        .toEqual(['content/notes']);
+    });
+
+    it('is undefined when there is nothing provable to read', () => {
+      // No loader at all, and a loader with no base.
+      expect(readCollectionBlocks(`const c = defineCollection({\n  schema: z.object({}),\n});\n`)[0].loaderBase).toBeUndefined();
+      expect(baseOf(wrap("loader: glob({ pattern: '**/*.md' })"))).toEqual([undefined]);
+    });
+
+    it('refuses a base it cannot prove rather than guessing', () => {
+      // A variable, a template, a concatenation — each resolves to a directory
+      // only the running config knows.
+      expect(baseOf(wrap('loader: glob({ base: DIR })'))).toEqual([undefined]);
+      expect(baseOf(wrap('loader: glob({ base: `src/content/${name}` })'))).toEqual([undefined]);
+      expect(baseOf(wrap("loader: glob({ base: 'src/' + name })"))).toEqual([undefined]);
+    });
+
+    it('anchors on glob as the callee, not as a substring', () => {
+      expect(baseOf(wrap("loader: myGlob({ base: 'src/nope' })"))).toEqual([undefined]);
+      expect(baseOf(wrap("loader: loaders.glob({ base: 'src/nope' })"))).toEqual([undefined]);
+    });
+
+    // The base is read from the defineCollection argument list directly, so an
+    // opaque schema beside it costs nothing: the collection is still pointed at
+    // the right directory even while its fields are unreadable.
+    it('reads the base of a collection whose schema it cannot parse', () => {
+      const blocks = readCollectionBlocks(
+        wrap("loader: glob({ base: 'src/content/opaque' })", 'buildSchema()'),
+      );
+      expect(blocks[0].unrecognized).toBeTruthy();
+      expect(blocks[0].loaderBase).toBe('src/content/opaque');
+    });
+
+    // blankNonCode is what makes this safe: a brace or a colon inside a string
+    // is not structure.
+    it('is not fooled by braces inside the pattern string', () => {
+      expect(baseOf(wrap("loader: glob({ pattern: '**/*.{md,mdx}', base: 'src/content/mixed' })")))
+        .toEqual(['src/content/mixed']);
+    });
+  });
 });
 
 describe('addField', () => {
