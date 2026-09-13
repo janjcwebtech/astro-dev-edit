@@ -14,6 +14,9 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Changed
+
+- The package is published on npm: `npm install --save-dev astro-dev-edit`, rather than the `github:` install spec.
 ### Fixed
 
 - A `z.object({ ...common, … })` schema no longer makes the whole collection read-only in the designer. Entries that aren't `name: schema` — a spread, a computed key — are reported in `opaqueEntries` and skipped, so every field the config writes out stays editable and a new one can still be added. The fields a spread brings in carry a **declared elsewhere** badge, and turning **Image fields** off is refused while one is present.
