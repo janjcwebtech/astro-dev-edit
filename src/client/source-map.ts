@@ -1,3 +1,4 @@
+import { isPackagePath } from '../shared/package-path.ts';
 import type { SourceLoc } from '../shared/protocol.ts';
 
 /**
@@ -115,6 +116,47 @@ export function nearestSource(node: EventTarget | null): HTMLElement | null {
   let el = node as HTMLElement | null;
   while (el && el !== document.body) {
     if (sourceFor(el)) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/**
+ * Whether a loc names a file inside an installed package rather than the
+ * user's own source.
+ *
+ * Asked on hover — `astro:assets` annotates every `<Image>` to
+ * `node_modules/astro/components/Image.astro` — so it answers from the string
+ * the client already holds rather than a round trip. The predicate itself is
+ * shared with the server, which asks the same question of the same annotation.
+ */
+export function isPackageSource(src: SourceLoc): boolean {
+  return isPackagePath(src.file);
+}
+
+/**
+ * Nearest ancestor (or self) whose source loc is the user's own — skipping
+ * package-owned locs.
+ *
+ * {@link nearestSource} stops at the first annotated element, and for an
+ * `astro:assets` `<Image>` that is the `<img>` itself, annotated to Astro's
+ * own component. The element is then a dead end: nothing in it can be edited,
+ * and the file cannot even be opened. But the element *was* written somewhere
+ * — as `<Image …>` or as a wrapper around it — and that somewhere is the
+ * nearest enclosing element Astro annotated to a project file.
+ *
+ * Two levels of indirection do not break it: a `<SiteImage>` wrapping an
+ * `<Image>` still renders inside whatever markup the page wrote around it, so
+ * the walk lands on that markup rather than on either component.
+ *
+ * Returns null when nothing above it is the user's either, which is the honest
+ * answer for a page whose whole subtree came from a package.
+ */
+export function nearestOwnSource(from: HTMLElement): HTMLElement | null {
+  let el: HTMLElement | null = from;
+  while (el && el !== document.body) {
+    const src = sourceFor(el);
+    if (src && !isPackageSource(src)) return el;
     el = el.parentElement;
   }
   return null;

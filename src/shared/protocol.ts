@@ -133,6 +133,21 @@ export interface OpenRequest {
   /** "line:col"; omitted or empty opens the file at its top. */
   loc?: string;
 }
+export interface OpenResponse {
+  /** False whenever `refused` is set — no editor was launched. */
+  ok: boolean;
+  /**
+   * Set when the file is real but is not the user's to open: a package-owned
+   * path like the `astro:assets` `<Image>` component, or one outside the
+   * editable content roots. The overlay shows this sentence instead of an
+   * error, the way `/peek` and `/classify` already answer for the same paths.
+   *
+   * A refusal, not a softened gate — the editor is not launched either way.
+   * Genuine anomalies (missing, escaping the root, a disallowed extension)
+   * remain errors.
+   */
+  refused?: string;
+}
 
 // --- POST /page-source -------------------------------------------------------
 /**
