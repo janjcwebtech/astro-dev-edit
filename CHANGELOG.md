@@ -17,6 +17,10 @@ Writing an entry — one line, past tense, no essay:
 ### Changed
 
 - The package is published on npm: `npm install --save-dev astro-dev-edit`, rather than the `github:` install spec.
+### Fixed
+
+- A `z.object({ ...common, … })` schema no longer makes the whole collection read-only in the designer. Entries that aren't `name: schema` — a spread, a computed key — are reported in `opaqueEntries` and skipped, so every field the config writes out stays editable and a new one can still be added. The fields a spread brings in carry a **declared elsewhere** badge, and turning **Image fields** off is refused while one is present.
+- Open-in-editor, the CSS inspector's `/inspect/open`, and reading `UNSPLASH_ACCESS_KEY` out of a `.env` file no longer fail once the package is installed from npm rather than linked from a path. The three request-time `await import()` calls are static imports, so nothing is loaded through the config module runner Astro closes after reading `astro.config.mjs`.
 
 ## [0.11.0] - 2026-09-12
 

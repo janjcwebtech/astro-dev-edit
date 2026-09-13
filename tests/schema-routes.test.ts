@@ -140,6 +140,24 @@ describe('POST /collections', () => {
     expect(blog.expressions).toEqual({ title: 'z.string()', excerpt: 'z.string()' });
   });
 
+  it('names a spread in the schema and still reports the literal fields as patchable', async () => {
+    // What the panel needs to draw the boundary: the collection is patchable
+    // (`schemaForm` set, no `unrecognized`), `title` has an expression and
+    // `shared` doesn't, so only the field the config writes out is editable.
+    await writeFile(
+      join(root, 'src/content.config.ts'),
+      CONFIG.replace('excerpt: z.string(),', '...shared,'),
+    );
+    const h = await mount();
+    const r = await request(h, '/__dev-edit/collections');
+    const [blog] = r.body.collections;
+    expect(blog.schemaForm).toBe('object');
+    expect(blog.unrecognized).toBeUndefined();
+    expect(blog.opaqueEntries).toEqual(['...shared']);
+    expect(blog.fields.map((f: any) => f.name)).toEqual(['title', 'excerpt']);
+    expect(blog.expressions).toEqual({ title: 'z.string()' });
+  });
+
   it('reports schemaEditor: false without refusing the read', async () => {
     const h = await mount({ schemaEditor: false });
     const r = await request(h, '/__dev-edit/collections');

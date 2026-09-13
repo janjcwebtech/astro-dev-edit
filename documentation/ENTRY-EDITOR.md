@@ -284,8 +284,25 @@ Worth knowing before you use it:
     Turning it back **off** is refused while any field still uses `image()`, and
     the refusal names them: remove or retype those fields first.
 -   **A schema the designer can't prove, it won't touch.** Built by a helper,
-    holding a spread, conditional — the row says so and offers *Open source*
+    returned by a call, conditional — the row says so and offers *Open source*
     instead of controls.
+-   **A spread is read around, not refused.** A schema that shares a block of
+    fields between collections still opens:
+
+    ```js
+    schema: z.object({
+      ...common,        // declared elsewhere
+      author: z.string(),
+    })
+    ```
+
+    `author` is editable like any other field, and a new field can be added.
+    The fields `common` brings in are listed with their real types — Astro
+    resolved them — but carry a **declared elsewhere** badge and read-only
+    controls, because changing one means editing the module that declares it.
+    A computed key (`[key]: z.string()`) is treated the same way. The one thing
+    this refuses is turning **Image fields** back *off*, which it cannot do
+    without proving nothing in the spread uses `image()`.
 -   **Names are validated, not escaped.** A collection or field name has to be a
     plain identifier, and a new collection's directory is confined to
     `contentRoots` like any other write. A value that would need quoting to be

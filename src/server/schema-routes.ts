@@ -230,6 +230,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
       fieldSource: derived ? 'schema' : 'source',
       expressions: Object.fromEntries((block?.fields ?? []).map((f) => [f.name, f.expr])),
       schemaForm: block?.schemaForm ?? null,
+      ...(block?.opaqueEntries.length ? { opaqueEntries: block.opaqueEntries } : {}),
       ...(block?.unrecognized
         ? { unrecognized: block.unrecognized }
         : block
