@@ -1,4 +1,5 @@
 import type { TextWriter } from './text-writes.ts';
+import { createHash } from 'node:crypto';
 import { chmod, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 // Static, not a lazy import inside readEnvKey: see the note in editor.ts. A
@@ -45,7 +46,7 @@ import { atomicWrite, SECRET_MODE } from './paths.ts';
  * clear, work from any browser, and have a home for future additions.
  *
  * The key is **never** returned to the client — only whether one resolved,
- * where from, and a masked fragment. It must never enter a log line or an error
+ * where from, and a fingerprint of it. It must never enter a log line or an error
  * message either.
  */
 
@@ -338,10 +339,24 @@ export async function saveStoredOptions(root: string, next: StoredOptions, write
   await writeSettingsFile(root, { ...current, options: next }, writeText);
 }
 
-/** A fragment of the key, for recognition only — never enough to use. Eight
- *  bullets regardless of length, so the mask leaks nothing about the real one. */
+/**
+ * A **fingerprint** of the key, for recognition only — four hex characters of
+ * its SHA-256, behind eight bullets regardless of length, so neither the tail
+ * nor the length of the real key leaks.
+ *
+ * The tail this used to return was four real characters of the resolved key,
+ * on every `GET /settings`, and that includes a key the server was never asked
+ * to store — one from `astro.config.mjs` or an exported shell variable.
+ * `SECURITY.md` counts a fragment of an access key in a response as reportable.
+ *
+ * A hash keeps the one property the mask exists for: the same key always draws
+ * the same four characters, so a user can tell "still the key I saved" from
+ * "something else now supplies it". Recognising *which* key by sight was never
+ * the job — where a config or shell variable supplies it, the panel names the
+ * file.
+ */
 export function maskKey(key: string): string {
-  return '••••••••' + key.slice(-4);
+  return '••••••••' + createHash('sha256').update(key).digest('hex').slice(0, 4);
 }
 
 /**
