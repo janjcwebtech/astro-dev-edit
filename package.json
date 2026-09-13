@@ -1,6 +1,6 @@
 {
   "name": "astro-dev-edit",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "In-browser visual content editing for the Astro dev server — click text or images in the rendered page, writes straight to source. Dev-only.",
   "type": "module",
   "author": "Jan Cerny (https://github.com/janjcwebtech)",
