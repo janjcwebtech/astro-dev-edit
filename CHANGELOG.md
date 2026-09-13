@@ -14,6 +14,10 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Changed
+
+- The Unsplash key hint in the Settings panel is a fingerprint — `••••••••8f6d`, four hex characters of the key's SHA-256 — where it used to be four real characters of the key's tail. `GET /settings` carried that tail on every read, including for a key from `astro.config.mjs` or an exported shell variable that the server was never asked to store. The hint is still stable per key, which is all it is for.
+
 ## [0.11.1] - 2026-09-13
 
 ### Changed

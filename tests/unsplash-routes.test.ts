@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -626,6 +627,12 @@ describe('/settings', () => {
 
   /** A middleware whose key resolution is the real one, so a write is visible
    *  to the next read without a restart. */
+  /** The hint format, restated here rather than imported: eight bullets and
+   *  four hex characters of the key's SHA-256. Importing `maskKey` would make
+   *  every assertion below agree with whatever it happened to return. */
+  const fingerprint = (key: string): string =>
+    '••••••••' + createHash('sha256').update(key).digest('hex').slice(0, 4);
+
   function live(configKey?: string): Connect.NextHandleFunction {
     return mount(config({ resolve: () => resolveUnsplashKey(root, configKey) }));
   }
@@ -639,20 +646,37 @@ describe('/settings', () => {
     expect(r.body.unsplash.hint).toBeUndefined();
   });
 
-  it('stores a key, then reports it masked and never returns it', async () => {
+  it('stores a key, then reports it fingerprinted and never returns it', async () => {
     const via = live();
-    const saved = await put('SECRETKEY123456Ab3d', via);
+    const KEY = 'SECRETKEY123456Ab3d';
+    const saved = await put(KEY, via);
     expect(saved.status).toBe(200);
     expect(saved.body.unsplash.configured).toBe(true);
     expect(saved.body.unsplash.source).toBe('env-file');
     expect(saved.body.unsplash.sourceFile).toBe(ENV_TARGET);
-    expect(saved.body.unsplash.hint).toBe('••••••••Ab3d');
+    expect(saved.body.unsplash.hint).toBe(fingerprint(KEY));
 
     const read = await get(via);
-    expect(read.body.unsplash.hint).toBe('••••••••Ab3d');
-    // The raw key appears nowhere in either response.
-    expect(saved.raw).not.toContain('SECRETKEY123456');
-    expect(read.raw).not.toContain('SECRETKEY123456');
+    // Stable across reads — recognition is the whole job of the hint.
+    expect(read.body.unsplash.hint).toBe(fingerprint(KEY));
+
+    // The raw key appears nowhere in either response, and neither does any
+    // four-character run of it: the hint used to carry the real tail.
+    for (const raw of [saved.raw, read.raw]) {
+      expect(raw).not.toContain('SECRETKEY123456');
+      for (let i = 0; i + 4 <= KEY.length; i++) {
+        expect(raw, `run "${KEY.slice(i, i + 4)}" at ${i}`).not.toContain(KEY.slice(i, i + 4));
+      }
+    }
+  });
+
+  it('fingerprints a config or shell key too — the tail of one never crossed the wire', async () => {
+    const KEY = 'CONFIGKEY987654Zz9q';
+    const r = await get(live(KEY));
+    expect(r.body.unsplash.hint).toBe(fingerprint(KEY));
+    for (let i = 0; i + 4 <= KEY.length; i++) {
+      expect(r.raw).not.toContain(KEY.slice(i, i + 4));
+    }
   });
 
   it('writes the key to .env.local at the fixed root path, owner-only', async () => {

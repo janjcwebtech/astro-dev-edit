@@ -110,8 +110,10 @@ copy; until then it says so.
 your `.gitignore` does not cover — a plain `.env*` line covers it, as Astro's own
 starters ship — but this integration cannot edit your ignore rules for you. The
 key is never sent back to the browser: a read reports only whether one resolved,
-from where, whether the panel may change it, and a masked fragment like
-`••••••••Ab3d`.
+from where, whether the panel may change it, and a fingerprint like
+`••••••••8f6d` — four hex characters of the key's SHA-256, not of the key
+itself. The same key always draws the same four, so the panel still tells
+"still the one I saved" from "something else supplies it now".
 
 ### Import size
 

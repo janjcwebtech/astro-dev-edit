@@ -36,7 +36,7 @@ import type { UnsplashConfig } from './unsplash-routes.ts';
  *   must say so instead of accepting input that resolution would discard.
  * - **the access key** — a secret, written to `.env.local`. It is never in a
  *   response: a read reports only whether one resolved, from where, whether the
- *   panel may change it, and a masked fragment. It must never enter a log line
+ *   panel may change it, and a fingerprint of it. It must never enter a log line
  *   or an error message either.
  *
  * **An option patch is all-or-nothing.** A patch naming any unknown,

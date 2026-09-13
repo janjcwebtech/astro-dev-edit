@@ -643,7 +643,7 @@ export interface OptionDescriptor {
 
 /**
  * The access key itself is **never** in this shape. Only whether one resolved,
- * where from, whether the panel may change it, and a masked fragment.
+ * where from, whether the panel may change it, and a fingerprint of it.
  */
 export interface SettingsResponse {
   /** Every option, in the order the panel should render them. Absent from a
@@ -670,7 +670,10 @@ export interface SettingsResponse {
      *  `.env.development`, `.astro-dev-edit.json`. Absent for `config` and
      *  `env-shell`, which have no file, and when nothing is configured. */
     sourceFile?: string;
-    /** Masked tail, e.g. `••••••••Ab3d`. Absent when nothing is configured. */
+    /** Recognition fingerprint, e.g. `••••••••8f6d` — eight bullets and four
+     *  hex characters of the key's SHA-256. No part of the key itself crosses
+     *  the wire, and neither does its length. Absent when nothing is
+     *  configured. */
     hint?: string;
     /**
      * Whether a save would actually take effect. False when something that
