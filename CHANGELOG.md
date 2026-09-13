@@ -14,6 +14,10 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Fixed
+
+- The collection designer no longer advises the `astro-dev-edit:page-source` meta tag on collections where the entry already resolves from the URL. A route that fetches through a helper defeats the route scan, which is not the same as having no detail route, so the note now reports what resolution will actually do: `pageEditingFallback` on each `CollectionSummary` is `resolves`, `no-entries`, or `ambiguous`, and only the last keeps the warning and the snippet — which is the case where the meta tag is the real answer.
+
 ## [0.11.1] - 2026-09-13
 
 ### Changed

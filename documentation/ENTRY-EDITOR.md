@@ -117,10 +117,17 @@ failing means no button rather than the wrong one:
    included.
 
 If your route fetches entries through a helper, step 2 finds nothing and every
-switched-on collection stays a candidate; a unique id still resolves, and a tie
-is refused rather than guessed. If **no** route naming the collection is found
-at all, the row says *no detail route* and the collection's own view offers the
-meta tag to emit instead — see below.
+declared collection stays a candidate; a unique id still resolves, and a tie is
+refused rather than guessed.
+
+Where step 2 found nothing, the collection's own view says which of those two it
+will be, rather than assuming the worst:
+
+| What it says | What happens on a detail page |
+| --- | --- |
+| the entry is matched from the URL instead | the drawer works, with nothing to add to your templates |
+| this collection has no entries yet | nothing to resolve to — add one and the drawer follows |
+| another collection holds an entry of the same name | resolution refuses rather than guess, and the meta tag below is the answer |
 
 Switching a collection **off** removes only the in-page drawer. The collection
 stays in the Collections drawer, and its entries stay editable from the

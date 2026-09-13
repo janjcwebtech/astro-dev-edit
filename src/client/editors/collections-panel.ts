@@ -591,6 +591,37 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
         'muted',
       );
     }
+    // A null detailRoute means the scan could not *prove* which route renders
+    // this collection — it reads only a string-literal getCollection('x') in
+    // the page file, so a route fetching through a helper defeats it. Saying
+    // "no route was found" there sent people to paste a meta tag into a layout
+    // that already worked. The server says what resolution's fallback will do,
+    // and only the case where it genuinely refuses keeps the warn and snippet.
+    if (c.pageEditingFallback === 'resolves') {
+      return note(
+        [
+          icon('file', 12),
+          textNode(
+            'Content editor is on. No route names this collection in its own source — it ' +
+              'may fetch entries through a helper — so the entry is matched from the URL ' +
+              'instead, and Edit entry works on its detail pages with no meta tag.',
+          ),
+        ],
+        'muted',
+      );
+    }
+    if (c.pageEditingFallback === 'no-entries') {
+      return note(
+        [
+          icon('file', 12),
+          textNode(
+            'Content editor is on, but this collection has no entries yet, so there is ' +
+              'nothing for a detail page to resolve to. Add one and the drawer follows.',
+          ),
+        ],
+        'muted',
+      );
+    }
     const snippet =
       '{import.meta.env.DEV && (\n' +
       '  <meta name="astro-dev-edit:page-source" content={entry.filePath} />\n' +
@@ -599,9 +630,9 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
       [
         icon('alert', 12),
         textNode(
-          'Content editor is on, but no route naming this collection was found — it may ' +
-            "fetch its entries through a helper. Emit this in the detail page's <head>, " +
-            'with your own entry variable, and the drawer works there too:',
+          'Content editor is on, but another collection holds an entry of the same name, ' +
+            'so matching this one from the URL would be a guess. Emit this in the detail ' +
+            "page's <head>, with your own entry variable, and the drawer works there:",
         ),
       ],
       'warn',
