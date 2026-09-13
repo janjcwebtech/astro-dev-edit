@@ -18,6 +18,10 @@ Writing an entry — one line, past tense, no essay:
 
 - The refusal on an element rendered by a package names where the component was **used** — the nearest enclosing element written in your own source — and its button opens that file there. An `astro:assets` `<Image>` annotates to `node_modules/astro/components/Image.astro`, which is neither editable nor openable; the jump lands on the call site instead.
 
+### Changed
+
+- The Unsplash key hint in the Settings panel is a fingerprint — `••••••••8f6d`, four hex characters of the key's SHA-256 — where it used to be four real characters of the key's tail. `GET /settings` carried that tail on every read, including for a key from `astro.config.mjs` or an exported shell variable that the server was never asked to store. The hint is still stable per key, which is all it is for.
+
 ### Fixed
 
 - `/open` answers a package-owned or out-of-root path with a refusal sentence instead of a 400, matching `/peek` and `/classify`. The hover pill offers *open* on an `astro:assets` `<Image>`, so the error it raised was the tool failing on its own affordance; no editor is launched either way.
