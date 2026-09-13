@@ -25,6 +25,7 @@ Writing an entry — one line, past tense, no essay:
 ### Fixed
 
 - `/open` answers a package-owned or out-of-root path with a refusal sentence instead of a 400, matching `/peek` and `/classify`. The hover pill offers *open* on an `astro:assets` `<Image>`, so the error it raised was the tool failing on its own affordance; no editor is launched either way.
+- The collection designer no longer advises the `astro-dev-edit:page-source` meta tag on collections where the entry already resolves from the URL. A route that fetches through a helper defeats the route scan, which is not the same as having no detail route, so the note now reports what resolution will actually do: `pageEditingFallback` on each `CollectionSummary` is `resolves`, `no-entries`, or `ambiguous`, and only the last keeps the warning and the snippet — which is the case where the meta tag is the real answer.
 
 ## [0.11.1] - 2026-09-13
 

@@ -37,6 +37,7 @@ import type {
 } from './content-config.ts';
 import {
   MAX_ENTRIES_LISTED,
+  entryId,
   inContentRoots,
   listEntryFiles,
 } from './collection-entries.ts';
@@ -146,12 +147,14 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     enabled: boolean;
     schemaEditor: boolean;
     contentRoots: string[];
+    editableExtensions: string[];
   }> {
     const { options } = await optionsResolver.resolve();
     return {
       enabled: options.entryEditor !== false,
       schemaEditor: options.schemaEditor,
       contentRoots: options.contentRoots,
+      editableExtensions: options.editableExtensions,
     };
   }
 
@@ -197,6 +200,52 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     }
   }
 
+  /**
+   * Which collections hold an entry id another collection also holds.
+   *
+   * This is the one thing that stops entry resolution's fallback from
+   * answering. Layer 2 of `/entry/resolve` leaves *every* declared collection a
+   * candidate when the page file names none, and layer 3 then matches the URL's
+   * tail against their entry ids and refuses `ambiguous` on a tie — so a shared
+   * id is the whole of the risk, and a collection whose ids are its own alone
+   * resolves without any meta tag.
+   *
+   * Deliberately mirrors layer 3's reads rather than approximating them:
+   * `inContentRoots` confinement, `listEntryFiles`, `entryId`, and the same
+   * narrowing of ENTRY_EXTENSIONS by the live `editableExtensions`. A cheaper
+   * guess here would put the panel's advice back out of step with what
+   * resolution does, which is the bug this answers.
+   */
+  async function sharedEntryIds(
+    infos: readonly EntryCollectionInfo[],
+    contentRoots: string[],
+    editableExtensions: string[],
+  ): Promise<Map<string, { count: number; collides: boolean }>> {
+    const extensions = ENTRY_EXTENSIONS.filter((e) => editableExtensions.includes(e));
+    const idsBy = new Map<string, string[]>();
+    for (const info of infos) {
+      const dirAbs = resolve(root, info.dir);
+      if (!inContentRoots(root, dirAbs, contentRoots)) {
+        idsBy.set(info.collection, []);
+        continue;
+      }
+      const { names } = await listEntryFiles(dirAbs, extensions);
+      idsBy.set(info.collection, names.map(entryId));
+    }
+    const owners = new Map<string, number>();
+    for (const ids of idsBy.values()) {
+      for (const id of new Set(ids)) owners.set(id, (owners.get(id) ?? 0) + 1);
+    }
+    const out = new Map<string, { count: number; collides: boolean }>();
+    for (const [collection, ids] of idsBy) {
+      out.set(collection, {
+        count: ids.length,
+        collides: ids.some((id) => (owners.get(id) ?? 0) > 1),
+      });
+    }
+    return out;
+  }
+
   /** The panel's row for one collection: its live fields (schema-derived when the
    *  schema resolved) joined to what the config source actually says. */
   async function summarize(
@@ -205,6 +254,9 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     /** The stored overrides for this collection, to tell apart what the panel
      *  wrote from what the project's config owns. */
     storedFields: Record<string, FieldOverride>,
+    /** This collection's row from {@link sharedEntryIds}. Absent only when the
+     *  collection isn't one the provider reported. */
+    fallback: { count: number; collides: boolean } | undefined,
   ): Promise<CollectionSummary> {
     // Read off the config layer directly rather than inferred by comparing
     // effective against stored: a config and a stored value that agree are
@@ -221,6 +273,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     const derived = info.schema ? zodToFields(info.schema) : null;
     const fields: FieldDescriptor[] =
       derived ?? inferFields(Object.fromEntries((block?.fields ?? []).map((f) => [f.name, null])));
+    const detailRoute = (await detailRoutes?.patternFor(info.collection)) ?? null;
     return {
       name: info.collection,
       dir: info.dir,
@@ -250,7 +303,17 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
       // Null is a real answer, not a missing one: a data collection no dynamic
       // route renders has no detail route, and the panel says so rather than
       // implying the switch will produce a button somewhere.
-      detailRoute: (await detailRoutes?.patternFor(info.collection)) ?? null,
+      detailRoute,
+      // …but "no route was *found*" is not "no route exists", so where the scan
+      // came up empty the panel is told what resolution's fallback will do
+      // instead of being left to assume the worst.
+      pageEditingFallback: detailRoute
+        ? null
+        : !fallback || fallback.count === 0
+          ? 'no-entries'
+          : fallback.collides
+            ? 'ambiguous'
+            : 'resolves',
     };
   }
 
@@ -298,6 +361,33 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
         const infos = (await schemaProvider?.listCollections()) ?? [];
         const storedOptions: StoredOptions = await readStoredOptions(root).catch(() => ({}));
         const stored: EntryEditorOptions = storedOptions.entryEditor || {};
+        // A collection the config *declares* but the provider couldn't report —
+        // which is what happens when the config module fails to load at all,
+        // and is exactly when the designer is most useful. Built here rather
+        // than in the loop below because the id scan has to see these too: an
+        // id they share is just as ambiguous to resolution as any other.
+        const reported = new Set(infos.map((i) => i.collection));
+        const sourceOnly: EntryCollectionInfo[] = blocks
+          .filter((b) => !reported.has(b.name))
+          .map((b) => ({
+            collection: b.name,
+            dir: `src/content/${b.name}`,
+            schema: null,
+            // The provider returns nothing for this name only when the config
+            // module failed to load *and* nothing configures it explicitly —
+            // so the stored layer is the whole answer here.
+            pageEditing: stored.collections?.[b.name]?.pageEditing === true,
+            fieldConfig: {},
+          }));
+
+        // Once per request, not per row: the answer for any one collection
+        // depends on every other collection's ids.
+        const { contentRoots, editableExtensions } = await gate();
+        const fallbacks = await sharedEntryIds(
+          [...infos, ...sourceOnly],
+          contentRoots,
+          editableExtensions,
+        );
         const collections: CollectionSummary[] = [];
         for (const info of infos) {
           collections.push(
@@ -305,30 +395,19 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
               info,
               blocks.find((b) => b.name === info.collection),
               stored.collections?.[info.collection]?.fields ?? {},
+              fallbacks.get(info.collection),
             ),
           );
         }
-        // A collection the config *declares* but the provider couldn't report —
-        // which is what happens when the config module fails to load at all, and
-        // is exactly when the designer is most useful. Listing it from the source
-        // alone beats letting it vanish from the panel with no explanation.
-        const covered = new Set(collections.map((c) => c.name));
-        for (const block of blocks) {
-          if (covered.has(block.name)) continue;
+        // Listing a source-only collection beats letting it vanish from the
+        // panel with no explanation.
+        for (const info of sourceOnly) {
           collections.push(
             await summarize(
-              {
-                collection: block.name,
-                dir: `src/content/${block.name}`,
-                schema: null,
-                // The provider returns nothing for this name only when the
-                // config module failed to load *and* nothing configures it
-                // explicitly — so the stored layer is the whole answer here.
-                pageEditing: stored.collections?.[block.name]?.pageEditing === true,
-                fieldConfig: {},
-              },
-              block,
+              info,
+              blocks.find((b) => b.name === info.collection),
               {},
+              fallbacks.get(info.collection),
             ),
           );
         }
