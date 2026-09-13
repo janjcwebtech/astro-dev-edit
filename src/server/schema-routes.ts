@@ -43,7 +43,8 @@ import {
 } from './collection-entries.ts';
 import type { DetailRoutes } from './entry-detect.ts';
 import { launchInEditor } from './editor.ts';
-import { ENTRY_EXTENSIONS } from './entry-routes.ts';
+import { compilePattern } from './entry-pattern.ts';
+import { DATA_ENTRY_REASON, entryExtensionsFor, isDataEntry } from './entry-routes.ts';
 import type { OptionsResolver, StoredOptions } from './options.ts';
 import { insideRoot } from './paths.ts';
 import type { Route, RouteResult } from './router.ts';
@@ -184,20 +185,27 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     }
   }
 
-  /** Entry files in a collection's directory. Counting only — nothing here is
-   *  ever opened. */
-  async function countEntries(dir: string): Promise<{ exists: boolean; count: number }> {
-    const abs = resolve(root, dir);
+  /**
+   * Entry files in a collection's directory. Counting only — nothing here is
+   * ever opened.
+   *
+   * Counts through the same {@link listEntryFiles} the Items tab and entry
+   * resolution use, rather than its own `readdir` filter. Two spellings of
+   * "which files are entries" is how the count came to disagree with the list:
+   * this one held a hardcoded markdown set, so a data collection reported `0
+   * entries` while its directory sat there full.
+   */
+  async function countEntries(
+    info: Pick<EntryCollectionInfo, 'dir' | 'pattern'>,
+    extensions: readonly string[],
+  ): Promise<{ exists: boolean; count: number }> {
+    const abs = resolve(root, info.dir);
     if (!insideRoot(root, abs) || !existsSync(abs)) return { exists: false, count: 0 };
-    try {
-      const files = await readdir(abs, { recursive: true });
-      return {
-        exists: true,
-        count: files.filter((f) => ENTRY_EXTENSIONS.some((e) => String(f).endsWith(e))).length,
-      };
-    } catch {
-      return { exists: true, count: 0 };
-    }
+    const { names } = await listEntryFiles(abs, {
+      extensions,
+      match: compilePattern(info.pattern),
+    });
+    return { exists: true, count: names.length };
   }
 
   /**
@@ -212,7 +220,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
    *
    * Deliberately mirrors layer 3's reads rather than approximating them:
    * `inContentRoots` confinement, `listEntryFiles`, `entryId`, and the same
-   * narrowing of ENTRY_EXTENSIONS by the live `editableExtensions`. A cheaper
+   * entry extensions the live `editableExtensions` leave in force. A cheaper
    * guess here would put the panel's advice back out of step with what
    * resolution does, which is the bug this answers.
    */
@@ -221,7 +229,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     contentRoots: string[],
     editableExtensions: string[],
   ): Promise<Map<string, { count: number; collides: boolean }>> {
-    const extensions = ENTRY_EXTENSIONS.filter((e) => editableExtensions.includes(e));
+    const extensions = entryExtensionsFor(editableExtensions);
     const idsBy = new Map<string, string[]>();
     for (const info of infos) {
       const dirAbs = resolve(root, info.dir);
@@ -229,7 +237,10 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
         idsBy.set(info.collection, []);
         continue;
       }
-      const { names } = await listEntryFiles(dirAbs, extensions);
+      const { names } = await listEntryFiles(dirAbs, {
+        extensions,
+        match: compilePattern(info.pattern),
+      });
       idsBy.set(info.collection, names.map(entryId));
     }
     const owners = new Map<string, number>();
@@ -246,6 +257,21 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     return out;
   }
 
+  /** Whether a collection holds at least one entry the drawer could open — a
+   *  markdown-family file. A collection of pure data lists and counts, but its
+   *  rows are not openable, and the panel says so. */
+  async function holdsTextEntry(
+    info: EntryCollectionInfo,
+    extensions: readonly string[],
+  ): Promise<boolean> {
+    const abs = resolve(root, info.dir);
+    const { names } = await listEntryFiles(abs, {
+      extensions,
+      match: compilePattern(info.pattern),
+    });
+    return names.some((n) => !isDataEntry(n));
+  }
+
   /** The panel's row for one collection: its live fields (schema-derived when the
    *  schema resolved) joined to what the config source actually says. */
   async function summarize(
@@ -257,6 +283,8 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     /** This collection's row from {@link sharedEntryIds}. Absent only when the
      *  collection isn't one the provider reported. */
     fallback: { count: number; collides: boolean } | undefined,
+    /** The entry extensions in force, resolved once per request. */
+    extensions: readonly string[],
   ): Promise<CollectionSummary> {
     // Read off the config layer directly rather than inferred by comparing
     // effective against stored: a config and a stored value that agree are
@@ -265,7 +293,12 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
     const pageEditingLocked =
       optionsResolver.entryEditorConfig()?.collections?.[info.collection]?.pageEditing !==
       undefined;
-    const { exists, count } = await countEntries(info.dir);
+    const { exists, count } = await countEntries(info, extensions);
+    // "Can this collection hold an entry the drawer can open?" — asked of the
+    // loader's own pattern where there is one, and of the entries on disk
+    // otherwise, so a collection with no provable pattern is judged by what it
+    // actually holds rather than assumed editable.
+    const dataOnly = count > 0 && !(await holdsTextEntry(info, extensions));
     // No resolvable schema: fall back to the field names the *source* names, so
     // the row isn't empty. Types are unknown, which `json` is the honest answer
     // for — the same degradation the entry panel makes — and `fieldSource` tells
@@ -307,6 +340,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
       // …but "no route was *found*" is not "no route exists", so where the scan
       // came up empty the panel is told what resolution's fallback will do
       // instead of being left to assume the worst.
+      ...(dataOnly ? { entriesReadOnly: DATA_ENTRY_REASON } : {}),
       pageEditingFallback: detailRoute
         ? null
         : !fallback || fallback.count === 0
@@ -383,6 +417,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
         // Once per request, not per row: the answer for any one collection
         // depends on every other collection's ids.
         const { contentRoots, editableExtensions } = await gate();
+        const extensions = entryExtensionsFor(editableExtensions);
         const fallbacks = await sharedEntryIds(
           [...infos, ...sourceOnly],
           contentRoots,
@@ -396,6 +431,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
               blocks.find((b) => b.name === info.collection),
               stored.collections?.[info.collection]?.fields ?? {},
               fallbacks.get(info.collection),
+              extensions,
             ),
           );
         }
@@ -408,6 +444,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
               blocks.find((b) => b.name === info.collection),
               {},
               fallbacks.get(info.collection),
+              extensions,
             ),
           );
         }
@@ -555,8 +592,11 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
         }
 
         const { options } = await optionsResolver.resolve();
-        const extensions = ENTRY_EXTENSIONS.filter((e) => options.editableExtensions.includes(e));
-        const { names, truncated } = await listEntryFiles(dirAbs, extensions);
+        const extensions = entryExtensionsFor(options.editableExtensions);
+        const { names, truncated } = await listEntryFiles(dirAbs, {
+          extensions,
+          match: compilePattern(info?.pattern),
+        });
         const entries: CollectionEntryItem[] = [];
         for (const name of names) {
           entries.push(await describeEntry(dir, dirAbs, name));

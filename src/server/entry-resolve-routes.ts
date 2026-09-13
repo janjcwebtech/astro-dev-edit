@@ -4,7 +4,8 @@ import type { EntryResolveRefusal, EntryResolveRequest, EntryResolveResponse } f
 import { entryId, inContentRoots, listEntryFiles } from './collection-entries.ts';
 import type { EntryCollectionInfo, EntrySchemaProvider } from './content-config.ts';
 import type { DetailRoutes } from './entry-detect.ts';
-import { ENTRY_EXTENSIONS } from './entry-routes.ts';
+import { compilePattern } from './entry-pattern.ts';
+import { entryExtensionsFor, isDataEntry } from './entry-routes.ts';
 import type { OptionsResolver } from './options.ts';
 import type { RouteManifest } from './route-manifest.ts';
 import type { Route } from './router.ts';
@@ -153,7 +154,7 @@ export function createEntryResolveRoutes(deps: EntryResolveRouteDeps): Route[] {
 
         // --- layer 3: which entry ------------------------------------------
         const target = normalizePath(pathname);
-        const extensions = ENTRY_EXTENSIONS.filter((e) => options.editableExtensions.includes(e));
+        const extensions = entryExtensionsFor(options.editableExtensions);
         const matches: Candidate[] = [];
         for (const info of candidates) {
           const dirAbs = resolve(root, info.dir);
@@ -161,7 +162,10 @@ export function createEntryResolveRoutes(deps: EntryResolveRouteDeps): Route[] {
           // pointed outside the content roots is not listed, not refused: another
           // collection may still answer.
           if (!inContentRoots(root, dirAbs, options.contentRoots)) continue;
-          const { names } = await listEntryFiles(dirAbs, extensions);
+          const { names } = await listEntryFiles(dirAbs, {
+            extensions,
+            match: compilePattern(info.pattern),
+          });
           for (const name of names) {
             const id = entryId(name);
             if (target === `/${id}` || target.endsWith(`/${id}`)) {
@@ -187,6 +191,17 @@ export function createEntryResolveRoutes(deps: EntryResolveRouteDeps): Route[] {
         }
 
         const best = matches[0];
+        // Resolved, and not something the drawer can open. Withholding the
+        // button is the honest end of the same refusal `/entry` gives: offering
+        // *Edit entry* and then failing on the click would be worse than the
+        // silence this replaces.
+        if (isDataEntry(best.file)) {
+          return refuse('data-entry', {
+            collection: best.collection,
+            entryFile: best.file,
+            pattern: hit.pattern,
+          });
+        }
         const info = candidates.find((c) => c.collection === best.collection);
         if (info?.pageEditing !== true) {
           // Found it, and the user hasn't switched this collection on. Both

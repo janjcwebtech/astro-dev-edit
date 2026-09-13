@@ -568,6 +568,12 @@ export function buildCollectionsPane(opts: CollectionsPaneOptions): CollectionsP
    * nowhere else. Handing over the snippet is the honest substitute.
    */
   function pageEditingNote(c: CollectionSummary): HTMLElement {
+    // A data collection has no drawer to offer, switched on or not, so the
+    // page-editing story does not apply to it — saying why it is read-only is
+    // the only useful thing there is to say.
+    if (c.entriesReadOnly) {
+      return note([icon('alert', 12), textNode(c.entriesReadOnly)], 'warn');
+    }
     if (!c.pageEditing) {
       return note(
         [

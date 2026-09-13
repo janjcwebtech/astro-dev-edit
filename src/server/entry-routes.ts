@@ -15,6 +15,7 @@ import type {
 import { slugify } from '../shared/slug.ts';
 import type { EntryCollectionInfo, EntrySchemaProvider } from './content-config.ts';
 import type { OptionsResolver } from './options.ts';
+import { compilePattern } from './entry-pattern.ts';
 import { validateEditablePath } from './paths.ts';
 import type { Route } from './router.ts';
 import {
@@ -47,8 +48,59 @@ export interface EntryRouteDeps {
   schemaProvider: EntrySchemaProvider | null;
 }
 
-/** Extensions the entry editor treats as collection entries. */
-export const ENTRY_EXTENSIONS = ['.md', '.mdx'];
+/**
+ * Markdown-family entries. `editableExtensions` may narrow these: they are
+ * files the overlay also patches in place from a click on the page, so a user
+ * who turns `.mdx` off means it here too.
+ */
+export const TEXT_ENTRY_EXTENSIONS = ['.md', '.mdx'];
+
+/**
+ * Data entries — Astro's content layer has taken these since 5.0.
+ *
+ * **Not** narrowed by `editableExtensions`, deliberately. That option says
+ * which files the overlay may patch from a click on a rendered page, and a
+ * `.json` entry is never such a file. Intersecting against it was what made a
+ * data collection unreachable by *any* configuration: the intersection can only
+ * subtract, so adding `.json` to `editableExtensions` yielded the empty set
+ * rather than admitting it.
+ */
+export const DATA_ENTRY_EXTENSIONS = ['.json', '.yml', '.yaml'];
+
+/** Every extension that can be a collection entry. */
+export const ENTRY_EXTENSIONS = [...TEXT_ENTRY_EXTENSIONS, ...DATA_ENTRY_EXTENSIONS];
+
+/** The entry extensions in force, given the live `editableExtensions`. The one
+ *  place that rule lives; four call sites used to spell the intersection out. */
+export function entryExtensionsFor(editableExtensions: readonly string[]): string[] {
+  return [
+    ...TEXT_ENTRY_EXTENSIONS.filter((e) => editableExtensions.includes(e)),
+    ...DATA_ENTRY_EXTENSIONS,
+  ];
+}
+
+/** Whether an entry is data rather than markdown — all fields, no body. */
+export function isDataEntry(file: string): boolean {
+  const lower = file.toLowerCase();
+  return DATA_ENTRY_EXTENSIONS.some((e) => lower.endsWith(e));
+}
+
+/**
+ * Why a data entry lists but does not open.
+ *
+ * The drawer's model is frontmatter plus a markdown body, and a `.json` or
+ * `.yml` entry is all data and no body — `parseEntry` would report every byte
+ * of it as body and no fields at all. Editing needs a patcher that round-trips
+ * these formats without reflowing the parts the user did not touch, which is
+ * tracked on #62.
+ *
+ * Listing them is still worth doing: a collection that reports its real count
+ * and says why it is read-only is a better answer than one that reports `0
+ * entries` and looks broken.
+ */
+export const DATA_ENTRY_REASON =
+  'Data entries (.json, .yml, .yaml) are listed but not editable yet — the drawer ' +
+  'edits frontmatter and a markdown body, and these have neither. Open the file to edit it.';
 
 function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
@@ -63,7 +115,11 @@ async function pickEntryExtension(info: EntryCollectionInfo, dirAbs: string): Pr
     const files = await readdir(dirAbs, { recursive: true });
     const seen = new Set<string>();
     for (const f of files) {
-      const ext = ENTRY_EXTENSIONS.find((e) => String(f).endsWith(e));
+      // Markdown family only. A data collection's entries are not a template
+      // for a new entry: what this route writes is frontmatter and a body, so
+      // following a directory of `.json` files would produce a `.json` file
+      // holding markdown.
+      const ext = TEXT_ENTRY_EXTENSIONS.find((e) => String(f).endsWith(e));
       if (ext) seen.add(ext);
     }
     if (seen.size === 1) return [...seen][0];
@@ -71,6 +127,23 @@ async function pickEntryExtension(info: EntryCollectionInfo, dirAbs: string): Pr
     // Unreadable dir — the create itself will surface the real error.
   }
   return '.md';
+}
+
+/**
+ * Whether a collection's own loader pattern would even accept the entry this
+ * route knows how to write.
+ *
+ * A collection declared `pattern: '**\/*.json'` cannot hold a markdown entry:
+ * Astro would not load the file, so creating one produces a file on disk that
+ * the site never sees. Refusing says so; writing it would not.
+ *
+ * A collection with no provable pattern is left alone — that is every
+ * collection that worked before, and the answer there is unchanged.
+ */
+function acceptsTextEntry(info: EntryCollectionInfo): boolean {
+  const match = compilePattern(info.pattern);
+  if (!match) return true;
+  return TEXT_ENTRY_EXTENSIONS.some((e) => match(`probe${e}`) || match(`nested/probe${e}`));
 }
 
 /** Assemble the panel's field list: schema-derived when possible (with
@@ -115,7 +188,7 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
     const { options } = await optionsResolver.resolve();
     return {
       contentRoots: options.contentRoots,
-      entryExtensions: ENTRY_EXTENSIONS.filter((e) => options.editableExtensions.includes(e)),
+      entryExtensions: entryExtensionsFor(options.editableExtensions),
       enabled: options.entryEditor !== false,
     };
   }
@@ -145,6 +218,11 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
       handler: async (body) => {
         const { file } = body as EntryRequest;
         const abs = await validateEntryPath(file);
+        // A data entry passes the path gate — it is a real entry and the Items
+        // tab lists it — but there is no frontmatter/body model to hand back.
+        // Refusing in words beats returning an entry whose every byte reads as
+        // body and whose field list is empty.
+        if (isDataEntry(abs)) throw new Error(DATA_ENTRY_REASON);
         const source = await readFile(abs, 'utf8');
         const parsed = parseEntry(source);
         const rel = await relToRoot(abs);
@@ -176,6 +254,10 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
       handler: async (body) => {
         const { file, etag, changes } = body as EntryApplyRequest;
         const abs = await validateEntryPath(file);
+        // The write half of the same refusal: nothing can have opened a data
+        // entry to produce these changes, so this is a backstop, not a path a
+        // user reaches.
+        if (isDataEntry(abs)) throw new Error(DATA_ENTRY_REASON);
         if (typeof etag !== 'string' || !etag) throw new Error('etag is required');
         if (!changes || typeof changes !== 'object') throw new Error('changes are required');
 
@@ -246,6 +328,9 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
         );
         if (relDir.startsWith('..') || !inContentRoot) {
           throw new Error('collection directory is outside the editable content roots');
+        }
+        if (!acceptsTextEntry(info)) {
+          return { status: 422, body: { error: DATA_ENTRY_REASON } };
         }
         const ext = await pickEntryExtension(info, dirReal);
         if (!entryExtensions.includes(ext)) {

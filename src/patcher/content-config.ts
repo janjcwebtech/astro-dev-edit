@@ -111,6 +111,23 @@ export interface CollectionBlock {
    * than falling back to the convention.
    */
   loaderBase?: string;
+  /**
+   * The glob loader's `pattern`, as written — one entry per literal, since
+   * Astro accepts a string or an array of them. The declaration of *what counts
+   * as an entry*, the same way {@link loaderBase} declares where they live.
+   *
+   * Needed for more than extensions. A `base` broader than the collection is
+   * only correct because the pattern narrows it —
+   * `glob({ pattern: 'settings.yml', base: './src/content' })` names one file,
+   * while its base holds every other collection — so a reader that honours the
+   * base and ignores the pattern hands that collection everything beneath it.
+   *
+   * Absent under the same rule as {@link loaderBase}: a pattern this scanner
+   * cannot prove is refused rather than guessed at. An array with even one
+   * unprovable element is refused whole, since a partial pattern list would
+   * silently narrow the collection.
+   */
+  loaderPattern?: string[];
 }
 
 /** The shape {@link addCollection} emits. */
@@ -446,11 +463,12 @@ function locate(source: string): Located {
       });
       continue;
     }
-    const loaderBase = readLoaderBase(source, code, argOpen, argClose);
+    const loader = readGlobLoader(source, code, argOpen, argClose);
     blocks.push({
       ...base,
       ...readSchema(source, code, argOpen, argClose),
-      ...(loaderBase ? { loaderBase } : {}),
+      ...(loader?.base ? { loaderBase: loader.base } : {}),
+      ...(loader?.pattern ? { loaderPattern: loader.pattern } : {}),
     });
   }
   return { code, blocks, registry };
@@ -517,24 +535,24 @@ function readQuotedValue(source: string, code: string, e: Entry, limit: number):
 }
 
 /**
- * The glob loader's `base` inside a `defineCollection(` argument list, when it
- * is written as a string literal.
+ * The glob loader's `base` and `pattern` inside a `defineCollection(` argument
+ * list, for the parts written as string literals.
  *
- * Anchors only on the shape it can prove — `loader: glob({ …, base: '…' })` —
- * and returns undefined for everything else, which is the same
- * refuse-don't-guess stance the rest of this module takes. Astro's `glob` is
- * the only loader with a `base`; a custom loader's directory is not knowable
- * from the config text at all.
+ * Anchors only on the shape it can prove — `loader: glob({ … })` — and returns
+ * undefined for everything else, which is the same refuse-don't-guess stance
+ * the rest of this module takes. Astro's `glob` is the only loader with these;
+ * a custom loader's directory and file set are not knowable from the config
+ * text at all.
  *
- * `./src/content/x`, `src/content/x/` and `src/content/x` are the same
- * directory written three ways, so the result is normalized to the last.
+ * The two are read together because they only mean anything together: a base
+ * broader than the collection is correct precisely when the pattern narrows it.
  */
-function readLoaderBase(
+function readGlobLoader(
   source: string,
   code: string,
   argOpen: number,
   argClose: number,
-): string | undefined {
+): { base?: string; pattern?: string[] } | undefined {
   const objOpen = skipSpace(code, argOpen + 1, argClose);
   if (code[objOpen] !== '{') return undefined;
   const objClose = matchBracket(code, objOpen);
@@ -543,8 +561,8 @@ function readLoaderBase(
   const loader = readEntries(code, objOpen, objClose).find((e) => e.name === 'loader');
   if (!loader) return undefined;
 
-  // `glob(` as a call, not as a substring: `myGlob(` and `globbed` must not
-  // match, and the identifier has to be the callee.
+  // `glob(` as a call, not as a substring: `myGlob(` and `loaders.glob(` must
+  // not match, and the identifier has to be the callee.
   const call = /(^|[^\w$.])glob[\s]*\(/.exec(code.slice(loader.valueStart, loader.end));
   if (!call) return undefined;
   const parenOpen = loader.valueStart + call.index + call[0].length - 1;
@@ -556,17 +574,87 @@ function readLoaderBase(
   const globClose = matchBracket(code, globOpen);
   if (globClose === -1) return undefined;
 
-  const baseEntry = readEntries(code, globOpen, globClose).find((e) => e.name === 'base');
-  if (!baseEntry) return undefined;
+  const entries = readEntries(code, globOpen, globClose);
+  return {
+    ...(readBase(source, code, entries, globClose) ?? {}),
+    ...(readPattern(source, code, entries, globClose) ?? {}),
+  };
+}
 
-  const raw = readQuotedValue(source, code, baseEntry, globClose);
-  if (raw === null || raw.trim() === '') return undefined;
+/** `base: '…'`, normalized: `./src/content/x`, `src/content/x/` and
+ *  `src/content/x` are one directory written three ways. */
+function readBase(
+  source: string,
+  code: string,
+  entries: Entry[],
+  limit: number,
+): { base: string } | undefined {
+  const e = entries.find((x) => x.name === 'base');
+  if (!e) return undefined;
+  const raw = readQuotedValue(source, code, e, limit);
+  if (raw === null) return undefined;
   const normalized = raw
     .trim()
     .replace(/\\/g, '/')
     .replace(/^\.\//, '')
     .replace(/\/+$/, '');
-  return normalized === '' ? undefined : normalized;
+  return normalized === '' ? undefined : { base: normalized };
+}
+
+/**
+ * `pattern: '…'` or `pattern: ['…', '…']`.
+ *
+ * An array with even one element this scanner cannot prove is refused **whole**
+ * rather than partially: a pattern list missing one of its members would
+ * silently narrow the collection, which is the same class of confident wrong
+ * answer as a guessed directory.
+ */
+function readPattern(
+  source: string,
+  code: string,
+  entries: Entry[],
+  limit: number,
+): { pattern: string[] } | undefined {
+  const e = entries.find((x) => x.name === 'pattern');
+  if (!e) return undefined;
+
+  const one = readQuotedValue(source, code, e, limit);
+  if (one !== null) return one.trim() === '' ? undefined : { pattern: [one.trim()] };
+
+  // An array literal: the colon is in the blanked copy, the `[` after it.
+  const colon = code.indexOf(':', e.start);
+  if (colon === -1 || colon >= limit) return undefined;
+  const open = skipSpace(code, colon + 1, limit);
+  if (code[open] !== '[') return undefined;
+  const close = matchBracket(code, open);
+  if (close === -1 || close >= limit) return undefined;
+  // Nothing may follow the array but the entry separator.
+  let after = close + 1;
+  while (after < limit && /\s/.test(code[after])) after++;
+  if (after !== limit && code[after] !== ',') return undefined;
+
+  // `readEntries` is no use inside an array of literals: every element is a run
+  // of blanks, so each segment trims to nothing and none is pushed. The proof
+  // is simpler here anyway — once the literals are blanked, a list of them
+  // leaves only whitespace and commas behind. An identifier, a call, a spread
+  // or a template's `${…}` all leave code, and refuse the whole array.
+  if (/[^\s,]/.test(code.slice(open + 1, close))) return undefined;
+
+  const out: string[] = [];
+  let i = open + 1;
+  while (i < close) {
+    while (i < close && /[\s,]/.test(source[i])) i++;
+    if (i >= close) break;
+    const quote = source[i];
+    if (quote !== '"' && quote !== "'") return undefined;
+    const end = source.indexOf(quote, i + 1);
+    if (end === -1 || end >= close) return undefined;
+    const raw = source.slice(i + 1, end);
+    if (raw.includes('\\') || raw.trim() === '') return undefined;
+    out.push(raw.trim());
+    i = end + 1;
+  }
+  return out.length > 0 ? { pattern: out } : undefined;
 }
 
 /** The `schema:` value inside a `defineCollection(` argument list. */
@@ -709,6 +797,7 @@ export function readCollectionBlocks(source: string): CollectionBlock[] {
     registered: b.registered,
     line: source.slice(0, b.blockStart).split('\n').length,
     ...(b.loaderBase ? { loaderBase: b.loaderBase } : {}),
+    ...(b.loaderPattern ? { loaderPattern: b.loaderPattern } : {}),
   }));
 }
 

@@ -260,6 +260,63 @@ export const collections = { posts };
         .toEqual(['src/content/mixed']);
     });
   });
+
+  /**
+   * The pattern declares *what counts as an entry*, and it is needed for more
+   * than extensions: a `base` broader than the collection is only correct
+   * because the pattern narrows it. Reading the base while ignoring the pattern
+   * hands such a collection every file beneath its base.
+   */
+  describe('loaderPattern', () => {
+    const patternOf = (src: string): (string[] | undefined)[] =>
+      readCollectionBlocks(src).map((b) => b.loaderPattern);
+
+    const wrap = (loader: string): string =>
+      `const c = defineCollection({\n  ${loader},\n  schema: z.object({ title: z.string() }),\n});\n`;
+
+    it('reads a single literal pattern', () => {
+      expect(patternOf(wrap("loader: glob({ pattern: '**/*.md', base: 'src/content/blog' })")))
+        .toEqual([['**/*.md']]);
+      // The narrow pattern that makes a broad base correct.
+      expect(patternOf(wrap("loader: glob({ pattern: 'settings.yml', base: './src/content' })")))
+        .toEqual([['settings.yml']]);
+      // A brace group is part of the pattern, not structure.
+      expect(patternOf(wrap("loader: glob({ pattern: '**/*.{md,mdx}' })")))
+        .toEqual([['**/*.{md,mdx}']]);
+    });
+
+    it('reads an array of literal patterns', () => {
+      expect(patternOf(wrap("loader: glob({ pattern: ['**/*.md', '**/*.mdx'] })")))
+        .toEqual([['**/*.md', '**/*.mdx']]);
+      // Trailing comma and newlines are ordinary formatting.
+      expect(patternOf(wrap("loader: glob({ pattern: [\n    '**/*.json',\n  ] })")))
+        .toEqual([['**/*.json']]);
+    });
+
+    it('is undefined when absent, and refuses what it cannot prove', () => {
+      expect(patternOf(wrap("loader: glob({ base: 'src/content/blog' })"))).toEqual([undefined]);
+      expect(patternOf(wrap('loader: glob({ pattern: PATTERN })'))).toEqual([undefined]);
+      expect(patternOf(wrap('loader: glob({ pattern: `**/*.${ext}` })'))).toEqual([undefined]);
+    });
+
+    // A partial pattern list would silently narrow the collection — the same
+    // class of confident wrong answer as a guessed directory — so one
+    // unprovable element refuses the whole array.
+    it('refuses an array whole when any element is unprovable', () => {
+      expect(patternOf(wrap("loader: glob({ pattern: ['**/*.md', EXTRA] })"))).toEqual([undefined]);
+      expect(patternOf(wrap("loader: glob({ pattern: ['**/*.md', ...more] })"))).toEqual([
+        undefined,
+      ]);
+    });
+
+    it('reads base and pattern together', () => {
+      const [block] = readCollectionBlocks(
+        wrap("loader: glob({ pattern: 'settings.yml', base: './src/content' })"),
+      );
+      expect(block.loaderBase).toBe('src/content');
+      expect(block.loaderPattern).toEqual(['settings.yml']);
+    });
+  });
 });
 
 describe('addField', () => {

@@ -464,3 +464,47 @@ it('reveals entry updates and creation, but does not reveal deletion', async () 
   expect(deleted.status).toBe(200);
   expect(launchInEditor).toHaveBeenCalledTimes(2);
 });
+
+/**
+ * Data entries pass the path gate — they are real entries and the Items tab
+ * lists them — but the drawer cannot open one. Its model is frontmatter plus a
+ * markdown body, and a `.json` entry has neither: `parseEntry` would report
+ * every byte as body and no fields at all.
+ *
+ * So the routes refuse **in words**. Listing a data collection while silently
+ * failing on the click would be worse than the `0 entries` silence it replaces,
+ * which is why the count and the refusal ship together.
+ */
+describe('data entries', () => {
+  const dataRel = 'src/content/blog/team.json';
+
+  beforeEach(async () => {
+    await writeFile(join(root, dataRel), '{"name":"Admin"}\n');
+  });
+
+  it('refuses to open one, naming the reason', async () => {
+    const r = await request({ url: '/__dev-edit/entry', body: { file: dataRel } });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('not editable yet');
+    expect(r.body.error).toContain('.json');
+  });
+
+  it('refuses to write one', async () => {
+    const r = await request({
+      url: '/__dev-edit/entry/apply',
+      body: { file: dataRel, etag: 'whatever', changes: { name: 'Other' } },
+    });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toContain('not editable yet');
+    // The file is untouched — the refusal comes before anything reads an etag.
+    expect(await readFile(join(root, dataRel), 'utf8')).toBe('{"name":"Admin"}\n');
+  });
+
+  // A markdown entry in the same collection is unaffected: the refusal is per
+  // file, not per collection, so a mixed collection keeps working.
+  it('still opens a markdown entry beside it', async () => {
+    const r = await request({ url: '/__dev-edit/entry', body: { file: entryRel } });
+    expect(r.status).toBe(200);
+    expect(r.body.collection).toBe('blog');
+  });
+});
