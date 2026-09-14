@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>astro-dev-edit — Narrow to editor + inspector</title>
+  <link rel="stylesheet" href="plan.css">
+  <style>
+    /* page-local: a third file tag for deletions, and a tighter tree row */
+    .tag.gone { color: var(--danger); background: rgba(192, 69, 69, 0.10); border: 1px solid var(--danger); }
+    .legend .l-del i { background: var(--danger); }
+    .trow { display: flex; align-items: center; gap: 8px; font-family: ui-monospace, Menlo, Consolas, monospace;
+            font-size: 11px; padding: 3px 6px; border-radius: 4px; }
+    .trow .loc { margin-left: auto; color: var(--faint); }
+    .trow.hit { background: var(--accent-soft); }
+    .trow.comp { border: 1.5px solid var(--new); background: var(--new-soft); color: var(--new); font-weight: 700; }
+    .trow.slot { border: 1px dashed var(--warn); color: var(--warn); }
+    .mini { font-size: 10px; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; color: var(--faint); }
+    .crumb { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+    .crumb .sep { color: var(--faint); }
+    .crumb .cur { font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header class="doc-head">
+    <div class="doc-eyebrow">astro-dev-edit · Scope reduction + new capability</div>
+    <h1>Narrow to an editor and a source inspector</h1>
+    <p class="doc-sub">Delete the CMS and Unsplash; keep on-page editing, CSS peek and open-in-editor; add Astro component-composition inspection — the chain of <code>.astro</code> usages that actually produced the selected content.</p>
+  </header>
+
+  <div class="ribbon">
+    <span class="status draft">draft</span>
+    <span class="meta"><b>10</b> new · <b>23</b> modified · <b>~34</b> removed</span>
+    <a class="plan-link" href="narrow-to-editor-inspector.mockup.html">interactive mockup ↗</a>
+    <span class="meta">updated <b>2026-09-14</b></span>
+    <div class="progress">
+      <div class="progress-track"><div class="progress-fill" style="width: 0%"></div></div>
+      <div class="progress-label">0% · 0/21 tasks</div>
+    </div>
+    <a class="plan-link" href="narrow-to-editor-inspector.plan.md">full plan ↗</a>
+  </div>
+
+  <!-- 01 DECISIONS -->
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>Decided</h2></div>
+    <div class="glance">
+      <div class="chip">
+        <div class="chip-k">Adapt, don't rebuild</div>
+        <div class="chip-v">Delete the CMS, keep the engine<small>protocol.ts 280–980 and api.ts 178–372 are contiguous cuts. ~12 edit points, ~35 file deletes.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">Component identity</div>
+        <div class="chip-v">Props-threaded usage chain<small>Manufactured in the existing pre-compiler transform. DOM ancestry and import graphs are not proof.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">Annotation namespace</div>
+        <div class="chip-v">Own <code>data-atx-*</code> on Astro 5/6/7<small>Kills the dev-toolbar dependency and the attribute-strip race.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">Settings</div>
+        <div class="chip-v">Slim drawer stays<small>Keeps drawer.ts / group.ts / fields.ts alive for ~5 options.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">Images</div>
+        <div class="chip-v">Local picker stays, Unsplash goes<small>−2,674 LOC, including the repo's largest test file.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">Invocation</div>
+        <div class="chip-v">Hold ⌥ to wake it; no admin bar<small>A launcher on the left edge; the tree panel's header carries menu, settings, the route and a source pill. Ordinary clicks keep navigating.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">Markdown routes</div>
+        <div class="chip-v">Frontmatter fields and plain body lines<small>Matched by rendered text; anything with inline markup is refused. Keeps <code>patcher/frontmatter.ts</code> as a value writer.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">One panel</div>
+        <div class="chip-v">The inspector opens on every click<small>Same five sections every time; only the Edit section changes shape. No modal refusal, no modal image panel.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">Prop editing</div>
+        <div class="chip-v">Editable at the usage site, within a proven boundary<small>String literals and one-hop traces. Imports, computed values and spreads stay read-only with a reason. Closes #61.</small></div>
+      </div>
+      <div class="chip">
+        <div class="chip-k">Composition surface</div>
+        <div class="chip-v">Breadcrumbs on the hover pill<small>The element tree stays and becomes component-aware, rather than being replaced.</small></div>
+      </div>
+    </div>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#decisions">rationale in plan.md § Decisions</a>
+  </section>
+
+  <!-- 02 WIREFRAMES -->
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>Hover pill · what changes</h2></div>
+    <div class="ba">
+      <div class="wire-stage">
+        <div class="wire-caption"><span class="now">WF-1a — today</span></div>
+        <div class="wf" style="padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="wbox wire-cross" style="min-height: 54px; position: relative;">
+            <div class="emph-outline"><span>hovered element</span></div>
+          </div>
+          <div class="wbox solid" style="display: flex; flex-direction: column; gap: 5px; align-items: stretch; padding: 7px;">
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="mono" style="font-size: 11px;">hero.astro:12:5 · editable</span>
+              <span class="mini" style="margin-left: auto;">open ↗</span>
+              <span class="mini">copy context</span>
+            </div>
+            <div class="wbox is-moved" style="display: flex; gap: 5px; padding: 4px;">
+              <span style="font-size: 10px;">.btn</span><span style="font-size: 10px;">.btn-primary</span><span style="font-size: 10px;">.hero-cta</span>
+            </div>
+          </div>
+          <div class="wbox is-moved" style="min-height: 40px; margin-left: 40px;">rules card (auto, on chip hover)</div>
+        </div>
+      </div>
+      <div class="wire-stage">
+        <div class="wire-caption"><span class="after">WF-1b — proposed</span></div>
+        <div class="wf" style="padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="wbox wire-cross" style="min-height: 54px; position: relative;">
+            <div class="emph-outline"><span>hovered element</span></div>
+          </div>
+          <div class="wbox solid" style="display: flex; flex-direction: column; gap: 5px; align-items: stretch; padding: 7px; position: relative;">
+            <span class="callout-n wf-badge">1</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span class="mono" style="font-size: 11px;">ServiceCard.astro:12:5 · editable</span>
+            </div>
+            <div class="wbox is-new" style="padding: 5px; position: relative;">
+              <span class="callout-n wf-badge">2</span>
+              <div class="crumb">
+                <span>index.astro</span><span class="sep">›</span>
+                <span>Services.astro</span><span class="sep">›</span>
+                <span class="cur">ServiceCard.astro</span>
+              </div>
+            </div>
+          </div>
+          <div class="wbox ghost" style="min-height: 40px; margin-left: 40px; position: relative;">
+            <span class="callout-n wf-badge">3</span>click → inspector (actions · CSS · rules live there)
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <span class="l-new"><i></i>new</span>
+      <span class="l-moved"><i></i>moved (hover → inspector)</span>
+      <span class="l-gone"><i></i>removed</span>
+      <span class="l-x"><i></i>unchanged</span>
+    </div>
+    <ul class="callouts">
+      <li><span class="callout-n">1</span><span><strong>Compact at rest</strong> — one row. <code>src/client/hover.ts</code></span></li>
+      <li><span class="callout-n">2</span><span><strong>Composition breadcrumb</strong> on dwell; each segment a button. <code>src/client/composition.ts</code></span></li>
+      <li><span class="callout-n">3</span><span><strong>No pinned state</strong> — detail moves into the inspector, which every click opens.</span></li>
+    </ul>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#ui">plan.md § UI</a>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02b</span><h2>Admin bar &amp; element tree</h2></div>
+    <div class="ba">
+      <div class="wire-stage">
+        <div class="wire-caption"><span class="now">WF-2a — bar today</span></div>
+        <div class="wf" style="padding: 10px; display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+          <div class="wbox" style="font-size: 10px;">⌂</div>
+          <div class="wbox" style="font-size: 10px;">Elements</div>
+          <div class="wbox" style="font-size: 10px;">Edit page</div>
+          <div class="wbox is-gone" style="font-size: 10px;">Edit entry</div>
+          <div class="wbox ghost" style="font-size: 10px; margin-left: auto;">pin</div>
+          <div class="wbox ghost" style="font-size: 10px;">edge</div>
+          <div class="wbox" style="font-size: 10px;">Save &amp; exit</div>
+          <div style="flex-basis: 100%; height: 0;"></div>
+          <div class="wbox ghost" style="font-size: 10px;">▾ Open page source</div>
+          <div class="wbox is-gone" style="font-size: 10px;">▾ Collections</div>
+          <div class="wbox ghost" style="font-size: 10px;">▾ Settings</div>
+        </div>
+      </div>
+      <div class="wire-stage">
+        <div class="wire-caption"><span class="after">WF-2b — bar proposed</span></div>
+        <div class="wf" style="padding: 10px; display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+          <div class="wbox" style="font-size: 10px;">⌂</div>
+          <div class="wbox" style="font-size: 10px;">Elements</div>
+          <div class="wbox" style="font-size: 10px;">Edit page</div>
+          <div class="wbox ghost" style="font-size: 10px; margin-left: auto;">pin</div>
+          <div class="wbox ghost" style="font-size: 10px;">edge</div>
+          <div class="wbox" style="font-size: 10px;">Save &amp; exit</div>
+          <div style="flex-basis: 100%; height: 0;"></div>
+          <div class="wbox ghost" style="font-size: 10px;">▾ Open page source</div>
+          <div class="wbox ghost" style="font-size: 10px;">▾ Settings</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ba" style="margin-top: 18px;">
+      <div class="wire-stage">
+        <div class="wire-caption"><span class="now">WF-3a — tree today</span></div>
+        <div class="wf" style="padding: 10px; display: flex; flex-direction: column; gap: 2px;">
+          <div class="trow">▾ body</div>
+          <div class="trow" style="padding-left: 16px;">▾ main <span class="loc">index.astro:8:3</span></div>
+          <div class="trow" style="padding-left: 30px;">▾ section <span class="loc">index.astro:10:5</span></div>
+          <div class="trow is-moved" style="padding-left: 44px; border: 1px solid var(--warn); color: var(--warn);">▾ div <span class="loc">ServiceCard.astro:4:3</span></div>
+          <div class="trow" style="padding-left: 58px;">h3 <span class="loc">ServiceCard.astro:5:5</span></div>
+          <div class="wbox is-moved" style="margin-top: 8px; font-size: 10px;">silently reparented across the component gap</div>
+        </div>
+      </div>
+      <div class="wire-stage">
+        <div class="wire-caption"><span class="after">WF-3b — tree proposed</span></div>
+        <div class="wf" style="padding: 10px; display: flex; flex-direction: column; gap: 2px;">
+          <div class="trow">▾ body</div>
+          <div class="trow" style="padding-left: 16px;">▾ main <span class="loc">index.astro:8:3</span></div>
+          <div class="trow" style="padding-left: 30px;">▾ section <span class="loc">index.astro:10:5</span></div>
+          <div class="trow comp" style="margin-left: 44px; position: relative;">
+            <span class="callout-n wf-badge">4</span>▾ ⬡ Services.astro
+            <span class="loc">used at index.astro:12:5</span>
+          </div>
+          <div class="trow comp" style="margin-left: 58px;">▾ ⬡ ServiceCard.astro <span class="loc">used at Services.astro:22:7</span></div>
+          <div class="trow" style="padding-left: 72px;">h3 <span class="loc">ServiceCard.astro:5:5</span></div>
+          <div class="trow slot" style="margin-left: 72px; position: relative;">
+            <span class="callout-n wf-badge">5</span>⤷ slot · p
+            <span class="loc">written in index.astro:14:9</span>
+          </div>
+          <div class="wbox is-new" style="margin-top: 8px; font-size: 10px; position: relative;">
+            <span class="callout-n wf-badge">6</span>every component row: [ open file ] [ open usage ]
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <span class="l-new"><i></i>new</span>
+      <span class="l-moved"><i></i>wrong today</span>
+      <span class="l-gone"><i></i>removed</span>
+      <span class="l-x"><i></i>unchanged</span>
+    </div>
+    <ul class="callouts">
+      <li><span class="callout-n">4</span><span><strong>Component boundary rows</strong> replace the silent gap-reparent. <code>src/client/tree.ts</code></span></li>
+      <li><span class="callout-n">5</span><span><strong>Slot content marked</strong> via the prefix rule — presentation vs content, made visible.</span></li>
+      <li><span class="callout-n">6</span><span><strong>Two jumps per component</strong> — the file, and the usage-site line in the parent.</span></li>
+    </ul>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#ui">plan.md § UI</a>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02c</span><h2>Clicking anything — one panel</h2></div>
+    <div class="ba">
+      <div class="wire-stage">
+        <div class="wire-caption"><span class="now">WF-4a — today (refusal modal)</span></div>
+        <div class="wf" style="padding: 14px; display: flex; flex-direction: column; gap: 8px; align-items: center;">
+          <div class="wbox ghost" style="width: 100%; min-height: 26px; font-size: 10px;">backdrop · page blocked</div>
+          <div class="wbox solid" style="width: 86%; display: flex; flex-direction: column; gap: 6px; padding: 9px; align-items: stretch;">
+            <div style="font-size: 11px; font-weight: 700;">Can't edit this here</div>
+            <div class="wbox is-moved" style="font-size: 10px;">reason describes <em>index.astro:28:58</em> — an ancestor you never clicked</div>
+            <div style="display: flex; gap: 5px;">
+              <span class="mini">Open source</span><span class="mini">Peek</span><span class="mini">Close</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="wire-stage">
+        <div class="wire-caption"><span class="after">WF-4b — proposed (always the inspector)</span></div>
+        <div class="wf" style="padding: 14px; display: flex; gap: 8px;">
+          <div class="wbox wire-cross" style="flex: 1; min-height: 120px;">page stays live</div>
+          <div class="wbox solid is-new" style="width: 52%; display: flex; flex-direction: column; gap: 6px; padding: 9px; align-items: stretch; position: relative;">
+            <span class="callout-n wf-badge">7</span>
+            <div style="font-size: 10px;">rendered by a component — not editable here</div>
+            <div class="crumb" style="padding: 4px 0;">
+              <span>index.astro</span><span class="sep">›</span><span>Services.astro</span><span class="sep">›</span><span class="cur">ServiceCard.astro</span>
+            </div>
+            <div class="wbox is-new" style="font-size: 10px; text-align: left; line-height: 1.8; display: block;">EDIT · prop value<br><span class="mono">title</span><br>[ Build things that outlast… ]</div>
+            <div class="wbox ghost" style="font-size: 10px; text-align: left; line-height: 1.8; display: block;">CHAIN (indented)<br>└ Base.astro<br>&nbsp;&nbsp;└ Hero.astro · presentation</div>
+            <div class="wbox ghost" style="font-size: 10px; text-align: left;">props · slot · CSS (collapsed)</div>
+            <div style="display: flex; gap: 5px;">
+              <span class="mini">Open component</span><span class="mini">Open usage</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="callouts">
+      <li><span class="callout-n">7</span><span><strong>No modal.</strong> Non-modal inspector; a refusal is just one shape of the Edit section. <code>src/client/editors/notice.ts</code> (rewrite)</span></li>
+      <li><span class="callout-n">8</span><span><strong>Indented chain + presentation/content badges</strong> — nesting is drawn, not implied.</span></li>
+      <li><span class="callout-n">9</span><span><strong>Props editable where provable</strong> — literals and one-hop traces; the rest read-only with a reason.</span></li>
+    </ul>
+    <div class="open-q"><b>Open:</b> if experiment <b>E1</b> shows chain threading can't be proven truthful, the breadcrumb degrades to static tiers only — still useful, but unable to distinguish repeated instances.</div>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#open-questions">plan.md § Open questions</a>
+  </section>
+
+  <!-- 03 FLOW -->
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Flow · resolving the chain</h2></div>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="node start"><b>Click in edit mode</b><span>capture-phase router</span></div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-row">
+        <div class="node decision"><b>/classify</b><span>AST truth, not the DOM</span></div>
+        <div class="flow-note"><b>request fails →</b> toast, no editor opens <em>a stale click must fail safe</em></div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="fork">
+        <div class="fork-col">
+          <div class="fork-label">editable</div>
+          <div class="node terminal-ok"><b>Inline edit or popup</b><span>verify-then-patch, atomic write</span></div>
+        </div>
+        <div class="fork-col">
+          <div class="fork-label">not editable</div>
+          <div class="node terminal-alt"><b>Inspector opens</b><span>reason as a header line</span></div>
+        </div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-row">
+        <div class="node decision"><b>Read <span class="mono">data-atx-chain</span></b><span>from the clicked element</span></div>
+        <div class="flow-note"><b>absent →</b> static graph only <em>MDX, framework island, set:html — named as <span class="mono">chain-break</span></em></div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-row">
+        <div class="node decision"><b>Validation equation</b><span>resolveTarget(last(C)) == F ?</span></div>
+        <div class="flow-note"><b>breaks →</b> a <span class="mono">{...Astro.props}</span> spread clobbered the chain <em>detected, never silently wrong</em></div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="fork">
+        <div class="fork-col">
+          <div class="fork-label">holds at every hop</div>
+          <div class="node terminal-ok"><b>proven</b><span>full chain, props, slot previews</span></div>
+        </div>
+        <div class="fork-col">
+          <div class="fork-label">repaired or refused</div>
+          <div class="node terminal-alt"><b>inferred · candidates · none</b><span>one static path → inferred; 2–8 → candidates; else a named refusal</span></div>
+        </div>
+      </div>
+    </div>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#flow">plan.md § Flow</a>
+  </section>
+
+  <!-- 04 ARCHITECTURE -->
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Architecture</h2></div>
+    <div class="arch">
+      <div class="arch-tier">
+        <div class="arch-tier-label">Overlay client (one shadow root)</div>
+        <div class="arch-boxes">
+          <div class="abox is-new"><b>composition.ts</b><span>reads the chain, batches id resolution</span></div>
+          <div class="abox is-new"><b>composition-model.ts</b><span>pure: instance tree + slot edges</span></div>
+          <div class="abox is-mod"><b>hover.ts</b><span>compact pill + breadcrumb</span></div>
+          <div class="abox is-mod"><b>tree.ts</b><span>component rows, slot marks</span></div>
+          <div class="abox is-mod"><b>source-map.ts</b><span>prefer data-atx-*; retire the strip race</span></div>
+          <div class="abox"><b>router.ts · css-inspect.ts</b><span>unchanged — zero CMS coupling</span></div>
+        </div>
+      </div>
+      <div class="arch-flow-hint">↓ POST /__dev-edit/composition · /composition/links · /composition/uses — localhost-gated, typed in protocol.ts ↓</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Dev middleware</div>
+        <div class="arch-boxes">
+          <div class="abox is-new"><b>composition-routes.ts</b><span>the three-route feature group</span></div>
+          <div class="abox is-new"><b>composition.ts</b><span>pure: tiering, equation, repair</span></div>
+          <div class="abox is-new"><b>usage-index.ts</b><span>mtime cache, specifier resolution, reverse map</span></div>
+          <div class="abox is-mod"><b>middleware.ts · options.ts</b><span>drop CMS groups, add one option</span></div>
+          <div class="abox"><b>text-writes.ts · paths.ts</b><span>unchanged — one write seam, one path gate</span></div>
+        </div>
+      </div>
+      <div class="arch-flow-hint">↓ mtime-cached reads · this.resolve() for import specifiers (aliases honoured) ↓</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Vite transform — before Astro's compiler</div>
+        <div class="arch-boxes">
+          <div class="abox is-mod"><b>annotate.ts</b><span>component-usage injection, via injected opts</span></div>
+          <div class="abox is-new"><b>usage-parse.ts</b><span>pure: usages, prop source text, slot ranges</span></div>
+          <div class="abox is-new"><b>usage-id.ts</b><span>the one hash both sides mint</span></div>
+        </div>
+      </div>
+      <div class="arch-flow-hint">↓ data-atx-file / -loc / -chain injected — no newlines added, locs from the ORIGINAL source ↓</div>
+      <div class="arch-tier">
+        <div class="arch-tier-label">Project source</div>
+        <div class="arch-boxes">
+          <div class="abox"><b>*.astro</b><span>never modified by the transform — on-disk file untouched</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <span class="l-new"><i></i>new file</span>
+      <span class="l-mod"><i></i>modified</span>
+      <span class="l-x"><i></i>unchanged</span>
+    </div>
+    <div class="table-wrap" style="margin-top: 14px;">
+      <table>
+        <thead><tr><th>Tier</th><th>Trigger</th><th>Shown</th></tr></thead>
+        <tbody>
+          <tr><td class="file-path">proven</td><td class="desc">Chain resolves, equation holds at every hop</td><td class="desc">Full chain, props, slot previews, slot relations</td></tr>
+          <tr><td class="file-path">inferred</td><td class="desc">Spread-truncated, or exactly one static path</td><td class="desc">Same, each inferred link flagged with its reason</td></tr>
+          <tr><td class="file-path">candidates</td><td class="desc">2–8 static paths</td><td class="desc">"Used in N places", each openable — not an answer</td></tr>
+          <tr><td class="file-path">none</td><td class="desc">0 or &gt;8 paths, package leaf, MDX boundary</td><td class="desc">Named refusal + Open source on what is known</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#architecture">plan.md § Architecture</a>
+  </section>
+
+  <!-- 05 FILES -->
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>Files touched</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>File</th><th>Status</th><th>Change</th></tr></thead>
+        <tbody>
+          <tr><td class="file-path">src/shared/usage-id.ts</td><td><span class="tag new">new</span></td><td class="desc">One id hash, minted by both sides</td></tr>
+          <tr><td class="file-path">src/server/usage-parse.ts</td><td><span class="tag new">new</span></td><td class="desc">Pure: usages, props, slot ranges</td></tr>
+          <tr><td class="file-path">src/server/usage-index.ts</td><td><span class="tag new">new</span></td><td class="desc">mtime cache + specifier resolution</td></tr>
+          <tr><td class="file-path">src/server/composition.ts</td><td><span class="tag new">new</span></td><td class="desc">Pure: tiering, equation, repair</td></tr>
+          <tr><td class="file-path">src/server/composition-routes.ts</td><td><span class="tag new">new</span></td><td class="desc">Three routes, one factory</td></tr>
+          <tr><td class="file-path">src/client/composition-model.ts</td><td><span class="tag new">new</span></td><td class="desc">Pure instance tree + slot edges</td></tr>
+          <tr><td class="file-path">src/client/composition.ts</td><td><span class="tag new">new</span></td><td class="desc">Chain reads, batched resolution</td></tr>
+          <tr><td class="file-path">src/shared/protocol.ts</td><td><span class="tag mod">mod</span></td><td class="desc">Cut 280–980; add composition shapes</td></tr>
+          <tr><td class="file-path">src/server/annotate.ts</td><td><span class="tag mod">mod</span></td><td class="desc">Usage injection via injected opts</td></tr>
+          <tr><td class="file-path">src/server/middleware.ts</td><td><span class="tag mod">mod</span></td><td class="desc">~55 lines: routes, deps, /health</td></tr>
+          <tr><td class="file-path">src/index.ts</td><td><span class="tag mod">mod</span></td><td class="desc">~70 lines; build one UsageIndex</td></tr>
+          <tr><td class="file-path">src/server/options.ts</td><td><span class="tag mod">mod</span></td><td class="desc">~150 lines out, one spec in</td></tr>
+          <tr><td class="file-path">src/client/editors/notice.ts</td><td><span class="tag mod">mod</span></td><td class="desc">Rewrite — ~90 of 197 lines are CMS</td></tr>
+          <tr><td class="file-path">src/client/api.ts</td><td><span class="tag mod">mod</span></td><td class="desc">Cut 178–372; add composition calls</td></tr>
+          <tr><td class="file-path">src/client/overlay.ts · admin-bar.ts</td><td><span class="tag mod">mod</span></td><td class="desc">~95 lines across 9 clusters</td></tr>
+          <tr><td class="file-path">src/client/hover.ts · tree.ts</td><td><span class="tag mod">mod</span></td><td class="desc">Pill breadcrumb; component rows</td></tr>
+          <tr><td class="file-path">src/client/styles.ts</td><td><span class="tag mod">mod</span></td><td class="desc">~830 dead lines — last commit</td></tr>
+          <tr><td class="file-path">src/client/{source-map,element-context,features,ui,settings-panel}.ts</td><td><span class="tag mod">mod</span></td><td class="desc">Namespace, copy payload, gates, slimming</td></tr>
+          <tr><td class="file-path">schema designer — 5 files</td><td><span class="tag gone">del</span></td><td class="desc">collections-panel, schema-routes, +3</td></tr>
+          <tr><td class="file-path">entry management — 8 files</td><td><span class="tag gone">del</span></td><td class="desc">entry.ts, entry-routes, frontmatter, +5</td></tr>
+          <tr><td class="file-path">rich text — 2 files + mountLight</td><td><span class="tag gone">del</span></td><td class="desc">Light-DOM exception goes with it</td></tr>
+          <tr><td class="file-path">Unsplash — 5 files</td><td><span class="tag gone">del</span></td><td class="desc">Incl. dotenv patcher + secret path</td></tr>
+          <tr><td class="file-path">tests — ~14 files</td><td><span class="tag gone">del</span></td><td class="desc">~4,900 lines, ~51% of test mass</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span class="l-new"><i></i>new</span>
+      <span class="l-mod"><i></i>modified</span>
+      <span class="l-del"><i></i>deleted</span>
+    </div>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#files-touched">plan.md § Files touched</a>
+  </section>
+
+  <!-- 06 EXPERIMENTS -->
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>Experiments, before any of it</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Question</th><th>Pass</th><th>Fail ⇒</th></tr></thead>
+        <tbody>
+          <tr><td class="file-path">E6</td><td class="desc">Is removal really ~12 edit points?</td><td class="desc">Green with edits confined to ~12 points, ≤1 day</td><td class="desc">Hidden coupling ⇒ reconsider the middle path</td></tr>
+          <tr><td class="file-path">E2</td><td class="desc">Does composition disturb the loc invariant?</td><td class="desc">205/205 parity, no newlines, round-trip green</td><td class="desc">This seam cannot carry the feature</td></tr>
+          <tr><td class="file-path">E1</td><td class="desc">Does the chain tell the truth on a real tree?</td><td class="desc">Chains match by hand; slot prefix holds; spread caught</td><td class="desc">Static tiers only, no threading</td></tr>
+          <tr><td class="file-path">E3</td><td class="desc">Does <span class="mono">data-atx-*</span> survive on Astro 5/6?</td><td class="desc">Live count == served count, both toolbar states</td><td class="desc">Keep the MutationObserver cache</td></tr>
+          <tr><td class="file-path">E4</td><td class="desc">What does it cost the page?</td><td class="desc">&lt;10% dev-HTML growth, no render regression</td><td class="desc">Stamp component roots only; ancestor walk</td></tr>
+          <tr><td class="file-path">E5</td><td class="desc">How much does the static index cover?</td><td class="desc">≥90% resolvable, every failure named</td><td class="desc">Redesign the tier model</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#implementation-progress">plan.md § Implementation progress</a>
+  </section>
+
+  <!-- 07 VERIFICATION -->
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2>Verification</h2></div>
+    <ul class="checks">
+      <li><strong>Both gates green after every phase</strong> — baseline 38 files / 851 tests, <code>tsc --noEmit</code> clean.</li>
+      <li><strong>Element annotations byte-identical with composition on and off</strong> — the single most important regression guard in the feature.</li>
+      <li><strong>A chain's last link resolves to the element's own file</strong>; a <code>{...Astro.props}</code> forwarder yields <em>inferred</em> or <em>candidates</em>, never a wrong chain.</li>
+      <li><strong>Slotted content is marked as slotted</strong>, and its chain is a strict prefix of its DOM parent's.</li>
+      <li><strong>Live <code>data-atx-file</code> count equals the served count</strong> on Astro 5.18 and 7.1.1, dev toolbar on and off.</li>
+      <li><strong>No <code>/__dev-edit</code> route answers a CMS path</strong>; <code>/health</code> reports no <code>entryEditor</code> or <code>unsplash</code>.</li>
+      <li><strong>A committed fixture site exercises a genuine 3-deep chain</strong> — the current playground has only Base/Nav/Footer and cannot.</li>
+    </ul>
+    <a class="ref" href="narrow-to-editor-inspector.plan.md#verification">plan.md § Verification</a>
+  </section>
+
+</div>
+</body>
+</html>

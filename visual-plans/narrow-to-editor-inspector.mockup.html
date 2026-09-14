@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>astro-dev-edit — interactive mockup</title>
+<style>
+/* MOCKUP ONLY — an imitation of the narrowed overlay, built from the real
+   tokens in src/client/ui.ts. No files are written, no server is called. */
+:root {
+  --bg:#0a0a0a; --card:#171717; --elevated:#262626; --accent:#404040;
+  --border:rgb(255 255 255 / .10); --input:rgb(255 255 255 / .15);
+  --input-bg:rgb(255 255 255 / .075); --control-bg:rgb(255 255 255 / .045); --ring:#737373;
+  --fg:#fafafa; --muted:#a1a1a1; --faint:#949494; --primary:#e5e5e5; --primary-fg:#171717;
+  --brand:#6144d7; --brand-text:#aaa7f4; --destructive:#ff6467; --success:#0a7e3a;
+  --success-text:#67d283; --warning:#e3ae28; --info:#2fc183;
+  --chart1:#aaa7f4; --chart2:#67d283; --chart3:#e3ae28; --chart4:#f98f87; --chart5:#55c4e5;
+  --glass:#16161d; --glass-raised:#1d1d23;
+  --r-sm:6px; --r-md:8px; --r-lg:10px; --r-xl:14px; --r-full:999px;
+  --mb:40px;
+  --mono:ui-monospace, SFMono-Regular, Menlo, monospace; --ui:ui-sans-serif, system-ui, sans-serif;
+}
+* { box-sizing:border-box; }
+html, body { margin:0; padding:0; }
+body { font-family:var(--ui); background:#eceaf3; }
+
+/* ---------- host page (a plausible light Astro site) ---------- */
+#host { background:#fff; color:#16151c; min-height:100vh; padding:calc(var(--mb) + 18px) 0 60px; }
+#host a { color:inherit; text-decoration:none; }
+.wrap { max-width:1000px; margin:0 auto; padding:0 32px; }
+.site-nav { display:flex; align-items:center; gap:28px; padding:22px 0; border-bottom:1px solid #eae8f0; }
+.logo { font-weight:800; font-size:17px; letter-spacing:-.02em; }
+.site-nav .links { display:flex; gap:22px; margin-left:auto; font-size:14px; color:#52505e; }
+.hero { padding:64px 0 52px; display:grid; grid-template-columns:1.15fr 1fr; gap:44px; align-items:center; }
+.badge { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:#5b3fd0; background:#efecff; padding:4px 9px; border-radius:999px; margin-bottom:14px; }
+.hero-title { font-size:44px; line-height:1.08; letter-spacing:-.03em; margin:0 0 16px; }
+.hero-sub { font-size:16px; line-height:1.6; color:#52505e; margin:0 0 24px; max-width:46ch; }
+.btn { display:inline-block; background:#16151c; color:#fff !important; padding:11px 20px; border-radius:10px; font-size:14px; font-weight:600; }
+.hero-art { display:block; width:100%; aspect-ratio:4/3; border-radius:16px; object-fit:cover;
+  background:#f4f2fb; border:1px solid #eae8f0; }
+.services { padding:44px 0 64px; }
+.services h2 { font-size:26px; letter-spacing:-.02em; margin:0 0 6px; }
+.lede { color:#52505e; font-size:15px; margin:0 0 28px; }
+.grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.card { border:1px solid #eae8f0; border-radius:14px; padding:20px; background:#fcfcfe; }
+.card .cover { display:block; width:100%; aspect-ratio:16/9; border-radius:9px; object-fit:cover;
+  background:#efecff; margin-bottom:13px; }
+.card-title { font-size:15px; margin:0 0 7px; letter-spacing:-.01em; }
+.card-body { font-size:13.5px; line-height:1.6; color:#52505e; margin:0; }
+.quote { padding:8px 0 64px; }
+.quote-text { margin:0; font-size:20px; line-height:1.5; letter-spacing:-.02em; max-width:60ch; border-left:3px solid #b9aeff; padding-left:20px; }
+.who { font-size:13px; color:#52505e; }
+.who-row { display:flex; align-items:center; gap:11px; margin-top:16px; padding-left:23px; }
+.avatar { width:38px; height:38px; border-radius:999px; object-fit:cover; background:#efecff; flex:none; }
+.prose-fig { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:12px;
+  background:#efecff; margin:0 0 26px; border:1px solid #eae8f0; }
+.card.linkish { cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+.card.linkish:hover { border-color:#c9c0ff; box-shadow:0 6px 22px rgb(97 68 215 / .10); }
+.card .more { display:inline-block; margin-top:12px; font-size:12.5px; font-weight:600; color:#5b3fd0; }
+.prose { max-width:70ch; padding:36px 0 56px; }
+.prose .eyebrow { font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#5b3fd0; margin:0 0 10px; }
+.prose h1 { font-size:38px; line-height:1.12; letter-spacing:-.03em; margin:0 0 14px; }
+.prose .lede { font-size:17px; line-height:1.6; color:#52505e; margin:0 0 26px; }
+.prose h2 { font-size:21px; letter-spacing:-.02em; margin:30px 0 10px; }
+.prose p { font-size:15.5px; line-height:1.75; color:#3b3947; margin:0 0 15px; }
+.prose ul { margin:0 0 15px; padding-left:20px; } .prose li { font-size:15.5px; line-height:1.8; color:#3b3947; }
+.prose a { color:#5b3fd0; text-decoration:underline; text-underline-offset:2px; }
+.crumbnav { display:inline-flex; gap:7px; align-items:center; font-size:13px; color:#52505e; padding:22px 0 0; cursor:pointer; }
+.crumbnav:hover { color:#16151c; }
+.site-foot { border-top:1px solid #eae8f0; padding:26px 0; font-size:13px; color:#52505e; }
+body[data-edit="1"] #host [data-atx] { cursor:pointer; }
+#host [data-editing="1"] { outline:2px solid var(--brand); outline-offset:2px; border-radius:3px;
+  background:color-mix(in srgb, var(--brand) 9%, transparent); cursor:text; }
+#host [data-live="1"] { outline:2px dashed var(--brand); outline-offset:3px; border-radius:3px; }
+
+/* ---------- overlay: bar + menu ---------- */
+#ov button { font-family:inherit; cursor:pointer; }
+.launcher { position:fixed; left:12px; top:50%; transform:translateY(-50%); z-index:710; width:38px; height:38px;
+  border-radius:var(--r-xl); border:1px solid var(--border); background:color-mix(in srgb, var(--glass) 92%, transparent);
+  backdrop-filter:blur(14px); color:#fff; font-size:15px; box-shadow:0 10px 30px rgb(0 0 0 / .35); display:grid; place-items:center; }
+.launcher:hover { background:var(--glass-raised); }
+.launcher b { color:var(--brand-text); }
+.launcher .kbd { position:absolute; left:46px; white-space:nowrap; font-size:11px; color:var(--fg); background:var(--card);
+  border:1px solid var(--border); border-radius:var(--r-md); padding:4px 8px; opacity:0; pointer-events:none; transition:opacity .12s; }
+.launcher:hover .kbd { opacity:1; }
+.ctl { height:30px; padding:0 10px; border-radius:var(--r-md); border:1px solid transparent; background:transparent; color:var(--fg);
+  font-size:12.5px; display:inline-flex; align-items:center; gap:6px; }
+.ctl:hover { background:var(--accent); }
+.ctl.icon { width:32px; height:32px; padding:0; justify-content:center; color:var(--muted); }
+.ctl.icon:hover { color:var(--fg); }
+/* header glyphs are 18px SVGs, not 12px text characters */
+.ico-svg { width:18px; height:18px; display:block; flex:none; }
+.mk { width:15px; height:15px; display:block; flex:none; color:var(--brand-text); }
+/* Figma's component glyph: four rhombi meeting at the centre */
+.fig { width:13px; height:13px; display:block; flex:none; }
+.menu { position:fixed; top:calc(var(--mb) + 78px); left:12px; z-index:720; min-width:210px; padding:5px; border-radius:var(--r-xl);
+  background:color-mix(in srgb, var(--glass-raised) 97%, transparent); backdrop-filter:blur(14px); border:1px solid var(--border);
+  box-shadow:0 18px 50px rgb(0 0 0 / .45); }
+.menu button { display:flex; align-items:center; gap:9px; width:100%; height:32px; padding:0 10px; border:0; background:transparent;
+  color:var(--fg); font-size:13px; border-radius:var(--r-md); text-align:left; }
+.menu button:hover { background:var(--accent); }
+.menu .foot { display:flex; gap:7px; align-items:center; padding:8px 10px 4px; margin-top:4px; border-top:1px solid var(--border); font-size:11px; color:var(--faint); }
+.dot { width:6px; height:6px; border-radius:999px; background:var(--success-text); }
+/* the panel's own two header rows: tool actions, then which page you are on */
+.pagerow { display:flex; align-items:center; gap:8px; padding:8px 10px 8px 12px; border-bottom:1px solid var(--border); }
+.pagerow .rt { font-family:var(--mono); font-size:12px; color:var(--fg); font-weight:600; }
+.pagerow .fl { font-family:var(--mono); font-size:10.5px; color:var(--faint); }
+.pagerow .pill-btn { margin-left:auto; height:24px; padding:0 9px; border-radius:var(--r-full); border:1px solid var(--input);
+  background:var(--control-bg); color:var(--fg); font-size:11px; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+.pagerow .pill-btn:hover { background:var(--accent); }
+.pagerow .pill-btn svg { width:13px; height:13px; flex:none; }
+[hidden] { display:none !important; }
+
+/* ---------- hover highlight + compact pill ----------
+   Stacking order, deliberate: host page < hlbox 480 < pill 490 < side panels 700
+   < launcher 710 < menu 720 < modals 900+. The selection frame is page chrome, so
+   it must never paint over the tree or the inspector. */
+.hlbox { position:absolute; pointer-events:none; z-index:480; border:2px solid var(--brand); border-radius:4px; }
+.hlbox[data-kind="readonly"] { border-color:var(--warning); border-style:dashed; }
+.hlbox[data-kind="image"] { border-color:var(--info); }
+.hlbox.locked { box-shadow:0 0 0 4px color-mix(in srgb, var(--brand) 22%, transparent); }
+.pill { position:absolute; z-index:490; background:var(--card); border:1px solid var(--border); border-radius:var(--r-lg);
+  box-shadow:0 12px 34px rgb(0 0 0 / .42); color:var(--fg); font-size:12px; min-width:230px; max-width:460px; cursor:pointer; }
+.pill .r1 { display:flex; align-items:center; gap:8px; padding:7px 10px; }
+.pill .loc { font-family:var(--mono); font-size:11.5px; }
+.verdict { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--brand-text); }
+.verdict[data-k="readonly"] { color:var(--warning); } .verdict[data-k="image"] { color:var(--info); }
+.pill .go { margin-left:auto; font-size:10.5px; color:var(--faint); }
+.pill .crumbs { display:flex; align-items:center; gap:4px; flex-wrap:wrap; padding:7px 10px; border-top:1px solid var(--border); font-family:var(--mono); font-size:11px; }
+.sep { color:var(--faint); }
+.crumb { background:var(--control-bg); border:1px solid var(--input); color:var(--brand-text); border-radius:var(--r-sm); padding:2px 7px; font:inherit; }
+.crumb:hover { background:var(--accent); }
+.crumb.cur { background:var(--primary); border-color:var(--primary); color:var(--primary-fg); font-weight:700; }
+.crumb.inferred { border-style:dashed; border-color:var(--warning); color:var(--warning); }
+
+/* ---------- inspector (always opens on click) ---------- */
+.insp { position:fixed; right:0; top:var(--mb); bottom:0; width:400px; z-index:700; background:var(--card);
+  border-left:1px solid var(--border); display:flex; flex-direction:column; color:var(--fg); }
+.insp.left { right:auto; left:0; border-left:0; border-right:1px solid var(--border); }
+body[data-tree="1"] .insp.left { left:320px; }
+.ih { display:flex; align-items:center; gap:7px; padding:8px 8px 8px 13px; border-bottom:1px solid var(--border); }
+.ih b { font-size:12.5px; font-weight:600; }
+.ih .tag { font-family:var(--mono); font-size:11px; color:var(--faint); }
+.ibody { overflow:auto; padding:12px; display:flex; flex-direction:column; gap:11px; flex:1; }
+.ifoot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid var(--border); background:var(--bg); }
+.ifoot .btn-ui { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.tier { display:inline-flex; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:var(--r-full); }
+.tier[data-t="proven"] { color:var(--success-text); background:color-mix(in srgb, var(--success-text) 15%, transparent); }
+.tier[data-t="inferred"] { color:var(--warning); background:color-mix(in srgb, var(--warning) 15%, transparent); }
+.tier[data-t="candidates"] { color:var(--chart5); background:color-mix(in srgb, var(--chart5) 15%, transparent); }
+.reason { font-size:12.5px; line-height:1.55; color:var(--muted); margin:0; }
+.reason b { color:var(--fg); font-weight:600; }
+.reason code, .note code { font-family:var(--mono); font-size:11px; color:var(--chart3); }
+
+.grp { border:1px solid var(--border); border-radius:var(--r-xl); background:var(--bg); overflow:hidden; flex:none; }
+.grp > h4 { margin:0; padding:8px 12px; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--faint);
+  border-bottom:1px solid var(--border); background:var(--card); display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; }
+.grp > h4 .chev { transition:transform .12s; }
+.grp[data-open="0"] > h4 { border-bottom:0; } .grp[data-open="0"] > h4 .chev { transform:rotate(-90deg); }
+.grp[data-open="0"] > .gb { display:none; }
+.grp > h4 .aside { margin-left:auto; text-transform:none; letter-spacing:0; font-weight:500; font-family:var(--mono); }
+.grp.edit { border-color:color-mix(in srgb, var(--brand) 55%, transparent); }
+.grp.edit > h4 { color:var(--brand-text); }
+.gb { padding:11px 12px; display:flex; flex-direction:column; gap:9px; }
+.note { font-size:11px; color:var(--faint); line-height:1.5; margin:0; }
+
+/* indented component chain */
+.tree-chain { padding:6px 0; }
+.cn { position:relative; display:flex; align-items:flex-start; gap:7px; padding:5px 10px 5px calc(12px + var(--d) * 18px); cursor:pointer; }
+.cn:hover { background:color-mix(in srgb, var(--fg) 5%, transparent); }
+.cn[data-sel="1"] { background:color-mix(in srgb, var(--brand) 20%, transparent); }
+.cn::before { content:""; position:absolute; left:calc(12px + (var(--d) - 1) * 18px + 6px); top:0; height:15px; width:9px;
+  border-left:1px solid var(--accent); border-bottom:1px solid var(--accent); border-bottom-left-radius:5px; }
+.cn[style*="--d:0"]::before { display:none; }
+.cn .ic { color:var(--brand-text); width:13px; height:17px; flex:none; display:flex; align-items:center; justify-content:center; }
+.cn.leaf .ic { color:var(--fg); }
+.cn .cm { min-width:0; flex:1; }
+.cn .nm { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--brand-text); line-height:17px; }
+.cn.leaf .nm { color:var(--fg); font-weight:600; }
+.cn.inferred .nm { color:var(--warning); }
+.cn .sb { font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cn .roles { display:inline-flex; gap:4px; margin-left:6px; vertical-align:1px; }
+.role { font-family:var(--ui); font-size:9.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:1px 6px; border-radius:var(--r-full); }
+.role.pres { color:var(--chart5); background:color-mix(in srgb, var(--chart5) 16%, transparent); }
+.role.cont { color:var(--chart2); background:color-mix(in srgb, var(--chart2) 16%, transparent); }
+.cn .acts { display:none; gap:4px; margin-top:5px; }
+.cn[data-sel="1"] .acts { display:flex; }
+
+/* fields — borderless at rest, ring on focus (DESIGN-SYSTEM non-negotiable) */
+.mini { height:24px; padding:0 8px; font-size:11px; border-radius:var(--r-md); border:1px solid var(--input); background:var(--control-bg);
+  color:var(--fg); display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.mini:hover { background:var(--accent); }
+.mini.primary { background:var(--primary); border-color:var(--primary); color:var(--primary-fg); font-weight:600; }
+.prop { display:flex; flex-direction:column; gap:5px; padding:9px 0; }
+.prop + .prop { border-top:1px solid var(--border); }
+.prop .pk { display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11.5px; }
+.prop .pk .n { color:var(--chart5); }
+.prop .pk .st { margin-left:auto; font-family:var(--ui); font-size:10px; color:var(--faint); }
+.prop .pk .words { font-family:var(--ui); font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--primary-fg); background:var(--brand-text); padding:1px 6px; border-radius:var(--r-full); }
+.inp { width:100%; height:32px; border-radius:var(--r-lg); border:1px solid transparent; background:var(--input-bg); color:var(--fg);
+  padding:0 10px; font-size:12.5px; font-family:var(--ui); outline:none; }
+.inp:focus { border-color:var(--input); box-shadow:0 0 0 3px color-mix(in srgb, var(--ring) 45%, transparent); }
+.inp[aria-invalid="true"] { border-color:var(--destructive); }
+.inp.ta { height:auto; min-height:64px; padding:8px 10px; line-height:1.55; resize:vertical; font-size:12.5px; }
+.inp.ro { font-family:var(--mono); font-size:11.5px; color:var(--chart3); background:transparent; border:1px dashed var(--border); cursor:not-allowed; }
+.prop .row { display:flex; gap:6px; align-items:center; }
+.prop .err { font-size:11px; color:var(--destructive); }
+.prop[data-hot="1"] .inp { border-color:var(--brand-text); }
+
+.chips { display:flex; gap:5px; flex-wrap:wrap; }
+.chip-css { height:24px; padding:0 8px; font-family:var(--mono); font-size:11px; border-radius:var(--r-sm); border:1px solid var(--input);
+  background:var(--control-bg); color:var(--chart1); }
+.chip-css[data-open="1"] { background:var(--accent); }
+.rule { border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; }
+.rule pre { margin:0; padding:8px 10px; font-family:var(--mono); font-size:11px; line-height:1.65; white-space:pre; overflow-x:auto; }
+.rule .s { color:var(--chart1); } .rule .p { color:var(--chart5); } .rule .v { color:var(--chart2); }
+.rule .src { display:flex; align-items:center; padding:5px 10px; border-top:1px solid var(--border); font-family:var(--mono); font-size:10.5px; color:var(--faint); background:var(--card); }
+.rule .src .mini { margin-left:auto; }
+.mediagrid { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+.mtile { aspect-ratio:1; border-radius:var(--r-md); border:2px solid transparent; position:relative; overflow:hidden;
+  padding:0; background:#f4f2fb; }
+.mtile img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+.mtile[data-sel="1"] { border-color:var(--brand); }
+.mtile span { position:absolute; left:0; right:0; bottom:0; font-family:var(--mono); font-size:8.5px; color:#fff; background:rgb(0 0 0 / .55); padding:2px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cand { display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid var(--input); border-radius:var(--r-md); background:var(--control-bg); font-family:var(--mono); font-size:11px; }
+.cand .mini { margin-left:auto; }
+
+/* ---------- element tree ---------- */
+.tree { position:fixed; left:0; top:var(--mb); bottom:0; width:320px; z-index:700; display:flex; flex-direction:column;
+  background:color-mix(in srgb, var(--glass) 94%, transparent); backdrop-filter:blur(14px); border-right:1px solid var(--border); }
+.tree .th { display:flex; align-items:center; gap:7px; padding:8px 8px 8px 12px; border-bottom:1px solid var(--border); color:var(--fg); }
+.tree .th b { font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:7px; }
+.tree .tb { overflow:auto; padding:6px; flex:1; }
+.trow { display:flex; align-items:center; gap:7px; padding:4px 7px; border-radius:var(--r-md); font-family:var(--mono); font-size:11.5px;
+  color:var(--fg); white-space:nowrap; cursor:pointer; min-width:0; }
+.trow:hover { background:var(--accent); }
+.trow .tn { display:inline-flex; align-items:center; gap:6px; flex:0 0 auto; }
+.trow[data-sel="1"] { background:color-mix(in srgb, var(--brand) 30%, transparent); }
+.trow.comp { color:var(--brand-text); font-weight:700; }
+.trow.slot { color:var(--warning); }
+.trow .lc { margin-left:auto; padding-left:8px; color:var(--faint); font-size:10.5px; font-weight:400;
+  overflow:hidden; text-overflow:ellipsis; flex:0 1 auto; min-width:0; }
+.trow.flag .lc { color:var(--warning); }
+.tree .lg { display:flex; gap:12px; padding:8px 12px; border-top:1px solid var(--border); font-size:10.5px; color:var(--faint); }
+.tree .lg span { display:inline-flex; align-items:center; gap:5px; }
+.tree .lg i { display:inline-block; width:8px; height:8px; border-radius:2px; }
+
+/* ---------- modal: peek + settings ---------- */
+.backdrop { position:fixed; inset:var(--mb) 0 0 0; z-index:900; background:rgb(0 0 0 / .55); }
+.panel { position:fixed; z-index:910; top:50%; left:50%; transform:translate(-50%,-50%); width:min(760px,94vw); background:var(--card);
+  border:1px solid var(--border); border-radius:var(--r-xl); color:var(--fg); box-shadow:0 30px 80px rgb(0 0 0 / .55); overflow:hidden; }
+.panel .ph, .drawer .dh { display:flex; align-items:center; gap:9px; padding:12px 15px; border-bottom:1px solid var(--border); font-size:13.5px; }
+.panel .ph span { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--faint); }
+.panel .pb { padding:14px; }
+.panel .pf, .drawer .df { display:flex; gap:8px; justify-content:flex-end; padding:11px 15px; border-top:1px solid var(--border); background:var(--bg); }
+.btn-ui { height:32px; padding:0 14px; border-radius:var(--r-lg); font-size:13px; border:1px solid transparent; }
+.btn-ui.primary { background:var(--primary); color:var(--primary-fg); font-weight:600; }
+.btn-ui.outline { background:var(--control-bg); border-color:var(--input); color:var(--fg); }
+.btn-ui.outline:hover { background:var(--accent); }
+.code { margin:0; font-family:var(--mono); font-size:11.5px; line-height:1.7; background:var(--bg); border-radius:var(--r-lg); overflow:auto; max-height:52vh; }
+.code .ln { display:flex; gap:12px; padding:0 12px; white-space:pre; }
+.code .ln .n { color:var(--faint); width:22px; text-align:right; flex:none; }
+.code .ln[data-f="1"] { background:color-mix(in srgb, var(--brand) 24%, transparent); }
+.k-cm { color:var(--faint); } .k-tg { color:var(--chart1); } .k-tk { color:var(--fg); }
+.drawer { position:fixed; top:var(--mb); right:0; bottom:0; width:min(420px,94vw); z-index:910; background:var(--card); border-left:1px solid var(--border);
+  color:var(--fg); display:flex; flex-direction:column; }
+.drawer .db { padding:14px; display:flex; flex-direction:column; gap:12px; overflow:auto; flex:1; }
+.srow { display:flex; align-items:center; gap:11px; padding:10px 12px; }
+.srow + .srow { border-top:1px solid var(--border); }
+.srow .sl { flex:1; } .srow b { display:block; font-size:12.5px; font-weight:600; }
+.srow span { display:block; font-size:11px; color:var(--faint); margin-top:2px; line-height:1.45; }
+.sw { width:34px; height:20px; border-radius:999px; background:var(--input); border:0; position:relative; flex:none; }
+.sw::after { content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:999px; background:var(--fg); transition:left .13s; }
+.sw[data-on="1"] { background:var(--primary); } .sw[data-on="1"]::after { left:16px; background:var(--primary-fg); }
+.lock { font-size:10px; color:var(--faint); border:1px solid var(--border); border-radius:var(--r-sm); padding:2px 6px; flex:none; }
+
+.toasts { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:950; display:flex; flex-direction:column; gap:8px; align-items:center; }
+.toast { background:var(--card); border:1px solid var(--border); color:var(--fg); font-size:12.5px; padding:9px 14px; border-radius:var(--r-full);
+  box-shadow:0 12px 34px rgb(0 0 0 / .45); display:flex; gap:8px; align-items:center; max-width:720px; }
+.toast i { font-style:normal; color:var(--success-text); } .toast[data-k="warn"] i { color:var(--warning); }
+
+/* ---------- mockup strip (not the product) ---------- */
+#rail { position:fixed; top:0; left:0; right:0; height:var(--mb); z-index:990; background:#fff; border-bottom:1px solid #d9d5e6;
+  display:flex; align-items:center; gap:10px; padding:0 12px; font-size:12px; }
+#rail .tagm { flex:none; font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:#5b3fd0; border:1px solid #ded8f6; background:#f4f2fb; border-radius:999px; padding:3px 9px; font-weight:700; }
+#rail .rb { display:flex; align-items:center; gap:3px; overflow-x:auto; flex:1; height:100%; }
+#rail small { flex:none; padding:0 6px 0 11px; font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:#a29cba; border-left:1px solid #eae6f5; margin-left:4px; }
+#rail small:first-child { border-left:0; margin-left:0; padding-left:2px; }
+#rail .sc { flex:none; white-space:nowrap; border:1px solid transparent; background:none; padding:5px 10px; border-radius:999px; font-size:12px; color:#3a3650; cursor:pointer; }
+#rail .sc:hover { background:#f1eefb; border-color:#e2dcf7; }
+#rail .sc[data-cur="1"] { background:#5b3fd0; border-color:#5b3fd0; color:#fff; font-weight:600; }
+#rail .nt { flex:none; color:#8b86a0; font-size:10.5px; white-space:nowrap; border-left:1px solid #eae6f5; padding-left:11px; }
+@media (max-width:900px) { .hero, .grid { grid-template-columns:1fr; } .insp { width:320px; } }
+</style>
+</head>
+<body data-edit="0" data-tree="0">
+<!-- HOST PAGE. data-atx = where WRITTEN · data-chain = usage ids · data-k = what a click can do -->
+<div id="host"><div id="page-home" class="wrap">
+  <nav class="site-nav">
+    <a class="logo" data-atx="src/components/Nav.astro:6:5" data-chain="u1.u2" data-k="text">Studio Meridian</a>
+    <div class="links">
+      <a class="nav-link" data-atx="src/components/Nav.astro:10:9" data-chain="u1.u2" data-k="text">Work</a>
+      <a class="nav-link" data-atx="src/components/Nav.astro:11:9" data-chain="u1.u2" data-k="text">Studio</a>
+      <a class="nav-link" data-atx="src/components/Nav.astro:12:9" data-chain="u1.u2" data-k="text">Journal</a>
+    </div>
+  </nav>
+  <section class="hero">
+    <div>
+      <span class="badge" data-atx="src/components/ui/Badge.jsx:3:3" data-chain="" data-k="readonly"
+        data-reason="Inside a React island (<code>client:load</code>) — no usage chain reached it.">New engagements</span>
+      <h1 class="hero-title" data-atx="src/components/Hero.astro:9:28" data-chain="u1.u3" data-k="prop" data-bind="u3.title">Build things that outlast the brief</h1>
+      <p class="hero-sub" data-atx="src/components/Hero.astro:10:25" data-chain="u1.u3" data-k="text">We design and build considered digital products for teams who would rather do one thing properly than five things quickly.</p>
+      <a class="btn" data-atx="src/components/ui/Button.astro:4:63" data-chain="u1.u3.u8" data-k="slot" data-bind="u8.slot">Start a project</a>
+    </div>
+    <img class="hero-art" alt="A page being edited in place" src="../examples/playground/public/images/hero.svg"
+        data-atx="src/components/Hero.astro:13:3" data-chain="u1.u3" data-k="image"
+        data-src="/images/hero.svg" data-alt="A page being edited in place">
+  </section>
+  <section class="services">
+    <h2 data-atx="src/components/Services.astro:10:7" data-chain="u1.u4" data-k="text">What we do</h2>
+    <p class="lede" data-atx="src/components/Services.astro:11:20" data-chain="u1.u4" data-k="text">Three practices, one team, no handoffs.</p>
+    <div class="grid">
+      <article class="card linkish" data-nav="service" data-i="0" data-atx="src/components/ServiceCard.astro:5:3" data-chain="u1.u4.u5" data-k="readonly"
+        data-reason="Nested block markup — editing it as text would change structure. Its heading and body are editable on their own.">
+        <img class="cover" alt="A draft being marked up" src="../examples/playground/public/images/article-draft.svg">
+        <h3 class="card-title" data-atx="src/components/ServiceCard.astro:6:27" data-chain="u1.u4.u5" data-k="prop" data-bind="u5.title.0">Product design</h3>
+        <p class="card-body" data-atx="src/components/Services.astro:15:30" data-chain="u1.u4" data-k="value" data-bind="u5.body.0">Research, interface design and a design system your engineers will actually keep.</p>
+        <span class="more">Read more →</span>
+      </article>
+      <article class="card" data-i="1" data-atx="src/components/ServiceCard.astro:5:3" data-chain="u1.u4.u5" data-k="readonly"
+        data-reason="Nested block markup — editing it as text would change structure. Its heading and body are editable on their own.">
+        <img class="cover" alt="A browser rendering a page" src="../examples/playground/public/images/article-browser.svg">
+        <h3 class="card-title" data-atx="src/components/ServiceCard.astro:6:27" data-chain="u1.u4.u5" data-k="prop" data-bind="u5.title.1">Front-end build</h3>
+        <p class="card-body" data-atx="src/components/Services.astro:15:30" data-chain="u1.u4" data-k="value" data-bind="u5.body.1">Astro, TypeScript and CSS that a small team can maintain without a framework rewrite every year.</p>
+      </article>
+      <article class="card" data-i="2" data-atx="src/components/ServiceCard.astro:5:3" data-chain="u1.u4.u5" data-k="readonly"
+        data-reason="Nested block markup — editing it as text would change structure. Its heading and body are editable on their own.">
+        <img class="cover" alt="An Astro project tree" src="../examples/playground/public/images/article-astro.svg">
+        <h3 class="card-title" data-atx="src/components/ServiceCard.astro:6:27" data-chain="u1.u4.u5" data-k="prop" data-bind="u5.title.2">Editorial systems</h3>
+        <p class="card-body" data-atx="src/components/Services.astro:15:30" data-chain="u1.u4" data-k="value" data-bind="u5.body.2">Content models that fit how your team writes, not how a CMS vendor wishes you did.</p>
+      </article>
+    </div>
+  </section>
+  <section class="quote">
+    <blockquote class="quote-text" data-atx="src/components/Testimonial.astro:5:34" data-chain="u1.u9.u7" data-infer="u7" data-k="text">They rebuilt our site in six weeks and we have not needed to call them since. That is the compliment.</blockquote>
+    <div class="who-row">
+      <img class="avatar" alt="Priya Raman" src="../examples/playground/public/images/portrait.svg"
+        data-atx="src/components/Testimonial.astro:7:5" data-chain="u1.u9.u7" data-infer="u7" data-k="image"
+        data-src="/images/portrait.svg" data-alt="Priya Raman">
+      <div class="who" data-atx="src/components/Testimonial.astro:6:28" data-chain="u1.u9.u7" data-infer="u7" data-k="text">Priya Raman — Head of Digital, Northbank</div>
+    </div>
+  </section>
+  <footer class="site-foot" data-atx="src/components/Footer.astro:5:5" data-chain="u1.u6" data-k="text">© 2026 Studio Meridian — built with Astro</footer>
+</div>
+
+<!-- ============ TEMPLATED PAGE: src/pages/services/[slug].astro + a .md entry ============ -->
+<div id="page-service" class="wrap" hidden>
+  <nav class="site-nav">
+    <a class="logo" data-atx="src/components/Nav.astro:6:5" data-chain="s1.s2" data-k="text">Studio Meridian</a>
+    <div class="links">
+      <a class="nav-link" data-atx="src/components/Nav.astro:10:9" data-chain="s1.s2" data-k="text">Work</a>
+      <a class="nav-link" data-atx="src/components/Nav.astro:11:9" data-chain="s1.s2" data-k="text">Studio</a>
+    </div>
+  </nav>
+  <span class="crumbnav" data-nav="home">← Back to the home page</span>
+  <article class="prose">
+    <p class="eyebrow" data-atx="src/pages/services/[slug].astro:13:5" data-chain="s1" data-k="text">Service</p>
+    <h1 data-atx="src/pages/services/[slug].astro:14:9" data-chain="s1" data-k="fm" data-bind="fm.title">Product design</h1>
+    <p class="lede" data-atx="src/pages/services/[slug].astro:15:24" data-chain="s1" data-k="fm" data-bind="fm.excerpt">Research, interface design and a design system your engineers will actually keep.</p>
+    <img class="prose-fig" alt="Atlas cover" src="../examples/playground/src/assets/works/atlas-cover.svg"
+      data-atx="src/pages/services/[slug].astro:16:5" data-chain="s1" data-k="image"
+      data-src="~/assets/works/atlas-cover.svg" data-alt="Atlas cover">
+    <p data-atx="src/content/services/product-design.md:7" data-chain="s1.s3" data-infer="s3" data-k="mdbody" data-bind="md.7">We start every engagement with the questions nobody has written down yet, because those are the ones that decide what gets built.</p>
+    <h2 data-atx="src/content/services/product-design.md:9" data-chain="s1.s3" data-infer="s3" data-k="mdbody" data-bind="md.9">How it runs</h2>
+    <p data-atx="src/content/services/product-design.md:11" data-chain="s1.s3" data-infer="s3" data-k="mdbody" data-bind="md.11">Two-week cycles, a working prototype at the end of each, and a written decision log you keep afterwards.</p>
+    <ul>
+      <li data-atx="src/content/services/product-design.md:13" data-chain="s1.s3" data-infer="s3" data-k="mdbody" data-bind="md.13">Discovery workshops with the people who own the problem</li>
+      <li data-atx="src/content/services/product-design.md:14" data-chain="s1.s3" data-infer="s3" data-k="mdbody" data-bind="md.14">Prototype, test, and throw away what did not survive</li>
+    </ul>
+    <p data-atx="src/content/services/product-design.md:16" data-chain="s1.s3" data-infer="s3" data-k="mdrich"
+       data-reason="Inline markup — a link and bold text. HTML back to Markdown is a lossy round trip, so it is refused.">See the <a href="#">engagement model</a> for how we price it, or <strong>book an intro call</strong>.</p>
+  </article>
+  <footer class="site-foot" data-atx="src/components/Footer.astro:5:5" data-chain="s1.s4" data-k="text">© 2026 Studio Meridian — built with Astro</footer>
+</div></div>
+
+<!-- OVERLAY -->
+<div id="ov">
+  <button class="launcher" id="launcher" title="Open the element tree"><svg class="mk" style="width:17px;height:17px" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 0 12 6 6 12 0 6Z"/></svg>
+    <span class="kbd">hold ⌥ to inspect · click for the tree</span></button>
+  <div class="menu" id="menu" hidden>
+    <button id="mCopy">⎘ Copy page context</button>
+    <button id="mRescan">↻ Re-scan components</button>
+    <div class="foot"><span class="dot"></span> dev server connected · astro 7.1.1</div>
+  </div>
+  <aside class="tree" id="tree" hidden>
+    <div class="th"><b><svg class="mk" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 0 12 6 6 12 0 6Z"/></svg>astro-dev-edit</b>
+      <button class="ctl icon" id="mMark" title="Menu" style="margin-left:auto"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h12M4 10h12M4 14h12"/></svg></button>
+      <button class="ctl icon" id="bSettings" title="Settings"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 6.6h8.1M15.6 6.6H17M3 13.4h1.4M8.9 13.4H17"/><circle cx="13.4" cy="6.6" r="2.2"/><circle cx="6.6" cy="13.4" r="2.2"/></svg></button>
+      <button class="ctl icon" id="treeClose" title="Close"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5.8 5.8l8.4 8.4M14.2 5.8l-8.4 8.4"/></svg></button></div>
+    <div class="pagerow">
+      <div><div class="rt" id="pgRoute">/</div><div class="fl" id="pgFile">src/pages/index.astro</div></div>
+      <button class="pill-btn" id="pgSource"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M11 2.5 4.5 11.2h4.2L9 17.5 15.5 8.8h-4.2Z"/></svg> source</button>
+    </div>
+    <div class="tb" id="treeBody"></div>
+    <div class="lg"><span style="color:var(--brand-text)"><svg class="fig" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 .35 8.3 2.65 6 4.95 3.7 2.65Z M9.35 3.7 11.65 6 9.35 8.3 7.05 6Z M6 7.05 8.3 9.35 6 11.65 3.7 9.35Z M2.65 3.7 4.95 6 2.65 8.3 .35 6Z"/></svg></span><span style="margin-left:-7px">component</span><span><i style="background:var(--warning)"></i>slot / markdown</span></div>
+  </aside>
+  <aside class="insp" id="insp" hidden>
+    <div class="ih"><b>Inspector</b><span class="tag" id="inspTag"></span>
+      <button class="ctl icon" id="inspDock" title="Dock to the other side" style="margin-left:auto"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="4" width="14.4" height="12" rx="2.2"/><path d="M12.2 4v12"/></svg></button>
+      <button class="ctl icon" id="inspClose" title="Close (Esc)"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5.8 5.8l8.4 8.4M14.2 5.8l-8.4 8.4"/></svg></button></div>
+    <div class="ibody" id="inspBody"></div>
+    <div class="ifoot" id="inspFoot"></div>
+  </aside>
+  <div class="hlbox" id="hl" hidden></div>
+  <div class="pill" id="pill" hidden></div>
+  <div class="backdrop" id="backdrop" hidden></div>
+  <div class="panel" id="peek" hidden>
+    <div class="ph"><b id="peekTitle"></b><span id="peekLoc"></span></div>
+    <div class="pb"><pre class="code" id="peekCode"></pre></div>
+    <div class="pf"><button class="btn-ui outline" data-close>Close</button><button class="btn-ui primary" id="peekOpen">Open in editor</button></div>
+  </div>
+  <div class="drawer" id="settings" hidden>
+    <div class="dh"><b>Settings</b><button class="ctl icon" data-close style="margin-left:auto"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5.8 5.8l8.4 8.4M14.2 5.8l-8.4 8.4"/></svg></button></div>
+    <div class="db">
+      <div class="grp"><h4>Editing</h4><div class="gb" style="padding:0">
+        <div class="srow"><div class="sl"><b>Click to edit</b><span>Turn on-page editing off, keep the integration.</span></div><button class="sw" data-on="1"></button></div>
+        <div class="srow"><div class="sl"><b>Edit props at the usage site</b><span>Literals, and values one hop from a literal. The rest is read-only.</span></div><button class="sw" data-on="1"></button></div>
+        <div class="srow"><div class="sl"><b>Open in editor</b><span>Launch your editor at a source location.</span></div><button class="sw" data-on="1"></button></div>
+      </div></div>
+      <div class="grp"><h4>Inspection</h4><div class="gb" style="padding:0">
+        <div class="srow"><div class="sl"><b>CSS inspector</b><span>Matched rules, with a jump to source.</span></div><button class="sw" data-on="1"></button></div>
+        <div class="srow"><div class="sl"><b>Component composition</b><span>Thread a usage chain through props to prove what rendered an element.</span></div><span class="lock">astro.config</span></div>
+        <div class="srow"><div class="sl"><b>Source annotations</b><span>Injected on every Astro version. No dev toolbar needed.</span></div><span class="lock">astro.config</span></div>
+      </div></div>
+    </div>
+    <div class="df"><button class="btn-ui outline" data-close>Close</button><button class="btn-ui primary" data-close>Save</button></div>
+  </div>
+  <div class="toasts" id="toasts"></div>
+</div>
+<div id="rail"><span class="tagm">Mockup</span><div class="rb" id="railBody"></div><span class="nt" title="Hovering, clicking and typing on the page really work.">mock only — nothing is written</span></div>
+<script>
+/* =========================== MOCK USAGE GRAPH =========================== */
+const LINKS = {
+  u1:{ name:'Base.astro',        file:'src/pages/index.astro',          loc:'8:1',  res:'src/layouts/Base.astro' },
+  u2:{ name:'Nav.astro',         file:'src/layouts/Base.astro',         loc:'9:5',  res:'src/components/Nav.astro' },
+  u3:{ name:'Hero.astro',        file:'src/pages/index.astro',          loc:'9:3',  res:'src/components/Hero.astro' },
+  u8:{ name:'Button.astro',      file:'src/components/Hero.astro',      loc:'11:5', res:'src/components/ui/Button.astro' },
+  u4:{ name:'Services.astro',    file:'src/pages/index.astro',          loc:'10:3', res:'src/components/Services.astro' },
+  u5:{ name:'ServiceCard.astro', file:'src/components/Services.astro',  loc:'14:7', res:'src/components/ServiceCard.astro',
+       repeat:'<code>services.map()</code> — 3 instances share this usage site' },
+  u9:{ name:'Quote.astro',       file:'src/pages/index.astro',          loc:'11:3', res:'src/components/Quote.astro' },
+  u7:{ name:'Testimonial.astro', file:'src/components/Quote.astro',     loc:'4:1',  res:'src/components/Testimonial.astro',
+       inferred:'<code>{...Astro.props}</code> in Quote.astro overwrote the chain. Quote uses Testimonial once, so the link came from the static usage graph.' },
+  s1:{ name:'Base.astro',   file:'src/pages/services/[slug].astro', loc:'11:1', res:'src/layouts/Base.astro' },
+  s2:{ name:'Nav.astro',    file:'src/layouts/Base.astro',          loc:'9:5',  res:'src/components/Nav.astro' },
+  s4:{ name:'Footer.astro', file:'src/layouts/Base.astro',          loc:'11:5', res:'src/components/Footer.astro' },
+  s3:{ name:'Content',      file:'src/pages/services/[slug].astro', loc:'18:5', res:'src/content/services/product-design.md', md:true,
+       inferred:'<code>&lt;Content /&gt;</code> renders Markdown, so no chain threads through it. Derived from the route template and the entry it renders.' },
+  u6:{ name:'Footer.astro',      file:'src/layouts/Base.astro',         loc:'11:5', res:'src/components/Footer.astro' },
+};
+const SERVICES = [
+  { title:'Product design',    icon:'pen',  body:'Research, interface design and a design system your engineers will actually keep.' },
+  { title:'Front-end build',   icon:'code', body:'Astro, TypeScript and CSS that a small team can maintain without a framework rewrite every year.' },
+  { title:'Editorial systems', icon:'book', body:'Content models that fit how your team writes, not how a CMS vendor wishes you did.' },
+];
+/* Editable values. `original` is what the source holds; `value` is what the field shows. */
+const MODEL = {};
+const def = (k, v) => (MODEL[k] = { value:v, original:v });
+def('u1.title', 'Studio Meridian — considered digital products');
+def('u3.title', 'Build things that outlast the brief');
+def('u8.href', '#contact'); def('u8.variant', 'dark'); def('u8.slot', 'Start a project');
+def('fm.title', 'Product design');
+def('fm.excerpt', 'Research, interface design and a design system your engineers will actually keep.');
+def('md.7',  'We start every engagement with the questions nobody has written down yet, because those are the ones that decide what gets built.');
+def('md.9',  'How it runs');
+def('md.11', 'Two-week cycles, a working prototype at the end of each, and a written decision log you keep afterwards.');
+def('md.13', 'Discovery workshops with the people who own the problem');
+def('md.14', 'Prototype, test, and throw away what did not survive');
+SERVICES.forEach((s, i) => { def(`u5.title.${i}`, s.title); def(`u5.icon.${i}`, s.icon); def(`u5.body.${i}`, s.body); });
+
+/* Props at each usage site, and exactly why each one is or isn't editable. */
+function propsOf(id, i = 0) {
+  switch (id) {
+    case 'u1': return [ lit('title', 'u1.title', 'src/pages/index.astro:8:7') ];
+    case 's1': return [ traced('title', 'fm.title', '{entry.data.title}', 'the entry’s frontmatter',
+                               'src/content/services/product-design.md:2') ];
+    case 'u3': return [ lit('title', 'u3.title', 'src/pages/index.astro:9:9'),
+                        ro('eyebrow', '{site.tagline}', 'from <code>../data/site</code> — edit it at source') ];
+    case 'u8': return [ lit('href', 'u8.href', 'src/components/Hero.astro:11:13'),
+                        lit('variant', 'u8.variant', 'src/components/Hero.astro:11:29'),
+                        ro('class', '"btn"', 'styling, not content') ];
+    case 'u5': return [ traced('title', `u5.title.${i}`, '{s.title}', `services[${i}].title`, `src/components/Services.astro:${4 + i}`),
+                        traced('icon', `u5.icon.${i}`, '{s.icon}', `services[${i}].icon`, `src/components/Services.astro:${4 + i}`),
+                        ro('featured', '{i === 0}', 'computed boolean — strings only') ];
+    case 'u7': return [ ro('…', '{...Astro.props}', 'a spread — values come from Quote.astro’s caller') ];
+    default: return [];
+  }
+}
+function lit(n, key, target) { return { n, key, kind:'literal', src:`"${MODEL[key].value}"`, note:'string literal · verify-then-patch', target }; }
+function traced(n, key, src, via, target) { return { n, key, kind:'traced', src, note:`traces one hop to <code>${via}</code>`, target:`${via} in ${target}` }; }
+function ro(n, src, why) { return { n, kind:'readonly', src, note:why }; }
+
+function slotsOf(id, i = 0) {
+  if (id === 'u8') return [{ n:'default', key:'u8.slot', target:'src/components/Hero.astro:11:52' }];
+  if (id === 'u1') return [{ n:'default', preview:'<Hero … /> <Services /> <Quote />', why:'components, not text' }];
+  if (id === 'u5') return [{ n:'default', preview:'<p class="card-body">{s.body}</p>', why:'markup — the paragraph is editable on its own' }];
+  return [];
+}
+
+const CSS_RULES = {
+  'hero-title':[{ s:'.hero-title', d:[['font-size','44px'],['line-height','1.08'],['letter-spacing','-0.03em']], src:'src/components/Hero.astro:31' }],
+  'hero-sub':[{ s:'.hero-sub', d:[['font-size','16px'],['line-height','1.6'],['max-width','46ch']], src:'src/components/Hero.astro:37' }],
+  'btn':[{ s:'.btn', d:[['background','#16151c'],['padding','11px 20px'],['border-radius','10px']], src:'src/styles/global.css:64' },
+         { s:'.btn-dark', d:[['color','#fff']], src:'src/components/ui/Button.astro:12' }],
+  'card':[{ s:'.card', d:[['border','1px solid #eae8f0'],['border-radius','14px'],['padding','20px']], src:'src/styles/global.css:118' }],
+  'card-title':[{ s:'.card-title', d:[['font-size','15px'],['letter-spacing','-0.01em']], src:'src/components/ServiceCard.astro:14' }],
+  'card-body':[{ s:'.card-body', d:[['font-size','13.5px'],['color','#52505e']], src:'src/components/ServiceCard.astro:18' },
+               { s:'.card > :where(p)', d:[['margin','0']], src:'src/components/ServiceCard.astro:22' }],
+  'quote-text':[{ s:'.quote-text', d:[['font-size','20px'],['border-left','3px solid #b9aeff']], src:'src/components/Testimonial.astro:15' }],
+  'badge':[{ s:'.badge', d:[['text-transform','uppercase'],['border-radius','999px']], src:'src/components/ui/Badge.module.css:1' }],
+  'logo':[{ s:'.logo', d:[['font-weight','800']], src:'src/components/Nav.astro:19' }],
+  'nav-link':[{ s:'.nav-link', d:[['color','#52505e']], src:'src/components/Nav.astro:24' }],
+  'site-foot':[{ s:'.site-foot', d:[['padding','26px 0']], src:'src/styles/global.css:190' }],
+  'hero-art':[{ s:'.hero-art', d:[['aspect-ratio','4/3'],['border-radius','16px'],['object-fit','cover']], src:'src/components/Hero.astro:41' }],
+  'avatar':[{ s:'.avatar', d:[['width','38px'],['border-radius','999px'],['object-fit','cover']], src:'src/components/Testimonial.astro:21' }],
+  'prose-fig':[{ s:'.prose-fig', d:[['aspect-ratio','16/9'],['border-radius','12px']], src:'src/styles/global.css:204' }],
+  'cover':[{ s:'.card .cover', d:[['aspect-ratio','16/9'],['border-radius','9px']], src:'src/components/ServiceCard.astro:10' }],
+};
+
+/* Sources are functions of MODEL, so a peek shows what would be written. */
+const v = (k) => MODEL[k].value;
+const SOURCES = {
+  'src/pages/index.astro': () => ['---', "import Base from '../layouts/Base.astro';", "import Hero from '../components/Hero.astro';",
+    "import Services from '../components/Services.astro';", "import Quote from '../components/Quote.astro';", "import { site } from '../data/site';", '---',
+    `<Base title="${v('u1.title')}">`, `  <Hero title="${v('u3.title')}" eyebrow={site.tagline} />`, '  <Services />', '  <Quote />', '</Base>'],
+  'src/components/Hero.astro': () => ['---', "import Button from './ui/Button.astro';", "import Badge from './ui/Badge.jsx';", 'const { title, eyebrow } = Astro.props;', '---',
+    '<section class="hero">', '  <div>', '    <Badge client:load>{eyebrow}</Badge>', '    <h1 class="hero-title">{title}</h1>',
+    '    <p class="hero-sub">We design and build considered digital products…</p>',
+    `    <Button href="${v('u8.href')}" variant="${v('u8.variant')}" class="btn">${v('u8.slot')}</Button>`, '  </div>',
+    '  <img class="hero-art" src="/images/hero.svg" alt="A page being edited in place" />', '</section>'],
+  'src/components/Services.astro': () => ['---', "import ServiceCard from './ServiceCard.astro';", 'const services = [',
+    ...SERVICES.map((_, i) => `  { title: '${v(`u5.title.${i}`)}', icon: '${v(`u5.icon.${i}`)}', body: '${v(`u5.body.${i}`).slice(0, 38)}…' },`),
+    '];', '---', '<section class="services">', '  <h2>What we do</h2>', '  <p class="lede">Three practices, one team, no handoffs.</p>', '  <div class="grid">',
+    '    {services.map((s, i) => (', '      <ServiceCard title={s.title} icon={s.icon} featured={i === 0}>', '        <p class="card-body">{s.body}</p>',
+    '      </ServiceCard>', '    ))}', '  </div>', '</section>'],
+  'src/components/ServiceCard.astro': () => ['---', 'const { title, icon, featured = false } = Astro.props;', '---',
+    '<article class="card" data-featured={featured}>', '  <div class="ico" data-icon={icon}></div>', '  <h3 class="card-title">{title}</h3>', '  <slot />', '</article>'],
+  'src/components/ui/Button.astro': () => ['---', "const { href, variant = 'light', ...rest } = Astro.props;", '---',
+    '<a href={href} class:list={[`btn-${variant}`]} {...rest}><slot /></a>'],
+  'src/components/Quote.astro': () => ['---', "import Testimonial from './Testimonial.astro';", '---', '<Testimonial {...Astro.props} />'],
+  'src/components/Testimonial.astro': () => ['---', '---', '<figure class="quote">', '  <blockquote class="quote-text">They rebuilt our site in six weeks…</blockquote>',
+    '  <figcaption class="who">Priya Raman — Head of Digital, Northbank</figcaption>',
+    '  <img class="avatar" src="/images/portrait.svg" alt="Priya Raman" />', '</figure>'],
+  /* line numbers here line up with the data-atx locs on the rendered page:
+     7 paragraph · 9 heading · 11 paragraph · 13-14 list · 16 the rich one */
+  'src/content/services/product-design.md': () => ['---', `title: ${v('fm.title')}`, 'excerpt: >-', `  ${v('fm.excerpt')}`,
+    'order: 1', '---', v('md.7'), '', `## ${v('md.9')}`, '', v('md.11'), '',
+    `- ${v('md.13')}`, `- ${v('md.14')}`, '',
+    'See the [engagement model](/engagements) for how we price it, or **book an intro call**.'],
+  'src/pages/services/[slug].astro': () => ['---', "import Base from '../../layouts/Base.astro';",
+    "import { getCollection } from 'astro:content';", 'export async function getStaticPaths() {',
+    "  const all = await getCollection('services');",
+    '  return all.map((entry) => ({ params: { slug: entry.slug }, props: { entry } }));', '}',
+    'const { entry } = Astro.props;', 'const { Content } = await entry.render();', '---',
+    '<Base title={entry.data.title}>', '  <article class="prose">', '    <p class="eyebrow">Service</p>',
+    '    <h1>{entry.data.title}</h1>', '    <p class="lede">{entry.data.excerpt}</p>',
+    '    <Image class="prose-fig" src={cover} alt="Atlas cover" />', '',
+    '    <Content />', '  </article>', '</Base>'],
+  'src/layouts/Base.astro': () => ['---', "import Nav from '../components/Nav.astro';", "import Footer from '../components/Footer.astro';",
+    'const { title } = Astro.props;', '---', '<html lang="en">', '  <head><title>{title}</title></head>', '  <body>', '    <Nav />',
+    '    <main><slot /></main>', '    <Footer />', '  </body>', '</html>'],
+};
+
+/* ================================ GLYPHS =============================== */
+/* Figma's component mark — four rhombi meeting at the centre. Every component,
+   in the tree and in the chain, carries it; the route file and the DOM leaf get
+   their own marks so the three kinds of row stay tellable apart. */
+const FIG  = '<svg class="fig" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 .35 8.3 2.65 6 4.95 3.7 2.65Z M9.35 3.7 11.65 6 9.35 8.3 7.05 6Z M6 7.05 8.3 9.35 6 11.65 3.7 9.35Z M2.65 3.7 4.95 6 2.65 8.3 .35 6Z"/></svg>';
+const DOC  = '<svg class="fig" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M2.6 1.1h4.1l3.3 3.3v6.5H2.6Z"/><path d="M6.6 1.2v3.3h3.3"/></svg>';
+const LEAF = '<svg class="fig" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.4" y="1.4" width="9.2" height="9.2" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';
+
+/* Real files from examples/playground — the site this mockup imitates. */
+const MEDIA = [
+  { n:'hero.svg',           p:'/images/hero.svg',            f:'public/images/hero.svg' },
+  { n:'portrait.svg',       p:'/images/portrait.svg',        f:'public/images/portrait.svg' },
+  { n:'workflow.svg',       p:'/images/workflow.svg',        f:'public/images/workflow.svg' },
+  { n:'editor-jump.svg',    p:'/images/editor-jump.svg',     f:'public/images/editor-jump.svg' },
+  { n:'article-astro.svg',  p:'/images/article-astro.svg',   f:'public/images/article-astro.svg' },
+  { n:'article-browser.svg',p:'/images/article-browser.svg', f:'public/images/article-browser.svg' },
+  { n:'article-compare.svg',p:'/images/article-compare.svg', f:'public/images/article-compare.svg' },
+  { n:'article-draft.svg',  p:'/images/article-draft.svg',   f:'public/images/article-draft.svg' },
+  { n:'article-tour.svg',   p:'/images/article-tour.svg',    f:'public/images/article-tour.svg' },
+  { n:'swatch-purple.svg',  p:'/images/swatch-purple.svg',   f:'public/images/swatch-purple.svg' },
+  { n:'swatch-slate.svg',   p:'/images/swatch-slate.svg',    f:'public/images/swatch-slate.svg' },
+  { n:'cesar-rincon.jpg',   p:'/images/cesar-rincon-XHVpWcr5grQ-unsplash.jpg', f:'public/images/cesar-rincon-XHVpWcr5grQ-unsplash.jpg' },
+  { n:'favicon.svg',        p:'/favicon.svg',                f:'public/favicon.svg' },
+  { n:'atlas-cover.svg',    p:'~/assets/works/atlas-cover.svg',    f:'src/assets/works/atlas-cover.svg' },
+  { n:'ledger-cover.svg',   p:'~/assets/works/ledger-cover.svg',   f:'src/assets/works/ledger-cover.svg' },
+  { n:'onvero/thumb.svg',   p:'~/assets/works/onvero/thumb.svg',   f:'src/assets/works/onvero/thumb.svg' },
+  { n:'onvero/header.svg',  p:'~/assets/works/onvero/header.svg',  f:'src/assets/works/onvero/header.svg' },
+];
+const mediaUrl = (m) => '../examples/playground/' + m.f;
+
+/* =============================== HELPERS =============================== */
+const $ = (s) => document.querySelector(s);
+const el = (t, c, h) => { const n = document.createElement(t); if (c) n.className = c; if (h != null) n.innerHTML = h; return n; };
+const base = (p) => p.split('/').pop();
+const S = { edit:false, tree:false, node:null, hover:null, dwell:null, sel:null, textFinish:null, cssOpen:{} };
+
+function toast(msg, k = 'ok') {
+  const t = el('div', 'toast', `<i>${k === 'ok' ? '✓' : '⌁'}</i><span>${msg}</span>`); t.dataset.k = k;
+  $('#toasts').append(t); setTimeout(() => t.remove(), 3200);
+}
+const chainOf = (n) => (n.dataset.chain ? n.dataset.chain.split('.') : []);
+const parentHost = (n) => n.parentElement?.closest('[data-chain]') || null;
+/** Slot test: the element's chain is a STRICT PREFIX of its DOM parent's. */
+function isSlotted(n) {
+  const mine = chainOf(n), host = parentHost(n); if (!host) return false;
+  const theirs = chainOf(host);
+  return mine.length > 0 && mine.length < theirs.length && mine.every((x, i) => x === theirs[i]);
+}
+const tierOf = (n) => (!n.dataset.chain ? 'candidates' : n.dataset.infer ? 'inferred' : 'proven');
+const instOf = (n) => { const c = n.closest('[data-i]'); return c ? +c.dataset.i : 0; };
+/** Which link supplies the words, when they do not live in this element's own file. */
+function supplier(n) {
+  const ids = chainOf(n);
+  if (['prop', 'slot', 'value', 'fm', 'mdbody'].includes(n.dataset.k)) return ids[ids.length - 1] || null;
+  return null;
+}
+
+/* ======================= HOVER HIGHLIGHT + PILL ======================== */
+const KIND = { text:'edit in place', markup:'edit in place', prop:'edit via prop', slot:'edit slot text',
+               value:'edit traced value', image:'image', readonly:'inspect only',
+               fm:'edit entry field', mdbody:'edit markdown', mdrich:'inspect only' };
+function drawHl(n, locked) {
+  const h = $('#hl'), r = n.getBoundingClientRect();
+  h.hidden = false; h.dataset.kind = n.dataset.k; h.classList.toggle('locked', !!locked);
+  h.style.cssText += `;top:${r.top + scrollY - 2}px;left:${r.left + scrollX - 2}px;width:${r.width + 4}px;height:${r.height + 4}px`;
+}
+/** The strip of viewport the side panels are not sitting on. */
+function freeBounds() {
+  let L = 8, R = innerWidth - 12;
+  const t = $('#tree'), i = $('#insp');
+  if (t && !t.hidden) L = Math.max(L, t.getBoundingClientRect().right + 8);
+  if (i && !i.hidden) {
+    const b = i.getBoundingClientRect();
+    if (b.left > innerWidth / 2) R = Math.min(R, b.left - 8); else L = Math.max(L, b.right + 8);
+  }
+  return { L, R };
+}
+function place(n, box, gap = 8) {
+  const r = n.getBoundingClientRect(), below = innerHeight - r.bottom, { L, R } = freeBounds();
+  const flip = below < box.offsetHeight + gap + 12 && r.top > box.offsetHeight + gap;
+  box.style.top = (flip ? r.top + scrollY - box.offsetHeight - gap : r.bottom + scrollY + gap) + 'px';
+  box.style.left = Math.max(L, Math.min(r.left + scrollX, R - box.offsetWidth)) + 'px';
+}
+function renderPill(n, crumbs) {
+  const p = $('#pill'), k = n.dataset.k;
+  let h = `<div class="r1"><span class="loc">${base(n.dataset.atx)}</span>
+    <span class="verdict" data-k="${k}">${KIND[k]}</span><span class="go">click to inspect</span></div>`;
+  if (crumbs) {
+    const ids = isSlotted(n) ? chainOf(parentHost(n)) : chainOf(n);
+    const parts = ids.map((id) => `<button class="crumb${n.dataset.infer === id ? ' inferred' : ''}" data-crumb="${id}">${base(LINKS[id].res)}</button>`);
+    const lead = ids.length ? `<button class="crumb" data-crumb="root">index.astro</button><span class="sep">›</span>` : '';
+    const leaf = `<span class="crumb cur">&lt;${n.tagName.toLowerCase()}&gt;</span>`;
+    h += `<div class="crumbs">${lead}${parts.join('<span class="sep">›</span>')}<span class="sep">›</span>${leaf}
+      ${isSlotted(n) ? '<span class="sep" title="written outside, rendered inside">⤷ slot</span>' : ''}</div>`;
+  }
+  p.innerHTML = h; p.hidden = false; place(n, p);
+}
+document.addEventListener('mouseover', (e) => {
+  if (!S.edit) return;
+  const n = e.target.closest('#host [data-atx]'); if (!n || n === S.hover) return;
+  S.hover = n; clearTimeout(S.dwell);
+  if (!S.node) drawHl(n);
+  renderPill(n, false);
+  S.dwell = setTimeout(() => { if (S.hover === n) renderPill(n, true); }, 400);
+});
+document.addEventListener('mouseout', (e) => {
+  if (!S.edit) return;
+  const to = e.relatedTarget;
+  if (to && (to.closest('#pill') || to.closest('#host [data-atx]'))) return;
+  clearTimeout(S.dwell); S.hover = null; $('#pill').hidden = true;
+  if (S.node) drawHl(S.node, true); else $('#hl').hidden = true;
+});
+$('#pill').addEventListener('click', (e) => {
+  const n = S.hover; if (!n) return;
+  const c = e.target.closest('[data-crumb]');
+  openInspector(n, c ? c.dataset.crumb : undefined);
+});
+
+/* ====================== CLICK ROUTING — always inspect ================== */
+document.addEventListener('click', (e) => {
+  if (!S.edit || e.target.closest('#ov') || e.target.closest('#rail')) return;
+  const n = e.target.closest('#host [data-atx]'); if (!n) return;
+  e.preventDefault(); e.stopPropagation();
+  openInspector(n);
+}, true);
+
+/* ============================== INSPECTOR ============================== */
+function openInspector(n, focusLink) {
+  if (S.node !== n) endTextEdit(true);
+  S.node = n; S.sel = focusLink || supplier(n) || (isSlotted(n) ? chainOf(parentHost(n)).slice(-1)[0] : chainOf(n).slice(-1)[0]) || 'root';
+  drawHl(n, true); $('#insp').hidden = false; $('#pill').hidden = true;
+  $('#inspTag').textContent = `<${n.tagName.toLowerCase()}>`;
+  renderInspector();
+  if (n.dataset.k === 'text' || n.dataset.k === 'markup') beginTextEdit(n);
+}
+function renderInspector() {
+  const n = S.node, k = n.dataset.k, b = $('#inspBody'); b.innerHTML = '';
+  const tier = tierOf(n);
+
+  /* --- status --- */
+  const st = el('div');
+  st.innerHTML = `<span class="tier" data-t="${tier}">${
+    { proven:'proven chain', inferred:'one link inferred', candidates:'no chain' }[tier]}</span>`;
+  b.append(st);
+
+  /* --- 1. EDIT — what a click does here --- */
+  b.append(editGroup(n, k));
+
+  /* --- 2. COMPONENT CHAIN, indented --- */
+  if (tier === 'candidates') b.append(candidatesGroup());
+  else b.append(chainGroup(n));
+
+  /* --- 3. PROPS at the selected usage site --- */
+  b.append(propsGroup(n));
+
+  /* --- 4. SLOT at the selected usage site --- */
+  const slots = S.sel === 'root' ? [] : slotsOf(S.sel, instOf(n));
+  if (slots.length) b.append(slotGroup(slots, n));
+
+  /* --- 5. CSS --- */
+  b.append(cssGroup(n));
+
+  /* --- footer --- */
+  const f = $('#inspFoot'); f.innerHTML = '';
+  const file = n.dataset.atx.split(':')[0];
+  const p = el('button', 'btn-ui outline', '⧉ Peek source'); p.onclick = () => openPeek(file, +n.dataset.atx.split(':')[1]);
+  const o = el('button', 'btn-ui primary', '⌁ Open ' + base(file)); o.onclick = () => toast(`Opened ${n.dataset.atx} in your editor`);
+  f.append(p, o);
+}
+
+function group(title, aside, open = true, cls = '') {
+  const g = el('div', 'grp' + (cls ? ' ' + cls : '')); g.dataset.open = open ? '1' : '0';
+  g.append(el('h4', null, `<span class="chev">▾</span>${title}${aside ? `<span class="aside">${aside}</span>` : ''}`));
+  const gb = el('div', 'gb'); g.append(gb);
+  g.querySelector('h4').onclick = () => (g.dataset.open = g.dataset.open === '1' ? '0' : '1');
+  return { g, gb };
+}
+
+/* ---- 1. the edit surface, chosen by what the element actually is ---- */
+function editGroup(n, k) {
+  const i = instOf(n);
+  if (k === 'text' || k === 'markup') {
+    const { g, gb } = group('Edit · in place', 'contenteditable', true, 'edit');
+    gb.append(el('p', 'reason', `Written in <b>${base(n.dataset.atx)}</b> — you are typing straight into the page.`));
+    const row = el('div', 'row'); row.style.cssText = 'display:flex;gap:6px';
+    const sv = el('button', 'mini primary', '✓ Save'), rv = el('button', 'mini', '↺ Revert');
+    [sv, rv].forEach((x) => (x.onmousedown = (e) => e.preventDefault()));
+    sv.onclick = () => endTextEdit(true); rv.onclick = () => endTextEdit(false);
+    row.append(sv, rv); gb.append(row);
+    gb.append(el('p', 'note', 'Enter saves · Esc reverts · clicking elsewhere commits.'));
+    return g;
+  }
+  if (k === 'image') {
+    const { g, gb } = group('Edit · image', null, true, 'edit');
+    const srcF = field({ label:'src', key:null, ro:`"${n.dataset.src}"`, note:'static path' });
+    gb.append(srcF);
+    gb.append(field({ label:'alt', key:null, ro:`"${n.dataset.alt}"`, note:'static · alt can be added, src never' }));
+    let shown = 8, filter = '';
+    const search = el('input', 'inp mediafilter'); search.placeholder = 'Filter images…';
+    const grid = el('div', 'mediagrid');
+    const more = el('button', 'mini'); more.style.alignSelf = 'flex-start';
+    const draw = () => {
+      const list = MEDIA.filter((m) => (m.n + ' ' + m.f).includes(filter));
+      grid.innerHTML = '';
+      list.slice(0, shown).forEach((m) => {
+        const t = el('button', 'mtile', `<img alt="" src="${mediaUrl(m)}"><span>${m.n}</span>`);
+        t.title = m.f;
+        t.dataset.sel = m.p === n.dataset.src ? '1' : '0';
+        t.onclick = () => {
+          [...grid.children].forEach((c) => (c.dataset.sel = '0')); t.dataset.sel = '1';
+          n.src = mediaUrl(m); n.dataset.src = m.p;
+          srcF.querySelector('.inp').value = `"${m.p}"`;
+          toast(`Wrote src="${m.p}" — verified against source`);
+        };
+        grid.append(t);
+      });
+      more.textContent = list.length > shown ? `▾ ${Math.min(8, list.length - shown)} more (${list.length} in this project)` : `all ${list.length} shown`;
+      more.disabled = list.length <= shown;
+      more.style.opacity = more.disabled ? '.5' : '1';
+    };
+    search.oninput = () => { filter = search.value.trim(); shown = 8; draw(); };
+    more.onclick = () => { shown += 8; draw(); };
+    gb.append(search); gb.append(grid); gb.append(more);
+    const up = el('div'); up.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+    const upBtn = el('button', 'mini primary', '⬆ Upload');
+    upBtn.onclick = () => toast('Uploaded coast-02.jpg → public/images/ · src rewritten');
+    const dirBtn = el('button', 'mini', 'public/images');
+    dirBtn.onclick = () => toast('uploadDir is public/images — set in astro.config.mjs');
+    up.append(upBtn, dirBtn); gb.append(up);
+    draw();
+    gb.append(el('p', 'note', 'Project files only. Uploads land in <code>uploadDir</code>, under <code>public/</code>.'));
+    return g;
+  }
+  if (k === 'readonly') {
+    const { g, gb } = group('Can’t edit here', null, true);
+    gb.append(el('p', 'reason', n.dataset.reason));
+    const o = el('button', 'mini', '⌁ Open ' + base(n.dataset.atx));
+    o.onclick = () => toast(`Opened ${n.dataset.atx} in your editor`);
+    gb.append(o);
+    return g;
+  }
+  if (k === 'fm' || k === 'mdbody') {
+    const file = 'src/content/services/product-design.md';
+    const line = +n.dataset.atx.split(':').pop();
+    const key = n.dataset.bind;
+    const isFm = k === 'fm';
+    const { g, gb } = group(isFm ? 'Edit · entry field' : 'Edit · markdown', null, true, 'edit');
+    gb.append(el('p', 'reason', isFm
+      ? `Template prints <code>{entry.data.${key.split('.')[1]}}</code>. Writes one YAML key in <b>${base(file)}</b>.`
+      : `No annotation reaches <code>&lt;Content /&gt;</code>. Matched once against <b>${base(file)}</b>, line ${line}.`));
+    gb.append(field({ label:isFm ? key.split('.')[1] : `line ${line}`, key, hot:true, focus:true,
+      note:isFm ? 'frontmatter · one YAML key rewritten in place'
+                : 'matched by rendered text · unique in this file',
+      target:`${file}:${line}` }));
+    const row = el('div'); row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+    const pk = el('button', 'mini', '⧉ Peek the entry'); pk.onclick = () => openPeek(file, line);
+    const op = el('button', 'mini', `⌁ Open ${base(file)}:${line}`); op.onclick = () => toast(`Opened ${file}:${line}`);
+    row.append(pk, op); gb.append(row);
+    if (!isFm) gb.append(el('p', 'note', 'Plain text only — inline markup is refused, not round-tripped.'));
+    return g;
+  }
+  if (k === 'mdrich') {
+    const { g, gb } = group('Can’t edit here', null, true);
+    gb.append(el('p', 'reason', n.dataset.reason));
+    const file = 'src/content/services/product-design.md', line = +n.dataset.atx.split(':').pop();
+    const row = el('div'); row.style.cssText = 'display:flex;gap:6px';
+    const pk = el('button', 'mini', '⧉ Peek'); pk.onclick = () => openPeek(file, line);
+    const op = el('button', 'mini', `⌁ Open ${base(file)}:${line}`); op.onclick = () => toast(`Opened ${file}:${line}`);
+    row.append(pk, op); gb.append(row);
+    return g;
+  }
+  /* prop · slot · value — the words live at a usage site in another file */
+  const L = LINKS[S.sel] || LINKS[chainOf(n).slice(-1)[0]];
+  const key = n.dataset.bind;
+  const titles = { prop:'Edit · prop value', slot:'Edit · slot text', value:'Edit · traced value' };
+  const { g, gb } = group(titles[k], null, true, 'edit');
+  let why;
+  if (k === 'prop') {
+    const pn = key.split('.')[1];
+    why = `Arrives as the <code>${pn}</code> prop from <b>${base(L.file)}:${L.loc}</b>. ${base(n.dataset.atx)} only prints <code>{${pn}}</code>.`;
+  } else if (k === 'slot') {
+    why = `Slot content handed to <b>${base(L.res)}</b> at <b>${base(L.file)}:${L.loc}</b> — it lives in the caller.`;
+  } else {
+    const host = parentHost(n);
+    const drawnBy = host ? base(LINKS[chainOf(host).slice(-1)[0]].res) : base(n.dataset.atx);
+    why = `Written in <b>${base(n.dataset.atx)}</b> as <code>{s.body}</code>, rendered into ${drawnBy}’s slot.`;
+  }
+  gb.append(el('p', 'reason', why));
+  const prop = (propsOf(S.sel, instOf(n)) || []).find((p) => p.key === key);
+  gb.append(field({ label:k === 'slot' ? 'slot text' : (prop ? prop.n : 'value'), key, hot:true, focus:true,
+    note: prop ? prop.note : `traces one hop to <code>services[${instOf(n)}].body</code>`,
+    target: prop ? prop.target : `services[${instOf(n)}].body in src/components/Services.astro:${4 + instOf(n)}` }));
+  if (k === 'prop' && L.repeat) gb.append(el('p', 'note', `${L.repeat} · this field edits instance ${instOf(n) + 1}.`));
+  const tgt = parseTarget(prop ? prop.target : `services[${instOf(n)}].body in src/components/Services.astro:${4 + instOf(n)}`);
+  if (tgt) {
+    const row2 = el('div'); row2.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+    const pk = el('button', 'mini', `⧉ Peek ${base(tgt.file)}`);
+    pk.onclick = () => openPeek(tgt.file, tgt.line);
+    const op = el('button', 'mini', `⌁ Open ${base(tgt.file)}:${tgt.line}`);
+    op.onclick = () => toast(`Opened ${tgt.file}:${tgt.line}`);
+    row2.append(pk, op); gb.append(row2);
+    gb.append(el('p', 'note', 'These open where the words live; the footer opens where the element is drawn.'));
+  }
+  return g;
+}
+
+/* ---- 2. the chain, indented so the nesting is visible ---- */
+function chainGroup(n) {
+  const slotted = isSlotted(n);
+  const ids = slotted ? chainOf(parentHost(n)) : chainOf(n);
+  const isMd = n.dataset.k === 'mdbody' || n.dataset.k === 'mdrich' || n.dataset.k === 'fm';
+  const presFile = isMd ? ROUTES[CURRENT].file
+    : slotted ? LINKS[ids[ids.length - 1]].res : n.dataset.atx.split(':')[0];
+  const supId = supplier(n);
+  const contFile = isMd ? 'src/content/services/product-design.md'
+    : supId ? LINKS[supId].file : n.dataset.atx.split(':')[0];
+  const { g, gb } = group('Component chain', `${ids.length + 1} deep`);
+  gb.style.padding = '0'; gb.classList.add('tree-chain');
+
+  const row = (opts) => {
+    const { d, id, icon, name, sub, cls = '', file } = opts;
+    const r = el('div', 'cn ' + cls); r.style.setProperty('--d', d);
+    r.dataset.sel = S.sel === id ? '1' : '0';
+    const roles = [];
+    if (file && file === presFile) roles.push('<span class="role pres">presentation</span>');
+    if (file && file === contFile) roles.push('<span class="role cont">content</span>');
+    r.innerHTML = `<span class="ic">${icon}</span><div class="cm">
+      <div class="nm">${name}${roles.length ? `<span class="roles">${roles.join('')}</span>` : ''}</div>
+      <div class="sb">${sub}</div></div>`;
+    if (id) {
+      r.onclick = () => { S.sel = id; renderInspector(); };
+      const acts = el('div', 'acts');
+      const L = LINKS[id];
+      const mk = (t, fn) => { const x = el('button', 'mini', t); x.onclick = (e) => { e.stopPropagation(); fn(); }; return x; };
+      if (id === 'root') {
+        const rf = ROUTES[CURRENT].file;
+        acts.append(mk('⌁ file', () => toast('Opened ' + rf)), mk('⧉ peek', () => openPeek(rf, 1)));
+      } else {
+        acts.append(mk('⌁ component', () => toast(`Opened ${L.res} in your editor`)),
+                    mk('⧉ peek', () => openPeek(L.res, 1)),
+                    mk('⌁ usage', () => toast(`Opened ${L.file}:${L.loc} — the usage site`)));
+      }
+      r.querySelector('.cm').append(acts);
+    }
+    return r;
+  };
+
+  const RT = ROUTES[CURRENT];
+  gb.append(row({ d:0, id:'root', icon:DOC, name:base(RT.file), sub:`route entry · ${RT.file}`, file:RT.file }));
+  ids.forEach((id, i) => {
+    const L = LINKS[id];
+    gb.append(row({ d:i + 1, id, icon:L.md ? DOC : FIG, name:base(L.res), file:L.res,
+      cls: n.dataset.infer === id ? 'inferred' : '',
+      sub: L.md
+        ? `rendered by &lt;Content /&gt; at ${base(L.file)}:${L.loc} · markdown`
+        : `used at ${base(L.file)}:${L.loc}${L.repeat ? ` · ${instOf(n) + 1} of 3` : ''}` }));
+    if (n.dataset.infer === id) {
+      const note = el('p', 'note'); note.style.cssText = 'padding:0 12px 8px ' + (12 + (i + 1) * 18) + 'px';
+      note.innerHTML = `<b style="color:var(--warning)">Inferred.</b> ${L.inferred}`;
+      gb.append(note);
+    }
+  });
+  gb.append(row({ d:ids.length + 1, icon:LEAF, cls:'leaf', name:`&lt;${n.tagName.toLowerCase()}&gt;`,
+    sub: slotted ? `⤷ slot · written in ${base(n.dataset.atx)}` : n.dataset.atx }));
+  if (slotted) {
+    const nt = el('p', 'note', 'Its chain is a strict prefix of its parent’s — so it was slotted in, not written there.');
+    nt.style.padding = '0 12px 10px'; gb.append(nt);
+  }
+  return g;
+}
+
+function candidatesGroup() {
+  const { g, gb } = group('Where this could have come from', '3 sites');
+  gb.append(el('p', 'reason', 'No chain reached it. The usage graph offers three call sites — open each and decide.'));
+  [['src/components/Nav.astro','8:7'], ['src/components/Hero.astro','8:5'], ['src/components/ServiceCard.astro','5:5']].forEach(([f, l]) => {
+    const r = el('div', 'cand', `<span>${base(f)}<span style="color:var(--faint)">:${l}</span></span>`);
+    const x = el('button', 'mini', '⌁ open'); x.onclick = () => toast(`Opened ${f}:${l}`); r.append(x); gb.append(r);
+  });
+  return g;
+}
+
+/* ---- 3. props at the selected usage site, editable where provable ---- */
+function propsGroup(n) {
+  const id = S.sel, i = instOf(n);
+  if (id === 'root' || !id) {
+    const { g, gb } = group('Props', 'route');
+    gb.append(el('p', 'note', 'A route has no caller.'));
+    return g;
+  }
+  const L = LINKS[id], props = propsOf(id, i);
+  // If the Edit group already exposes the prop that matters, start collapsed —
+  // the others stay one click away instead of duplicating a field on screen.
+  const dup = props.some((p) => p.key && p.key === n.dataset.bind);
+  const { g, gb } = group('Props', `${base(L.file)}:${L.loc}`, !dup);
+  if (!props.length) { gb.append(el('p', 'note', 'No props at this usage site.')); return g; }
+  props.forEach((p) => gb.append(field({
+    label:p.n, key:p.kind === 'readonly' ? null : p.key, ro:p.kind === 'readonly' ? p.src : null,
+    note:p.note, target:p.target, hot:p.key && p.key === n.dataset.bind, focus:false,
+  })));
+  return g;
+}
+
+function slotGroup(slots, n) {
+  const { g, gb } = group('Slot content', slots.length === 1 ? slots[0].n : `${slots.length} slots`);
+  slots.forEach((s) => {
+    if (s.key) gb.append(field({ label:`slot: ${s.n}`, key:s.key, note:'a string literal at the usage site', target:s.target, hot:s.key === n.dataset.bind, focus:false }));
+    else { gb.append(field({ label:`slot: ${s.n}`, key:null, ro:s.preview, note:s.why })); }
+  });
+  return g;
+}
+
+/* ---- 4. CSS peek, folded into the same panel ---- */
+function cssGroup(n) {
+  const classes = [...n.classList].filter((c) => CSS_RULES[c]);
+  const { g, gb } = group('CSS', classes.length ? `${classes.length} matched` : 'none', false);
+  if (!classes.length) { gb.append(el('p', 'note', 'No resolvable rule on this element.')); return g; }
+  const chips = el('div', 'chips'); gb.append(chips);
+  const out = el('div'); out.style.cssText = 'display:flex;flex-direction:column;gap:8px'; gb.append(out);
+  const show = (c) => {
+    S.cssOpen = { [c]:1 }; [...chips.children].forEach((x) => (x.dataset.open = x.textContent === '.' + c ? '1' : '0'));
+    out.innerHTML = '';
+    CSS_RULES[c].forEach((r) => {
+      const card = el('div', 'rule', `<pre><span class="s">${r.s}</span> {\n${
+        r.d.map(([p, val]) => `  <span class="p">${p}</span>: <span class="v">${val}</span>;`).join('\n')}\n}</pre>`);
+      const src = el('div', 'src', `<span>${r.src}</span>`);
+      const b = el('button', 'mini', 'open ↗'); b.onclick = () => toast(`Opened ${r.src} in your editor`);
+      src.append(b); card.append(src); out.append(card);
+    });
+  };
+  classes.forEach((c) => { const b = el('button', 'chip-css', '.' + c); b.onclick = () => show(c); chips.append(b); });
+  show(classes[0]);
+  return g;
+}
+
+
+/** "services[1].title in src/x.astro:5" | "src/x.astro:9:9" -> {file, line} */
+function parseTarget(t) {
+  if (!t) return null;
+  const tail = t.includes(' in ') ? t.split(' in ').pop() : t;
+  const bits = tail.split(':');
+  return { file: bits[0], line: +bits[1] || 1 };
+}
+
+/* ===================== EDITABLE FIELD (props, slots) ==================== */
+function field({ label, key, ro, note, target, hot, focus }) {
+  const w = el('div', 'prop'); if (hot) w.dataset.hot = '1';
+  w.innerHTML = `<div class="pk"><span class="n">${label}</span>
+    ${hot ? '<span class="words">these words</span>' : ''}
+    <span class="st">${ro ? 'read-only' : 'editable'}</span></div>`;
+  if (ro || !key) {
+    const i = el('input', 'inp ro'); i.value = ro || ''; i.readOnly = true; w.append(i);
+    if (note) w.append(el('p', 'note', note));
+    return w;
+  }
+  const m = MODEL[key];
+  // A sentence of prose does not belong in a 32px input.
+  const long = m.value.length > 70;
+  const inp = el(long ? 'textarea' : 'input', 'inp' + (long ? ' ta' : ''));
+  inp.value = m.value; inp.dataset.key = key;
+  if (long) inp.rows = Math.min(6, Math.ceil(m.value.length / 52) + 1);
+  const err = el('p', 'err'); err.hidden = true;
+  const row = el('div', 'row'); row.hidden = m.value === m.original;
+  const sv = el('button', 'mini primary', '✓ Save'), rv = el('button', 'mini', '↺ Revert');
+  row.append(sv, rv, el('span', 'note', target ? `writes ${target}` : ''));
+  const sync = () => {
+    document.querySelectorAll(`.inp[data-key="${key}"]`).forEach((o) => { if (o !== inp) o.value = m.value; });
+    document.querySelectorAll(`#host [data-bind="${key}"]`).forEach((n2) => {
+      n2.textContent = m.value; n2.dataset.live = m.value === m.original ? '0' : '1';
+    });
+    if (key === 'u1.title') document.title = m.value + ' — mockup';
+  };
+  const validate = (val) => {
+    if (/[{}]/.test(val)) return '“{” would start an expression — refused, not escaped.';
+    if (/[<>]/.test(val)) return 'Angle brackets change markup, not words — refused.';
+    return null;
+  };
+  inp.oninput = () => {
+    const bad = validate(inp.value);
+    inp.setAttribute('aria-invalid', bad ? 'true' : 'false');
+    err.hidden = !bad; err.textContent = bad || '';
+    m.value = inp.value; sync(); row.hidden = m.value === m.original || !!bad;
+  };
+  const save = () => {
+    if (validate(m.value)) return;
+    m.original = m.value; row.hidden = true; sync();
+    document.querySelectorAll(`#host [data-bind="${key}"]`).forEach((n2) => (n2.dataset.live = '0'));
+    toast(`Wrote ${target} — verified against source`);
+  };
+  const revert = () => { m.value = m.original; inp.value = m.value; err.hidden = true;
+    inp.setAttribute('aria-invalid', 'false'); row.hidden = true; sync(); };
+  sv.onclick = save; rv.onclick = revert;
+  inp.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === 'Escape') { e.preventDefault(); revert(); } };
+  w.append(inp, err, row);
+  if (note) w.append(el('p', 'note', note));
+  if (focus) setTimeout(() => { inp.focus(); inp.select(); }, 30);
+  return w;
+}
+
+/* ======================== INLINE TEXT EDITING ========================== */
+function beginTextEdit(n) {
+  const original = n.textContent;
+  n.dataset.editing = '1'; n.contentEditable = 'true'; n.focus();
+  getSelection().selectAllChildren(n);
+  const onKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); endTextEdit(true); }
+    if (e.key === 'Escape') { e.preventDefault(); endTextEdit(false); }
+  };
+  n.addEventListener('keydown', onKey);
+  S.textFinish = (commit) => {
+    n.removeEventListener('keydown', onKey);
+    n.contentEditable = 'false'; delete n.dataset.editing; S.textFinish = null;
+    if (!commit) { n.textContent = original; return; }
+    if (n.textContent === original) return;
+    toast(`Wrote ${n.dataset.atx} — verified against source`);
+  };
+}
+function endTextEdit(commit) { if (S.textFinish) S.textFinish(commit); }
+
+/* ============================ PEEK / MENU ============================== */
+function openPeek(file, line) {
+  const lines = (SOURCES[file] || (() => ['// not part of the mockup fixture']))();
+  $('#peekTitle').textContent = file; $('#peekLoc').textContent = line ? 'line ' + line : '';
+  $('#peekCode').innerHTML = lines.map((t, i) => {
+    const cls = /^\s*(---|import|const|\]|\);)/.test(t) ? 'k-tk' : /^\s*</.test(t) ? 'k-tg' : 'k-cm';
+    return `<div class="ln" data-f="${i + 1 === line ? 1 : 0}"><span class="n">${i + 1}</span><span class="${cls}">${
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span></div>`;
+  }).join('');
+  $('#backdrop').hidden = false; $('#peek').hidden = false;
+}
+$('#peekOpen').onclick = () => { hideModal(); toast('Opened ' + $('#peekTitle').textContent + ' in your editor'); };
+function hideModal() { $('#backdrop').hidden = true; $('#peek').hidden = true; $('#settings').hidden = true; }
+$('#backdrop').onclick = hideModal;
+document.querySelectorAll('[data-close]').forEach((b) => (b.onclick = hideModal));
+$('#mMark').onclick = (e) => { e.stopPropagation(); $('#menu').hidden = !$('#menu').hidden; };
+document.addEventListener('click', () => ($('#menu').hidden = true));
+$('#menu').addEventListener('click', (e) => e.stopPropagation());
+document.querySelectorAll('.sw').forEach((s) => (s.onclick = () => (s.dataset.on = s.dataset.on === '1' ? '0' : '1')));
+$('#inspClose').onclick = () => { endTextEdit(true); $('#insp').hidden = true; S.node = null; $('#hl').hidden = true; };
+$('#inspDock').onclick = () => $('#insp').classList.toggle('left');
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('#backdrop').hidden) return hideModal();
+  if (!$('#insp').hidden && !S.textFinish) $('#inspClose').click();
+});
+
+/* ============================ ELEMENT TREE ============================= */
+const TREES = {
+  home: [
+    { d:0, t:'body' },
+    { d:1, c:'Base.astro', s:'index.astro:8:1', sel:'#page-home .logo', id:'u1' },
+    { d:2, c:'Nav.astro', s:'Base.astro:9:5', sel:'#page-home .logo', id:'u2' },
+    { d:3, t:'a.logo', s:'Nav.astro:6:5', sel:'#page-home .logo' },
+    { d:2, t:'main', s:'Base.astro:10:5' },
+    { d:3, c:'Hero.astro', s:'index.astro:9:3', sel:'.hero-title', id:'u3' },
+    { d:4, t:'span.badge', s:'island · no chain', sel:'.badge', flag:1 },
+    { d:4, t:'h1.hero-title', s:'Hero.astro:9:28', sel:'.hero-title' },
+    { d:4, t:'p.hero-sub', s:'Hero.astro:10:25', sel:'.hero-sub' },
+    { d:4, c:'Button.astro', s:'Hero.astro:11:5', sel:'.btn', id:'u8' },
+    { d:5, t:'a.btn', s:'Button.astro:4:63', sel:'.btn' },
+    { d:4, t:'img.hero-art', s:'Hero.astro:13:3', sel:'.hero-art' },
+    { d:3, c:'Services.astro', s:'index.astro:10:3', sel:'.services h2', id:'u4' },
+    { d:4, t:'h2', s:'Services.astro:10:7', sel:'.services h2' },
+    { d:4, c:'ServiceCard.astro', s:'Services.astro:14:7 · 1/3', sel:'[data-i="0"] .card-title', id:'u5' },
+    { d:5, t:'article.card', s:'ServiceCard.astro:5:3', sel:'[data-i="0"]' },
+    { d:6, t:'h3.card-title', s:'ServiceCard.astro:6:27', sel:'[data-i="0"] .card-title' },
+    { d:6, slot:1, t:'⤷ p.card-body', s:'Services.astro:15:30', sel:'[data-i="0"] .card-body' },
+    { d:4, c:'ServiceCard.astro', s:'Services.astro:14:7 · 2/3', sel:'[data-i="1"] .card-title', id:'u5' },
+    { d:3, c:'Quote.astro', s:'index.astro:11:3', sel:'.quote-text', id:'u9' },
+    { d:4, c:'Testimonial.astro', s:'inferred — spread', sel:'.quote-text', id:'u7', flag:1 },
+    { d:5, t:'blockquote.quote-text', s:'Testimonial.astro:5:34', sel:'.quote-text' },
+    { d:5, t:'img.avatar', s:'Testimonial.astro:7:5', sel:'.avatar' },
+    { d:1, c:'Footer.astro', s:'Base.astro:11:5', sel:'#page-home .site-foot', id:'u6' },
+  ],
+  service: [
+    { d:0, t:'body' },
+    { d:1, c:'Base.astro', s:'[slug].astro:11:1', sel:'#page-service .logo', id:'s1' },
+    { d:2, c:'Nav.astro', s:'Base.astro:9:5', sel:'#page-service .logo', id:'s2' },
+    { d:2, t:'main', s:'Base.astro:10:5' },
+    { d:3, t:'article.prose', s:'[slug].astro:12:3' },
+    { d:4, t:'p.eyebrow', s:'[slug].astro:13:5', sel:'.eyebrow' },
+    { d:4, t:'h1', s:'[slug].astro:14:9', sel:'#page-service h1' },
+    { d:4, t:'p.lede', s:'[slug].astro:15:24', sel:'#page-service .lede' },
+    { d:4, t:'img.prose-fig', s:'[slug].astro:16:5', sel:'.prose-fig' },
+    { d:4, c:'Content', s:'markdown — chain ends', sel:'[data-bind="md.7"]', id:'s3', flag:1 },
+    { d:5, md:1, t:'p', s:'product-design.md:7', sel:'[data-bind="md.7"]' },
+    { d:5, md:1, t:'h2', s:'product-design.md:9', sel:'[data-bind="md.9"]' },
+    { d:5, md:1, t:'p', s:'product-design.md:11', sel:'[data-bind="md.11"]' },
+    { d:5, md:1, t:'li ×2', s:'product-design.md:13', sel:'[data-bind="md.13"]' },
+    { d:5, md:1, t:'p', s:'product-design.md:16 · rich', sel:'#page-service .prose p:last-of-type' },
+    { d:1, c:'Footer.astro', s:'Base.astro:11:5', sel:'#page-service .site-foot', id:'s4' },
+  ],
+};
+function renderTree() {
+  const TREE = TREES[CURRENT];
+  $('#treeBody').innerHTML = TREE.map((r, i) => {
+    const pad = 7 + r.d * 13;
+    const cls = r.c ? 'trow comp' : (r.slot || r.md) ? 'trow slot' : 'trow';
+    return `<div class="${cls}${r.flag ? ' flag' : ''}" style="padding-left:${pad}px" data-i="${i}">
+      <span class="tn">${r.c ? FIG + r.c : r.t}</span><span class="lc" title="${r.s || ''}">${r.s || ''}</span></div>`;
+  }).join('');
+}
+$('#treeBody').addEventListener('click', (e) => {
+  const row = e.target.closest('.trow'); if (!row) return;
+  [...$('#treeBody').children].forEach((c) => (c.dataset.sel = '0')); row.dataset.sel = '1';
+  const r = TREES[CURRENT][+row.dataset.i]; if (!r.sel) return;
+  const n = document.querySelector(r.sel.startsWith('#') ? r.sel : '#host ' + r.sel); if (!n) return;
+  n.scrollIntoView({ block:'center' }); openInspector(n, r.id);
+});
+$('#treeClose').onclick = () => toggleTree(false);
+function toggleTree(on) {
+  S.tree = on === undefined ? !S.tree : on;
+  $('#tree').hidden = !S.tree; document.body.dataset.tree = S.tree ? '1' : '0';
+  $('#launcher').hidden = S.tree; if (S.tree) renderTree();
+}
+
+/* ===================== MODES — hold ⌥ to wake the tool ================== */
+function setEdit(on) {
+  S.edit = on; document.body.dataset.edit = on ? '1' : '0';
+  if (!on) {
+    endTextEdit(true); $('#hl').hidden = true; $('#pill').hidden = true;
+    S.hover = null; clearTimeout(S.dwell);
+  }
+}
+/* The tool is asleep until ⌥ is held. Ordinary clicks keep working, which is
+   what lets a card navigate like any other link. The inspector, once opened,
+   stays put after the key is released. */
+addEventListener('keydown', (e) => { if (e.altKey && !S.edit) setEdit(true); });
+addEventListener('keyup', (e) => { if (!e.altKey && S.edit && !S.node) setEdit(false); });
+addEventListener('blur', () => { if (!S.node) setEdit(false); });
+
+/* page navigation — the mock site has two routes */
+const ROUTES = {
+  home:    { route:'/', file:'src/pages/index.astro' },
+  service: { route:'/services/product-design', file:'src/pages/services/[slug].astro' },
+};
+let CURRENT = 'home';
+function goto(page) {
+  CURRENT = page;
+  $('#page-home').hidden = page !== 'home';
+  $('#page-service').hidden = page !== 'service';
+  $('#pgRoute').textContent = ROUTES[page].route;
+  $('#pgFile').textContent = ROUTES[page].file;
+  $('#insp').hidden = true; S.node = null; $('#hl').hidden = true; $('#pill').hidden = true;
+  if (S.tree) renderTree();
+  scrollTo({ top:0 });
+}
+document.addEventListener('click', (e) => {
+  if (S.edit) return;                    // holding ⌥ means inspect, not navigate
+  const nav = e.target.closest('[data-nav]'); if (!nav) return;
+  e.preventDefault(); goto(nav.dataset.nav);
+});
+
+$('#launcher').onclick = () => toggleTree(true);
+$('#pgSource').onclick = () => toast(`Opened ${ROUTES[CURRENT].file}`);
+$('#bSettings').onclick = () => { $('#backdrop').hidden = false; $('#settings').hidden = false; };
+$('#mCopy').onclick = () => { $('#menu').hidden = true; toast('Page context copied — route, template, chain'); };
+$('#mRescan').onclick = () => { $('#menu').hidden = true; toast('Re-scanned the usage index — 9 components, 14 usages'); };
+addEventListener('scroll', () => { const n = S.node || S.hover; if (n && !$('#hl').hidden) drawHl(n, !!S.node); if (S.hover && !$('#pill').hidden) place(S.hover, $('#pill')); }, { passive:true });
+
+/* =============================== SCENES =============================== */
+const pick = (sel) => document.querySelector(sel.startsWith('#') ? sel : '#host ' + sel);
+/* Every image target remembers what it shipped with, so a scene starts clean. */
+document.querySelectorAll('#host img[data-src]').forEach((i) => { i.dataset.src0 = i.dataset.src; i.dataset.url0 = i.getAttribute('src'); });
+function reset(page = 'home') {
+  hideModal(); toggleTree(false); setEdit(false); goto(page);
+  document.querySelectorAll('#host img[data-src0]').forEach((i) => { i.dataset.src = i.dataset.src0; i.setAttribute('src', i.dataset.url0); });
+  Object.keys(MODEL).forEach((k) => { MODEL[k].value = MODEL[k].original; });
+  document.querySelectorAll('#host [data-bind]').forEach((n) => {
+    const m = MODEL[n.dataset.bind]; if (m) n.textContent = m.value; n.dataset.live = '0';
+  });
+  $('#insp').classList.remove('left'); $('#toasts').innerHTML = '';
+  getSelection()?.removeAllRanges(); scrollTo({ top:0 });
+}
+const show = (sel, link, page = 'home') => { reset(page); setEdit(true); const n = pick(sel);
+  n.scrollIntoView({ block:'center' }); setTimeout(() => openInspector(n, link), 20); };
+const hover = (sel, crumbs, page = 'home') => { reset(page); setEdit(true); const n = pick(sel); S.hover = n;
+  n.scrollIntoView({ block:'center' }); setTimeout(() => { drawHl(n); renderPill(n, crumbs); }, 20); };
+
+const SCENES = [
+  ['Waking it', [
+    ['Asleep — just the launcher', () => reset()],
+    ['Holding ⌥', () => { reset(); setEdit(true); }],
+    ['Tree open', () => { reset(); toggleTree(true); }],
+  ]],
+  ['Hover', [
+    ['Compact pill', () => hover('.hero-sub', false)],
+    ['+ breadcrumb', () => hover('.card-title', true)],
+  ]],
+  ['Home page', [
+    ['Text · in place', () => show('.hero-sub')],
+    ['Prop · hero heading', () => show('.hero-title')],
+    ['Prop · repeated card', () => show('[data-i="1"] .card-title')],
+    ['Slot text · button', () => show('.btn')],
+    ['Image · browse + upload', () => show('.hero-art')],
+    ['Image · inferred chain', () => show('.avatar')],
+    ['Inferred chain', () => show('.quote-text')],
+    ['Read-only · island', () => show('.badge')],
+  ]],
+  ['Templated page (.md)', [
+    ['The page itself', () => reset('service')],
+    ['Template text', () => show('.eyebrow', undefined, 'service')],
+    ['Entry field · title', () => show('#page-service h1', undefined, 'service')],
+    ['Markdown body', () => show('[data-bind="md.7"]', undefined, 'service')],
+    ['Markdown heading', () => show('[data-bind="md.9"]', undefined, 'service')],
+    ['Entry cover image', () => show('.prose-fig', undefined, 'service')],
+    ['Rich paragraph — refused', () => show('#page-service .prose p:last-of-type', undefined, 'service')],
+    ['Tree on the .md route', () => { reset('service'); toggleTree(true); }],
+    ['Peek the entry', () => { reset('service'); openPeek('src/content/services/product-design.md', 7); }],
+  ]],
+  ['Panels', [
+    ['Tree + inspector', () => { reset(); toggleTree(true); setEdit(true);
+      const n = pick('[data-i="0"] .card-body'); setTimeout(() => openInspector(n), 20); }],
+    ['Settings', () => { reset(); $('#backdrop').hidden = false; $('#settings').hidden = false; }],
+  ]],
+];
+$('#railBody').innerHTML = SCENES.map(([g, items]) =>
+  `<small>${g}</small>` + items.map((it, i) => `<button class="sc" data-g="${g}" data-i="${i}">${it[0]}</button>`).join('')).join('');
+$('#railBody').addEventListener('click', (e) => {
+  const b = e.target.closest('.sc'); if (!b) return;
+  $('#railBody').querySelectorAll('.sc').forEach((x) => (x.dataset.cur = '0'));
+  b.dataset.cur = '1';
+  SCENES.find(([g]) => g === b.dataset.g)[1][+b.dataset.i][1]();
+});
+goto('home');
+$('#railBody').querySelector('.sc[data-g="Waking it"][data-i="0"]').dataset.cur = '1';
+</script>
+</body>
+</html>

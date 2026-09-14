@@ -1,0 +1,330 @@
+/* ============================================================
+ plan.css — shared stylesheet for visual plan pages (v2).
+ Copy this file next to your .plan.html pages and link it:
+     <link rel="stylesheet" href="plan.css">
+ One copy serves every plan page in the folder. Never inline it,
+ and never edit it per-plan — page-specific tweaks go in a small
+ <style> block in the page itself.
+ Theme: light is the base, dark via prefers-color-scheme, and
+ data-theme="dark|light" on <html> overrides both directions.
+ ============================================================ */
+
+/* ---------- tokens: light is the base, dark overrides via media query,
+   and data-theme overrides both directions for the viewer's toggle ---------- */
+:root {
+  --bg: #eef0f3;
+  --panel: #ffffff;
+  --panel-2: #f6f7f9;
+  --ink: #23252b;
+  --muted: #6b6e78;
+  --faint: #9a9da8;
+  --border: #d4d7de;
+  --border-soft: #e3e5ea;
+  --accent: #0a67b5;
+  --accent-soft: rgba(10, 103, 181, 0.10);
+  --new: #0a8f4d;
+  --new-soft: rgba(10, 143, 77, 0.10);
+  --danger: #c04545;
+  --wire-fill: #eceef2;
+  --wire-line: #b9bdc7;
+  --code-bg: #f0f1f4;
+  --shadow: 0 1px 3px rgba(20, 22, 28, 0.08);
+  --warn: #b7791f;
+  --warn-soft: rgba(183, 121, 31, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1c20; --panel: #242529; --panel-2: #2a2b30;
+    --ink: #d8dade; --muted: #9b9ea8; --faint: #6d707a;
+    --border: #3b3d45; --border-soft: #33353c;
+    --accent: #4da3e8; --accent-soft: rgba(77, 163, 232, 0.12);
+    --new: #58b368; --new-soft: rgba(88, 179, 104, 0.12);
+    --danger: #d06262;
+    --wire-fill: #2e2f35; --wire-line: #55575f;
+    --code-bg: #202126; --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --warn: #d9a441; --warn-soft: rgba(217, 164, 65, 0.14);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b1c20; --panel: #242529; --panel-2: #2a2b30;
+  --ink: #d8dade; --muted: #9b9ea8; --faint: #6d707a;
+  --border: #3b3d45; --border-soft: #33353c;
+  --accent: #4da3e8; --accent-soft: rgba(77, 163, 232, 0.12);
+  --new: #58b368; --new-soft: rgba(88, 179, 104, 0.12);
+  --danger: #d06262;
+  --wire-fill: #2e2f35; --wire-line: #55575f;
+  --code-bg: #202126; --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --warn: #d9a441; --warn-soft: rgba(217, 164, 65, 0.14);
+}
+:root[data-theme="light"] {
+  --bg: #eef0f3; --panel: #ffffff; --panel-2: #f6f7f9;
+  --ink: #23252b; --muted: #6b6e78; --faint: #9a9da8;
+  --border: #d4d7de; --border-soft: #e3e5ea;
+  --accent: #0a67b5; --accent-soft: rgba(10, 103, 181, 0.10);
+  --new: #0a8f4d; --new-soft: rgba(10, 143, 77, 0.10);
+  --danger: #c04545;
+  --wire-fill: #eceef2; --wire-line: #b9bdc7;
+  --code-bg: #f0f1f4; --shadow: 0 1px 3px rgba(20, 22, 28, 0.08);
+  --warn: #b7791f; --warn-soft: rgba(183, 121, 31, 0.12);
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px; line-height: 1.55;
+  color: var(--ink); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+.mono, code, .callout-n, .wire-label, .node, .chip-k, .file-path, .flow-note {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+.page { max-width: 960px; margin: 0 auto; padding: 48px 24px 96px; }
+
+/* ---------- header ---------- */
+.doc-head { border-bottom: 2px solid var(--ink); padding-bottom: 24px; margin-bottom: 40px; }
+.doc-eyebrow {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 10px;
+}
+h1 {
+  font-size: clamp(26px, 4.5vw, 38px); font-weight: 750; letter-spacing: -0.02em;
+  margin: 0 0 10px; line-height: 1.12; text-wrap: balance;
+}
+.doc-sub { color: var(--muted); max-width: 62ch; margin: 0; }
+.doc-meta {
+  display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 16px;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--faint);
+}
+.doc-meta strong { color: var(--muted); font-weight: 600; }
+
+/* ---------- sections ---------- */
+section { margin-bottom: 56px; }
+.sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.sec-num { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--faint); letter-spacing: 0.08em; }
+h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.sec-intro { color: var(--muted); margin: 0 0 20px; max-width: 68ch; }
+h3 { font-size: 15px; font-weight: 650; margin: 28px 0 10px; }
+
+/* ---------- decisions-at-a-glance chips ---------- */
+.glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.chip { background: var(--panel); border: 1px solid var(--border-soft); border-radius: 6px; padding: 14px 16px; box-shadow: var(--shadow); }
+.chip-k { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.chip-v { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.chip-v small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+/* ---------- wireframe stage ---------- */
+.wire-stage { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; box-shadow: var(--shadow); }
+.wire-stage + .callouts { margin-top: 14px; }
+.wire-caption { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-bottom: 14px; }
+.wire-label { font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
+.wf { min-width: 640px; border: 1.5px solid var(--wire-line); border-radius: 4px; background: var(--panel-2); }
+
+/* generic lo-fi boxes: dashed = region, solid = control, is-new = highlighted addition */
+.wbox {
+  border: 1px dashed var(--wire-line); border-radius: 3px; background: var(--wire-fill);
+  padding: 6px 8px; font-size: 10.5px; color: var(--muted);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 26px;
+}
+.wbox.solid { border-style: solid; }
+.wbox.is-new { border: 1.5px solid var(--new); background: var(--new-soft); color: var(--new); font-weight: 700; position: relative; }
+.wbox.ghost { background: transparent; border-color: var(--border-soft); }
+
+/* numbered callout badges: green = new element, .acc = accent (emphasis, not new) */
+.callout-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--new); color: #fff; font-size: 10px; font-weight: 700;
+  flex: none; line-height: 1;
+}
+.callout-n.acc { background: var(--accent); }
+.wf-badge { position: absolute; top: -9px; right: -7px; z-index: 2; }
+ul.callouts { padding: 0; margin: 0; }
+.callouts { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; }
+.callouts li { display: flex; gap: 10px; align-items: baseline; list-style: none; font-size: 13.5px; color: var(--muted); }
+.callouts li .callout-n { position: relative; top: 2px; }
+.callouts li strong { color: var(--ink); font-weight: 600; }
+
+/* accent outline over a region (a crop area, a selection) — emphasis, not "new" */
+.emph-outline {
+  position: absolute; inset: 4px; border: 2px solid var(--accent); border-radius: 3px;
+  pointer-events: none; display: flex; align-items: flex-end; justify-content: flex-end;
+}
+.emph-outline span {
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 9.5px; font-weight: 700;
+  color: var(--accent); background: var(--panel); padding: 1px 6px; border-radius: 2px 0 0 0;
+  letter-spacing: 0.04em;
+}
+
+/* placeholder "image" fill: two crossed diagonals */
+.wire-cross { position: relative; min-height: 80px; }
+.wire-cross::before, .wire-cross::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(to top right, transparent calc(50% - 0.5px), var(--wire-line) 50%, transparent calc(50% + 0.5px));
+}
+.wire-cross::after {
+  background: linear-gradient(to bottom right, transparent calc(50% - 0.5px), var(--wire-line) 50%, transparent calc(50% + 0.5px));
+}
+
+/* text skeleton lines inside a mock panel */
+.skeleton { position: absolute; background: var(--wire-fill); border-radius: 2px; }
+
+/* ---------- flow diagram ---------- */
+.flow { display: grid; gap: 0; justify-items: start; }
+.flow-row { display: grid; grid-template-columns: minmax(220px, 340px) 1fr; gap: 16px; align-items: start; width: 100%; }
+.node {
+  background: var(--panel); border: 1.5px solid var(--border); border-radius: 6px;
+  padding: 10px 14px; font-size: 12.5px; line-height: 1.45; color: var(--ink);
+  box-shadow: var(--shadow); width: 100%;
+}
+.node b { font-weight: 700; display: block; font-size: 12.5px; }
+.node span { color: var(--muted); font-size: 11.5px; display: block; margin-top: 2px; }
+.node.start { border-color: var(--accent); background: var(--accent-soft); }
+.node.decision { border-style: dashed; }
+.node.terminal-ok { border-color: var(--new); background: var(--new-soft); }
+.node.terminal-alt { border-color: var(--border); background: var(--panel-2); }
+.flow-arrow {
+  height: 26px; display: flex; align-items: center; padding-left: 28px;
+  color: var(--faint); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; gap: 8px;
+}
+.flow-arrow::before { content: "↓"; font-size: 14px; color: var(--muted); }
+.flow-note { font-size: 11px; color: var(--danger); align-self: center; line-height: 1.5; }
+.flow-note em { font-style: normal; color: var(--faint); display: block; }
+.flow-note b { color: var(--danger); }
+.fork { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; margin-top: 4px; }
+.fork-col { display: grid; gap: 0; justify-items: stretch; }
+.fork-label {
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+  padding: 6px 0 6px 4px;
+}
+
+/* ---------- architecture tiers ---------- */
+.arch { display: grid; gap: 14px; }
+.arch-tier { border: 1px solid var(--border-soft); border-radius: 8px; background: var(--panel); padding: 14px 16px; box-shadow: var(--shadow); }
+.arch-tier-label { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
+.arch-boxes { display: flex; flex-wrap: wrap; gap: 10px; }
+.abox { border: 1px solid var(--border); border-radius: 5px; background: var(--panel-2); padding: 8px 12px; font-size: 12px; min-width: 150px; flex: 1; }
+.abox b { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; display: block; font-weight: 700; }
+.abox span { color: var(--muted); font-size: 11px; display: block; margin-top: 3px; line-height: 1.45; }
+.abox.is-new { border-color: var(--new); background: var(--new-soft); }
+.abox.is-mod { border-color: var(--accent); border-style: dashed; }
+.arch-flow-hint { text-align: center; color: var(--faint); font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; padding: 0 0 2px; }
+.legend { display: flex; gap: 18px 18px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; font-style: normal; }
+.legend .l-new i { background: var(--new-soft); border: 1.5px solid var(--new); }
+.legend .l-mod i { background: var(--panel-2); border: 1.5px dashed var(--accent); }
+.legend .l-x i { background: var(--panel-2); border: 1px solid var(--border); }
+
+/* ---------- code + tables + checklist ---------- */
+pre { background: var(--code-bg); border: 1px solid var(--border-soft); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; margin: 0; }
+code { font-size: 0.92em; background: var(--code-bg); border-radius: 3px; padding: 1px 5px; }
+pre code { background: none; padding: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); }
+th { text-align: left; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+td { padding: 9px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+.file-path { font-size: 12px; white-space: nowrap; }
+.tag { display: inline-block; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; border-radius: 3px; padding: 1.5px 7px; text-transform: uppercase; }
+.tag.new { color: var(--new); background: var(--new-soft); border: 1px solid var(--new); }
+.tag.mod { color: var(--accent); background: var(--accent-soft); border: 1px dashed var(--accent); }
+td.desc { color: var(--muted); }
+.checks { display: grid; gap: 8px; padding: 0; margin: 0; }
+.checks li { list-style: none; display: flex; gap: 10px; align-items: baseline; font-size: 13.5px; color: var(--muted); }
+.checks li::before { content: "☐"; color: var(--accent); font-size: 14px; flex: none; position: relative; top: 1px; }
+.checks li strong { color: var(--ink); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .flow-row { grid-template-columns: 1fr; gap: 6px; }
+  .fork { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   v2 additions — status ribbon, before/after, compact prose,
+   diff badges, print. Everything above is shared with v1.
+   ============================================================ */
+
+/* ---------- status ribbon (mirrors the plan .md frontmatter) ---------- */
+.ribbon {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+  background: var(--panel); border: 1px solid var(--border-soft);
+  border-radius: 8px; padding: 12px 16px; box-shadow: var(--shadow);
+  margin-bottom: 28px;
+}
+.status {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  border-radius: 999px; padding: 3px 11px; border: 1px solid currentColor;
+}
+.status.draft      { color: var(--faint); }
+.status.ready      { color: var(--accent);  background: var(--accent-soft); }
+.status.building   { color: var(--warn);    background: var(--warn-soft); }
+.status.review     { color: var(--accent);  background: var(--accent-soft); }
+.status.done       { color: var(--new);     background: var(--new-soft); }
+.status.blocked    { color: var(--danger);  background: rgba(192, 69, 69, 0.10); }
+.ribbon .meta { font-size: 12px; color: var(--muted); }
+.ribbon .meta b { color: var(--ink); font-weight: 600; }
+.ribbon .plan-link { margin-left: auto; font-size: 12px; }
+a { color: var(--accent); }
+
+/* progress bar — only meaningful once implementation starts */
+.progress { flex: 1 1 160px; min-width: 120px; max-width: 260px; }
+.progress-track { height: 6px; border-radius: 3px; background: var(--wire-fill); overflow: hidden; }
+.progress-fill  { height: 100%; background: var(--new); border-radius: 3px; }
+.progress-label { font-size: 10.5px; color: var(--faint); font-family: ui-monospace, Menlo, Consolas, monospace; margin-top: 4px; }
+
+/* ---------- back-reference to the written plan ---------- */
+/* v2 keeps prose in the .md — each visual points at the section that explains it. */
+.ref {
+  display: block; margin-top: 8px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; color: var(--faint); text-decoration: none;
+}
+.ref::before { content: "↳ "; }
+.ref:hover { color: var(--accent); }
+
+/* ---------- before / after wireframe pair ---------- */
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.ba > .wire-stage { min-width: 0; overflow-x: hidden; }
+/* v1's .wf carries min-width: 640px for a full-width stage — half-width
+   columns must be allowed to shrink or the content spills past the card. */
+.ba .wf { min-width: 0; }
+.ba .wbox { min-width: 0; }
+.ba .wire-caption .now    { color: var(--faint); }
+.ba .wire-caption .after  { color: var(--new); }
+.ba-arrow { align-self: center; text-align: center; color: var(--faint); font-size: 20px; }
+
+/* diff badges on a wireframe box: what changed about an existing element */
+.wbox.is-gone { border-style: solid; border-color: var(--danger); color: var(--danger); opacity: 0.65; text-decoration: line-through; }
+.wbox.is-moved { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.legend .l-gone i  { background: transparent; border: 1.5px solid var(--danger); }
+.legend .l-moved i { background: var(--warn-soft); border: 1.5px solid var(--warn); }
+
+/* ---------- density: v2 pages are graphical, so prose is capped ---------- */
+.sec-intro { font-size: 13px; max-width: 60ch; }
+section { margin-bottom: 40px; }
+
+/* ---------- open questions (drawn, not written up) ---------- */
+.open-q {
+  margin-top: 14px;
+  border-left: 3px solid var(--warn); background: var(--warn-soft);
+  padding: 8px 12px; border-radius: 0 5px 5px 0; font-size: 12.5px; color: var(--muted);
+}
+.open-q b { color: var(--ink); font-weight: 600; }
+
+@media (max-width: 720px) {
+  .ba { grid-template-columns: 1fr; }
+  .ba-arrow { transform: rotate(90deg); }
+}
+
+@media print {
+  html, body { background: #fff; }
+  .page { padding: 0; max-width: none; }
+  section { break-inside: avoid; }
+  .ribbon { box-shadow: none; }
+}
