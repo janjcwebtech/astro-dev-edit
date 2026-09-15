@@ -1,0 +1,16 @@
+---
+import Layout from './Layout.astro';
+import Services from './Services.astro';
+import Forward from './Forward.astro';
+import Recursive from './Recursive.astro';
+import RecursiveSpread from './RecursiveSpread.astro';
+import Rootless from './Rootless.astro';
+---
+<Layout>
+  <p id="page-slot">Page-owned slot</p>
+  <Services />
+  <Forward title="Forwarded" />
+  <Recursive depth={2} />
+  <RecursiveSpread depth={2} />
+  {[1, 2].map(i => <Rootless label={i} />)}
+</Layout>

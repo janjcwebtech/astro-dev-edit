@@ -22,6 +22,47 @@ export interface SourceLoc {
  *  renders, or an img attribute. */
 export type TargetType = 'text' | 'markup' | 'expression' | 'src' | 'alt';
 
+// Composition proof: usage ids identify source sites, never runtime instances.
+export type CompositionTier = 'proven' | 'inferred' | 'candidates' | 'none';
+export type CompositionRefusal =
+  | 'dynamic' | 'namespaced' | 'not-astro' | 'package' | 'outside-root'
+  | 'chain-break' | 'unresolved' | 'spread' | 'reserved-attribute'
+  | 'invalid-chain' | 'incomplete-index' | 'too-many-paths' | 'no-path' | 'recursive';
+export interface UsageProp {
+  name: string;
+  kind: string;
+  source: string;
+}
+export interface UsageSlot {
+  name: string;
+  start: number;
+  end: number;
+  source: string;
+}
+export interface UsageLink {
+  id: string;
+  file: string;
+  loc: string;
+  offset: number;
+  name: string;
+  target?: string;
+  refusal?: CompositionRefusal;
+  hasSpread: boolean;
+  props: UsageProp[];
+  slots: UsageSlot[];
+}
+export interface CompositionRequest {
+  file: string;
+  route: string;
+  chain?: string;
+}
+export interface CompositionResponse {
+  tier: CompositionTier;
+  links: UsageLink[];
+  candidates?: UsageLink[][];
+  reason?: CompositionRefusal;
+}
+
 /** Whether an attribute can be patched: statically quoted, expression-driven,
  *  or absent from the source. */
 export type AttrState = 'static' | 'dynamic' | 'missing';

@@ -1,0 +1,4 @@
+---
+const { depth } = Astro.props;
+---
+<div data-spread-depth={depth}>{depth > 0 && <Astro.self {...Astro.props} depth={depth - 1} />}</div>

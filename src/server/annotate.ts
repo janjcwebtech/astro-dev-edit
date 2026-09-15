@@ -1,5 +1,6 @@
 import { parse } from '@astrojs/compiler';
 import type { Plugin as VitePlugin } from 'vite';
+import type { UsageLink } from '../shared/protocol.ts';
 
 /**
  * Self-annotation for Astro ≥7 — inject `data-astro-source-file` / `-loc`
@@ -76,14 +77,14 @@ function locForElement(node: AstNode): Pos | null {
  * every script on the page (its own `ClientRouter` included). Neither is an
  * editable element, so nothing in the editing surface is lost.
  */
-const NEVER_ANNOTATE = new Set(['script', 'style']);
+const NEVER_ANNOTATE = new Set(['script', 'style', 'slot']);
 
 /** Plain lowercase HTML elements only — components/fragments are never
  *  annotated (matches compiler behavior; the client walks up via
  *  nearestSource anyway), nor is anything in NEVER_ANNOTATE. */
 function isAnnotatable(node: AstNode): boolean {
   return (
-    node.type === 'element' &&
+    (node.type === 'element' || node.type === 'custom-element') &&
     !!node.name &&
     /^[a-z]/.test(node.name) &&
     !NEVER_ANNOTATE.has(node.name)
@@ -105,11 +106,21 @@ interface Insertion {
  * `file` is the absolute path stamped into the attribute (what the Vite
  * transform receives as its module id).
  */
-export async function annotateAstroSource(source: string, file: string): Promise<string> {
+export async function annotateAstroSource(
+  source: string, file: string,
+  opts: { composition?: readonly UsageLink[] } = {},
+): Promise<string> {
   const { ast } = await parse(source, { position: true });
   const starts = lineStartIndices(source);
   const insertions: Insertion[] = [];
   const fileAttr = escapeAttr(file);
+  for (const link of opts.composition ?? []) {
+    if (link.file !== file || !link.target || link.refusal || !source.startsWith(`<${link.name}`, link.offset)) continue;
+    insertions.push({
+      index: link.offset + 1 + link.name.length,
+      text: ` data-atx-chain={(Astro.props["data-atx-chain"]??"")+".${link.id}"}`,
+    });
+  }
 
   const walk = (node: AstNode): void => {
     if (isAnnotatable(node) && node.position) {
@@ -122,7 +133,10 @@ export async function annotateAstroSource(source: string, file: string): Promise
           index: tagStart + 1 + node.name!.length,
           text:
             ` data-astro-source-file="${fileAttr}"` +
-            ` data-astro-source-loc="${loc.line}:${loc.column}"`,
+            ` data-astro-source-loc="${loc.line}:${loc.column}"` +
+            (opts.composition ?
+              ` data-atx-file="${fileAttr}" data-atx-loc="${loc.line}:${loc.column}"` +
+              ` data-atx-chain={Astro.props["data-atx-chain"]??"!"}` : ''),
         });
       }
     }

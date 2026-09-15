@@ -1,0 +1,13 @@
+---
+import Label from '@fixture/Label.astro';
+import Card from './Card.astro';
+const items = ['First', 'Second', 'First'];
+---
+<section id="services">
+  {items.map((title, i) => <Card title={title} instance={i}>
+    <Fragment slot="heading"><b data-heading={i}>Named {title}</b></Fragment>
+    <Label slot="detail" />
+    <p data-slot={i}>Content {title}</p>
+  </Card>)}
+  {true && <Card title="Conditional" instance="conditional" />}
+</section>

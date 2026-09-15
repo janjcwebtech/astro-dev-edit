@@ -115,8 +115,9 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         // on Astro ≥7 the Rust compiler doesn't
         // (withastro/compiler-rs#96), so we inject them ourselves with a
         // pre-compiler Vite transform. Unresolvable version → inject too:
-        // double annotation is harmless (identical values, browsers keep the
-        // first), while missing annotation kills the feature.
+        // missing annotation kills the feature. Duplicate legacy annotations
+        // are not a loc-parity guarantee on Go: the compiler can put a shifted
+        // loc first. The composition proof uses its own data-atx-loc instead.
         const astroMajor = detectAstroMajor(projectRoot);
         const selfAnnotate =
           sourceAnnotations === 'force' ||

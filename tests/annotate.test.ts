@@ -28,6 +28,13 @@ function injectedLoc(annotated: string, tag: string): string {
 }
 
 describe('annotateAstroSource', () => {
+  it('never stamps slots, and includes custom elements in force mode', async () => {
+    const out = await annotateAstroSource('<slot><my-card>Fallback</my-card></slot>', FILE);
+    expect(out).toContain('<slot>');
+    expect(out).toContain('<my-card data-astro-source-file=');
+    expect(out).not.toContain('<slot data-');
+  });
+
   it('annotates a text-bearing element with its text start', async () => {
     const src = `<p>Hello world</p>\n`;
     const out = await annotateAstroSource(src, FILE);

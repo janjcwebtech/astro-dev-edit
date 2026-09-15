@@ -1,0 +1,11 @@
+---
+import Label from './Label.astro';
+const { title, instance } = Astro.props;
+---
+<article data-card={instance}>
+  <h2>{title}</h2>
+  <header><slot name="heading"><em>Fallback heading</em></slot></header>
+  <slot><p>Fallback content</p></slot>
+  <aside><slot name="detail" /></aside>
+  <Label />
+</article>

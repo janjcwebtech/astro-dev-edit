@@ -10,6 +10,13 @@ It ships TypeScript source with **no build step** — `exports` points at `./src
 
 Three layers meet at one type-only contract.
 
+## Composition experiment
+
+The isolated [component tracing proof](COMPOSITION-PROOF.md) uses the existing
+annotation transform with an injected usage index. The public integration does
+not enable it. Its resolver checks every source hop and refuses uncertain
+forwarding; the fixture is available through `npm run dev:composition`.
+
 ## The contract — `src/shared/`
 
 `protocol.ts` is the single source of truth for every request and response shape on the `/__dev-edit` endpoints. Both client and server import it with `import type` (enforced by `verbatimModuleSyntax`), so it never reaches the client bundle, and a shape change breaks `typecheck` on the other side instead of at runtime. Changing what one side sends starts there.
