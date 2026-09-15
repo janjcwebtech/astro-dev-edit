@@ -1,9 +1,9 @@
 # Component tracing proof
 
-The `feat/editor-inspector` branch contains an isolated, dev-only tracing
-implementation. The CMS-capable baseline remains at the annotated tag
-`cms-snapshot-2026-09-15` (`7be47b5`). The public integration still exposes its
-existing editing UI; the committed fixture enables the stronger tracing.
+The `feat/editor-inspector` branch contains opt-in dev-only tracing and a
+[read-only API](COMPOSITION-API.md). The CMS-capable baseline remains at the annotated tag
+`cms-snapshot-2026-09-15` (`7be47b5`). The public integration exposes its existing editing UI; `composition: true`
+enables the stronger tracing and API. The committed fixture uses this option.
 
 ## Run it
 
@@ -148,10 +148,10 @@ map back to the original file. Astro's first legacy loc can be shifted on Go;
   Full hydration, client DOM rewrites, toolbar-off combinations and the real-site
   compatibility/weight matrix are not verified. Missing or damaged markers need
   a parity check when client code can remove both halves of a boundary.
-- The static index still covers visited modules. It needs complete discovery
-  before static fallback tiers can be exposed to the client. There are still no
-  composition HTTP routes, user-facing inspector, staged-value store, or prop
-  writes, and no CMS/Unsplash removal.
+- The tracing API discovers the graph reachable from a requested route, not
+  every caller in the repository. Its completeness and freshness rules are in
+  [the API contract](COMPOSITION-API.md). The user-facing inspector, staged-value
+  store, prop and HTML-string writes, and CMS/Unsplash removal are not implemented.
 
 The stronger mechanism resolves the original spread and multi-root limitations
 within the tested Astro scope. It provides concrete instance and slot-placement

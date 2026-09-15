@@ -27,7 +27,8 @@ export type CompositionTier = 'proven' | 'inferred' | 'candidates' | 'none';
 export type CompositionRefusal =
   | 'dynamic' | 'namespaced' | 'not-astro' | 'package' | 'outside-root'
   | 'chain-break' | 'unresolved' | 'spread' | 'reserved-attribute'
-  | 'invalid-chain' | 'incomplete-index' | 'too-many-paths' | 'no-path' | 'recursive';
+  | 'invalid-chain' | 'incomplete-index' | 'too-many-paths' | 'no-path' | 'recursive'
+  | 'disabled' | 'no-route' | 'stale-index' | 'index-limit' | 'path-refused' | 'untracked-html';
 export interface UsageProp {
   name: string;
   kind: string;
@@ -84,6 +85,46 @@ export interface CompositionResponse {
   reason?: CompositionRefusal;
 }
 
+/** Browser requests name a URL; only the server chooses the route source file. */
+export interface CompositionLookupRequest {
+  pathname: string;
+  file: string;
+  chain?: string;
+  traceVersion?: 2;
+}
+export interface CompositionLinksRequest {
+  pathname: string;
+  ids: string[];
+}
+/** Reverse usages are scoped to this route's reachable Astro modules. */
+export interface CompositionUsesRequest {
+  pathname: string;
+  file: string;
+}
+export interface CompositionCoverage {
+  complete: boolean;
+  files: number;
+  revision: number;
+  issues: { file: string; loc?: string; reason: CompositionRefusal }[];
+}
+export interface CompositionLookupResponse extends CompositionResponse {
+  route: string | null;
+  coverage: CompositionCoverage;
+}
+export interface CompositionLinksResponse {
+  route: string | null;
+  links: UsageLink[];
+  missing: string[];
+  coverage: CompositionCoverage;
+  reason?: CompositionRefusal;
+}
+export interface CompositionUsesResponse {
+  route: string | null;
+  links: UsageLink[];
+  coverage: CompositionCoverage;
+  reason?: CompositionRefusal;
+}
+
 /** Whether an attribute can be patched: statically quoted, expression-driven,
  *  or absent from the source. */
 export type AttrState = 'static' | 'dynamic' | 'missing';
@@ -109,6 +150,8 @@ export interface HealthResponse {
   /** Whether the hover-pill CSS class/ID inspector is enabled. The overlay
    *  reads this at boot and skips rendering the chips row when false. */
   cssInspector: boolean;
+  /** Opt-in tracing API and version-2 annotations; no inspector UI implied. */
+  composition?: boolean;
   /** Whether the "Open source" buttons and jump-to-file links should render.
    *  Absent from a server that predates the option editor. */
   openInEditor?: boolean;

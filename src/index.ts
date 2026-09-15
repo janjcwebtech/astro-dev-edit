@@ -3,6 +3,8 @@ import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
 import { UNSPLASH_DEFAULT_IMPORT_WIDTH } from './shared/unsplash.ts';
 import { createAnnotatePlugin } from './server/annotate.ts';
+import { createCompositionPlugin } from './server/composition-plugin.ts';
+import { createCompositionService, type CompositionService } from './server/composition-service.ts';
 import { createSchemaProvider } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
 import { createPrivateFilesPlugin } from './server/private-files.ts';
@@ -51,9 +53,9 @@ function detectAstroMajor(projectRoot: string): number | null {
 }
 
 export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegration {
-  // Config-setup-time options only. Both are consumed before any dev server
-  // exists — `sourceAnnotations` registers a Vite plugin — so neither can come
-  // from the settings file, and both are reported to the panel as read-only.
+  // Config-setup-time options only. These are consumed before any dev server
+  // exists — annotation and composition options register Vite plugins — so
+  // they cannot come from the settings file and appear read-only in the panel.
   // `enabled` is additionally config-only because storing `false` there would
   // lock the user out of the UI that set it.
   const enabled = userOptions.enabled ?? DEFAULTS.enabled;
@@ -74,6 +76,7 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
    *  captured: the hook re-fires on any change under `srcDir`, so a page added
    *  mid-session has to be visible without a restart. */
   let resolvedRoutes: readonly ResolvedRouteLike[] = [];
+  let composition: CompositionService | null = null;
 
   return {
     name: 'astro-dev-edit',
@@ -119,12 +122,16 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         // are not a loc-parity guarantee on Go: the compiler can put a shifted
         // loc first. The composition proof uses its own data-atx-loc instead.
         const astroMajor = detectAstroMajor(projectRoot);
-        const selfAnnotate =
+        const trace = userOptions.composition ?? DEFAULTS.composition;
+        const selfAnnotate = trace ||
           sourceAnnotations === 'force' ||
           (sourceAnnotations === 'auto' && (astroMajor === null || astroMajor >= 7));
         if (selfAnnotate) {
-          updateConfig({ vite: { plugins: [createAnnotatePlugin()] } });
+          updateConfig({ vite: { plugins: [trace
+            ? createCompositionPlugin(projectRoot, () => composition?.invalidate())
+            : createAnnotatePlugin()] } });
           logger.info(
+            trace ? 'component tracing and data-atx-* source annotations enabled' :
             `injecting data-astro-source-* annotations (` +
               (sourceAnnotations === 'force'
                 ? 'sourceAnnotations: "force"'
@@ -162,6 +169,7 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
       'astro:routes:resolved': ({ routes }: { routes: readonly ResolvedRouteLike[] }) => {
         if (!active) return;
         resolvedRoutes = routes;
+        composition?.invalidate();
       },
 
       'astro:server:setup': ({ server, logger }) => {
@@ -173,6 +181,10 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
           root: projectRoot,
           configOptions: userOptions,
         });
+        if (userOptions.composition ?? DEFAULTS.composition) {
+          composition = createCompositionService({ root: projectRoot,
+            resolve: async (specifier, importer) => (await server.pluginContainer.resolveId(specifier, importer, { ssr: true }))?.id ?? null });
+        }
 
         // Vite dev middleware exposes the edit API under /__dev-edit/. (spec §4.3)
         server.middlewares.use(
@@ -181,6 +193,7 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
             root: projectRoot,
             publicDir,
             optionsResolver,
+            composition,
             // Always constructed: the entry editor can now be switched on from
             // the panel, so a provider built only when it started enabled would
             // leave the feature schema-less until the next restart. The routes

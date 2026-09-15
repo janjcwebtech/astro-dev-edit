@@ -5,12 +5,11 @@ import type { Plugin } from 'vite';
 import { annotateAstroSource } from './annotate.ts';
 import { createUsageIndex } from './usage-index.ts';
 
-/** Experimental dev harness. Not registered by the public integration yet.
- * Supersedes the annotation plugin when explicitly installed by a fixture. */
-export function createCompositionPlugin(root: string): Plugin {
+/** Opt-in dev tracing. Supersedes the legacy annotation plugin when enabled. */
+export function createCompositionPlugin(root: string, invalidate: () => void = () => {}): Plugin {
   const index = createUsageIndex({ root, canonical: realpath });
   return {
-    name: 'astro-dev-edit:composition-proof', enforce: 'pre', apply: 'serve',
+    name: 'astro-dev-edit:composition', enforce: 'pre', apply: 'serve',
     transform: {
       order: 'pre',
       async handler(source, file) {
@@ -24,6 +23,6 @@ export function createCompositionPlugin(root: string): Plugin {
           runtime: fileURLToPath(new URL('./composition-runtime.ts', import.meta.url)) }), map: null };
       },
     },
-    watchChange(id) { index.remove(id); },
+    watchChange(id) { index.remove(id); invalidate(); },
   };
 }

@@ -33,6 +33,18 @@ import type { SourceLoc } from '../shared/protocol.ts';
  */
 
 const PROP = '__astroDevEditSrc' as const;
+const SOURCE_ELEMENTS = '[data-atx-file], [data-astro-source-file]';
+
+function opaque(el: HTMLElement): boolean {
+  return Boolean(el.parentElement?.closest('[data-atx-boundary="html"]'));
+}
+
+/** Version-2 coordinates refer to untouched source. Legacy Go annotations can
+ * point into the transformed source and must never outrank these. */
+function ownSource(el: HTMLElement): SourceLoc | undefined {
+  const file = el.getAttribute('data-atx-file'), loc = el.getAttribute('data-atx-loc');
+  return file && loc ? { file, loc } : undefined;
+}
 
 interface Stamped extends HTMLElement {
   [PROP]?: SourceLoc;
@@ -61,6 +73,9 @@ function elementPath(el: HTMLElement): string {
 
 /** Record an annotated element's source loc into both cache layers. */
 function stamp(el: Stamped): void {
+  if (opaque(el)) return;
+  const own = ownSource(el);
+  if (own) { el[PROP] = own; sourceByPath.set(elementPath(el), own); return; }
   if (el[PROP]) return;
   const file = el.getAttribute('data-astro-source-file');
   if (!file) return;
@@ -73,7 +88,7 @@ function stamp(el: Stamped): void {
 /** Snapshot everything currently annotated in the DOM. Called at capture start
  *  and again after HMR re-renders (which re-annotate the fresh DOM). */
 export function cacheSourceMappings(): void {
-  for (const el of document.querySelectorAll<Stamped>('[data-astro-source-file]')) {
+  for (const el of document.querySelectorAll<Stamped>(SOURCE_ELEMENTS)) {
     stamp(el);
   }
 }
@@ -91,7 +106,7 @@ export function cacheSourceMappings(): void {
 export function annotatedElements(root: HTMLElement = document.body): HTMLElement[] {
   const out: HTMLElement[] = [];
   for (const el of root.querySelectorAll<Stamped>('*')) {
-    if (el[PROP]) out.push(el);
+    if (!opaque(el) && (ownSource(el) || el[PROP])) out.push(el);
   }
   return out;
 }
@@ -103,9 +118,10 @@ export function pathFor(el: HTMLElement): string {
   return elementPath(el);
 }
 
-/** Resolve a live element's source loc: property first, path fallback. */
+/** Original tool-owned coordinates first, then the legacy capture cache. */
 export function sourceFor(el: HTMLElement): SourceLoc | undefined {
-  return (el as Stamped)[PROP] ?? sourceByPath.get(elementPath(el));
+  if (opaque(el)) return undefined;
+  return ownSource(el) ?? (el as Stamped)[PROP] ?? sourceByPath.get(elementPath(el));
 }
 
 /**
@@ -171,8 +187,8 @@ const stampObserver = new MutationObserver((records) => {
     }
     for (const node of rec.addedNodes) {
       if (node instanceof HTMLElement) {
-        if (node.hasAttribute('data-astro-source-file')) stamp(node);
-        for (const el of node.querySelectorAll<Stamped>('[data-astro-source-file]')) {
+        if (node.matches(SOURCE_ELEMENTS)) stamp(node);
+        for (const el of node.querySelectorAll<Stamped>(SOURCE_ELEMENTS)) {
           stamp(el);
         }
       }
@@ -187,6 +203,6 @@ export function startCapture(): void {
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ['data-astro-source-file', 'data-astro-source-loc'],
+    attributeFilter: ['data-atx-file', 'data-atx-loc', 'data-astro-source-file', 'data-astro-source-loc'],
   });
 }

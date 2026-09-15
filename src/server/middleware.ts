@@ -21,6 +21,8 @@ import { createEntryRoutes } from './entry-routes.ts';
 import { createInspectRoutes } from './inspect-routes.ts';
 import type { OptionsResolver, ResolvedOptions } from './options.ts';
 import { createPageSourceRoutes } from './page-source-routes.ts';
+import { createCompositionRoutes } from './composition-routes.ts';
+import type { CompositionService } from './composition-service.ts';
 import {
   checkEditablePath,
   isPackageOwned,
@@ -76,6 +78,7 @@ interface MiddlewareDeps {
    *  when none is available (an Astro that never fired the routes hook, or a
    *  test) → the page-source route refuses rather than guessing. */
   routeManifest: RouteManifest | null;
+  composition?: CompositionService | null;
   /** Unsplash photo source. Its access key and its per-page/appName settings
    *  both resolve lazily, per request; null → no key resolver is available at
    *  all (the feature can still be switched on from the panel). */
@@ -179,6 +182,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
             name: 'astro-dev-edit',
             milestone: 1,
             cssInspector: o.cssInspector,
+            composition: o.composition && Boolean(deps.composition),
             openInEditor: o.openInEditor,
             entryEditor: o.entryEditor !== false,
             root,
@@ -451,6 +455,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     ...coreRoutes,
     ...createInspectRoutes({ logger, root, optionsResolver }),
     ...createPageSourceRoutes({ logger, optionsResolver, routeManifest }),
+    ...createCompositionRoutes({ root, optionsResolver, routeManifest, composition: deps.composition ?? null }),
     ...createEntryRoutes({ writeText, logger, root, optionsResolver, schemaProvider }),
     ...createEntryResolveRoutes({
       logger,

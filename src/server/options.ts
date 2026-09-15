@@ -81,6 +81,9 @@ export interface DevEditOptions {
    * dev-toolbar requirement on 5/6); `'off'` never injects.
    */
   sourceAnnotations?: 'auto' | 'force' | 'off';
+  /** Opt-in dev tracing and read-only composition API. Config-only: installs
+   * a pre-compiler transform; no inspector UI is enabled by this option. */
+  composition?: boolean;
   /**
    * The CMS-style entry panel for content-collection pages that emit the
    * `astro-dev-edit:page-source` meta tag. Zero-config for conventional
@@ -175,6 +178,7 @@ export const DEFAULTS: ResolvedOptions = {
   revealWriteDelayMs: 1000,
   cssInspector: true,
   sourceAnnotations: 'auto',
+  composition: false,
   entryEditor: {},
   schemaEditor: true,
   // Off unless asked for: the feature reaches a third-party API and needs a key
@@ -226,6 +230,12 @@ interface OptionSpec {
 /** The registry. Adding an option is one entry — resolution, the `/settings`
  *  response and the panel's control all follow from it. */
 const OPTION_SPECS: readonly OptionSpec[] = [
+  {
+    key: 'composition', label: 'Component tracing',
+    help: 'Experimental Astro component tracing and read-only API. Requires a dev-server restart; the inspector UI is separate.',
+    type: 'boolean', group: 'general', configOnly: true,
+    fallback: DEFAULTS.composition, read: (o) => o.composition,
+  },
   {
     key: 'enabled',
     label: 'Integration enabled',
@@ -513,6 +523,7 @@ function toResolvedOptions(
     schemaEditor: flat.get('schemaEditor') === true,
     cssInspector: flat.get('cssInspector') === true,
     sourceAnnotations: flat.get('sourceAnnotations') as 'auto' | 'force' | 'off',
+    composition: flat.get('composition') === true,
     entryEditor: flat.get('entryEditor') === true ? entryEditor : false,
     unsplash: unsplashOn
       ? {

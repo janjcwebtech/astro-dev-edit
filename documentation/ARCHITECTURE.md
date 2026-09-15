@@ -10,13 +10,20 @@ It ships TypeScript source with **no build step** — `exports` points at `./src
 
 Three layers meet at one type-only contract.
 
-## Composition experiment
+## Component tracing
 
-The isolated [component tracing proof](COMPOSITION-PROOF.md) uses the existing
-annotation transform with an injected usage index. The public integration does
-not enable it. Its resolver checks every source hop. Version 2 captures protected
-per-render identities and emits runtime boundaries for native slot insertions; serialized
-HTML stays opaque. The fixture is available through `npm run dev:composition`.
+`composition: true` opts into the [read-only tracing API](COMPOSITION-API.md) and
+version-2 annotations. The [tracing proof](COMPOSITION-PROOF.md) covers protected
+per-render identities and runtime boundaries for native slots. Serialized HTML
+stays opaque; the source reader prefers the original `data-atx-*` coordinates.
+
+`composition-service.ts` discovers a fresh, bounded graph from the requested
+route using Vite's SSR resolver. `composition-routes.ts` supplies chain lookup,
+batched usage links and route-scoped reverse uses through the existing
+middleware and path gate. Static inference requires complete coverage; watcher
+invalidation drops in-flight snapshots. The fixture uses the normal integration
+through `npm run dev:composition`. The new inspector UI and value writes remain
+separate from this layer.
 
 ## The contract — `src/shared/`
 

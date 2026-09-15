@@ -41,6 +41,7 @@ export default defineConfig({
 | `revealWriteDelayMs` | `1000` | How long to wait after asking the editor to open an existing file. A whole number of milliseconds, `0` to `10000`. |
 | `cssInspector` | `true` | The hover pill's class and ID CSS inspector. |
 | `sourceAnnotations` | `'auto'` | Who emits `data-astro-source-*`: `'auto'`, `'force'` or `'off'`. Config only, because it registers a Vite plugin. |
+| `composition` | `false` | Experimental tracing API and version-2 source annotations. Config only; when true, supersedes `sourceAnnotations`. See [Component tracing API](COMPOSITION-API.md). |
 | `entryEditor` | `{}` | The entry drawer. `false` disables it. Sub-options: `configPath`, and per collection `pageEditing`, `dir`, `extension`, `fields` — `pageEditing` is normally set from the Collections drawer, and setting it here locks that switch. See [Entry editor](ENTRY-EDITOR.md). |
 | `schemaEditor` | `true` | Whether the collection designer may write your `content.config.ts`. |
 | `unsplash` | `false` | The Unsplash source. `{}` turns it on. Sub-options: `accessKey`, `appName`, `perPage`, `importWidth`. See [Unsplash](MEDIA.md#unsplash-photo-picker). |
@@ -51,7 +52,7 @@ Highest first: **`astro.config.mjs`**, then **`.astro-dev-edit.json`**, then the
 defaults above. `astro.config.mjs` wins because it is code you wrote
 deliberately, it is committed, and `astro build` reads it.
 
-`enabled` and `sourceAnnotations` are the two config only options. Both are
+`enabled`, `sourceAnnotations` and `composition` are config only options. They are
 consumed in `astro:config:setup`, before a dev server exists, so the settings
 file cannot reach them. They render read-only in the drawer.
 

@@ -1,4 +1,10 @@
 import type {
+  CompositionLookupRequest,
+  CompositionLookupResponse,
+  CompositionLinksRequest,
+  CompositionLinksResponse,
+  CompositionUsesRequest,
+  CompositionUsesResponse,
   ApplyRequestWire,
   AssetsResponse,
   ClassifyRequest,
@@ -52,6 +58,19 @@ import type {
  */
 
 const API = '/__dev-edit';
+
+/** Read-only composition queries. A named refusal is a successful answer. */
+async function compositionPost<T>(path: string, request: unknown): Promise<T> {
+  const res = await post(path, request);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `composition failed (${res.status})`);
+  return res.json() as Promise<T>;
+}
+export const getComposition = (req: CompositionLookupRequest): Promise<CompositionLookupResponse> =>
+  compositionPost('/composition', req);
+export const getCompositionLinks = (req: CompositionLinksRequest): Promise<CompositionLinksResponse> =>
+  compositionPost('/composition/links', req);
+export const getCompositionUses = (req: CompositionUsesRequest): Promise<CompositionUsesResponse> =>
+  compositionPost('/composition/uses', req);
 
 async function errorMessage(res: Response): Promise<string | undefined> {
   const body = (await res.json().catch(() => ({}))) as { error?: string };

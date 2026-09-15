@@ -16,6 +16,7 @@ Writing an entry — one line, past tense, no essay:
 
 ### Added
 
+- Added opt-in `composition: true` tracing through the normal integration, with read-only chain, batch-link and route-scoped usage APIs, bounded source discovery, and file-change invalidation. The existing source reader prefers original `data-atx-*` locations and ignores copied annotations inside generated HTML.
 - Added an isolated component-tracing fixture (`npm run dev:composition`) with source usage chains, protected per-render identities, and native-slot insertion boundaries. Spread recursion and repeated multi-root components are traced; replayed `set:html` output is explicitly untracked.
 - Data collections — `.json`, `.yml` and `.yaml` entries — are listed and counted instead of reporting `0 entries`. They are not editable yet: the row says why, detail pages don't offer **Edit entry** for one, and `POST /entry` refuses one in words. `editableExtensions` no longer gates them, so no configuration can hide a data entry.
 

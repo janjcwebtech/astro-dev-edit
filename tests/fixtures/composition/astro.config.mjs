@@ -1,11 +1,13 @@
 import { defineConfig } from 'astro/config';
 import { fileURLToPath } from 'node:url';
-import { createCompositionPlugin } from '../../../src/server/composition-plugin.ts';
+import { readdirSync } from 'node:fs';
+import devEdit from '../../../src/index.ts';
 
 export default defineConfig({
   devToolbar: { enabled: true },
+  integrations: [devEdit({ composition: true, entryEditor: false,
+    contentRoots: ['src', ...readdirSync(new URL('.', import.meta.url)).filter(file => file.endsWith('.astro'))] })],
   vite: {
     resolve: { alias: { '@fixture': fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, '') } },
-    plugins: [createCompositionPlugin(fileURLToPath(new URL('.', import.meta.url)))],
   },
 });

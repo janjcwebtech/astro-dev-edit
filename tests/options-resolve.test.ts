@@ -95,9 +95,9 @@ describe('precedence', () => {
 });
 
 describe('config-only options', () => {
-  it('reports enabled and sourceAnnotations locked and restart-requiring', async () => {
+  it('reports setup options locked and restart-requiring', async () => {
     const { described } = await resolve();
-    for (const key of ['enabled', 'sourceAnnotations']) {
+    for (const key of ['enabled', 'sourceAnnotations', 'composition']) {
       const d = describedBy(described, key);
       expect(d.locked).toBe(true);
       expect(d.restartRequired).toBe(true);
@@ -107,14 +107,16 @@ describe('config-only options', () => {
   it('never takes them from the stored file, even when present', async () => {
     // Storing `enabled: false` must not be able to lock the user out of the UI
     // that set it; `sourceAnnotations` registers a Vite plugin at config time.
-    const { options } = await resolve({}, { enabled: false, sourceAnnotations: 'off' });
+    const { options } = await resolve({}, { enabled: false, sourceAnnotations: 'off', composition: true });
     expect(options.enabled).toBe(true);
     expect(options.sourceAnnotations).toBe('auto');
+    expect(options.composition).toBe(false);
   });
 
   it('keeps them out of the writable key list', () => {
     expect(WRITABLE_OPTION_KEYS).not.toContain('enabled');
     expect(WRITABLE_OPTION_KEYS).not.toContain('sourceAnnotations');
+    expect(WRITABLE_OPTION_KEYS).not.toContain('composition');
     expect(WRITABLE_OPTION_KEYS).toContain('cssInspector');
   });
 });
