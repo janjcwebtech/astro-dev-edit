@@ -1,5 +1,6 @@
 import { realpath } from 'node:fs/promises';
 import { relative, isAbsolute, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { annotateAstroSource } from './annotate.ts';
 import { createUsageIndex } from './usage-index.ts';
@@ -19,7 +20,8 @@ export function createCompositionPlugin(root: string): Plugin {
         // Keep resolution local to the awaited transform, including aliases.
         const links = await index.update(source, file,
           async (specifier, importer) => (await this.resolve(specifier, importer))?.id ?? null);
-        return { code: await annotateAstroSource(source, file, { composition: links }), map: null };
+        return { code: await annotateAstroSource(source, file, { composition: links,
+          runtime: fileURLToPath(new URL('./composition-runtime.ts', import.meta.url)) }), map: null };
       },
     },
     watchChange(id) { index.remove(id); },

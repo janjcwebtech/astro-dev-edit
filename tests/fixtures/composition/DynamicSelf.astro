@@ -1,0 +1,5 @@
+---
+const depth = Astro.props.depth ?? 2;
+const Again = Astro.self;
+---
+<div data-dynamic-depth={depth}>{depth > 0 && <Again depth={depth - 1} />}</div>

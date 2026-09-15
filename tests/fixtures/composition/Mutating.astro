@@ -1,0 +1,6 @@
+---
+import Label from './Label.astro';
+const exposedSymbols = Object.getOwnPropertySymbols(Astro.props).length;
+Astro.props['data-atx-chain'] = 'application-value';
+---
+<div {...Astro.props} data-exposed-symbols={exposedSymbols}><Label {...Astro.props} /></div>

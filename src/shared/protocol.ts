@@ -44,6 +44,8 @@ export interface UsageLink {
   file: string;
   loc: string;
   offset: number;
+  /** Safe insertion point immediately before the opening tag's / or >. */
+  injectionOffset?: number;
   name: string;
   target?: string;
   refusal?: CompositionRefusal;
@@ -55,6 +57,25 @@ export interface CompositionRequest {
   file: string;
   route: string;
   chain?: string;
+  traceVersion?: 2;
+}
+
+/** IDs last for one server render; source usage ids remain stable across renders. */
+export interface RenderTrace {
+  id: string;
+  file: string;
+  parent: string | null;
+  chain: string;
+}
+export interface SlotPlacement {
+  id: string;
+  receiver: string;
+  name: string;
+  loc: string;
+  fallback: boolean;
+  file: string;
+  chain: string;
+  parent: string | null;
 }
 export interface CompositionResponse {
   tier: CompositionTier;

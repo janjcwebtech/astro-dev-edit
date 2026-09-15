@@ -1,0 +1,26 @@
+---
+import Rootless from './Rootless.astro';
+import RecursiveSpread from './RecursiveSpread.astro';
+import Forward from './Forward.astro';
+import RepeatSlots from './RepeatSlots.astro';
+import ForwardSlots from './ForwardSlots.astro';
+import Mutating from './Mutating.astro';
+import Delayed from './Delayed.astro';
+---
+<html><body>
+  {[1, 2].map(label => <Rootless label={label} />)}
+  <RecursiveSpread depth={2} />
+  <Forward title="Protected" />
+  <RepeatSlots>
+    <span data-repeated-slot>Repeated words</span>
+    <Rootless slot="detail" label="slotted" />
+  </RepeatSlots>
+  <ForwardSlots>
+    <span data-forwarded-slot>Forwarded words</span>
+    <Rootless slot="detail" label="forwarded" />
+  </ForwardSlots>
+  <RepeatSlots />
+  <Mutating />
+  <Delayed delay={5} label="slow"><span data-delayed-slot="slow">Slow slot</span></Delayed>
+  <Delayed delay={0} label="fast"><span data-delayed-slot="fast">Fast slot</span></Delayed>
+</body></html>

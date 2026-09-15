@@ -1,6 +1,7 @@
 import { parse } from '@astrojs/compiler';
 import type { Plugin as VitePlugin } from 'vite';
 import type { UsageLink } from '../shared/protocol.ts';
+import { prepareComposition } from './composition-instrument.ts';
 
 /**
  * Self-annotation for Astro ≥7 — inject `data-astro-source-file` / `-loc`
@@ -16,8 +17,9 @@ import type { UsageLink } from '../shared/protocol.ts';
  * The critical invariant: injected locs are computed from the ORIGINAL source,
  * so they reference on-disk coordinates — the patcher resolves them against
  * the on-disk file (`src/patcher/astro.ts`) and needs no changes. Injection
- * adds no newlines, so line numbers stay true end to end; only columns shift
- * in the compiled output (dev-only, cosmetic).
+ * in legacy mode adds no newlines. The enhanced composition experiment may
+ * add frontmatter to allocate per-render state; its file/loc attributes still
+ * refer to the original source, independently of generated line numbers.
  *
  * Loc rules mirror the compiler's, as documented in `src/patcher/astro.ts`
  * and pinned by `tests/helpers.ts::locOf`:
@@ -40,6 +42,7 @@ interface AstNode {
   name?: string;
   position?: { start: Pos; end?: Pos };
   children?: AstNode[];
+  attributes?: { name: string }[];
 }
 
 // (line, column) → JS string index; same math as src/patcher/astro.ts, which
@@ -98,6 +101,7 @@ function escapeAttr(value: string): string {
 interface Insertion {
   index: number;
   text: string;
+  deleteCount?: number;
 }
 
 /**
@@ -108,13 +112,15 @@ interface Insertion {
  */
 export async function annotateAstroSource(
   source: string, file: string,
-  opts: { composition?: readonly UsageLink[] } = {},
+  opts: { composition?: readonly UsageLink[]; runtime?: string } = {},
 ): Promise<string> {
   const { ast } = await parse(source, { position: true });
   const starts = lineStartIndices(source);
   const insertions: Insertion[] = [];
   const fileAttr = escapeAttr(file);
-  for (const link of opts.composition ?? []) {
+  const enhanced = opts.runtime ? await prepareComposition(source, file, opts.composition ?? [], opts.runtime) : undefined;
+  if (enhanced) insertions.push(...enhanced.insertions);
+  for (const link of enhanced ? [] : opts.composition ?? []) {
     if (link.file !== file || !link.target || link.refusal || !source.startsWith(`<${link.name}`, link.offset)) continue;
     insertions.push({
       index: link.offset + 1 + link.name.length,
@@ -136,7 +142,10 @@ export async function annotateAstroSource(
             ` data-astro-source-loc="${loc.line}:${loc.column}"` +
             (opts.composition ?
               ` data-atx-file="${fileAttr}" data-atx-loc="${loc.line}:${loc.column}"` +
-              ` data-atx-chain={Astro.props["data-atx-chain"]??"!"}` : ''),
+              (enhanced ? ` data-atx-chain={${enhanced.trace}.chain} data-atx-instance={${enhanced.trace}.id}` +
+                ` data-atx-parent={${enhanced.trace}.parent??""} data-atx-version="2"`
+                + (node.attributes?.some(a => a.name === 'set:html') ? ' data-atx-boundary="html"' : '')
+                : ` data-atx-chain={Astro.props["data-atx-chain"]??"!"}`) : ''),
         });
       }
     }
@@ -154,7 +163,7 @@ export async function annotateAstroSource(
   let cursor = 0;
   for (const ins of insertions) {
     parts.push(source.slice(cursor, ins.index), ins.text);
-    cursor = ins.index;
+    cursor = ins.index + (ins.deleteCount ?? 0);
   }
   parts.push(source.slice(cursor));
   return parts.join('');

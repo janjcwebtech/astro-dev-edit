@@ -1,9 +1,9 @@
 # Component tracing proof
 
-The `feat/editor-inspector` branch starts with an isolated tracing implementation.
-The CMS-capable baseline is preserved by the annotated tag
-`cms-snapshot-2026-09-15` at `7be47b5`. The public integration still exposes its
-existing editing UI; composition is enabled only in the committed fixture.
+The `feat/editor-inspector` branch contains an isolated, dev-only tracing
+implementation. The CMS-capable baseline remains at the annotated tag
+`cms-snapshot-2026-09-15` (`7be47b5`). The public integration still exposes its
+existing editing UI; the committed fixture enables the stronger tracing.
 
 ## Run it
 
@@ -13,6 +13,10 @@ npm run typecheck
 npm test
 ```
 
+Visit `/advanced` for repeated components, forwarding, recursion and slots;
+`/cached` demonstrates the explicit refusal for replayed HTML. The default route
+contains the original nested component fixture.
+
 The render tests select the compiler matching the installed Astro peer. To also
 exercise an existing Astro 5/6 installation while the repository uses Astro 7:
 
@@ -20,100 +24,136 @@ exercise an existing Astro 5/6 installation while the repository uses Astro 7:
 ATX_ASTRO5_ROOT=/absolute/path/to/an/astro5-project npm test
 ```
 
-That project supplies the runtime only. The test renders this repository's
-fixture from temporary compiled modules and does not edit the other project.
-The Go compiler's generated code requires the Astro 5/6 runtime: Astro 7 changes
-`createAstro`'s arguments, so mixing them is not a valid compatibility test.
+That project supplies the runtime only. Tests render this repository's fixture
+from temporary compiled modules and do not edit the other project. Go-generated
+code requires an Astro 5/6 runtime; Astro 7 changes the `createAstro` arguments.
 
-## What the implementation establishes
+## Three independent identities
 
-- `usage-parse.ts` reads original Astro AST positions and actual static imports
-  through `es-module-lexer`. Slot ranges use UTF-16 source coordinates, including
-  Unicode and self-closing component children. Only default imports bound to bare
-  identifiers are supported; unsupported bindings remain named refusals.
-- `usage-index.ts` resolves imports through an injected resolver; the dev plugin
-  supplies Vite's `this.resolve`, including aliases. Canonical paths exclude
-  packages and files outside the project. Per-file replacement removes stale
-  usage ids. This is an index of visited modules, **not a complete repository
-  scan**; static inference requires the caller to explicitly supply a complete
-  graph.
-- The existing annotation transform injects interned source-site ids through
-  component props. Original element loc annotations are identical with tracing
-  enabled or disabled, and injection adds no newlines. Tool-owned file, loc and
-  chain attributes accompany the legacy attributes in the fixture.
-- `composition.ts` checks the route, every caller/target hop, and the selected
-  element's source file. A complete static graph yields one inferred path,
-  2–8 candidates, or a named refusal. Uncertain chains never authorize writes.
-- `composition-model.ts` distinguishes lexical component and slot relationships.
-  It requires validated chains; divergent chains need actual slot source ranges.
-  It does not invent runtime instance ids or build the inspector/tree UI.
+| Identity | Meaning | Lifetime |
+| --- | --- | --- |
+| Usage ID | A component invocation written at a particular source location | Stable across renders/restarts while that location stays the same |
+| Render ID | One execution of a component, with its lexical parent render | One request/render; all native elements it creates share the ID |
+| Slot placement ID | One insertion through a native `<slot>`, with receiver, name, location and fallback status | One insertion, including repeated or forwarded insertions |
 
-The fixture covers nested layouts, three source links below a route, aliases,
-conditional usages, repeated cards with duplicate text, default/named/fallback
-slots, components supplied through slots, recursion, prop forwarding, recursive
-forwarding, and repeated output with multiple roots. Existing classify/apply is
-exercised against the original source of a rendered element.
+`data-atx-file` / `data-atx-loc` retain the original source coordinates.
+`data-atx-chain` retains the lexical usage chain. Version 2 additionally emits
+`data-atx-instance`, `data-atx-parent`, and `data-atx-version="2"`.
 
-## Corrections to the proposed mechanism
+### Protected transport
 
-### Slot components need more than a prefix comparison
+The transform appends its private tracing payload **after every application
+attribute and spread**. The payload uses a private symbol key. An injected
+frontmatter initializer captures it, removes it from `Astro.props`, and freezes
+the render context before application code runs. Ordinary prop forwarding and
+application changes to `Astro.props` cannot overwrite that captured context.
 
-Caller-owned native markup has a shorter chain than its receiving component.
-However, `Page → Label` supplied inside `Page → Card` has divergent chains.
-The slot relationship is proven by locating the Label usage inside the Card
-usage's slot-content range. Without that range the model reports `unrelated`.
+The opening-tag insertion point comes from the compiler's attribute text,
+including expressions, regexes, nested templates and nested markup. Unsupported
+spans fail explicitly instead of inserting into an expression by guesswork.
 
-### A matching final file cannot prove forwarded recursion
+Each request has one initial root. A later invocation missing the transport gets
+`?`, not the root sentinel `!`. That distinction catches dynamically bound
+recursion even when it renders the route's own file. Broken relationships remain
+broken through subsequent known usages. Version 1 chains retain the original
+conservative spread checks; version 2 still validates the route and every hop.
 
-`{...Astro.props}` can erase an injected usage id. An ordinary forwarder fails
-the caller/target equations. A recursive forwarder can erase its entire cycle
-and still end at the expected file. The resolver detects possible spread cycles
-and conservatively downgrades affected chains, including the outer render.
-Static lookup refuses to invent a recursion depth. Automatic spread repair is
-not implemented.
+### Slot insertion boundaries
 
-### A source-site id is not a rendered instance id
+Slot content can be evaluated before its receiving component renders. Source
+ownership alone therefore cannot describe the final placement. The runtime
+emits paired comments around each actual native-slot insertion. The comments
+include the receiver's identity and source chain, so transparent forwarding
+components are represented even when they contribute no native element.
 
-Repeated cards share a usage id but have distinct enclosing DOM subtrees. A
-source value still needs the existing value-matching and ambiguity checks before
-any future write. Adjacent repeated components with multiple roots do not have
-an unambiguous grouping from chain ids alone. They remain `same-site`, with no
-manufactured instance number.
+These are **runtime comments**, emitted after compilation. The compiler's removal
+of source comments does not remove them. They add no wrapper elements or layout
+boxes. They are visible to code that reads `childNodes`.
 
-## Verification evidence — 2026-09-15
+Forwarded named slots preserve their assignment on the outer fragment; the
+original inner `<slot>` loses that assignment. This is required by the Go
+compiler: keeping it on both levels silently drops the named content.
 
-- Server-rendered assertions pass using Go compiler 2.13.1 with Astro 5.18.2 and
-  Rust compiler 0.3.1 with Astro 7.1.1.
-- The fixture's original loc annotations match with composition on/off, its
-  newline counts match, and a rendered label classifies and patches against its
-  original file. These checks cover the committed fixture, not the plan's older
-  205-element playground measurement.
-- `npm run typecheck` passes; the full suite with both runtimes passes **896 tests across 41 files** (baseline: 880 across 39). The existing suite still reports a shutdown timeout after passing; the baseline does too.
-- Live Astro 7.1.1 with the dev toolbar active retains all **54/54** tool-owned
-  annotations after the toolbar removes the legacy attributes (**0** remain).
-- Live Astro 5.18.2 retains **54/54** tool-owned annotations and renders matching
-  chains, including the aliased slot component. Its toolbar fails to initialize
-  in the mixed-version harness, so toolbar survival on Astro 5 is **unverified**.
+`render-occurrences.ts` reads balanced boundary events. `composition-dom.ts`
+collects those events from the real DOM. An occurrence groups by render ID plus
+its slot-placement path. This distinguishes repeated insertion of the same
+caller-owned markup as well as components with multiple sibling roots. Empty
+and text-only slot placements remain available as placement records.
 
-### Legacy locs on the Go compiler
+## Findings and evidence — 2026-09-15
 
-The Go compiler can put its shifted loc before the original loc when it emits
-its own duplicate annotations. In the live Astro 5 fixture, all 54 first legacy
-locs differed from the tool-owned original locs. The plan's assumption that the
-first legacy value is always ours is therefore unsafe. The inspector must read
-`data-atx-file` / `data-atx-loc`; the legacy read path cannot establish parity by
-itself.
+| Case | Result |
+| --- | --- |
+| `.map()` renders a component with two roots | Each pair shares one render ID; different executions have different IDs |
+| Ordinary and recursive `{...Astro.props}` forwarding | Full chains remain proven, with distinct recursive render IDs |
+| Application mutates `Astro.props` | Captured tracing remains intact; no private symbols remain in application props |
+| Named, default and fallback slots | Each insertion carries explicit placement metadata |
+| A component is supplied through a slot | Its source chain remains distinct from the receiver's; placement is explicit |
+| A slot is rendered twice or forwarded through another component | Distinct placement IDs and correctly nested receiver records |
+| Async siblings and concurrent page renders | Correct receivers; no instance-ID sharing between requests |
+| Missing transport through dynamic recursion | Explicit `chain-break`, including recursion into the route's own file |
+| Slot HTML is cached as a string and inserted twice with `set:html` | Marked `untracked-html`; replayed instance IDs are not grouped |
+| Malformed, duplicate or incomplete boundary markers | Refused rather than used for a partial placement graph |
 
-## Boundary of this milestone
+`npm run typecheck` passes and the full suite with both runtimes passes **918
+tests across 42 files**. The pre-existing shutdown-timeout warning still follows
+a successful run.
 
-This is the E1 tracing gate and supporting parts of E2/E5, not the complete scope
-reduction. There are no composition HTTP routes, public option, inspector,
-instance tree, staged-value store, prop writes, or CMS/Unsplash removals yet.
-The static graph still needs repository discovery, caching and complete-coverage
-checks before its fallback tiers can be exposed to the client. Full hydration
-and toolbar on/off compatibility, large-page overhead, and the two real-site
-passes remain unverified. Markdown and framework boundaries remain outside the
-runtime proof.
+Automated rendering passes with Go compiler 2.13.1 / Astro 5.18.2 and Rust compiler
+0.3.1 / Astro 7.1.1. After removing tracing attributes and runtime comments, the
+advanced fixture's HTML is byte-identical to its version 1 rendering on both
+pairs. Original annotation coordinates also match, and classify/apply still
+patches the original source. This is fixture evidence, not a universal guarantee
+for every component or script.
 
-The next implementation slice is the complete static index and read-only route
-group, followed by the component-aware tree/inspector using these refusal rules.
+In live browser checks, **both Astro 5.18.2 and Astro 7.1.1** retain **45/45**
+element annotations and **17 slot placements** after their toolbars initialize;
+all legacy annotations are removed. The real DOM reader distinguishes repeated
+root pairs and forwarded slot paths. The cached-HTML page returns explicit
+`untracked-html` occurrences. Astro 5 uses an isolated temporary project with
+its own dependency resolution, resolving the first milestone's mixed-version
+harness failure.
+
+### Cost
+
+The 45-element, 17-slot advanced fixture adds **12,183 uncompressed bytes** over
+version 1: 21,452 → 33,635 bytes with Go; 14,120 → 26,303 bytes with Rust. These
+counts include machine-specific source paths and are not a real-site budget.
+Most metadata is deliberately verbose for the proof. A per-request manifest
+with compact references is a possible follow-up before expanding coverage.
+
+### Original source coordinates remain authoritative
+
+Version 2 creates frontmatter when a file has none, so it relaxes the first
+prototype's no-newlines rule. File/loc attributes are still computed from the
+untouched source. Generated-code diagnostics do not yet have a transform source
+map back to the original file. Astro's first legacy loc can be shifted on Go;
+`data-atx-loc` is the authoritative coordinate for the inspector.
+
+## Remaining boundaries
+
+- Render identity does not prove which array entry, computed value, or imported
+  value should be edited. Existing source tracing and verified writes remain
+  necessary; duplicate data values still need an ambiguity refusal.
+- Serialized HTML can replay IDs and comments. Descendants of instrumented
+  `set:html` containers are opaque to the DOM reader. Direct `Astro.slots.render`
+  and other HTML-string insertion mechanisms are not a general supported
+  placement channel.
+- A component emitting only plain text has no element on which to expose its
+  render ID. A full instance graph, including every transparent component,
+  still needs additional boundary records or a per-request manifest.
+- Dynamic component bindings, framework/MDX boundaries, packages and server
+  islands retain the existing refusals. Static slot names are required.
+- IDs are ephemeral; selection restoration across HMR needs separate logic.
+  Full hydration, client DOM rewrites, toolbar-off combinations and the real-site
+  compatibility/weight matrix are not verified. Missing or damaged markers need
+  a parity check when client code can remove both halves of a boundary.
+- The static index still covers visited modules. It needs complete discovery
+  before static fallback tiers can be exposed to the client. There are still no
+  composition HTTP routes, user-facing inspector, staged-value store, or prop
+  writes, and no CMS/Unsplash removal.
+
+The stronger mechanism resolves the original spread and multi-root limitations
+within the tested Astro scope. It provides concrete instance and slot-placement
+data for the next inspector slice, with explicit refusals at the remaining
+boundaries.

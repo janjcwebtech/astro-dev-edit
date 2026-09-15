@@ -14,8 +14,9 @@ Three layers meet at one type-only contract.
 
 The isolated [component tracing proof](COMPOSITION-PROOF.md) uses the existing
 annotation transform with an injected usage index. The public integration does
-not enable it. Its resolver checks every source hop and refuses uncertain
-forwarding; the fixture is available through `npm run dev:composition`.
+not enable it. Its resolver checks every source hop. Version 2 captures protected
+per-render identities and emits runtime boundaries for native slot insertions; serialized
+HTML stays opaque. The fixture is available through `npm run dev:composition`.
 
 ## The contract — `src/shared/`
 

@@ -32,6 +32,7 @@ function hasSpreadCycle(files: string[], links: readonly UsageLink[]): boolean {
 export function resolveComposition(
   request: CompositionRequest, links: readonly UsageLink[], completeGraph = false,
 ): CompositionResponse {
+  if (request.traceVersion === 2 && request.chain === '?') return { tier: 'none', links: [], reason: 'chain-break' };
   const byId = new Map(links.map(link => [link.id, link]));
   let reason: CompositionResponse['reason'] = 'invalid-chain';
   if (request.chain && /^(?:!|(?:\.[\w-]{8})+)$/.test(request.chain)) {
@@ -44,8 +45,8 @@ export function resolveComposition(
       file = link.target;
     }
     valid &&= file === request.file;
-    const spread = chain.some(link => link?.hasSpread) ||
-      (valid && hasSpreadCycle([request.route, ...chain.map(link => link!.target!)], links));
+    const spread = request.traceVersion !== 2 && (chain.some(link => link?.hasSpread) ||
+      (valid && hasSpreadCycle([request.route, ...chain.map(link => link!.target!)], links)));
     if (valid && !spread) {
       return { tier: 'proven', links: chain as UsageLink[] };
     }

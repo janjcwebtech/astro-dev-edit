@@ -1,0 +1,4 @@
+---
+const cached = await Astro.slots.render('default');
+---
+<div data-cached="first" set:html={cached} /><div data-cached="second" set:html={cached} />

@@ -1,5 +1,6 @@
 import { parse } from '@astrojs/compiler';
 import { init, parse as parseImports } from 'es-module-lexer';
+import { tagEnd, type TagAttribute } from './astro-tag-end.ts';
 import type { CompositionRefusal, UsageProp, UsageSlot } from '../shared/protocol.ts';
 
 interface Node {
@@ -16,6 +17,7 @@ export interface ParsedUsage {
   name: string;
   loc: string;
   offset: number;
+  injectionOffset?: number;
   specifier?: string;
   refusal?: CompositionRefusal;
   hasSpread: boolean;
@@ -67,6 +69,7 @@ export async function parseUsages(source: string): Promise<ParsedUsage[]> {
       const column = start.column + offset - indexAt(start);
       usages.push({
         name: node.name, loc: `${start.line}:${column}`, offset,
+        injectionOffset: tagEnd(source, offset, node.name, attrs as TagAttribute[])?.insert,
         specifier: self ? undefined : imports.get(node.name), refusal,
         hasSpread: attrs.some(a => a.kind === 'spread'),
         props: attrs.map(a => ({ name: a.name ?? '', kind: a.kind ?? '', source: a.raw || a.value || a.name || '' })),

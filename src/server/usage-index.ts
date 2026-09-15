@@ -28,6 +28,7 @@ export function createUsageIndex(deps: UsageIndexDeps) {
       for (const usage of await parseUsages(source)) {
         const link: UsageLink = {
           id: usageId(relative(deps.root, file), usage.loc), file, loc: usage.loc, offset: usage.offset,
+          injectionOffset: usage.injectionOffset,
           name: usage.name, hasSpread: usage.hasSpread, props: usage.props,
           slots: usage.slots, refusal: usage.refusal,
         };
