@@ -47,7 +47,13 @@ export type UsageVerdict = 'editable' | 'elsewhere' | 'read-only';
 export type UsageRefusal =
   /** `class`, `class:list`, `style` — styling, not content. */
   | 'styling'
-  /** `client:*`, `set:*`, `transition:*`, `slot="name"` — structure, not content. */
+  /**
+   * `client:*`, `transition:*`, `slot="name"` — structure, not content.
+   *
+   * `set:html` is deliberately **not** here: it names a value, and the value
+   * is a string the author wrote. It is judged like any other prop and marked
+   * {@link UsageProp.html}.
+   */
   | 'directive'
   /** `{...Astro.props}` — the values arrive from the caller's caller. */
   | 'spread'
@@ -134,6 +140,20 @@ export type UsageWrite =
 export type UsageProp = {
   name: string;
   kind: string;
+  /**
+   * The value reaches the page as HTML rather than as text — today, `set:html`.
+   *
+   * It is what tells the reader a field carrying `<b>` is a raw value and not
+   * a structural editor for the tags inside it, and it changes how the value
+   * is spelled at one destination: Astro injects a **quoted** `set:html` as
+   * the attribute's *source text*, undecoded, so `value` there is the bytes
+   * between the quotes and a write puts them back verbatim. Escaping them the
+   * way an ordinary attribute is escaped would turn every tag in the string
+   * into visible punctuation.
+   *
+   * It proves nothing about the elements that HTML produces.
+   */
+  html?: true;
   /** The bytes, exactly as `start`/`end` bound them — a quoted attribute's own
    *  quotes included, an expression's braces excluded. It is what the source
    *  *says*; the `value` an `editable` verdict carries is what it *means*. */

@@ -16,6 +16,7 @@ import type { UsageApplyTarget } from '../src/shared/protocol.ts';
 const FRONTMATTER = [
   "import Card from './Card.astro';",
   "const greeting = 'Hello there';",
+  "const intro = '<p>Hello <b>there</b></p>';",
   "const cards = [{ title: 'Card one' }, { title: 'Card two' }];",
 ].join('\n');
 const file = (body: string, frontmatter = FRONTMATTER) => `---\n${frontmatter}\n---\n${body}`;
@@ -173,5 +174,52 @@ describe('literal slot text is written in the caller’s own file', () => {
       .toMatchObject({ ok: false });
     expect(await write(file('<Card>Start a project</Card>'), { name: 'default', kind: 'slot' }, '   '))
       .toMatchObject({ ok: false, code: 'unsupported' });
+  });
+});
+
+/**
+ * An HTML value is a *whole* value. The tags in it are the author's words and
+ * they have to reach the page as tags — so the destination's own spelling is
+ * the only thing that touches them, and nothing pretends to know what the
+ * elements they produce correspond to.
+ */
+describe('a value the page renders as HTML keeps its tags', () => {
+  it('writes the whole string into the frontmatter literal, tags intact', async () => {
+    const source = file('<Card set:html={intro} />');
+    const result = await write(source, { name: 'set:html', kind: 'prop' },
+      `<p>New <b>bold</b> & "quoted" {braces}</p>`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Raw in the JavaScript string it lives in: an entity here would reach the
+    // page as visible punctuation, which is the one thing set:html must not do.
+    expect(result.newSource).toContain(`const intro = '<p>New <b>bold</b> & "quoted" {braces}</p>';`);
+    expect(result.newSource).toContain('<Card set:html={intro} />');
+    const [usage] = await parseUsages(result.newSource);
+    expect(usage.props[0]).toMatchObject({ verdict: 'editable', html: true,
+      value: `<p>New <b>bold</b> & "quoted" {braces}</p>` });
+  });
+
+  it('splices a quoted one in verbatim, so its tags stay tags', async () => {
+    for (const value of ['<em>Bold &amp; brash</em>', '<b>{x}</b>', "<a href='#x'>link</a>"]) {
+      const result = await write(file('<Card set:html="<i>old</i>" />'), { name: 'set:html', kind: 'prop' }, value);
+      expect(result.ok, value).toBe(true);
+      if (!result.ok) continue;
+      // The bytes, not an escaped rendering of them: an entity here would
+      // reach the page as punctuation rather than as the tag it spells.
+      expect(result.newSource, value).toContain(`set:html="${value}"`);
+      const [usage] = await parseUsages(result.newSource);
+      expect(usage.props[0], value).toMatchObject({ verdict: 'editable', html: true, value });
+    }
+  });
+
+  it('refuses the one character a quoted destination cannot spell', async () => {
+    // No entity is decoded here, so a `"` would simply end the attribute.
+    expect(await write(file('<Card set:html="<i>old</i>" />'), { name: 'set:html', kind: 'prop' },
+      '<a href="#x">link</a>')).toMatchObject({ ok: false, code: 'unsupported' });
+  });
+
+  it('refuses an HTML value it cannot trace, like any other prop', async () => {
+    expect(await write(file('<Card set:html={render()} />'), { name: 'set:html', kind: 'prop' }, '<b>x</b>'))
+      .toMatchObject({ ok: false, code: 'dynamic' });
   });
 });

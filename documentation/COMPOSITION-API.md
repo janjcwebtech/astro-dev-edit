@@ -179,6 +179,11 @@ copied annotations beneath `data-atx-boundary="html"`, while retaining the
 container's own source target. Editing a known whole HTML string is separate
 from tracing its generated descendants.
 
+A `set:html` on a **component** tag keeps its `chain-break` refusal, so its prop
+never reaches the panel. The injected HTML lands in the component's slot, where
+there is no container element to mark `data-atx-boundary="html"`, and the source
+reader would attribute those elements to the component's own template.
+
 `src/client/composition.ts` is the batching read side. `chainIds(element)`
 parses `data-atx-chain` — `!` (rendered by the route itself) and `?` (threading
 broke) are empty chains, and any other shape is refused whole rather than
@@ -261,8 +266,8 @@ and source links. Markdown-backed values open their known backing file in the
 IDE; they do not require a Markdown write API. Element values are staged and
 saved through `/apply`; a prop or slot value at a usage site goes through
 `/composition/apply` ([Staged values and Save](EDITING.md#staged-values-and-save)).
-Whole HTML string values and `set:html` destinations are not written from
-either.
+A `set:html` prop is written like any other, as a whole HTML string.
+`set:html` on a plain element is not written from either yet.
 
 ## Verification
 

@@ -30,6 +30,13 @@ import { parseFile, proveEntry, type ParsedUsage } from './usage-parse.ts';
  * the quote style already there, template text through {@link encodeSlotText}.
  * Nothing an edit can contain may become structure or behaviour.
  *
+ * A `set:html` value inverts the last sentence and nothing else: its tags are
+ * *meant* to become structure. It is written raw at both destinations — the
+ * JavaScript literal already leaves `<`, `&` and `{` alone, and a quoted one
+ * is spliced in verbatim, because Astro injects that attribute's source text
+ * without decoding it. The quote that would close such an attribute has no
+ * spelling, so a value carrying one is refused (rule 6).
+ *
  * The guarantee is checked rather than asserted: the patched source is parsed
  * again and the value has to **read back** as exactly what was typed. A write
  * whose own encoding does not round-trip is refused with the file untouched.
@@ -128,12 +135,14 @@ export async function applyUsageWrite(source: string, req: UsageWriteRequest): P
   }
 
   // A quoted attribute keeps the spaces it is given — they are content there.
-  // A slot run's outer whitespace is the file's indentation, and a frontmatter
-  // literal is written trimmed, exactly as the expression patcher writes one.
-  const expected = write.trace || req.target.kind === 'slot' ? req.newText.trim() : req.newText;
+  // A slot run's outer whitespace is the file's indentation, a frontmatter
+  // literal is written trimmed exactly as the expression patcher writes one,
+  // and an HTML value has no meaningful edge whitespace either.
+  const html = req.target.kind === 'prop' && (selected.value as UsageProp).html === true;
+  const expected = write.trace || html || req.target.kind === 'slot' ? req.newText.trim() : req.newText;
   const patched = write.trace
     ? patchTracedLiteral(source, parsed, write, req)
-    : patchInPlace(source, selected.value, req);
+    : patchInPlace(source, selected.value, req, html);
   if (!patched.ok) return patched;
 
   // Read back: the same parse, the same selector, and the value has to be
@@ -151,8 +160,9 @@ export async function applyUsageWrite(source: string, req: UsageWriteRequest): P
 }
 
 /** A quoted attribute or a run of slot text: the bytes at the proven range,
- *  re-encoded for the destination they sit in. */
-function patchInPlace(source: string, value: UsageProp | UsageSlot, req: UsageWriteRequest): ApplyResult {
+ *  re-encoded for the destination they sit in — or, for an HTML value,
+ *  deliberately not encoded at all. */
+function patchInPlace(source: string, value: UsageProp | UsageSlot, req: UsageWriteRequest, html: boolean): ApplyResult {
   const { start, end } = value;
   if (typeof start !== 'number' || typeof end !== 'number') {
     return refuse('unsupported', 'This value has no proven byte range to write into.');
@@ -170,6 +180,17 @@ function patchInPlace(source: string, value: UsageProp | UsageSlot, req: UsageWr
   const quote = source[start];
   if ((quote !== '"' && quote !== "'") || source[end - 1] !== quote) {
     return refuse('unsupported', 'This prop is not a quoted string in the source, so it is not written from here.');
+  }
+  // Astro injects a quoted `set:html` as the attribute's source text without
+  // decoding it, so escaping would turn every tag into visible punctuation and
+  // there is no entity to spell the closing quote with. Verbatim, or refused.
+  if (html) {
+    const text = req.newText.trim();
+    if (text.includes(quote)) {
+      return refuse('unsupported',
+        `A ${quote === '"' ? 'double' : 'single'} quote would close this attribute, and set:html does not decode entities here, so there is no way to spell one. Move the HTML into a frontmatter const to use it.`);
+    }
+    return { ok: true, newSource: source.slice(0, start + 1) + text + source.slice(end - 1) };
   }
   return { ok: true,
     newSource: source.slice(0, start + 1) + escapeAttrValue(req.newText, quote) + source.slice(end - 1) };

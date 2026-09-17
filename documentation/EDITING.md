@@ -52,7 +52,7 @@ Content that lives in a `.md` or `.mdx` entry is **not** edited in the browser. 
 
 Every refusal names its reason and offers one *View code* jump — a read-only source popup carrying its own **Open in editor**. On a page that declares a backing content file it also names that file as the place the words live.
 
-- **Not traceable to a string** — an expression the AST cannot resolve, a component, `set:html`, or block-level nested markup.
+- **Not traceable to a string** — an expression the AST cannot resolve, a component, a `set:html` whose value is not a quoted string or a frontmatter `const`, or block-level nested markup.
 - **Rendered by a component or a slot** — it has no source location of its own, because Astro annotates only what is written in the file, so the click is answered about the nearest element that *has* one. The notice names the tag you clicked, since the reason belongs to that ancestor: a one-word button can be refused for "containing nested markup" that lives in the wrapper around it.
 - **Rendered by a package** — `astro:assets`' `<Image>` renders through `node_modules/astro/components/Image.astro`, and that is the path its annotation carries. The notice names where the component was *used* — the nearest enclosing element written in your own source — and its button opens that file at that line, so the jump lands on the call site rather than in Astro's internals. Two levels of indirection are fine: a wrapper of your own around an `<Image>` still resolves to the markup that holds it. It is a **jump, not an edit**: an `<Image>`'s `src` and `alt` reach it as props, which the patchers do not trace, so you change them in the file the button opens. Package paths are never writable, and never open in your editor either — `contentRoots` does not include `node_modules`, and widening it is not a supported fix. Asking to open one is refused with that sentence rather than an error.
 
@@ -119,9 +119,9 @@ staged against.
 `src` and `alt` belong to the image picker rather than to a field. Everything
 else with an `editable` verdict has one: the literal-text targets — text,
 inline markup, a traced expression — and the prop and slot values at a
-component usage site. Whole HTML string values are not written from here yet.
-A row that is `elsewhere` or `read-only` keeps its sentence and its **View
-code** and has no field at all.
+component usage site, `set:html` among them: its value is a whole HTML string,
+edited raw. A row that is `elsewhere` or `read-only` keeps its sentence and its
+**View code** and has no field at all.
 
 ## The hover pill and source peek
 

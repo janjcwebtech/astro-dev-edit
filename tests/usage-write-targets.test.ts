@@ -246,6 +246,51 @@ describe('a prop carries its write verdict', () => {
     expect(props['Astro.props']).toMatchObject({ verdict: 'read-only', reason: 'spread' });
   });
 
+  /**
+   * `set:html` is shaped like a directive and is not one: `client:load` says
+   * *how* a component renders, `set:html` says *what* it renders. The words
+   * are the author's, so the prop is judged like any other — and the reader is
+   * told the destination reads them as HTML, which is true whatever the
+   * verdict turns out to be.
+   */
+  describe('set:html names a value, not structure', () => {
+    it('is editable as a whole string, and says the string is HTML', async () => {
+      const props = await parse('<Card set:html={intro} />', [
+        "import Card from './Card.astro';",
+        "const intro = '<p>Hello <b>there</b></p>';",
+      ].join('\n'));
+      expect(props['set:html']).toMatchObject({
+        verdict: 'editable', html: true, value: '<p>Hello <b>there</b></p>',
+        trace: { property: 'intro', label: 'intro' },
+      });
+    });
+
+    it('reads a quoted one raw, because that is what Astro injects', async () => {
+      // Not the compiler's decoded value: `set:html="&lt;em&gt;x"` puts the
+      // characters `<em>x` on the page, so the bytes are the value and the
+      // decoded reading would describe a different page.
+      const props = await parse('<Card set:html="&lt;em&gt;Quoted &amp; fine&lt;/em&gt;" />');
+      expect(props['set:html']).toMatchObject({
+        verdict: 'editable', html: true, value: '&lt;em&gt;Quoted &amp; fine&lt;/em&gt;',
+      });
+      const raw = await parse('<Card set:html="<em>Real &amp; bold</em>" />');
+      expect(raw['set:html']).toMatchObject({ verdict: 'editable', value: '<em>Real &amp; bold</em>' });
+    });
+
+    it('marks the destination even where the value is refused', async () => {
+      const props = await parse('<Card set:html={build()} />');
+      expect(props['set:html']).toMatchObject({ verdict: 'read-only', reason: 'computed', html: true });
+    });
+
+    it('leaves the rest of the directive family refused', async () => {
+      const props = await parse('<Card client:load transition:name="x" set:text={x} />');
+      for (const name of ['client:load', 'transition:name', 'set:text']) {
+        expect(props[name], name).toMatchObject({ verdict: 'read-only', reason: 'directive' });
+        expect(props[name].html, name).toBeUndefined();
+      }
+    });
+  });
+
   it('never leaves a verdict unnamed', async () => {
     const source = `---
 import Card from './Card.astro';

@@ -42,6 +42,11 @@ export interface ParsedUsage {
  *  shape, because `class="hero"` is a perfectly ordinary quoted literal. */
 const STYLING = new Set(['class', 'class:list', 'style']);
 
+/** The one directive-shaped name that carries a value rather than structure.
+ *  What it renders is HTML, which changes what the reader is told about the
+ *  value and nothing about how the bytes are written. */
+const HTML_PROP = 'set:html';
+
 /** Every local name a static import statement binds — default, namespace and
  *  named, with `as` aliases resolved to the local side. A type-only import
  *  binds no value and is skipped. */
@@ -82,12 +87,25 @@ function propWrite(
 ): UsageWrite {
   const { name, kind, source } = prop;
   if (STYLING.has(name)) return { verdict: 'read-only', reason: 'styling' };
-  if (name === 'slot' || name.includes(':')) return { verdict: 'read-only', reason: 'directive' };
+  // A colon marks a directive — `client:load` and `transition:name` shape how
+  // a component renders, and neither has words in it. `set:html` is the one
+  // that does: it names the string the component renders, so it is judged by
+  // the same rules as any other prop and the rest of the `set:*` family stays
+  // refused until one of them earns its own case.
+  if (name === 'slot' || (name.includes(':') && name !== HTML_PROP)) {
+    return { verdict: 'read-only', reason: 'directive' };
+  }
   if (kind === 'spread') return { verdict: 'read-only', reason: 'spread' };
   if (kind === 'empty') return { verdict: 'read-only', reason: 'boolean' };
   // The compiler decodes a quoted value while parsing, so `text` is already
   // the words; `attrSpan` has proved those words are what the bytes spell.
-  if (kind === 'quoted') return located(context.source, prop, { verdict: 'editable', value: prop.text });
+  // `set:html` is the exception: Astro injects that attribute's source text as
+  // HTML without decoding it, so the value is the bytes between the quotes and
+  // the decoded reading would be a different string with different behaviour.
+  if (kind === 'quoted') {
+    const value = name === HTML_PROP ? source.slice(1, -1) : prop.text;
+    return located(context.source, prop, { verdict: 'editable', value });
+  }
   if (kind === 'template-literal') return { verdict: 'read-only', reason: 'template' };
   if (kind !== 'expression' && kind !== 'shorthand') return { verdict: 'read-only', reason: 'unsupported' };
   if (source.trimStart().startsWith('`')) return { verdict: 'read-only', reason: 'template' };
@@ -131,9 +149,10 @@ export function proveEntry(frontmatter: string, write: UsageWrite, ordinal: numb
 export function proveLink(link: UsageLink, frontmatter: string, ordinal: number): UsageLink {
   if (!link.props.some(prop => prop.reason === 'unproven-entry')) return link;
   return { ...link, props: link.props.map(prop => {
-    const { name, kind, source, start, end } = prop;
+    const { name, kind, source, start, end, html } = prop;
     return { name, kind, source, ...(start === undefined ? {} : { start }),
-      ...(end === undefined ? {} : { end }), ...proveEntry(frontmatter, prop, ordinal) };
+      ...(end === undefined ? {} : { end }), ...(html ? { html } : {}),
+      ...proveEntry(frontmatter, prop, ordinal) };
   }) };
 }
 
@@ -235,10 +254,11 @@ export async function parseFile(source: string): Promise<ParsedFile> {
             ...(span ? { start: span.start, end: span.end } : {}),
           };
           const { text: _text, ...wire } = prop;
-          return { ...wire, ...propWrite(prop, {
-            source, frontmatter, values,
-            enclosingHead: context.at(-1)?.head ?? null,
-          }) };
+          return { ...wire, ...(a.name === HTML_PROP ? { html: true as const } : {}),
+            ...propWrite(prop, {
+              source, frontmatter, values,
+              enclosingHead: context.at(-1)?.head ?? null,
+            }) };
         }),
         slots: (node.children ?? []).flatMap((n, i, children) => {
           if (!n.position) return [];

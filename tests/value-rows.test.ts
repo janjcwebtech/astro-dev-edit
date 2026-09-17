@@ -229,3 +229,26 @@ describe('a chain row says which file owns the look and which holds the words', 
       .toEqual(['content']);
   });
 });
+
+/**
+ * `set:html` at a usage site is a value like any other, plus one fact about
+ * where it is going: the page reads it as HTML rather than as text.
+ */
+describe('an HTML value is one whole row, and says so', () => {
+  it('marks a usage-site prop as HTML without changing what makes it editable', () => {
+    const { rows } = buildValueRows(input({
+      links: [link('a', '/Page.astro', { props: [
+        prop('set:html', '{intro}', { kind: 'expression', html: true, value: '<p>Hi</p>' }),
+        prop('set:html', '{built}', { kind: 'expression', html: true, verdict: 'read-only', reason: 'computed', value: undefined }),
+      ] })],
+    }));
+    const [, editable, refused] = rows;
+    expect(editable).toMatchObject({ label: 'set:html', verdict: 'editable', value: '<p>Hi</p>',
+      caption: 'Rendered as HTML. The whole string is edited here.' });
+    expect(editable.details).toContain('renders as · HTML');
+    // The destination is a fact about the value, not about the verdict — a
+    // refused one is still HTML, and still keeps its own reason.
+    expect(refused).toMatchObject({ verdict: 'read-only', reason: 'computed' });
+    expect(refused.details).toContain('renders as · HTML');
+  });
+});

@@ -233,9 +233,13 @@ function usageRows(links: readonly UsageLink[], pathname: string,
         label: prop.name, ...write, value: prop.value ?? prop.source, destination: at,
         badges: [], pinned: false, depth,
         caption: write.verdict !== 'editable' ? write.caption
+          // The whole string, and only the whole string: what the tags inside
+          // it produce has no proven source, and this row never claims it has.
+          : prop.html ? 'Rendered as HTML. The whole string is edited here.'
           : prop.trace ? 'One hop to a literal in this file.'
           : 'A quoted string literal at the usage site.',
-        details: [`kind · ${prop.kind}`, ...byteRange(prop.start, prop.end),
+        details: [`kind · ${prop.kind}`, ...(prop.html ? ['renders as · HTML'] : []),
+          ...byteRange(prop.start, prop.end),
           ...(prop.trace ? [`trace · ${prop.trace.label}`] : []),
           ...(prop.verdict === 'elsewhere' ? [`imported from · ${prop.from}`] : []), chain],
       });

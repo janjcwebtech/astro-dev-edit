@@ -6,8 +6,8 @@ plan:
   type: system-design
   priority: high
   created: "2026-09-13"
-  updated: "2026-09-17"
-  progress: 70
+  updated: "2026-09-18"
+  progress: 72
   visual: narrow-to-editor-inspector.plan.html
   mockup: narrow-to-editor-inspector.mockup.html
   tags: [scope-reduction, astro, composition, annotations]
@@ -185,7 +185,7 @@ Editable where the source value is proven. Existing patchers need extension for 
 | Prop shape | Verdict | Mechanism |
 | --- | --- | --- |
 | `title="Build things…"` — quoted string literal | **editable** | The value span of a quoted attribute, as `src`/`alt` are written today (`patcher/astro.ts::escapeAttrValue`) |
-| `set:html={html}` — a known literal string | **editable** | Edit the whole string at its proven source; its generated descendants remain untracked |
+| `set:html={html}` — a known literal string | **editable** | Edit the whole string at its proven source; its generated descendants remain untracked. A quoted one is raw: Astro injects that attribute undecoded |
 | `<Button>Start a project</Button>` — literal slot text | **editable** | The slot children's source range from the static usage index |
 | `title={s.title}` — one hop to a literal in the same file | **editable** | `expression-trace.ts`, chain supplying the hop, instance matched by rendered text |
 | `eyebrow={site.tagline}` — imported | **elsewhere** | A second file; no transitive chase (#61's own rule). Read-only, and it names that file |
@@ -198,7 +198,7 @@ Rules it must obey:
 - The target is a **component tag's** attribute, which is new: `patcher/astro.ts::resolveElement` matches plain elements by annotation loc and component tags carry none, so resolution comes from the usage index's loc — a sibling resolver, not a looser one.
 - Verify-then-patch is unchanged (rule 5); the request names a **usage id**, never a path, and the file it resolves to still passes `validateEditablePath` (rule 3).
 - **Content is accepted; source syntax is preserved.** Encode string values for their actual destination (quoted attribute, JavaScript string or template text), preserving literal characters and existing rendering semantics. HTML strings receive a raw-value field, not a structural HTML editor. This user-approved scope supersedes the blanket character refusal for these content writes; it does not widen config or dotenv writes. Verify the written value reads back unchanged.
-- `ApplyOp` gains a `usage` target carrying `{usageId, prop | slot}`. `UsageProp` and `UsageSlot` carry a **three-state** `UsageWrite` — `editable` · `elsewhere` (writable, in the module it names in `from`) · `read-only` — each refusal naming its reason, so the client renders a reason rather than guessing. Three, not a boolean plus a refusal: a boolean cannot carry `elsewhere`, which is the state WF-4 item 8 exists to protect. `set:html` at a *component* tag is a `directive` refusal, not the editable whole-string case the table's second row describes — that row is about an element destination, and the usage tag itself is already a `chain-break`.
+- `ApplyOp` gains a `usage` target carrying `{usageId, prop | slot}`. `UsageProp` and `UsageSlot` carry a **three-state** `UsageWrite` — `editable` · `elsewhere` (writable, in the module it names in `from`) · `read-only` — each refusal naming its reason, so the client renders a reason rather than guessing. Three, not a boolean plus a refusal: a boolean cannot carry `elsewhere`, which is the state WF-4 item 8 exists to protect. `set:html` names a value rather than structure, so it earns a verdict at both destinations. At a *component* tag the usage is separately a `chain-break` — the injected HTML has no container to mark opaque — so that verdict is reachable through the API and not through the panel.
 
 ### Source navigation for a Markdown-backed route
 
@@ -284,7 +284,7 @@ Rules it must obey:
 - [x] **P6b** — staged values and one Save per row, for the literal-text targets (`text` / `markup` / `expression`): a field and one Save/Revert pair under each editable row, the caret on the page for `text`, amber on the element, verify-then-patch unchanged, and a pending edit kept across an unrelated reload or dropped by name
 - [x] **P6b** — the same field, Save and Revert for props and slot text, through the one staged-value store; `elsewhere` and `read-only` rows keep their sentence and their *View code*. The image grid in place of the modal is P6e
 - [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
-- [ ] **P6c** — prop and slot-text editing at proven source targets, with destination-aware encoding, lands via `/composition/apply` and `usage-write.ts`; the render ordinal earns back `unproven-entry` for a proven 1:1 `.map()`. **Whole HTML string values and `set:html` destinations are outstanding**, so the box stays open and #61 is not yet closed
+- [ ] **P6c** — prop and slot-text editing at proven source targets, with destination-aware encoding, lands via `/composition/apply` and `usage-write.ts`; the render ordinal earns back `unproven-entry` for a proven 1:1 `.map()`; `set:html` at a usage site earns a verdict. **The element destination is outstanding**, so the box stays open and #61 is not yet closed
 - [ ] **P6d** — Markdown-backed routes: source-file navigation for frontmatter and body content; no browser writes
 - [ ] **P6e** — image picker: filter across the project's assets, paged browsing, and upload into the configured `uploadDir`
 - [ ] **P7** — committed fixture site with a genuine 3-deep chain; real-site pass on both fixtures
@@ -304,7 +304,7 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [x] No route under `/__dev-edit` answers a CMS path; `/health` reports no `entryEditor` or `unsplash`
 - [x] A quoted prop edited from the inspector lands as a byte-level patch at the usage site, and a stale one refuses rather than writes
 - [x] A `{s.title}` prop inside a `.map()` edits **only** the clicked instance, and names which array entry it wrote
-- [x] String values containing braces, angle brackets and quotes save and read back unchanged at a usage site; HTML-valued destinations are outstanding with P6c's HTML half
+- [x] String values containing braces, angle brackets and quotes save and read back unchanged at a usage site, and at an HTML-valued destination — where the same characters are the tags themselves and reach the page as tags
 - [ ] A known HTML string is editable as a whole even when its generated descendants have no proven component relationships
 - [x] Computed, spread, styling and untraceable props render `read-only` with a named reason, and imported ones `elsewhere` naming their module
 - [x] No refused value ever offers an editable field that then fails on save — a field appears only for an `editable` verdict whose target the write path serves, which is what `unproven-entry` exists to keep true
