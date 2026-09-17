@@ -79,6 +79,19 @@ export function overlayCss(): string {
 .atx-inspector-note { font: 12px/1.5 var(--atx-font-ui); color: var(--atx-muted-fg); overflow-wrap: anywhere; margin: 8px 0; }
 .atx-inspector-details { font: 12px/1.5 var(--atx-font-ui); margin: 8px 0; }
 .atx-inspector-details > summary { cursor: pointer; color: var(--atx-muted-fg); }
+/* A Values row is three bands — what it is (title, verdict, badges, caption) ·
+   the value · where it goes — so the destination is named once instead of
+   three times, and the mechanism vocabulary stays inside the Details
+   disclosure the row already owns. */
+.atx-inspector .atx-item-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.atx-value-chip { flex: 0 0 auto; border: 1px solid var(--atx-input); border-radius: var(--atx-radius-sm); padding: 1px 6px; font: 500 10.5px var(--atx-font-ui); color: var(--atx-muted-fg); text-transform: lowercase; }
+.atx-value-chip[data-chip="editable"] { border-color: var(--atx-success-text); color: var(--atx-success-text); }
+.atx-value-chip[data-chip="elsewhere"] { border-color: var(--atx-warning); color: var(--atx-warning); }
+.atx-value-chip[data-chip="badge"] { border-style: dashed; color: var(--atx-faint-fg); }
+.atx-value-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+.atx-value-where { min-width: 0; font: 11px var(--atx-font-mono); color: var(--atx-faint-fg); overflow-wrap: anywhere; }
+.atx-inspector .atx-item[data-pinned] { border-left: 2px solid var(--atx-primary); }
+.atx-inspector .atx-item[data-verdict] > .atx-item-content > .atx-inspector-code { margin-top: 6px; }
 /* The panel header's second row: which page the tool is pointed at, and the one
    door onto its source. The title bar above it carries the tool's own controls
    (menu, settings, close) — see .atx-tree-action. */

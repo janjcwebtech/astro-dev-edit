@@ -67,7 +67,10 @@ export type UsageRefusal =
    *  provable write target (rule 6). */
   | 'unlocated'
   /** A value shape this parser does not model. */
-  | 'unsupported';
+  | 'unsupported'
+  /** An attribute the source does not contain: rule 6 refuses to point at one
+   *  that would have to be written first. */
+  | 'absent';
 
 /** The frontmatter string an editable one-hop expression reads. */
 export interface UsageTrace {

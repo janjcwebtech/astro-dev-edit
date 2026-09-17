@@ -7,7 +7,7 @@ plan:
   priority: high
   created: "2026-09-13"
   updated: "2026-09-17"
-  progress: 49
+  progress: 55
   visual: narrow-to-editor-inspector.plan.html
   mockup: narrow-to-editor-inspector.mockup.html
   tags: [scope-reduction, astro, composition, annotations]
@@ -279,6 +279,7 @@ Rules it must obey:
 - [x] **P6a** — hold-to-activate replaces edit mode; the admin bar becomes a left-edge launcher plus a panel header carrying route and source
 - [x] **P6a** — menu and settings in that header: `☰` (Copy page context, Re-scan the page) and `⚙` Settings, then close, with the route, its template and *View code* below
 - [x] **P6b** — one read-only inspector for every click: Values, Component chain, Slot relationships, CSS, one *View code* verb
+- [x] **P6b** — the row model: every value on a selection is a Values row carrying its own three-state verdict, the clicked value pinned and badged, slot-wrapped values badged `via slot`, and the destination named once behind a `Details` disclosure. `/classify` joins the selection load, since the DOM cannot tell a resolved `{expression}` from literal text
 - [ ] **P6b** — staged values and one Save per row; replaces the refusal modal and the image modal
 - [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
 - [ ] **P6c** — prop and slot-text editing at proven source targets, including whole HTML string values and destination-aware encoding (closes #61)
@@ -303,14 +304,15 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [ ] A `{s.title}` prop inside a `.map()` edits **only** the clicked instance, and names which array entry it wrote
 - [ ] String values containing braces, angle brackets and quotes save and read back unchanged; text remains text and HTML-valued destinations retain HTML behavior
 - [ ] A known HTML string is editable as a whole even when its generated descendants have no proven component relationships
-- [ ] Imported, computed and spread props render read-only with a named reason — never an editable field that fails on save
+- [x] Computed, spread, styling and untraceable props render `read-only` with a named reason, and imported ones `elsewhere` naming their module
+- [ ] No refused value ever offers an editable field that then fails on save
 - [ ] Clicking any element opens the inspector; no modal refusal or modal image panel remains
 - [ ] Nothing reaches disk before Save: a typed change, a picked image and an upload all leave the source byte-identical, and the element stays marked unsaved until Save
 - [x] Releasing ⌥ restores ordinary navigation while the inspector keeps its selection (no pending edit exists yet — that is P6b)
 - [ ] A pending edit survives an unrelated HMR update, and is discarded with a toast when its own file changed
 - [ ] A literal rendered on two routes edits as one value and writes one line, and both elements mark unsaved together
-- [ ] A value writable in another file reads `elsewhere` with that file named — never `read-only`
-- [ ] A value wrapped in slot markup is an editable row badged `via slot`, not a read-only slot preview
+- [x] A value writable in another file reads `elsewhere` with that file named — never `read-only`
+- [x] A value wrapped in slot markup is an editable row badged `via slot`, not a read-only slot preview
 - [ ] Markdown frontmatter, plain paragraphs and formatted paragraphs all offer source navigation without editable fields or Save
 - [ ] An unresolved Markdown backing file opens the known route template, without inventing an entry file or body-line location
 - [x] The overlay is inert until ⌥ is held: links navigate, forms submit, nothing is intercepted

@@ -6,11 +6,12 @@ import RepeatSlots from './RepeatSlots.astro';
 import ForwardSlots from './ForwardSlots.astro';
 import Mutating from './Mutating.astro';
 import Delayed from './Delayed.astro';
+import { TAGLINE } from './site-data.mjs';
 ---
 <html><body>
   {[1, 2].map(label => <Rootless label={label} />)}
   <RecursiveSpread depth={2} />
-  <Forward title="Protected" />
+  <Forward title="Protected" eyebrow={TAGLINE} />
   <RepeatSlots>
     <span data-repeated-slot>Repeated words</span>
     <Rootless slot="detail" label="slotted" />

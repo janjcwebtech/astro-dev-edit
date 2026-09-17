@@ -47,6 +47,12 @@ async function fixture(compiler: 'go' | 'rust', enhanced = false, entry = 'Page'
   const index = createUsageIndex({ root, canonical: async file => file,
     resolve: async (specifier, importer) => specifier.startsWith('@fixture/')
       ? join(root, specifier.slice('@fixture/'.length)) : resolve(dirname(importer), specifier) });
+  // Plain value modules travel with the fixture: the `elsewhere` verdict needs
+  // a real second module to name, and nothing compiles them.
+  for (const name of (await readdir(root, { withFileTypes: true }))
+    .filter(file => file.isFile() && file.name.endsWith('.mjs')).map(file => file.name)) {
+    await writeFile(join(dir, name), await readFile(join(root, name), 'utf8'));
+  }
   const sources = new Map<string, string>();
   for (const name of files) {
     const file = join(root, name), source = await readFile(file, 'utf8');

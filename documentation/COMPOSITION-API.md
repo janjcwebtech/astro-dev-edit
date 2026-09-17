@@ -35,13 +35,21 @@ mounts no toolbar:
 
 The panel shows:
 
-- **Values:** a read-only rendered text or image-attribute snapshot and its
-  original source location. A known page backing file has a separate source
-  link; it does not claim that every value comes from that file.
+- **Values:** one row per value on the selection, read-only. The clicked
+  value is pinned first, marked *selected element*, and badged *via slot* when
+  slot markup wraps it; below it come the values each usage site passes,
+  nearest site first, with the rest folded behind *Further up the chain*. Every
+  row carries its verdict — `editable`, `elsewhere` or `read-only` — a plain
+  caption, the value as the source spells it, and **View code** on the file
+  holding the words, named once. Mechanism vocabulary sits behind *Details*. A
+  selection with no value at all collapses the card to *nothing writable on
+  this selection* plus the reason and a jump to whatever source is known.
 - **Component chain:** a proven runtime chain, an explicitly inferred static
   path, separate candidate paths, or a named refusal. Component rows offer
-  **View code** for the component and **Open parent** for its usage site.
-  Usage details show prop and slot source text without evaluating it.
+  **View code** for the component and **Open parent** for its usage site, and
+  are badged *presentation* when the usage renders the selected element's own
+  file and *content* when it supplies any writable value. Usage details name
+  each prop and slot with its verdict; the values themselves are Values rows.
 - **Slot relationships:** all enclosing native-slot insertion boundaries,
   including forwarded slots and fallback content, with links to the receiving
   `<slot>` locations. The selected element's own source remains separate.

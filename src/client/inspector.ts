@@ -3,10 +3,11 @@ import * as api from './api.ts';
 import { readRenderOccurrences } from './composition-dom.ts';
 import { rulesForElement } from './css-inspect.ts';
 import { has } from './features.ts';
-import { card, item } from './group.ts';
+import { card, item, itemGroup } from './group.ts';
 import { createInspectorLoader, occurrenceSummary } from './inspector-model.ts';
 import { nearestOwnSource, sourceFor } from './source-map.ts';
 import { basename, footButton, isolateScroll, styled } from './ui.ts';
+import { buildValueRows, chainBadges, type ValueRow, type ValueRows, type ValueSelection } from './value-rows.ts';
 
 export interface InspectorDeps {
   viewCode(source: SourceLoc): void;
@@ -91,28 +92,25 @@ export function initInspector(deps: InspectorDeps) {
     parent.append(details);
   }
 
-  function usage(parent: HTMLElement, link: UsageLink) {
+  /** A chain row. `selectionFile` lets it say which file owns the look and
+   *  which holds the words; the values themselves are Values rows, so this row
+   *  names its usage site rather than re-listing them. */
+  function usage(parent: HTMLElement, link: UsageLink, selectionFile: string | null) {
     const row = item({ title: link.name,
       description: link.target ? basename(link.target) : `Unresolved · ${link.refusal ?? 'unresolved'}`,
       actions: [
         ...(link.target ? [codeButton({ file: link.target, loc: '1:1' })] : []),
         codeButton(link, 'Open parent'),
       ] });
+    row.title.append(...chainBadges(link, selectionFile).map(badge => chip(badge, 'badge')));
     const details = styled('details', 'atx-inspector-details');
     const summary = styled('summary', '');
     summary.textContent = `Usage at ${basename(link.file)}:${link.loc}`;
     details.append(summary);
-    for (const prop of link.props) {
-      note(details, `${prop.name} · ${prop.kind}`);
-      const value = styled('pre', 'atx-inspector-code');
-      value.textContent = prop.source;
-      details.append(value);
-    }
-    for (const slot of link.slots) {
-      note(details, `Slot ${slot.name || 'default'} · caller source`);
-      const value = styled('pre', 'atx-inspector-code');
-      value.textContent = slot.source;
-      details.append(value);
+    for (const value of [...link.props, ...link.slots]) {
+      note(details, 'name' in value && 'kind' in value
+        ? `${value.name} · ${value.kind} · ${value.verdict}`
+        : `slot ${value.name || 'default'} · ${value.verdict}`);
     }
     row.content.append(details);
     // The breadcrumb names a link by id; the row it opens has to be findable.
@@ -157,6 +155,81 @@ export function initInspector(deps: InspectorDeps) {
     return section.root;
   }
 
+  /** A verdict or a badge, as one small pill beside the row's label. */
+  function chip(text: string, kind: string) {
+    const el = styled('span', 'atx-value-chip');
+    el.dataset.chip = kind;
+    el.textContent = text;
+    return el;
+  }
+
+  /**
+   * One Values row, in three bands — **what it is** (label, verdict, badges,
+   * caption) · **the value** · **where it goes** — with the destination named
+   * once and the mechanism vocabulary folded behind `Details`, so the label
+   * can name a destination instead of explaining one.
+   */
+  function valueRow(row: ValueRow) {
+    const built = item({ title: row.label, description: row.caption,
+      variant: row.pinned ? 'muted' : 'plain' });
+    built.root.dataset.verdict = row.verdict;
+    if (row.pinned) built.root.dataset.pinned = '';
+    built.title.append(chip(row.verdict, row.verdict), ...row.badges.map(badge => chip(badge, 'badge')));
+
+    const value = styled('pre', 'atx-inspector-code');
+    value.textContent = row.value.slice(0, 4000) || '(empty)';
+    built.content.append(value);
+
+    const foot = styled('div', 'atx-value-foot');
+    if (row.destination) foot.append(codeButton(row.destination));
+    const where = styled('span', 'atx-value-where');
+    where.textContent = [
+      row.destination && `${basename(row.destination.file)}:${row.destination.loc}`,
+      row.from && `writable in ${row.from}`,
+    ].filter(Boolean).join(' · ') || 'No proven destination.';
+    if (row.destination) where.title = `${row.destination.file}:${row.destination.loc}`;
+    foot.append(where);
+    built.content.append(foot);
+
+    const details = styled('details', 'atx-inspector-details');
+    const summary = styled('summary', '');
+    summary.textContent = 'Details';
+    details.append(summary);
+    for (const line of row.details) note(details, line);
+    built.content.append(details);
+    return built.root;
+  }
+
+  /** The Values card, rendered from the model and nothing else. A refusal
+   *  collapses it to one sentence plus a jump to whatever source is known. */
+  function renderValues(
+    section: ReturnType<typeof card>,
+    model: ValueRows,
+    jump: { label: string; src: SourceLoc; description: string } | null,
+  ) {
+    section.body.replaceChildren();
+    if (!model.rows.length) {
+      note(section.body, `Nothing writable on this selection. ${model.refusal ?? ''}`.trim());
+      if (jump) sourceRow(section.body, jump.label, jump.src, jump.description);
+      return;
+    }
+    const list = itemGroup({ bleed: true });
+    for (const row of model.rows.filter(r => r.depth <= 0)) list.append(valueRow(row));
+    section.body.append(list);
+    // Values passed further up the chain are real rows, not a summary — but
+    // the site that handed this element its values is the one worth reading
+    // without scrolling past its grandparents.
+    const far = model.rows.filter(r => r.depth > 0);
+    if (!far.length) return;
+    const details = styled('details', 'atx-inspector-details');
+    const summary = styled('summary', '');
+    summary.textContent = `Further up the chain · ${far.length}`;
+    const rest = itemGroup();
+    for (const row of far) rest.append(valueRow(row));
+    details.append(summary, rest);
+    section.body.append(details);
+  }
+
   /** `focus` names a chain row to mark once the chain has resolved — a
    *  breadcrumb segment. Reselecting the element already shown keeps the panel
    *  as it is and only moves the mark. */
@@ -171,94 +244,124 @@ export function initInspector(deps: InspectorDeps) {
     title.textContent = `<${el.tagName.toLowerCase()}> · Read-only`;
     root.setAttribute('data-on', '');
     body.replaceChildren();
-    const values = card({ title: 'Values', description: 'Rendered value · read-only' });
-    const text = styled('pre', 'atx-inspector-code');
-    text.textContent = el instanceof HTMLImageElement ? `src: ${el.currentSrc || el.src}\nalt: ${el.alt}`
-      : (el.textContent ?? '').trim().slice(0, 4000) || '(No text content)';
-    values.body.append(text);
-    const source = sourceFor(el);
-    const opaque = !!el.parentElement?.closest('[data-atx-boundary="html"]');
-    if (source && !opaque) sourceRow(values.body, 'Written here', source);
-    else if (el.parentElement) {
-      const ancestor = nearestOwnSource(el.parentElement);
-      const ancestorSource = ancestor && sourceFor(ancestor);
-      if (ancestorSource) sourceRow(values.body, 'Enclosing source', ancestorSource, 'Container source; this element’s source is not proven.');
-    }
-    const backing = deps.backingFile();
-    if (backing) sourceRow(values.body, 'Page backing file', { file: backing, loc: '1:1' }, 'Route content file; individual value mapping is not proven.');
+    const values = card({ title: 'Values', description: 'Every value on this selection, one row each · read-only' });
     const chain = card({ title: 'Component chain' });
     const slots = card({ title: 'Slot relationships' });
     chainBody = chain.body;
     body.append(values.root, chain.root, slots.root, css(el));
+    note(values.body, 'Resolving values…');
+
+    const source = sourceFor(el);
+    const opaque = !!el.parentElement?.closest('[data-atx-boundary="html"]');
+    const selection: ValueSelection = {
+      source: source ?? null, opaque, viaSlot: false,
+      text: (el.textContent ?? '').trim().slice(0, 4000),
+      // The attribute, not `currentSrc`: the row describes what the file holds.
+      ...(el instanceof HTMLImageElement
+        ? { image: { src: el.getAttribute('src') ?? '', alt: el.getAttribute('alt') ?? '' } } : {}),
+    };
+    const ancestor = !source && el.parentElement ? nearestOwnSource(el.parentElement) : null;
+    const ancestorSource = ancestor && sourceFor(ancestor);
+    const backing = deps.backingFile();
+    const jump = ancestorSource
+      ? { label: 'Enclosing source', src: ancestorSource,
+        description: 'Container source; this element’s source is not proven.' }
+      : backing
+        ? { label: 'Page backing file', src: { file: backing, loc: '1:1' },
+          description: 'Route content file; individual value mapping is not proven.' }
+        : null;
 
     // Never climb from an untracked descendant to manufacture its ownership.
+    // Values is still answered: /classify needs only a source loc, and a
+    // broken chain says nothing about the words written in this file.
+    let render: ReturnType<typeof readRenderOccurrences> | null = null;
+    let group: ReturnType<typeof occurrenceSummary> = null;
     if (opaque || !source) {
       note(chain.body, opaque ? 'No chain · untracked-html. Generated HTML has no proven inner-element source relationship.'
         : 'No chain · this element has no source annotation.');
       note(slots.body, 'No proven slot relationship.');
-      return;
+    } else {
+      render = readRenderOccurrences(document);
+      if (!render.result.ok) {
+        note(chain.body, `No chain · ${render.result.reason}. Render annotations are incomplete or damaged.`);
+        note(slots.body, 'Slot placement graph refused.');
+      } else {
+        const key = render.elements.indexOf(el);
+        const occurrence = render.result.occurrences.find(p => p.key === key);
+        const peers = render.result.occurrences.filter(p => {
+          const peer = render!.elements[p.key];
+          return peer.getAttribute('data-atx-file') === el.getAttribute('data-atx-file') &&
+            peer.getAttribute('data-atx-chain') === el.getAttribute('data-atx-chain') &&
+            peer.getAttribute('data-atx-loc') === el.getAttribute('data-atx-loc');
+        });
+        group = occurrence ? occurrenceSummary(occurrence, peers) : null;
+        selection.viaSlot = (group?.slots ?? []).some(placement => !placement.fallback);
+        if (group) note(chain.body, `Rendered occurrence ${group.index} of ${group.total} of this source element.`);
+        if (!group?.slots.length) note(slots.body, 'No tracked slot insertion contains this element.');
+        for (const slot of group?.slots ?? []) {
+          sourceRow(slots.body, `${slot.name || 'default'} slot · ${slot.fallback ? 'fallback' : 'supplied content'}`,
+            { file: slot.file, loc: slot.loc }, `Rendered inside ${basename(slot.file)}:${slot.loc}`);
+        }
+      }
     }
-    const render = readRenderOccurrences(document);
-    if (!render.result.ok) {
-      note(chain.body, `No chain · ${render.result.reason}. Render annotations are incomplete or damaged.`);
-      note(slots.body, 'Slot placement graph refused.');
-      return;
-    }
-    const key = render.elements.indexOf(el);
-    const occurrence = render.result.occurrences.find(p => p.key === key);
-    const peers = render.result.occurrences.filter(p => {
-      const peer = render.elements[p.key];
-      return peer.getAttribute('data-atx-file') === el.getAttribute('data-atx-file') &&
-        peer.getAttribute('data-atx-chain') === el.getAttribute('data-atx-chain') &&
-        peer.getAttribute('data-atx-loc') === el.getAttribute('data-atx-loc');
-    });
-    const group = occurrence && occurrenceSummary(occurrence, peers);
-    if (group) note(values.body, `Rendered occurrence ${group.index} of ${group.total} of this source element.`);
-    if (!group?.slots.length) note(slots.body, 'No tracked slot insertion contains this element.');
-    for (const slot of group?.slots ?? []) {
-      sourceRow(slots.body, `${slot.name || 'default'} slot · ${slot.fallback ? 'fallback' : 'supplied content'}`,
-        { file: slot.file, loc: slot.loc }, `Rendered inside ${basename(slot.file)}:${slot.loc}`);
-    }
+
+    const chainable = !!source && !opaque && !!render?.result.ok;
     const loading = styled('p', 'atx-inspector-note');
-    loading.textContent = 'Resolving component chain…';
-    loading.setAttribute('role', 'status');
-    chain.body.append(loading);
-    try {
-      const answer = await loader.load({ pathname, file: source.file,
-        chain: el.getAttribute('data-atx-chain') ?? undefined,
-        ...(el.getAttribute('data-atx-version') === '2' ? { traceVersion: 2 as const } : {}),
-      });
-      if (!answer || !alive()) return;
-      chain.body.replaceChildren();
-      const labels = { proven: 'Proven chain', inferred: 'Inferred source path · rendered instance is not proven',
-        candidates: 'Multiple possible source paths · no path selected', none: 'No chain' };
-      note(chain.body, `${labels[answer.chain.tier]}${answer.chain.reason ? ' · ' + answer.chain.reason : ''}`);
-      if (answer.chain.route) {
-        sourceRow(chain.body, 'Route', { file: answer.chain.route, loc: '1:1' }).dataset.usage = 'route';
-      }
-      for (const link of answer.chain.links) usage(chain.body, link);
-      for (const [index, candidate] of (answer.chain.candidates ?? []).entries()) {
-        const details = styled('details', 'atx-inspector-details');
-        const summary = styled('summary', '');
-        summary.textContent = `Possible path ${index + 1}`;
-        details.append(summary);
-        candidate.forEach(link => usage(details, link));
-        chain.body.append(details);
-      }
-      coverage(chain.body, answer.chain.coverage);
-      const uses = styled('details', 'atx-inspector-details');
-      const summary = styled('summary', '');
-      summary.textContent = `Usages on this route · ${answer.uses.links.length}`;
-      uses.append(summary);
-      note(uses, 'Source usage sites, including unrendered branches. These are not rendered instance counts.');
-      if (answer.uses.reason) note(uses, answer.uses.reason);
-      answer.uses.links.forEach(link => usage(uses, link));
-      coverage(uses, answer.uses.coverage);
-      chain.body.append(uses);
-      focusUsage(focus ?? null);
-    } catch (error) {
-      if (alive()) loading.textContent = `Could not load composition · ${error instanceof Error ? error.message : 'Unknown error'}`;
+    if (chainable) {
+      loading.textContent = 'Resolving component chain…';
+      loading.setAttribute('role', 'status');
+      chain.body.append(loading);
     }
+    let answer;
+    try {
+      answer = await loader.load(
+        chainable ? {
+          pathname, file: source!.file,
+          chain: el.getAttribute('data-atx-chain') ?? undefined,
+          ...(el.getAttribute('data-atx-version') === '2' ? { traceVersion: 2 as const } : {}),
+        } : null,
+        source ? { file: source.file, loc: source.loc, tag: el.tagName.toLowerCase() } : null,
+      );
+    } catch (error) {
+      if (!alive()) return;
+      loading.textContent = `Could not load composition · ${error instanceof Error ? error.message : 'Unknown error'}`;
+      renderValues(values, { rows: [], refusal: 'The source changed while this selection was being resolved.' }, jump);
+      return;
+    }
+    if (!answer || !alive()) return;
+    renderValues(values, buildValueRows({
+      selection, classification: answer.classification, classifyError: answer.classifyError,
+      links: answer.chain?.links ?? [],
+    }), jump);
+    if (!answer.chain || !answer.uses) return;
+    chain.body.replaceChildren();
+    const labels = { proven: 'Proven chain', inferred: 'Inferred source path · rendered instance is not proven',
+      candidates: 'Multiple possible source paths · no path selected', none: 'No chain' };
+    note(chain.body, `${labels[answer.chain.tier]}${answer.chain.reason ? ' · ' + answer.chain.reason : ''}`);
+    if (group) note(chain.body, `Rendered occurrence ${group.index} of ${group.total} of this source element.`);
+    if (answer.chain.route) {
+      sourceRow(chain.body, 'Route', { file: answer.chain.route, loc: '1:1' }).dataset.usage = 'route';
+    }
+    for (const link of answer.chain.links) usage(chain.body, link, source?.file ?? null);
+    for (const [index, candidate] of (answer.chain.candidates ?? []).entries()) {
+      const details = styled('details', 'atx-inspector-details');
+      const summary = styled('summary', '');
+      summary.textContent = `Possible path ${index + 1}`;
+      details.append(summary);
+      candidate.forEach(link => usage(details, link, source?.file ?? null));
+      chain.body.append(details);
+    }
+    coverage(chain.body, answer.chain.coverage);
+    const uses = styled('details', 'atx-inspector-details');
+    const summary = styled('summary', '');
+    summary.textContent = `Usages on this route · ${answer.uses.links.length}`;
+    uses.append(summary);
+    note(uses, 'Source usage sites, including unrendered branches. These are not rendered instance counts.');
+    if (answer.uses.reason) note(uses, answer.uses.reason);
+    answer.uses.links.forEach(link => usage(uses, link, null));
+    coverage(uses, answer.uses.coverage);
+    chain.body.append(uses);
+    focusUsage(focus ?? null);
   }
 
   // Hydration can replace a selected node without a Vite update. Never keep
