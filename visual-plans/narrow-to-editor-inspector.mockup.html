@@ -72,20 +72,25 @@ body { font-family:var(--ui); background:#eceaf3; }
 body[data-edit="1"] #host [data-atx] { cursor:pointer; }
 #host [data-editing="1"] { outline:2px solid var(--brand); outline-offset:2px; border-radius:3px;
   background:color-mix(in srgb, var(--brand) 9%, transparent); cursor:text; }
-#host [data-live="1"] { outline:2px dashed var(--brand); outline-offset:3px; border-radius:3px; }
+/* Unsaved is its own colour. It must never be mistaken for the selection
+   outline, or "this is the element I picked" reads as "this is saved". */
+#host [data-dirty="1"] { outline:2px solid var(--warning); outline-offset:3px; border-radius:3px;
+  background:color-mix(in srgb, var(--warning) 12%, transparent); }
 
 /* ---------- overlay: bar + menu ---------- */
 #ov button { font-family:inherit; cursor:pointer; }
-.launcher { position:fixed; left:12px; top:50%; transform:translateY(-50%); z-index:710; width:38px; height:38px;
-  border-radius:var(--r-xl); border:1px solid var(--border); background:color-mix(in srgb, var(--glass) 92%, transparent);
-  backdrop-filter:blur(14px); color:#fff; font-size:15px; box-shadow:0 10px 30px rgb(0 0 0 / .35); display:grid; place-items:center; }
-.launcher:hover { background:var(--glass-raised); }
-.launcher b { color:var(--brand-text); }
-.launcher .kbd { position:absolute; left:46px; white-space:nowrap; font-size:11px; color:var(--fg); background:var(--card);
+.launcher { position:fixed; left:0; top:50%; transform:translateY(-50%); z-index:710;
+  display:flex; align-items:center; justify-content:center; width:24px; height:64px; padding:0;
+  border:none; border-right:1px solid rgb(255 255 255 / .10); border-radius:0 7px 7px 0;
+  background:color-mix(in srgb, var(--glass) 88%, transparent); backdrop-filter:blur(10px);
+  color:var(--brand-text); box-shadow:2px 0 14px rgb(0 0 0 / .30);
+  opacity:.7; transition:opacity .13s, color .13s; }
+.launcher:hover { opacity:1; color:var(--fg); }
+.launcher .kbd { position:absolute; left:32px; white-space:nowrap; font-size:11px; color:var(--fg); background:var(--card);
   border:1px solid var(--border); border-radius:var(--r-md); padding:4px 8px; opacity:0; pointer-events:none; transition:opacity .12s; }
 .launcher:hover .kbd { opacity:1; }
-.ctl { height:30px; padding:0 10px; border-radius:var(--r-md); border:1px solid transparent; background:transparent; color:var(--fg);
-  font-size:12.5px; display:inline-flex; align-items:center; gap:6px; }
+.ctl { height:30px; padding:0 11px; border-radius:var(--r-md); border:1px solid transparent; background:transparent; color:var(--fg);
+  font-size:12.5px; display:inline-flex; align-items:center; justify-content:center; gap:7px; }
 .ctl:hover { background:var(--accent); }
 .ctl.icon { width:32px; height:32px; padding:0; justify-content:center; color:var(--muted); }
 .ctl.icon:hover { color:var(--fg); }
@@ -94,20 +99,20 @@ body[data-edit="1"] #host [data-atx] { cursor:pointer; }
 .mk { width:15px; height:15px; display:block; flex:none; color:var(--brand-text); }
 /* Figma's component glyph: four rhombi meeting at the centre */
 .fig { width:13px; height:13px; display:block; flex:none; }
-.menu { position:fixed; top:calc(var(--mb) + 78px); left:12px; z-index:720; min-width:210px; padding:5px; border-radius:var(--r-xl);
+.menu { position:fixed; top:calc(var(--mb) + 78px); left:12px; z-index:720; min-width:230px; padding:6px; border-radius:var(--r-xl);
   background:color-mix(in srgb, var(--glass-raised) 97%, transparent); backdrop-filter:blur(14px); border:1px solid var(--border);
   box-shadow:0 18px 50px rgb(0 0 0 / .45); }
-.menu button { display:flex; align-items:center; gap:9px; width:100%; height:32px; padding:0 10px; border:0; background:transparent;
+.menu button { display:flex; align-items:center; gap:10px; width:100%; height:32px; padding:0 12px; border:0; background:transparent;
   color:var(--fg); font-size:13px; border-radius:var(--r-md); text-align:left; }
 .menu button:hover { background:var(--accent); }
-.menu .foot { display:flex; gap:7px; align-items:center; padding:8px 10px 4px; margin-top:4px; border-top:1px solid var(--border); font-size:11px; color:var(--faint); }
+.menu .foot { display:flex; gap:8px; align-items:center; padding:11px 12px 5px; margin-top:6px; border-top:1px solid var(--border); font-size:11px; color:var(--faint); }
 .dot { width:6px; height:6px; border-radius:999px; background:var(--success-text); }
 /* the panel's own two header rows: tool actions, then which page you are on */
-.pagerow { display:flex; align-items:center; gap:8px; padding:8px 10px 8px 12px; border-bottom:1px solid var(--border); }
+.pagerow { display:flex; align-items:center; gap:10px; padding:11px 10px 11px 16px; border-bottom:1px solid var(--border); }
 .pagerow .rt { font-family:var(--mono); font-size:12px; color:var(--fg); font-weight:600; }
 .pagerow .fl { font-family:var(--mono); font-size:10.5px; color:var(--faint); }
-.pagerow .pill-btn { margin-left:auto; height:24px; padding:0 9px; border-radius:var(--r-full); border:1px solid var(--input);
-  background:var(--control-bg); color:var(--fg); font-size:11px; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+.pagerow .pill-btn { margin-left:auto; height:26px; padding:0 11px; border-radius:var(--r-full); border:1px solid var(--input);
+  background:var(--control-bg); color:var(--fg); font-size:11px; display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
 .pagerow .pill-btn:hover { background:var(--accent); }
 .pagerow .pill-btn svg { width:13px; height:13px; flex:none; }
 [hidden] { display:none !important; }
@@ -117,19 +122,19 @@ body[data-edit="1"] #host [data-atx] { cursor:pointer; }
    < launcher 710 < menu 720 < modals 900+. The selection frame is page chrome, so
    it must never paint over the tree or the inspector. */
 .hlbox { position:absolute; pointer-events:none; z-index:480; border:2px solid var(--brand); border-radius:4px; }
-.hlbox[data-kind="readonly"] { border-color:var(--warning); border-style:dashed; }
-.hlbox[data-kind="image"] { border-color:var(--info); }
 .hlbox.locked { box-shadow:0 0 0 4px color-mix(in srgb, var(--brand) 22%, transparent); }
 .pill { position:absolute; z-index:490; background:var(--card); border:1px solid var(--border); border-radius:var(--r-lg);
   box-shadow:0 12px 34px rgb(0 0 0 / .42); color:var(--fg); font-size:12px; min-width:230px; max-width:460px; cursor:pointer; }
-.pill .r1 { display:flex; align-items:center; gap:8px; padding:7px 10px; }
+/* Unsaved feedback rides with the element as the amber outline; the buttons
+   that act on it live under the field, in one place, for every kind of value. */
+.state { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--success-text); }
+.state[data-d="1"] { color:var(--warning); }
+.pill .r1 { display:flex; align-items:center; gap:9px; padding:9px 12px; }
 .pill .loc { font-family:var(--mono); font-size:11.5px; }
-.verdict { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--brand-text); }
-.verdict[data-k="readonly"] { color:var(--warning); } .verdict[data-k="image"] { color:var(--info); }
 .pill .go { margin-left:auto; font-size:10.5px; color:var(--faint); }
-.pill .crumbs { display:flex; align-items:center; gap:4px; flex-wrap:wrap; padding:7px 10px; border-top:1px solid var(--border); font-family:var(--mono); font-size:11px; }
+.pill .crumbs { display:flex; align-items:center; gap:5px; flex-wrap:wrap; padding:9px 12px; border-top:1px solid var(--border); font-family:var(--mono); font-size:11px; }
 .sep { color:var(--faint); }
-.crumb { background:var(--control-bg); border:1px solid var(--input); color:var(--brand-text); border-radius:var(--r-sm); padding:2px 7px; font:inherit; }
+.crumb { background:var(--control-bg); border:1px solid var(--input); color:var(--brand-text); border-radius:var(--r-sm); padding:3px 8px; font:inherit; }
 .crumb:hover { background:var(--accent); }
 .crumb.cur { background:var(--primary); border-color:var(--primary); color:var(--primary-fg); font-weight:700; }
 .crumb.inferred { border-style:dashed; border-color:var(--warning); color:var(--warning); }
@@ -139,14 +144,13 @@ body[data-edit="1"] #host [data-atx] { cursor:pointer; }
   border-left:1px solid var(--border); display:flex; flex-direction:column; color:var(--fg); }
 .insp.left { right:auto; left:0; border-left:0; border-right:1px solid var(--border); }
 body[data-tree="1"] .insp.left { left:320px; }
-.ih { display:flex; align-items:center; gap:7px; padding:8px 8px 8px 13px; border-bottom:1px solid var(--border); }
+.ih { display:flex; align-items:center; gap:9px; padding:10px 10px 10px 16px; border-bottom:1px solid var(--border); }
 .ih b { font-size:12.5px; font-weight:600; }
 .ih .tag { font-family:var(--mono); font-size:11px; color:var(--faint); }
-.ibody { overflow:auto; padding:12px; display:flex; flex-direction:column; gap:11px; flex:1; }
-.ifoot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid var(--border); background:var(--bg); }
-.ifoot .btn-ui { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ibody { overflow:auto; padding:16px; display:flex; flex-direction:column; gap:14px; flex:1; }
 
-.tier { display:inline-flex; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:var(--r-full); }
+.tier { display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; padding:4px 9px 4px calc(9px + .06em); border-radius:var(--r-full); }
 .tier[data-t="proven"] { color:var(--success-text); background:color-mix(in srgb, var(--success-text) 15%, transparent); }
 .tier[data-t="inferred"] { color:var(--warning); background:color-mix(in srgb, var(--warning) 15%, transparent); }
 .tier[data-t="candidates"] { color:var(--chart5); background:color-mix(in srgb, var(--chart5) 15%, transparent); }
@@ -155,23 +159,37 @@ body[data-tree="1"] .insp.left { left:320px; }
 .reason code, .note code { font-family:var(--mono); font-size:11px; color:var(--chart3); }
 
 .grp { border:1px solid var(--border); border-radius:var(--r-xl); background:var(--bg); overflow:hidden; flex:none; }
-.grp > h4 { margin:0; padding:8px 12px; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--faint);
-  border-bottom:1px solid var(--border); background:var(--card); display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; }
+.grp > h4 { margin:0; padding:11px 14px; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--faint);
+  border-bottom:1px solid var(--border); background:var(--card); display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
 .grp > h4 .chev { transition:transform .12s; }
 .grp[data-open="0"] > h4 { border-bottom:0; } .grp[data-open="0"] > h4 .chev { transform:rotate(-90deg); }
 .grp[data-open="0"] > .gb { display:none; }
 .grp > h4 .aside { margin-left:auto; text-transform:none; letter-spacing:0; font-weight:500; font-family:var(--mono); }
 .grp.edit { border-color:color-mix(in srgb, var(--brand) 55%, transparent); }
 .grp.edit > h4 { color:var(--brand-text); }
-.gb { padding:11px 12px; display:flex; flex-direction:column; gap:9px; }
+.gb { padding:14px; display:flex; flex-direction:column; gap:12px; }
+/* A lone button in a column group would otherwise stretch edge to edge and sit
+   its label hard against the left rim. Hug the label, and centre it. */
+.gb > .mini { align-self:flex-start; }
 .note { font-size:11px; color:var(--faint); line-height:1.5; margin:0; }
+/* Where the vocabulary lives — verify-then-patch, strict prefix and friends.
+   Folded away by default so a label can just name its destination. */
+.dx { border-top:1px solid var(--border); margin-top:4px; padding-top:11px; }
+.dx > summary { font-size:10.5px; color:var(--faint); cursor:pointer; list-style:none; user-select:none;
+  display:flex; align-items:center; gap:7px; }
+.dx > summary::-webkit-details-marker { display:none; }
+.dx > summary::before { content:"▸"; font-size:9px; transition:transform .12s; }
+.dx[open] > summary::before { transform:rotate(90deg); }
+.dx > summary:hover { color:var(--fg); }
+.dx p { font-size:11px; color:var(--muted); line-height:1.55; margin:10px 0 0; }
+.dx code { font-family:var(--mono); font-size:10.5px; color:var(--chart3); }
 
 /* indented component chain */
-.tree-chain { padding:6px 0; }
-.cn { position:relative; display:flex; align-items:flex-start; gap:7px; padding:5px 10px 5px calc(12px + var(--d) * 18px); cursor:pointer; }
+.tree-chain { padding:8px 0; }
+.cn { position:relative; display:flex; align-items:flex-start; gap:9px; padding:7px 14px 7px calc(14px + var(--d) * 18px); cursor:pointer; }
 .cn:hover { background:color-mix(in srgb, var(--fg) 5%, transparent); }
 .cn[data-sel="1"] { background:color-mix(in srgb, var(--brand) 20%, transparent); }
-.cn::before { content:""; position:absolute; left:calc(12px + (var(--d) - 1) * 18px + 6px); top:0; height:15px; width:9px;
+.cn::before { content:""; position:absolute; left:calc(14px + (var(--d) - 1) * 18px + 6px); top:0; height:16px; width:9px;
   border-left:1px solid var(--accent); border-bottom:1px solid var(--accent); border-bottom-left-radius:5px; }
 .cn[style*="--d:0"]::before { display:none; }
 .cn .ic { color:var(--brand-text); width:13px; height:17px; flex:none; display:flex; align-items:center; justify-content:center; }
@@ -181,105 +199,147 @@ body[data-tree="1"] .insp.left { left:320px; }
 .cn.leaf .nm { color:var(--fg); font-weight:600; }
 .cn.inferred .nm { color:var(--warning); }
 .cn .sb { font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cn .roles { display:inline-flex; gap:4px; margin-left:6px; vertical-align:1px; }
-.role { font-family:var(--ui); font-size:9.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:1px 6px; border-radius:var(--r-full); }
+.cn .roles { display:inline-flex; gap:5px; margin-left:8px; vertical-align:1px; }
+.role { font-family:var(--ui); font-size:9.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  padding:2px 7px 2px calc(7px + .04em); border-radius:var(--r-full); }
 .role.pres { color:var(--chart5); background:color-mix(in srgb, var(--chart5) 16%, transparent); }
 .role.cont { color:var(--chart2); background:color-mix(in srgb, var(--chart2) 16%, transparent); }
-.cn .acts { display:none; gap:4px; margin-top:5px; }
+.cn .acts { display:none; gap:7px; margin-top:9px; margin-bottom:2px; }
 .cn[data-sel="1"] .acts { display:flex; }
 
 /* fields — borderless at rest, ring on focus (DESIGN-SYSTEM non-negotiable) */
-.mini { height:24px; padding:0 8px; font-size:11px; border-radius:var(--r-md); border:1px solid var(--input); background:var(--control-bg);
-  color:var(--fg); display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.mini { height:26px; padding:0 11px; font-size:11px; border-radius:var(--r-md); border:1px solid var(--input); background:var(--control-bg);
+  color:var(--fg); display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
 .mini:hover { background:var(--accent); }
 .mini.primary { background:var(--primary); border-color:var(--primary); color:var(--primary-fg); font-weight:600; }
-.prop { display:flex; flex-direction:column; gap:5px; padding:9px 0; }
+/* A row is three bands, deliberately unequal: WHAT IT IS (label + caption) ·
+   WHAT YOU TYPE (field, error, save) · WHERE IT GOES (note, source). One
+   uniform gap made all seven children read as a single undifferentiated list,
+   which is what made a five-row Values group feel like thirty lines of noise. */
+.prop { display:flex; flex-direction:column; gap:0; padding:17px 0 18px; }
+.prop > * { margin-top:9px; }
+.prop > *:first-child { margin-top:0; }
+.prop > .why { margin-top:6px; }     /* a caption, so it hugs the label above it */
+.prop > .inp { margin-top:12px; }    /* the control opens a band of its own */
+.prop > .err { margin-top:7px; }
+.prop > .row { margin-top:10px; }
+.prop > .note { margin-top:9px; }
+.prop > .foot { margin-top:15px; }   /* metadata, pushed away and kept quiet */
 .prop + .prop { border-top:1px solid var(--border); }
-.prop .pk { display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:11.5px; }
+.prop .pk { display:flex; align-items:center; gap:9px; font-family:var(--mono); font-size:11.5px; }
 .prop .pk .n { color:var(--chart5); }
 .prop .pk .st { margin-left:auto; font-family:var(--ui); font-size:10px; color:var(--faint); }
+/* editable · elsewhere · read-only — three states, because "you cannot write
+   this" and "write it somewhere else" are not the same answer. */
+.prop .pk .st[data-s="editable"] { color:var(--success-text); }
+.prop .pk .st[data-s="elsewhere"] { color:var(--warning); }
 .prop .pk .words { font-family:var(--ui); font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
-  color:var(--primary-fg); background:var(--brand-text); padding:1px 6px; border-radius:var(--r-full); }
+  color:var(--primary-fg); background:var(--brand-text); padding:2px 7px 2px calc(7px + .04em); border-radius:var(--r-full); }
+.prop .pk .via { font-family:var(--ui); font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--chart5); background:color-mix(in srgb, var(--chart5) 16%, transparent); padding:2px 7px 2px calc(7px + .04em); border-radius:var(--r-full); }
+/* the pinned row: the value you clicked, marked without shouting */
+.prop[data-sel="1"] { margin:0 -14px; padding:17px 14px 18px; border-left:2px solid var(--brand-text);
+  background:color-mix(in srgb, var(--brand) 9%, transparent); }
+.prop[data-sel="1"] + .prop { border-top:0; }
+.prop .why { font-size:12px; line-height:1.5; color:var(--muted); margin-bottom:0; }
+.prop .why b { color:var(--fg); font-weight:600; }
+.prop .why code { font-family:var(--mono); font-size:11px; color:var(--chart3); }
+/* Values is a list, not a stack of cards: rows carry their own padding and
+   hairlines, so the group's 12px gap would double every divider. */
+.gb.values { gap:0; padding:0 14px; }
+.gb.values > .prop:first-child { padding-top:15px; }
+.gb.values > .note { padding:14px 0; }
+.gb.values > .dx { margin-top:0; padding:13px 0 15px; }
+/* One footer line per row instead of a button row followed by a path
+   paragraph — the destination was being stated three times. */
+.prop .foot { display:flex; align-items:center; gap:10px; flex-wrap:nowrap; }
+/* One line, and the path yields first: the button must never wrap away from it. */
+.prop .foot .loc { flex:1 1 auto; text-align:right; font-family:var(--mono); font-size:10.5px; color:var(--faint);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.prop .foot .mini { flex:none; }
 .inp { width:100%; height:32px; border-radius:var(--r-lg); border:1px solid transparent; background:var(--input-bg); color:var(--fg);
-  padding:0 10px; font-size:12.5px; font-family:var(--ui); outline:none; }
+  padding:0 12px; font-size:12.5px; font-family:var(--ui); outline:none; }
 .inp:focus { border-color:var(--input); box-shadow:0 0 0 3px color-mix(in srgb, var(--ring) 45%, transparent); }
 .inp[aria-invalid="true"] { border-color:var(--destructive); }
-.inp.ta { height:auto; min-height:64px; padding:8px 10px; line-height:1.55; resize:vertical; font-size:12.5px; }
+.inp.ta { height:auto; min-height:72px; padding:9px 12px; line-height:1.6; resize:vertical; font-size:12.5px; }
 .inp.ro { font-family:var(--mono); font-size:11.5px; color:var(--chart3); background:transparent; border:1px dashed var(--border); cursor:not-allowed; }
-.prop .row { display:flex; gap:6px; align-items:center; }
+.prop .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .prop .err { font-size:11px; color:var(--destructive); }
 .prop[data-hot="1"] .inp { border-color:var(--brand-text); }
 
-.chips { display:flex; gap:5px; flex-wrap:wrap; }
-.chip-css { height:24px; padding:0 8px; font-family:var(--mono); font-size:11px; border-radius:var(--r-sm); border:1px solid var(--input);
+.chips { display:flex; gap:7px; flex-wrap:wrap; }
+.chip-css { height:26px; padding:0 10px; font-family:var(--mono); font-size:11px; border-radius:var(--r-sm); border:1px solid var(--input);
   background:var(--control-bg); color:var(--chart1); }
 .chip-css[data-open="1"] { background:var(--accent); }
 .rule { border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; }
-.rule pre { margin:0; padding:8px 10px; font-family:var(--mono); font-size:11px; line-height:1.65; white-space:pre; overflow-x:auto; }
+.rule pre { margin:0; padding:11px 13px; font-family:var(--mono); font-size:11px; line-height:1.7; white-space:pre; overflow-x:auto; }
 .rule .s { color:var(--chart1); } .rule .p { color:var(--chart5); } .rule .v { color:var(--chart2); }
-.rule .src { display:flex; align-items:center; padding:5px 10px; border-top:1px solid var(--border); font-family:var(--mono); font-size:10.5px; color:var(--faint); background:var(--card); }
+.rule .src { display:flex; align-items:center; gap:10px; padding:7px 8px 7px 13px; border-top:1px solid var(--border); font-family:var(--mono); font-size:10.5px; color:var(--faint); background:var(--card); }
 .rule .src .mini { margin-left:auto; }
-.mediagrid { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+.mediagrid { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
 .mtile { aspect-ratio:1; border-radius:var(--r-md); border:2px solid transparent; position:relative; overflow:hidden;
   padding:0; background:#f4f2fb; }
 .mtile img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
 .mtile[data-sel="1"] { border-color:var(--brand); }
-.mtile span { position:absolute; left:0; right:0; bottom:0; font-family:var(--mono); font-size:8.5px; color:#fff; background:rgb(0 0 0 / .55); padding:2px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cand { display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid var(--input); border-radius:var(--r-md); background:var(--control-bg); font-family:var(--mono); font-size:11px; }
+.mtile span { position:absolute; left:0; right:0; bottom:0; font-family:var(--mono); font-size:8.5px; color:#fff; background:rgb(0 0 0 / .55); padding:3px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cand { display:flex; align-items:center; gap:10px; padding:8px 8px 8px 13px; border:1px solid var(--input); border-radius:var(--r-md); background:var(--control-bg); font-family:var(--mono); font-size:11px; }
 .cand .mini { margin-left:auto; }
 
 /* ---------- element tree ---------- */
 .tree { position:fixed; left:0; top:var(--mb); bottom:0; width:320px; z-index:700; display:flex; flex-direction:column;
   background:color-mix(in srgb, var(--glass) 94%, transparent); backdrop-filter:blur(14px); border-right:1px solid var(--border); }
-.tree .th { display:flex; align-items:center; gap:7px; padding:8px 8px 8px 12px; border-bottom:1px solid var(--border); color:var(--fg); }
-.tree .th b { font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:7px; }
-.tree .tb { overflow:auto; padding:6px; flex:1; }
-.trow { display:flex; align-items:center; gap:7px; padding:4px 7px; border-radius:var(--r-md); font-family:var(--mono); font-size:11.5px;
+.tree .th { display:flex; align-items:center; gap:9px; padding:10px 10px 10px 16px; border-bottom:1px solid var(--border); color:var(--fg); }
+.tree .th b { font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:9px; }
+.tree .tb { overflow:auto; padding:10px 8px; flex:1; }
+.trow { display:flex; align-items:center; gap:9px; padding:6px 9px; border-radius:var(--r-md); font-family:var(--mono); font-size:11.5px;
   color:var(--fg); white-space:nowrap; cursor:pointer; min-width:0; }
 .trow:hover { background:var(--accent); }
-.trow .tn { display:inline-flex; align-items:center; gap:6px; flex:0 0 auto; }
+.trow .tn { display:inline-flex; align-items:center; gap:7px; flex:0 0 auto; }
 .trow[data-sel="1"] { background:color-mix(in srgb, var(--brand) 30%, transparent); }
 .trow.comp { color:var(--brand-text); font-weight:700; }
 .trow.slot { color:var(--warning); }
-.trow .lc { margin-left:auto; padding-left:8px; color:var(--faint); font-size:10.5px; font-weight:400;
+.trow .lc { margin-left:auto; padding-left:12px; color:var(--faint); font-size:10.5px; font-weight:400;
   overflow:hidden; text-overflow:ellipsis; flex:0 1 auto; min-width:0; }
 .trow.flag .lc { color:var(--warning); }
-.tree .lg { display:flex; gap:12px; padding:8px 12px; border-top:1px solid var(--border); font-size:10.5px; color:var(--faint); }
-.tree .lg span { display:inline-flex; align-items:center; gap:5px; }
+.tree .lg { display:flex; gap:14px; padding:11px 16px; border-top:1px solid var(--border); font-size:10.5px; color:var(--faint); }
+.tree .lg span { display:inline-flex; align-items:center; gap:6px; }
 .tree .lg i { display:inline-block; width:8px; height:8px; border-radius:2px; }
 
 /* ---------- modal: peek + settings ---------- */
 .backdrop { position:fixed; inset:var(--mb) 0 0 0; z-index:900; background:rgb(0 0 0 / .55); }
-.panel { position:fixed; z-index:910; top:50%; left:50%; transform:translate(-50%,-50%); width:min(760px,94vw); background:var(--card);
+/* Centred in the region the backdrop covers — below the mockup rail — not in
+   the viewport, or it rides half a rail too high. */
+.panel { position:fixed; z-index:910; top:calc(50% + var(--mb) / 2); left:50%; transform:translate(-50%,-50%); width:min(760px,94vw); background:var(--card);
   border:1px solid var(--border); border-radius:var(--r-xl); color:var(--fg); box-shadow:0 30px 80px rgb(0 0 0 / .55); overflow:hidden; }
-.panel .ph, .drawer .dh { display:flex; align-items:center; gap:9px; padding:12px 15px; border-bottom:1px solid var(--border); font-size:13.5px; }
+.panel .ph, .drawer .dh { display:flex; align-items:center; gap:11px; padding:13px 12px 13px 18px; border-bottom:1px solid var(--border); font-size:13.5px; }
 .panel .ph span { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--faint); }
-.panel .pb { padding:14px; }
-.panel .pf, .drawer .df { display:flex; gap:8px; justify-content:flex-end; padding:11px 15px; border-top:1px solid var(--border); background:var(--bg); }
-.btn-ui { height:32px; padding:0 14px; border-radius:var(--r-lg); font-size:13px; border:1px solid transparent; }
+.panel .pb { padding:18px; }
+.panel .pf, .drawer .df { display:flex; gap:10px; justify-content:flex-end; padding:14px 18px; border-top:1px solid var(--border); background:var(--bg); }
+.btn-ui { height:32px; padding:0 18px; border-radius:var(--r-lg); font-size:13px; border:1px solid transparent;
+  display:inline-flex; align-items:center; justify-content:center; }
 .btn-ui.primary { background:var(--primary); color:var(--primary-fg); font-weight:600; }
 .btn-ui.outline { background:var(--control-bg); border-color:var(--input); color:var(--fg); }
 .btn-ui.outline:hover { background:var(--accent); }
-.code { margin:0; font-family:var(--mono); font-size:11.5px; line-height:1.7; background:var(--bg); border-radius:var(--r-lg); overflow:auto; max-height:52vh; }
-.code .ln { display:flex; gap:12px; padding:0 12px; white-space:pre; }
+.code { margin:0; padding:12px 0; font-family:var(--mono); font-size:11.5px; line-height:1.75; background:var(--bg); border-radius:var(--r-lg); overflow:auto; max-height:52vh; }
+.code .ln { display:flex; gap:16px; padding:0 16px; white-space:pre; }
 .code .ln .n { color:var(--faint); width:22px; text-align:right; flex:none; }
 .code .ln[data-f="1"] { background:color-mix(in srgb, var(--brand) 24%, transparent); }
 .k-cm { color:var(--faint); } .k-tg { color:var(--chart1); } .k-tk { color:var(--fg); }
 .drawer { position:fixed; top:var(--mb); right:0; bottom:0; width:min(420px,94vw); z-index:910; background:var(--card); border-left:1px solid var(--border);
   color:var(--fg); display:flex; flex-direction:column; }
-.drawer .db { padding:14px; display:flex; flex-direction:column; gap:12px; overflow:auto; flex:1; }
-.srow { display:flex; align-items:center; gap:11px; padding:10px 12px; }
+.drawer .db { padding:16px; display:flex; flex-direction:column; gap:14px; overflow:auto; flex:1; }
+.srow { display:flex; align-items:center; gap:14px; padding:14px; }
 .srow + .srow { border-top:1px solid var(--border); }
 .srow .sl { flex:1; } .srow b { display:block; font-size:12.5px; font-weight:600; }
-.srow span { display:block; font-size:11px; color:var(--faint); margin-top:2px; line-height:1.45; }
+.srow span { display:block; font-size:11px; color:var(--faint); margin-top:4px; line-height:1.5; }
 .sw { width:34px; height:20px; border-radius:999px; background:var(--input); border:0; position:relative; flex:none; }
 .sw::after { content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:999px; background:var(--fg); transition:left .13s; }
 .sw[data-on="1"] { background:var(--primary); } .sw[data-on="1"]::after { left:16px; background:var(--primary-fg); }
-.lock { font-size:10px; color:var(--faint); border:1px solid var(--border); border-radius:var(--r-sm); padding:2px 6px; flex:none; }
+.lock { font-size:10px; color:var(--faint); border:1px solid var(--border); border-radius:var(--r-sm); padding:4px 8px; flex:none; }
 
 .toasts { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:950; display:flex; flex-direction:column; gap:8px; align-items:center; }
-.toast { background:var(--card); border:1px solid var(--border); color:var(--fg); font-size:12.5px; padding:9px 14px; border-radius:var(--r-full);
-  box-shadow:0 12px 34px rgb(0 0 0 / .45); display:flex; gap:8px; align-items:center; max-width:720px; }
+.toast { background:var(--card); border:1px solid var(--border); color:var(--fg); font-size:12.5px; padding:10px 18px; border-radius:var(--r-full);
+  box-shadow:0 12px 34px rgb(0 0 0 / .45); display:flex; gap:10px; align-items:center; justify-content:center; max-width:720px; }
 .toast i { font-style:normal; color:var(--success-text); } .toast[data-k="warn"] i { color:var(--warning); }
 
 /* ---------- mockup strip (not the product) ---------- */
@@ -381,14 +441,16 @@ body[data-tree="1"] .insp.left { left:320px; }
       <li data-atx="src/content/services/product-design.md:14" data-chain="s1.s3" data-infer="s3" data-k="mdbody" data-bind="md.14">Prototype, test, and throw away what did not survive</li>
     </ul>
     <p data-atx="src/content/services/product-design.md:16" data-chain="s1.s3" data-infer="s3" data-k="mdrich"
-       data-reason="Inline markup — a link and bold text. HTML back to Markdown is a lossy round trip, so it is refused.">See the <a href="#">engagement model</a> for how we price it, or <strong>book an intro call</strong>.</p>
+       data-reason="Markdown content is edited in the IDE. View code opens its backing file.">See the <a href="#">engagement model</a> for how we price it, or <strong>book an intro call</strong>.</p>
   </article>
   <footer class="site-foot" data-atx="src/components/Footer.astro:5:5" data-chain="s1.s4" data-k="text">© 2026 Studio Meridian — built with Astro</footer>
 </div></div>
 
 <!-- OVERLAY -->
 <div id="ov">
-  <button class="launcher" id="launcher" title="Open the element tree"><svg class="mk" style="width:17px;height:17px" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 0 12 6 6 12 0 6Z"/></svg>
+  <button class="launcher" id="launcher" title="Show the element tree"><svg viewBox="0 0 24 24" width="16" height="16"
+      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+      ><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M5 3h4v18H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="currentColor" stroke="none"/></svg>
     <span class="kbd">hold ⌥ to inspect · click for the tree</span></button>
   <div class="menu" id="menu" hidden>
     <button id="mCopy">⎘ Copy page context</button>
@@ -402,7 +464,7 @@ body[data-tree="1"] .insp.left { left:320px; }
       <button class="ctl icon" id="treeClose" title="Close"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5.8 5.8l8.4 8.4M14.2 5.8l-8.4 8.4"/></svg></button></div>
     <div class="pagerow">
       <div><div class="rt" id="pgRoute">/</div><div class="fl" id="pgFile">src/pages/index.astro</div></div>
-      <button class="pill-btn" id="pgSource"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M11 2.5 4.5 11.2h4.2L9 17.5 15.5 8.8h-4.2Z"/></svg> source</button>
+      <button class="pill-btn" id="pgSource"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M11 2.5 4.5 11.2h4.2L9 17.5 15.5 8.8h-4.2Z"/></svg> view code</button>
     </div>
     <div class="tb" id="treeBody"></div>
     <div class="lg"><span style="color:var(--brand-text)"><svg class="fig" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M6 .35 8.3 2.65 6 4.95 3.7 2.65Z M9.35 3.7 11.65 6 9.35 8.3 7.05 6Z M6 7.05 8.3 9.35 6 11.65 3.7 9.35Z M2.65 3.7 4.95 6 2.65 8.3 .35 6Z"/></svg></span><span style="margin-left:-7px">component</span><span><i style="background:var(--warning)"></i>slot / markdown</span></div>
@@ -412,7 +474,6 @@ body[data-tree="1"] .insp.left { left:320px; }
       <button class="ctl icon" id="inspDock" title="Dock to the other side" style="margin-left:auto"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="4" width="14.4" height="12" rx="2.2"/><path d="M12.2 4v12"/></svg></button>
       <button class="ctl icon" id="inspClose" title="Close (Esc)"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5.8 5.8l8.4 8.4M14.2 5.8l-8.4 8.4"/></svg></button></div>
     <div class="ibody" id="inspBody"></div>
-    <div class="ifoot" id="inspFoot"></div>
   </aside>
   <div class="hlbox" id="hl" hidden></div>
   <div class="pill" id="pill" hidden></div>
@@ -468,7 +529,9 @@ const SERVICES = [
 ];
 /* Editable values. `original` is what the source holds; `value` is what the field shows. */
 const MODEL = {};
-const def = (k, v) => (MODEL[k] = { value:v, original:v });
+/* `apply` lets a value write itself back into the page when it is not simple
+   text — an image src, for instance. Text-bound values need none. */
+const def = (k, v, apply) => (MODEL[k] = { value:v, original:v, apply });
 def('u1.title', 'Studio Meridian — considered digital products');
 def('u3.title', 'Build things that outlast the brief');
 def('u8.href', '#contact'); def('u8.variant', 'dark'); def('u8.slot', 'Start a project');
@@ -485,10 +548,9 @@ SERVICES.forEach((s, i) => { def(`u5.title.${i}`, s.title); def(`u5.icon.${i}`, 
 function propsOf(id, i = 0) {
   switch (id) {
     case 'u1': return [ lit('title', 'u1.title', 'src/pages/index.astro:8:7') ];
-    case 's1': return [ traced('title', 'fm.title', '{entry.data.title}', 'the entry’s frontmatter',
-                               'src/content/services/product-design.md:2') ];
+    case 's1': return [ ro('title', '{entry.data.title}', 'Edit the Markdown backing file in the IDE', true) ];
     case 'u3': return [ lit('title', 'u3.title', 'src/pages/index.astro:9:9'),
-                        ro('eyebrow', '{site.tagline}', 'from <code>../data/site</code> — edit it at source') ];
+                        ro('eyebrow', '{site.tagline}', 'from <code>../data/site</code> — edit it at source', true) ];
     case 'u8': return [ lit('href', 'u8.href', 'src/components/Hero.astro:11:13'),
                         lit('variant', 'u8.variant', 'src/components/Hero.astro:11:29'),
                         ro('class', '"btn"', 'styling, not content') ];
@@ -499,14 +561,25 @@ function propsOf(id, i = 0) {
     default: return [];
   }
 }
-function lit(n, key, target) { return { n, key, kind:'literal', src:`"${MODEL[key].value}"`, note:'string literal · verify-then-patch', target }; }
+function lit(n, key, target) { return { n, key, kind:'literal', src:`"${MODEL[key].value}"`, note:'a string literal', target }; }
 function traced(n, key, src, via, target) { return { n, key, kind:'traced', src, note:`traces one hop to <code>${via}</code>`, target:`${via} in ${target}` }; }
-function ro(n, src, why) { return { n, kind:'readonly', src, note:why }; }
+function ro(n, src, why, elsewhere) { return { n, kind:'readonly', src, note:why, elsewhere }; }
 
+/* A slot is one of three things, and the difference is what you can write:
+     key    — the slot IS a string, so it is a value like any other
+     inner  — the slot is markup that WRAPS values; those values are editable,
+              the wrapper is not. `body` on a ServiceCard is this case, and it
+              is why body belongs in the list beside title and icon.
+     neither— markup with nothing writable in it. */
 function slotsOf(id, i = 0) {
-  if (id === 'u8') return [{ n:'default', key:'u8.slot', target:'src/components/Hero.astro:11:52' }];
-  if (id === 'u1') return [{ n:'default', preview:'<Hero … /> <Services /> <Quote />', why:'components, not text' }];
-  if (id === 'u5') return [{ n:'default', preview:'<p class="card-body">{s.body}</p>', why:'markup — the paragraph is editable on its own' }];
+  if (id === 'u8') return [{ n:'default', key:'u8.slot', target:'src/components/Hero.astro:11:52',
+                             note:'a string literal at the usage site' }];
+  if (id === 'u1') return [{ n:'default', markup:'<Hero … /> <Services /> <Quote />', why:'components, not text' }];
+  if (id === 'u5') return [{ n:'default', markup:'<p class="card-body">{s.body}</p>',
+    inner:[{ n:'body', key:`u5.body.${i}`, kind:'traced', via:`services[${i}].body`,
+             note:`traces one hop to <code>services[${i}].body</code>`,
+             target:`services[${i}].body in src/components/Services.astro:${4 + i}`,
+             pick:`[data-i="${i}"] .card-body` }] }];
   return [];
 }
 
@@ -604,6 +677,33 @@ const MEDIA = [
 ];
 const mediaUrl = (m) => '../examples/playground/' + m.f;
 
+/* Every image on the page gets a pair of real values, so src and alt sit in the
+   values list like any prop instead of being a special read-only corner. */
+document.querySelectorAll('#host img[data-src]').forEach((im, j) => {
+  const id = `img${j}`; im.dataset.vkey = id;
+  def(`${id}.src`, im.dataset.src, (v) => {
+    im.dataset.src = v;
+    // Only repaint when the typed path names a file this project actually has.
+    // A typo should mark the field dirty, not blank the page out.
+    const hit = MEDIA.find((m) => m.p === v);
+    if (hit) im.setAttribute('src', mediaUrl(hit));
+  });
+  def(`${id}.alt`, im.dataset.alt, (v) => { im.dataset.alt = v; im.alt = v; });
+});
+
+/* Literal text is a value too. A heading written in the template and a heading
+   arriving as a prop are the same job to the person doing it, so both get a
+   MODEL entry and both edit from the Values field. Typing on the page stays —
+   it just drives the same value rather than a second, parallel mechanism.
+   Keyed by source loc, so the nav logo rendered on two routes is ONE value
+   writing ONE line, which is what the server would actually do. */
+const TEXT_KEYS = {};
+document.querySelectorAll('#host [data-k="text"], #host [data-k="markup"]').forEach((t) => {
+  const key = (TEXT_KEYS[t.dataset.atx] ||= `t${Object.keys(TEXT_KEYS).length + 1}`);
+  t.dataset.bind = key;
+  if (!MODEL[key]) def(key, t.textContent.trim());
+});
+
 /* =============================== HELPERS =============================== */
 const $ = (s) => document.querySelector(s);
 const el = (t, c, h) => { const n = document.createElement(t); if (c) n.className = c; if (h != null) n.innerHTML = h; return n; };
@@ -623,6 +723,8 @@ function isSlotted(n) {
   return mine.length > 0 && mine.length < theirs.length && mine.every((x, i) => x === theirs[i]);
 }
 const tierOf = (n) => (!n.dataset.chain ? 'candidates' : n.dataset.infer ? 'inferred' : 'proven');
+/** Which render of a repeated usage site this is. The real tool counts renders
+    in `composition-runtime.ts::child()`; it is never read off sibling order. */
 const instOf = (n) => { const c = n.closest('[data-i]'); return c ? +c.dataset.i : 0; };
 /** Which link supplies the words, when they do not live in this element's own file. */
 function supplier(n) {
@@ -632,12 +734,12 @@ function supplier(n) {
 }
 
 /* ======================= HOVER HIGHLIGHT + PILL ======================== */
-const KIND = { text:'edit in place', markup:'edit in place', prop:'edit via prop', slot:'edit slot text',
-               value:'edit traced value', image:'image', readonly:'inspect only',
-               fm:'edit entry field', mdbody:'edit markdown', mdrich:'inspect only' };
+/* No verdict on hover: knowing whether a click can edit needs a round-trip per
+   element, and the inspector opens on every click anyway. The pill names where
+   the element is written; the panel names what can be done there. */
 function drawHl(n, locked) {
   const h = $('#hl'), r = n.getBoundingClientRect();
-  h.hidden = false; h.dataset.kind = n.dataset.k; h.classList.toggle('locked', !!locked);
+  h.hidden = false; h.classList.toggle('locked', !!locked);
   h.style.cssText += `;top:${r.top + scrollY - 2}px;left:${r.left + scrollX - 2}px;width:${r.width + 4}px;height:${r.height + 4}px`;
 }
 /** The strip of viewport the side panels are not sitting on. */
@@ -658,9 +760,9 @@ function place(n, box, gap = 8) {
   box.style.left = Math.max(L, Math.min(r.left + scrollX, R - box.offsetWidth)) + 'px';
 }
 function renderPill(n, crumbs) {
-  const p = $('#pill'), k = n.dataset.k;
+  const p = $('#pill');
   let h = `<div class="r1"><span class="loc">${base(n.dataset.atx)}</span>
-    <span class="verdict" data-k="${k}">${KIND[k]}</span><span class="go">click to inspect</span></div>`;
+    <span class="go">click to inspect</span></div>`;
   if (crumbs) {
     const ids = isSlotted(n) ? chainOf(parentHost(n)) : chainOf(n);
     const parts = ids.map((id) => `<button class="crumb${n.dataset.infer === id ? ' inferred' : ''}" data-crumb="${id}">${base(LINKS[id].res)}</button>`);
@@ -699,49 +801,67 @@ document.addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation();
   openInspector(n);
 }, true);
+/* While a text edit is live the element is contenteditable, so clicking inside
+   it must place a caret, not re-open the inspector on it. */
+document.addEventListener('mousedown', (e) => {
+  if (S.textFinish && e.target.closest('[data-editing="1"]')) e.stopPropagation();
+}, true);
 
 /* ============================== INSPECTOR ============================== */
 function openInspector(n, focusLink) {
-  if (S.node !== n) endTextEdit(true);
+  if (S.node !== n) suspendTextEdit();
   S.node = n; S.sel = focusLink || supplier(n) || (isSlotted(n) ? chainOf(parentHost(n)).slice(-1)[0] : chainOf(n).slice(-1)[0]) || 'root';
   drawHl(n, true); $('#insp').hidden = false; $('#pill').hidden = true;
   $('#inspTag').textContent = `<${n.tagName.toLowerCase()}>`;
-  renderInspector();
+  // Before renderInspector, so the field knows a caret is already on the page
+  // and does not steal it back.
   if (n.dataset.k === 'text' || n.dataset.k === 'markup') beginTextEdit(n);
+  renderInspector();
+  syncCommit();
 }
 function renderInspector() {
   const n = S.node, k = n.dataset.k, b = $('#inspBody'); b.innerHTML = '';
   const tier = tierOf(n);
 
   /* --- status --- */
-  const st = el('div');
+  const st = el('div'); st.style.cssText = 'display:flex;align-items:center;gap:10px';
   st.innerHTML = `<span class="tier" data-t="${tier}">${
     { proven:'proven chain', inferred:'one link inferred', candidates:'no chain' }[tier]}</span>`;
+  // Element-scoped counterpart to the launcher menu's "Copy page context": the
+  // selector, the source loc and the component chain, ready to paste into a prompt.
+  const cp = el('button', 'mini', '⎘ Copy context');
+  cp.title = 'Copy selector, source loc and component chain';
+  cp.style.marginLeft = 'auto';
+  cp.onclick = () => toast('Element context copied — selector, source loc, chain');
+  st.append(el('span', 'state', ''), cp);
   b.append(st);
 
-  /* --- 1. EDIT — what a click does here --- */
-  b.append(editGroup(n, k));
+  /* --- 1. EDIT — only where there is a page-side affordance: typing in place,
+         picking an image, or a refusal to explain. A plain value has none, so
+         it goes straight into the values list instead of getting a block of
+         its own that says the same thing twice. --- */
+  const eg = editGroup(n, k);
+  if (eg) b.append(eg);
 
-  /* --- 2. COMPONENT CHAIN, indented --- */
+  /* --- 2. VALUES — the one editable list. Everything writable on this
+         selection, whatever transport it arrived by. --- */
+  b.append(valuesGroup(n));
+
+  /* --- 3. COMPONENT CHAIN, indented --- */
   if (tier === 'candidates') b.append(candidatesGroup());
   else b.append(chainGroup(n));
 
-  /* --- 3. PROPS at the selected usage site --- */
-  b.append(propsGroup(n));
-
-  /* --- 4. SLOT at the selected usage site --- */
-  const slots = S.sel === 'root' ? [] : slotsOf(S.sel, instOf(n));
-  if (slots.length) b.append(slotGroup(slots, n));
-
-  /* --- 5. CSS --- */
+  /* --- 4. CSS --- */
   b.append(cssGroup(n));
 
-  /* --- footer --- */
-  const f = $('#inspFoot'); f.innerHTML = '';
-  const file = n.dataset.atx.split(':')[0];
-  const p = el('button', 'btn-ui outline', '⧉ Peek source'); p.onclick = () => openPeek(file, +n.dataset.atx.split(':')[1]);
-  const o = el('button', 'btn-ui primary', '⌁ Open ' + base(file)); o.onclick = () => toast(`Opened ${n.dataset.atx} in your editor`);
-  f.append(p, o);
+  syncState();
+}
+
+/** A folded "Details" block. Jargon and mechanism go here, never in a label. */
+function diag(html, label = 'Details') {
+  const d = el('details', 'dx');
+  d.innerHTML = `<summary>${label}</summary><p>${html}</p>`;
+  return d;
 }
 
 function group(title, aside, open = true, cls = '') {
@@ -755,22 +875,10 @@ function group(title, aside, open = true, cls = '') {
 /* ---- 1. the edit surface, chosen by what the element actually is ---- */
 function editGroup(n, k) {
   const i = instOf(n);
-  if (k === 'text' || k === 'markup') {
-    const { g, gb } = group('Edit · in place', 'contenteditable', true, 'edit');
-    gb.append(el('p', 'reason', `Written in <b>${base(n.dataset.atx)}</b> — you are typing straight into the page.`));
-    const row = el('div', 'row'); row.style.cssText = 'display:flex;gap:6px';
-    const sv = el('button', 'mini primary', '✓ Save'), rv = el('button', 'mini', '↺ Revert');
-    [sv, rv].forEach((x) => (x.onmousedown = (e) => e.preventDefault()));
-    sv.onclick = () => endTextEdit(true); rv.onclick = () => endTextEdit(false);
-    row.append(sv, rv); gb.append(row);
-    gb.append(el('p', 'note', 'Enter saves · Esc reverts · clicking elsewhere commits.'));
-    return g;
-  }
   if (k === 'image') {
-    const { g, gb } = group('Edit · image', null, true, 'edit');
-    const srcF = field({ label:'src', key:null, ro:`"${n.dataset.src}"`, note:'static path' });
-    gb.append(srcF);
-    gb.append(field({ label:'alt', key:null, ro:`"${n.dataset.alt}"`, note:'static · alt can be added, src never' }));
+    // src and alt are values, and live in the values list with everything else.
+    // What is left here is the thing a list cannot do: show you the pictures.
+    const { g, gb } = group('Pick an image', null, true, 'edit');
     let shown = 8, filter = '';
     const search = el('input', 'inp mediafilter'); search.placeholder = 'Filter images…';
     const grid = el('div', 'mediagrid');
@@ -781,12 +889,15 @@ function editGroup(n, k) {
       list.slice(0, shown).forEach((m) => {
         const t = el('button', 'mtile', `<img alt="" src="${mediaUrl(m)}"><span>${m.n}</span>`);
         t.title = m.f;
-        t.dataset.sel = m.p === n.dataset.src ? '1' : '0';
+        t.dataset.sel = m.p === MODEL[`${n.dataset.vkey}.src`].value ? '1' : '0';
         t.onclick = () => {
+          // Picking is an edit like any other: it stages a value, it does not write.
           [...grid.children].forEach((c) => (c.dataset.sel = '0')); t.dataset.sel = '1';
-          n.src = mediaUrl(m); n.dataset.src = m.p;
-          srcF.querySelector('.inp').value = `"${m.p}"`;
-          toast(`Wrote src="${m.p}" — verified against source`);
+          const key = `${n.dataset.vkey}.src`, mv = MODEL[key];
+          mv.value = m.p; mv.apply(m.p);
+          document.querySelectorAll(`.inp[data-key="${key}"]`).forEach((x) => (x.value = m.p));
+          n.dataset.dirty = mv.value === mv.original ? '0' : '1';
+          renderInspector(); syncCommit();
         };
         grid.append(t);
       });
@@ -797,87 +908,61 @@ function editGroup(n, k) {
     search.oninput = () => { filter = search.value.trim(); shown = 8; draw(); };
     more.onclick = () => { shown += 8; draw(); };
     gb.append(search); gb.append(grid); gb.append(more);
-    const up = el('div'); up.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+    const up = el('div'); up.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
     const upBtn = el('button', 'mini primary', '⬆ Upload');
-    upBtn.onclick = () => toast('Uploaded coast-02.jpg → public/images/ · src rewritten');
+    upBtn.onclick = () => toast('Wrote coast-02.jpg → public/images/ · its src is staged until Save');
     const dirBtn = el('button', 'mini', 'public/images');
     dirBtn.onclick = () => toast('uploadDir is public/images — set in astro.config.mjs');
     up.append(upBtn, dirBtn); gb.append(up);
     draw();
-    gb.append(el('p', 'note', 'Project files only. Uploads land in <code>uploadDir</code>, under <code>public/</code>.'));
+    gb.append(el('p', 'note', 'Project files only. An upload is written to <code>uploadDir</code> straight away; only the <code>src</code> edit waits for Save.'));
     return g;
   }
   if (k === 'readonly') {
     const { g, gb } = group('Can’t edit here', null, true);
     gb.append(el('p', 'reason', n.dataset.reason));
-    const o = el('button', 'mini', '⌁ Open ' + base(n.dataset.atx));
-    o.onclick = () => toast(`Opened ${n.dataset.atx} in your editor`);
-    gb.append(o);
+    const o = el('button', 'mini', 'View code'); o.title = n.dataset.atx;
+    o.onclick = () => openPeek(n.dataset.atx.split(':')[0], +n.dataset.atx.split(':')[1]);
+    gb.append(o); gb.append(el('p', 'note', n.dataset.atx));
     return g;
   }
-  if (k === 'fm' || k === 'mdbody') {
-    const file = 'src/content/services/product-design.md';
-    const line = +n.dataset.atx.split(':').pop();
-    const key = n.dataset.bind;
-    const isFm = k === 'fm';
-    const { g, gb } = group(isFm ? 'Edit · entry field' : 'Edit · markdown', null, true, 'edit');
-    gb.append(el('p', 'reason', isFm
-      ? `Template prints <code>{entry.data.${key.split('.')[1]}}</code>. Writes one YAML key in <b>${base(file)}</b>.`
-      : `No annotation reaches <code>&lt;Content /&gt;</code>. Matched once against <b>${base(file)}</b>, line ${line}.`));
-    gb.append(field({ label:isFm ? key.split('.')[1] : `line ${line}`, key, hot:true, focus:true,
-      note:isFm ? 'frontmatter · one YAML key rewritten in place'
-                : 'matched by rendered text · unique in this file',
-      target:`${file}:${line}` }));
-    const row = el('div'); row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
-    const pk = el('button', 'mini', '⧉ Peek the entry'); pk.onclick = () => openPeek(file, line);
-    const op = el('button', 'mini', `⌁ Open ${base(file)}:${line}`); op.onclick = () => toast(`Opened ${file}:${line}`);
-    row.append(pk, op); gb.append(row);
-    if (!isFm) gb.append(el('p', 'note', 'Plain text only — inline markup is refused, not round-tripped.'));
+  if (['fm', 'mdbody', 'mdrich'].includes(k)) {
+    const { g, gb } = group('Edit in the IDE', null, true);
+    gb.append(el('p', 'reason', 'Frontmatter and body content live in the Markdown backing file.'));
+    const file = 'src/content/services/product-design.md', line = 1;
+    const row = el('div'); row.style.cssText = 'display:flex;gap:8px';
+    const pk = el('button', 'mini', 'View code'); pk.title = `${file}:${line}`;
+    pk.onclick = () => openPeek(file, line);
+    row.append(pk); gb.append(row);
+    gb.append(el('p', 'note', `${file}:${line}`));
     return g;
   }
-  if (k === 'mdrich') {
-    const { g, gb } = group('Can’t edit here', null, true);
-    gb.append(el('p', 'reason', n.dataset.reason));
-    const file = 'src/content/services/product-design.md', line = +n.dataset.atx.split(':').pop();
-    const row = el('div'); row.style.cssText = 'display:flex;gap:6px';
-    const pk = el('button', 'mini', '⧉ Peek'); pk.onclick = () => openPeek(file, line);
-    const op = el('button', 'mini', `⌁ Open ${base(file)}:${line}`); op.onclick = () => toast(`Opened ${file}:${line}`);
-    row.append(pk, op); gb.append(row);
-    return g;
+  /* text · markup · prop · slot · value — nothing to do
+     up here. The value, its reason and its destinations all live on its row in
+     Values, and literal text is no exception: it used to get a block of its own
+     carrying a second Save and Revert, so the same gesture had two homes. */
+  return null;
+}
+
+/* ---- why a given value reaches this element, in one line ---- */
+function whyValue(n, k) {
+  if (k === 'text' || k === 'markup') {
+    return `Written literally in <b>${base(n.dataset.atx)}</b>. This field and the page are the same value — type in either.`;
   }
-  /* prop · slot · value — the words live at a usage site in another file */
   const L = LINKS[S.sel] || LINKS[chainOf(n).slice(-1)[0]];
-  const key = n.dataset.bind;
-  const titles = { prop:'Edit · prop value', slot:'Edit · slot text', value:'Edit · traced value' };
-  const { g, gb } = group(titles[k], null, true, 'edit');
-  let why;
   if (k === 'prop') {
-    const pn = key.split('.')[1];
-    why = `Arrives as the <code>${pn}</code> prop from <b>${base(L.file)}:${L.loc}</b>. ${base(n.dataset.atx)} only prints <code>{${pn}}</code>.`;
-  } else if (k === 'slot') {
-    why = `Slot content handed to <b>${base(L.res)}</b> at <b>${base(L.file)}:${L.loc}</b> — it lives in the caller.`;
-  } else {
+    const pn = (n.dataset.bind || '.').split('.')[1];
+    return `Arrives as the <code>${pn}</code> prop from <b>${base(L.file)}:${L.loc}</b>. ${base(n.dataset.atx)} only prints <code>{${pn}}</code>.`;
+  }
+  if (k === 'slot') return `Slot content handed to <b>${base(L.res)}</b> at <b>${base(L.file)}:${L.loc}</b> — it lives in the caller.`;
+  if (k === 'value') {
     const host = parentHost(n);
     const drawnBy = host ? base(LINKS[chainOf(host).slice(-1)[0]].res) : base(n.dataset.atx);
-    why = `Written in <b>${base(n.dataset.atx)}</b> as <code>{s.body}</code>, rendered into ${drawnBy}’s slot.`;
+    return `Written in <b>${base(n.dataset.atx)}</b> as <code>{s.body}</code>, rendered into ${drawnBy}’s slot.`;
   }
-  gb.append(el('p', 'reason', why));
-  const prop = (propsOf(S.sel, instOf(n)) || []).find((p) => p.key === key);
-  gb.append(field({ label:k === 'slot' ? 'slot text' : (prop ? prop.n : 'value'), key, hot:true, focus:true,
-    note: prop ? prop.note : `traces one hop to <code>services[${instOf(n)}].body</code>`,
-    target: prop ? prop.target : `services[${instOf(n)}].body in src/components/Services.astro:${4 + instOf(n)}` }));
-  if (k === 'prop' && L.repeat) gb.append(el('p', 'note', `${L.repeat} · this field edits instance ${instOf(n) + 1}.`));
-  const tgt = parseTarget(prop ? prop.target : `services[${instOf(n)}].body in src/components/Services.astro:${4 + instOf(n)}`);
-  if (tgt) {
-    const row2 = el('div'); row2.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
-    const pk = el('button', 'mini', `⧉ Peek ${base(tgt.file)}`);
-    pk.onclick = () => openPeek(tgt.file, tgt.line);
-    const op = el('button', 'mini', `⌁ Open ${base(tgt.file)}:${tgt.line}`);
-    op.onclick = () => toast(`Opened ${tgt.file}:${tgt.line}`);
-    row2.append(pk, op); gb.append(row2);
-    gb.append(el('p', 'note', 'These open where the words live; the footer opens where the element is drawn.'));
-  }
-  return g;
+  if (['fm', 'mdbody', 'mdrich'].includes(k)) return 'Edit this content in <b>product-design.md</b> using View code.';
+  if (k === 'image') return `A static <code>src</code> on <b>${base(n.dataset.atx)}</b> — editable like any quoted attribute.`;
+  return null;
 }
 
 /* ---- 2. the chain, indented so the nesting is visible ---- */
@@ -907,14 +992,16 @@ function chainGroup(n) {
       r.onclick = () => { S.sel = id; renderInspector(); };
       const acts = el('div', 'acts');
       const L = LINKS[id];
-      const mk = (t, fn) => { const x = el('button', 'mini', t); x.onclick = (e) => { e.stopPropagation(); fn(); }; return x; };
+      const mk = (t, fn, tip) => { const x = el('button', 'mini', t); if (tip) x.title = tip;
+        x.onclick = (e) => { e.stopPropagation(); fn(); }; return x; };
       if (id === 'root') {
         const rf = ROUTES[CURRENT].file;
-        acts.append(mk('⌁ file', () => toast('Opened ' + rf)), mk('⧉ peek', () => openPeek(rf, 1)));
+        acts.append(mk('View code', () => openPeek(rf, 1), rf));
       } else {
-        acts.append(mk('⌁ component', () => toast(`Opened ${L.res} in your editor`)),
-                    mk('⧉ peek', () => openPeek(L.res, 1)),
-                    mk('⌁ usage', () => toast(`Opened ${L.file}:${L.loc} — the usage site`)));
+        // Two destinations, never two verbs: this component's own file, and the
+        // file above it that writes <Name />. Both land in the same popup.
+        acts.append(mk('View code', () => openPeek(L.res, 1), L.res),
+                    mk('Open parent', () => openPeek(L.file, +L.loc.split(':')[0]), `${L.file}:${L.loc}`));
       }
       r.querySelector('.cm').append(acts);
     }
@@ -931,7 +1018,7 @@ function chainGroup(n) {
         ? `rendered by &lt;Content /&gt; at ${base(L.file)}:${L.loc} · markdown`
         : `used at ${base(L.file)}:${L.loc}${L.repeat ? ` · ${instOf(n) + 1} of 3` : ''}` }));
     if (n.dataset.infer === id) {
-      const note = el('p', 'note'); note.style.cssText = 'padding:0 12px 8px ' + (12 + (i + 1) * 18) + 'px';
+      const note = el('p', 'note'); note.style.cssText = 'padding:2px 14px 10px ' + (14 + (i + 1) * 18) + 'px';
       note.innerHTML = `<b style="color:var(--warning)">Inferred.</b> ${L.inferred}`;
       gb.append(note);
     }
@@ -939,8 +1026,9 @@ function chainGroup(n) {
   gb.append(row({ d:ids.length + 1, icon:LEAF, cls:'leaf', name:`&lt;${n.tagName.toLowerCase()}&gt;`,
     sub: slotted ? `⤷ slot · written in ${base(n.dataset.atx)}` : n.dataset.atx }));
   if (slotted) {
-    const nt = el('p', 'note', 'Its chain is a strict prefix of its parent’s — so it was slotted in, not written there.');
-    nt.style.padding = '0 12px 10px'; gb.append(nt);
+    const nt = diag('Its chain is a <b>strict prefix</b> of its DOM parent’s: same links, fewer of them. That is the test — it was handed in from outside, not written inside.',
+                    'Why this counts as slotted');
+    nt.style.margin = '2px 14px 12px'; gb.append(nt);
   }
   return g;
 }
@@ -950,48 +1038,97 @@ function candidatesGroup() {
   gb.append(el('p', 'reason', 'No chain reached it. The usage graph offers three call sites — open each and decide.'));
   [['src/components/Nav.astro','8:7'], ['src/components/Hero.astro','8:5'], ['src/components/ServiceCard.astro','5:5']].forEach(([f, l]) => {
     const r = el('div', 'cand', `<span>${base(f)}<span style="color:var(--faint)">:${l}</span></span>`);
-    const x = el('button', 'mini', '⌁ open'); x.onclick = () => toast(`Opened ${f}:${l}`); r.append(x); gb.append(r);
+    const x = el('button', 'mini', 'View code'); x.title = `${f}:${l}`;
+    x.onclick = () => openPeek(f, +l.split(':')[0]); r.append(x); gb.append(r);
   });
   return g;
 }
 
-/* ---- 3. props at the selected usage site, editable where provable ---- */
-function propsGroup(n) {
-  const id = S.sel, i = instOf(n);
-  if (id === 'root' || !id) {
-    const { g, gb } = group('Props', 'route');
-    gb.append(el('p', 'note', 'A route has no caller.'));
+/* ---- 2. VALUES — the single editable list --------------------------------
+   One rule: everything you can change about this selection is a row here,
+   whatever transport it arrived by. A prop, a slot string, a value wrapped in
+   slot markup or an image attribute — all
+   the same kind of row, because to the person editing they are the same kind
+   of thing. Grouping by transport is what hid `body` behind a "read-only"
+   slot while its siblings `title` and `icon` sat there editable.            */
+function valuesGroup(n) {
+  const i = instOf(n), id = S.sel, k = n.dataset.k;
+  if (['fm', 'mdbody', 'mdrich'].includes(k)) {
+    const { g, gb } = group('Values');
+    gb.append(el('p', 'note', 'Edit this content in the IDE using View code above.'));
     return g;
   }
-  const L = LINKS[id], props = propsOf(id, i);
-  // If the Edit group already exposes the prop that matters, start collapsed —
-  // the others stay one click away instead of duplicating a field on screen.
-  const dup = props.some((p) => p.key && p.key === n.dataset.bind);
-  const { g, gb } = group('Props', `${base(L.file)}:${L.loc}`, !dup);
-  if (!props.length) { gb.append(el('p', 'note', 'No props at this usage site.')); return g; }
-  props.forEach((p) => gb.append(field({
-    label:p.n, key:p.kind === 'readonly' ? null : p.key, ro:p.kind === 'readonly' ? p.src : null,
-    note:p.note, target:p.target, hot:p.key && p.key === n.dataset.bind, focus:false,
-  })));
-  return g;
-}
+  const rows = [];
 
-function slotGroup(slots, n) {
-  const { g, gb } = group('Slot content', slots.length === 1 ? slots[0].n : `${slots.length} slots`);
-  slots.forEach((s) => {
-    if (s.key) gb.append(field({ label:`slot: ${s.n}`, key:s.key, note:'a string literal at the usage site', target:s.target, hot:s.key === n.dataset.bind, focus:false }));
-    else { gb.append(field({ label:`slot: ${s.n}`, key:null, ro:s.preview, note:s.why })); }
-  });
+  /* The value for the element you actually clicked, pinned first and marked.
+     It stays whichever chain row you browse to, so browsing the chain can
+     never lose the thing you came here to edit. */
+  const selKey = n.dataset.bind || (n.dataset.vkey ? `${n.dataset.vkey}.src` : null);
+  if (selKey && MODEL[selKey]) {
+    const own = (propsOf(id, i) || []).find((p) => p.key === selKey);
+    const slotInner = (id === 'root' ? [] : slotsOf(id, i)).flatMap((sl) => sl.inner || []);
+    const innerHit = slotInner.find((v) => v.key === selKey);
+    rows.push({
+      label: own ? own.n : innerHit ? innerHit.n
+           : k === 'image' ? 'src'
+           : k === 'markup' ? 'inline markup'
+           : k === 'text' ? 'text'
+           : k === 'slot' ? 'slot text' : 'value',
+      key: selKey, selected: true, why: whyValue(n, k),
+      via: innerHit ? 'slot' : null,
+      note: own ? own.note : innerHit ? innerHit.note
+          : k === 'image' ? 'a quoted attribute on the element'
+          : (k === 'text' || k === 'markup') ? 'a literal in the template · the caret is already on the page'
+          : k === 'slot' ? 'a string literal at the usage site' : null,
+      target: own ? own.target : innerHit ? innerHit.target
+            : n.dataset.atx,
+      extra: 'HTML characters are allowed in values. Saving preserves how the source renders this value.',
+    });
+    // An image's alt rides along with its src: same element, same edit.
+    if (k === 'image') rows.push({ label:'alt', key:`${n.dataset.vkey}.alt`,
+      note:'edited where it exists; an absent alt is added in the IDE, not written in', target:n.dataset.atx });
+  }
+
+  /* Everything else passed at the selected usage site. */
+  if (id && id !== 'root') {
+    const L = LINKS[id];
+    (propsOf(id, i) || []).forEach((p) => {
+      if (p.key && p.key === selKey) return;                       // already pinned above
+      rows.push({ label:p.n, key:p.kind === 'readonly' ? null : p.key,
+                  ro:p.kind === 'readonly' ? p.src : null, note:p.note, target:p.target,
+                  elsewhere:p.elsewhere });
+    });
+    slotsOf(id, i).forEach((sl) => {
+      if (sl.key && sl.key !== selKey) {
+        rows.push({ label:`slot: ${sl.n}`, key:sl.key, note:sl.note, target:sl.target });
+      } else if (sl.inner) {
+        sl.inner.forEach((v) => { if (v.key !== selKey)
+          rows.push({ label:v.n, key:v.key, note:v.note, target:v.target, via:'slot', pick:v.pick }); });
+      } else if (!sl.key) {
+        rows.push({ label:`slot: ${sl.n}`, key:null, ro:sl.markup, note:sl.why });
+      }
+    });
+    var aside = `${base(L.file)}:${L.loc}`;
+  }
+
+  const { g, gb } = group('Values', rows.length ? (aside || null) : 'none');
+  gb.classList.add('values');
+  if (!rows.length) {
+    gb.append(el('p', 'note', id === 'root' ? 'A route has no caller.' : 'Nothing writable on this selection.'));
+    return g;
+  }
+  rows.forEach((r) => gb.append(field(r)));
+  gb.append(diag('Saving is <b>verify-then-patch</b>: the server re-reads the source, checks it still matches what this page showed, and only then writes. If it moved, the write is refused rather than guessed at.'));
   return g;
 }
 
 /* ---- 4. CSS peek, folded into the same panel ---- */
 function cssGroup(n) {
   const classes = [...n.classList].filter((c) => CSS_RULES[c]);
-  const { g, gb } = group('CSS', classes.length ? `${classes.length} matched` : 'none', false);
+  const { g, gb } = group('CSS', classes.length ? `${classes.length} matched` : 'none');
   if (!classes.length) { gb.append(el('p', 'note', 'No resolvable rule on this element.')); return g; }
   const chips = el('div', 'chips'); gb.append(chips);
-  const out = el('div'); out.style.cssText = 'display:flex;flex-direction:column;gap:8px'; gb.append(out);
+  const out = el('div'); out.style.cssText = 'display:flex;flex-direction:column;gap:10px'; gb.append(out);
   const show = (c) => {
     S.cssOpen = { [c]:1 }; [...chips.children].forEach((x) => (x.dataset.open = x.textContent === '.' + c ? '1' : '0'));
     out.innerHTML = '';
@@ -999,7 +1136,8 @@ function cssGroup(n) {
       const card = el('div', 'rule', `<pre><span class="s">${r.s}</span> {\n${
         r.d.map(([p, val]) => `  <span class="p">${p}</span>: <span class="v">${val}</span>;`).join('\n')}\n}</pre>`);
       const src = el('div', 'src', `<span>${r.src}</span>`);
-      const b = el('button', 'mini', 'open ↗'); b.onclick = () => toast(`Opened ${r.src} in your editor`);
+      const b = el('button', 'mini', 'View code'); b.title = r.src;
+      b.onclick = () => openPeek(r.src.split(':')[0], +r.src.split(':')[1]);
       src.append(b); card.append(src); out.append(card);
     });
   };
@@ -1018,11 +1156,20 @@ function parseTarget(t) {
 }
 
 /* ===================== EDITABLE FIELD (props, slots) ==================== */
-function field({ label, key, ro, note, target, hot, focus }) {
-  const w = el('div', 'prop'); if (hot) w.dataset.hot = '1';
+function field(o) {
+  const { label, key, ro, note, target, selected, why, via, extra, pick, elsewhere } = o;
+  const w = el('div', 'prop'); if (selected) w.dataset.sel = '1';
+  if (key) w.dataset.key = key;   // so an in-place edit can find its own Save row
+  // Three states, not two. "read-only" used to cover both a computed boolean
+  // with nothing to write AND a value that is writable somewhere else — which
+  // is how `body` ended up looking as uneditable as `featured`.
+  const state = ro ? (elsewhere ? 'elsewhere' : 'read-only') : 'editable';
   w.innerHTML = `<div class="pk"><span class="n">${label}</span>
-    ${hot ? '<span class="words">these words</span>' : ''}
-    <span class="st">${ro ? 'read-only' : 'editable'}</span></div>`;
+    ${via ? `<span class="via">via ${via}</span>` : ''}
+    ${selected ? '<span class="words">selected element</span>' : ''}
+    <span class="st" data-s="${state}">${state}</span></div>`;
+  if (why) w.append(el('p', 'why', why));
+
   if (ro || !key) {
     const i = el('input', 'inp ro'); i.value = ro || ''; i.readOnly = true; w.append(i);
     if (note) w.append(el('p', 'note', note));
@@ -1037,64 +1184,193 @@ function field({ label, key, ro, note, target, hot, focus }) {
   const err = el('p', 'err'); err.hidden = true;
   const row = el('div', 'row'); row.hidden = m.value === m.original;
   const sv = el('button', 'mini primary', '✓ Save'), rv = el('button', 'mini', '↺ Revert');
-  row.append(sv, rv, el('span', 'note', target ? `writes ${target}` : ''));
+  [sv, rv].forEach((x) => (x.onmousedown = (e) => e.preventDefault()));  // keep the caret
+  // The destination is named once, in the footer. Repeating it here wrapped a
+  // long line under every dirty field for no extra information.
+  row.append(sv, rv, el('span', 'note', 'unsaved'));
   const sync = () => {
-    document.querySelectorAll(`.inp[data-key="${key}"]`).forEach((o) => { if (o !== inp) o.value = m.value; });
+    document.querySelectorAll(`.inp[data-key="${key}"]`).forEach((o2) => { if (o2 !== inp) o2.value = m.value; });
+    if (m.apply) m.apply(m.value);
     document.querySelectorAll(`#host [data-bind="${key}"]`).forEach((n2) => {
-      n2.textContent = m.value; n2.dataset.live = m.value === m.original ? '0' : '1';
+      // Never rewrite the node the caret is sitting in — it would collapse the
+      // selection to the start on every keystroke. Typing in the FIELD moves
+      // focus off the page, so that element still repaints.
+      if (n2 !== document.activeElement) n2.textContent = m.value;
+      n2.dataset.dirty = m.value === m.original ? '0' : '1';
+    });
+    const own = key.split('.')[0];
+    if (MODEL[`${own}.src`]) document.querySelectorAll(`#host [data-vkey="${own}"]`).forEach((n2) => {
+      n2.dataset.dirty = [`${own}.src`, `${own}.alt`].some((x) => MODEL[x].value !== MODEL[x].original) ? '1' : '0';
     });
     if (key === 'u1.title') document.title = m.value + ' — mockup';
   };
   const validate = (val) => {
-    if (/[{}]/.test(val)) return '“{” would start an expression — refused, not escaped.';
-    if (/[<>]/.test(val)) return 'Angle brackets change markup, not words — refused.';
+    // The mockup accepts arbitrary string content. Production writes must
+    // encode the destination syntax and verify the value round-trips.
     return null;
   };
   inp.oninput = () => {
     const bad = validate(inp.value);
     inp.setAttribute('aria-invalid', bad ? 'true' : 'false');
     err.hidden = !bad; err.textContent = bad || '';
-    m.value = inp.value; sync(); row.hidden = m.value === m.original || !!bad;
+    m.value = inp.value; sync(); row.hidden = m.value === m.original || !!bad; syncCommit();
   };
   const save = () => {
     if (validate(m.value)) return;
     m.original = m.value; row.hidden = true; sync();
-    document.querySelectorAll(`#host [data-bind="${key}"]`).forEach((n2) => (n2.dataset.live = '0'));
+    document.querySelectorAll(`#host [data-bind="${key}"]`).forEach((n2) => (n2.dataset.dirty = '0'));
+    syncCommit();
     toast(`Wrote ${target} — verified against source`);
   };
   const revert = () => { m.value = m.original; inp.value = m.value; err.hidden = true;
-    inp.setAttribute('aria-invalid', 'false'); row.hidden = true; sync(); };
+    inp.setAttribute('aria-invalid', 'false'); row.hidden = true; sync(); syncCommit(); };
   sv.onclick = save; rv.onclick = revert;
   inp.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === 'Escape') { e.preventDefault(); revert(); } };
   w.append(inp, err, row);
-  if (note) w.append(el('p', 'note', note));
-  if (focus) setTimeout(() => { inp.focus(); inp.select(); }, 30);
+  const foot1 = [note, extra].filter(Boolean).join(' · ');
+  if (foot1) w.append(el('p', 'note', foot1));
+
+  // Where this value lives, named rather than explained.
+  const tgt = parseTarget(target);
+  if (tgt) {
+    const foot = el('div', 'foot');
+    const mk = (t, fn) => { const x = el('button', 'mini', t); x.title = `${tgt.file}:${tgt.line}`;
+      x.onmousedown = (e) => e.preventDefault(); x.onclick = fn; return x; };
+    foot.append(mk('View code', () => openPeek(tgt.file, tgt.line)));
+    if (pick) {
+      const p = el('button', 'mini', 'Select on page →');
+      p.onmousedown = (e) => e.preventDefault();
+      p.onclick = () => { const t2 = document.querySelector('#host ' + pick);
+        if (t2) { t2.scrollIntoView({ block:'center' }); openInspector(t2); } };
+      foot.append(p);
+    }
+    // Filename, not the whole path: the directory is identical for every row and
+    // was the only reason this line could not sit beside its button.
+    const loc = el('span', 'loc', target.replace(tgt.file, base(tgt.file)));
+    loc.title = target;
+    foot.append(loc);
+    w.append(foot);
+  }
+  // Focus the field only when the caret is not already in the page — clicking
+  // text should leave you typing where you clicked, with the field mirroring.
+  if (selected && !S.textFinish) setTimeout(() => { inp.focus(); inp.select(); }, 30);
   return w;
 }
 
+/* ===================== ONE SAVING RULE, EVERYWHERE =====================
+   Every editable thing on the page is a MODEL value with exactly one field in
+   Values and exactly one Save/Revert pair under that field — literal text
+   included. The page and the field are two views of the same value: type in
+   either, save from either. No source line changes until you do — an uploaded
+   file is the one thing written before Save, because it must exist to be shown.
+   Enter or ✓ Save writes; Esc or ↺ Revert discards; anything else — clicking
+   away, releasing ⌥, closing the inspector — leaves the change pending and says
+   so, in amber, on the element. An unrelated HMR update keeps a pending edit,
+   re-found by source location; one that touches the value's own file drops it
+   with a toast rather than saving against source that moved. Literal text used
+   to be the exception, with its own Edit block, its own buttons and a floating
+   bar of its own.                                                            */
+function modelKeysOf(n) {
+  if (!n) return [];
+  if (n.dataset.bind && MODEL[n.dataset.bind]) return [n.dataset.bind];
+  if (n.dataset.vkey) return [`${n.dataset.vkey}.src`, `${n.dataset.vkey}.alt`];
+  return [];
+}
+function isDirty(n) {
+  if (!n) return false;
+  if (n.dataset.dirty === '1') return true;
+  return modelKeysOf(n).some((k) => MODEL[k].value !== MODEL[k].original);
+}
+function commitNode(n) {
+  if (!n) return;
+  const keys = modelKeysOf(n);
+  if (keys.length) {
+    keys.forEach((k) => { const m = MODEL[k]; m.original = m.value; });
+    document.querySelectorAll(`#host [data-bind="${n.dataset.bind}"]`).forEach((x) => {
+      x.dataset.dirty = '0'; x.__orig = x.textContent;
+    });
+    n.dataset.dirty = '0';
+    const where = (n.dataset.k === 'text' || n.dataset.k === 'markup') ? n.dataset.atx : keys.join(' + ');
+    toast(`Wrote ${where} — verified against source`);
+  } else if (n.dataset.dirty === '1') {
+    n.__orig = n.textContent; n.dataset.dirty = '0';
+    toast(`Wrote ${n.dataset.atx} — verified against source`);
+  }
+  if (S.node === n) renderInspector();
+  syncCommit();
+}
+function revertNode(n) {
+  if (!n) return;
+  const keys = modelKeysOf(n);
+  if (keys.length) {
+    keys.forEach((k) => {
+      const m = MODEL[k]; m.value = m.original;
+      if (m.apply) m.apply(m.value);
+      document.querySelectorAll(`.inp[data-key="${k}"]`).forEach((i) => (i.value = m.value));
+      document.querySelectorAll(`#host [data-bind="${k}"]`).forEach((x) => {
+        x.textContent = m.value; x.dataset.dirty = '0';
+      });
+    });
+    n.__orig = n.textContent;          // the caret may still be in it
+    n.dataset.dirty = '0';
+  } else {
+    if (n.__orig != null) n.textContent = n.__orig;
+    n.dataset.dirty = '0';
+  }
+  if (S.node === n) renderInspector();
+  syncCommit();
+}
+function syncState() {
+  const w = document.querySelector('#inspBody .state');
+  if (!w || !S.node) return;
+  const d = isDirty(S.node);
+  w.textContent = d ? 'unsaved' : 'saved'; w.dataset.d = d ? '1' : '0';
+}
+/** There is exactly one Save and one Revert for a given value, and they sit
+    under its field. A floating bar over the element used to be a second pair
+    for text only — which is the split this design removes. What rides with
+    the element is the amber outline, which reports state without acting. */
+function syncCommit() { syncState(); }
+
 /* ======================== INLINE TEXT EDITING ========================== */
 function beginTextEdit(n) {
-  const original = n.textContent;
+  if (n.__orig == null) n.__orig = n.textContent;   // a re-entered edit keeps its pending text
   n.dataset.editing = '1'; n.contentEditable = 'true'; n.focus();
   getSelection().selectAllChildren(n);
+  // The page and the field are two views of one MODEL value, so typing here
+  // moves the field, reveals its Save row, and marks every element bound to the
+  // same source line — the nav logo is one literal rendered on two routes.
+  const key = n.dataset.bind, m = MODEL[key];
+  const mark = () => {
+    if (!m) { n.dataset.dirty = n.textContent === n.__orig ? '0' : '1'; return syncCommit(); }
+    m.value = n.textContent;
+    document.querySelectorAll(`.inp[data-key="${key}"]`).forEach((i) => (i.value = m.value));
+    document.querySelectorAll(`#host [data-bind="${key}"]`).forEach((x) => {
+      if (x !== n) x.textContent = m.value;
+      x.dataset.dirty = m.value === m.original ? '0' : '1';
+    });
+    const row = document.querySelector(`#inspBody .prop[data-key="${key}"] .row`);
+    if (row) row.hidden = m.value === m.original;
+    syncCommit();
+  };
   const onKey = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); endTextEdit(true); }
-    if (e.key === 'Escape') { e.preventDefault(); endTextEdit(false); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitNode(n); suspendTextEdit(); }
+    if (e.key === 'Escape') { e.preventDefault(); revertNode(n); suspendTextEdit(); }
   };
   n.addEventListener('keydown', onKey);
-  S.textFinish = (commit) => {
-    n.removeEventListener('keydown', onKey);
+  n.addEventListener('input', mark);
+  S.textFinish = () => {
+    n.removeEventListener('keydown', onKey); n.removeEventListener('input', mark);
     n.contentEditable = 'false'; delete n.dataset.editing; S.textFinish = null;
-    if (!commit) { n.textContent = original; return; }
-    if (n.textContent === original) return;
-    toast(`Wrote ${n.dataset.atx} — verified against source`);
   };
 }
-function endTextEdit(commit) { if (S.textFinish) S.textFinish(commit); }
+/** Stop typing. Never writes and never discards — the change stays pending. */
+function suspendTextEdit() { if (S.textFinish) S.textFinish(); syncCommit(); }
 
 /* ============================ PEEK / MENU ============================== */
 function openPeek(file, line) {
-  const lines = (SOURCES[file] || (() => ['// not part of the mockup fixture']))();
+  const lines = (SOURCES[file] || cssFixture(file) || (() => ['// not part of the mockup fixture']))();
+  $('#peek').dataset.loc = line ? `${file}:${line}` : file;
   $('#peekTitle').textContent = file; $('#peekLoc').textContent = line ? 'line ' + line : '';
   $('#peekCode').innerHTML = lines.map((t, i) => {
     const cls = /^\s*(---|import|const|\]|\);)/.test(t) ? 'k-tk' : /^\s*</.test(t) ? 'k-tg' : 'k-cm';
@@ -1103,7 +1379,24 @@ function openPeek(file, line) {
   }).join('');
   $('#backdrop').hidden = false; $('#peek').hidden = false;
 }
-$('#peekOpen').onclick = () => { hideModal(); toast('Opened ' + $('#peekTitle').textContent + ' in your editor'); };
+$('#peekOpen').onclick = () => { hideModal(); toast('Opened ' + $('#peek').dataset.loc + ' in your editor'); };
+
+/* Stylesheets aren't in the SOURCES fixture. Rebuild one from CSS_RULES so the
+   unified "View code" door never opens onto a stub. */
+function cssFixture(file) {
+  const rules = Object.values(CSS_RULES).flat().filter((r) => r.src.split(':')[0] === file);
+  if (!rules.length) return null;
+  return () => {
+    const out = []; let at = 1;
+    rules.sort((a, b) => +a.src.split(':')[1] - +b.src.split(':')[1]).forEach((r) => {
+      const line = +r.src.split(':')[1];
+      while (at < line) { out.push(''); at++; }
+      out.push(`${r.s} {`, ...r.d.map(([k, v]) => `  ${k}: ${v};`), '}');
+      at += r.d.length + 2;
+    });
+    return out;
+  };
+}
 function hideModal() { $('#backdrop').hidden = true; $('#peek').hidden = true; $('#settings').hidden = true; }
 $('#backdrop').onclick = hideModal;
 document.querySelectorAll('[data-close]').forEach((b) => (b.onclick = hideModal));
@@ -1111,7 +1404,10 @@ $('#mMark').onclick = (e) => { e.stopPropagation(); $('#menu').hidden = !$('#men
 document.addEventListener('click', () => ($('#menu').hidden = true));
 $('#menu').addEventListener('click', (e) => e.stopPropagation());
 document.querySelectorAll('.sw').forEach((s) => (s.onclick = () => (s.dataset.on = s.dataset.on === '1' ? '0' : '1')));
-$('#inspClose').onclick = () => { endTextEdit(true); $('#insp').hidden = true; S.node = null; $('#hl').hidden = true; };
+$('#inspClose').onclick = () => {
+  suspendTextEdit(); $('#insp').hidden = true; S.node = null; $('#hl').hidden = true;
+  if (document.querySelector('#host [data-dirty="1"]')) toast('Closed with unsaved changes — they are still marked on the page', 'warn');
+};
 $('#inspDock').onclick = () => $('#insp').classList.toggle('left');
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
@@ -1189,20 +1485,26 @@ function toggleTree(on) {
   $('#launcher').hidden = S.tree; if (S.tree) renderTree();
 }
 
-/* ===================== MODES — hold ⌥ to wake the tool ================== */
+/* ============ MODES — interception is held, selection persists ===========
+   Two independent things, deliberately not one:
+     S.edit  — INTERCEPTION. True only while ⌥ is held. It is what steals hover
+               and clicks from the page.
+     S.node  — SELECTION. What the inspector is showing. Survives the key going
+               up, survives ordinary browsing.
+   Releasing ⌥ therefore always hands the page back: the inspector stays open on
+   what you picked, and the next ordinary click navigates like any other click.
+   Conflating the two is what made a card inspect instead of following its link. */
 function setEdit(on) {
   S.edit = on; document.body.dataset.edit = on ? '1' : '0';
-  if (!on) {
-    endTextEdit(true); $('#hl').hidden = true; $('#pill').hidden = true;
-    S.hover = null; clearTimeout(S.dwell);
-  }
+  if (on) return;
+  // Hover chrome belongs to interception, so it goes. The locked selection
+  // outline and any text edit in progress belong to the selection, so they stay.
+  $('#pill').hidden = true; S.hover = null; clearTimeout(S.dwell);
+  if (S.node) drawHl(S.node, true); else $('#hl').hidden = true;
 }
-/* The tool is asleep until ⌥ is held. Ordinary clicks keep working, which is
-   what lets a card navigate like any other link. The inspector, once opened,
-   stays put after the key is released. */
 addEventListener('keydown', (e) => { if (e.altKey && !S.edit) setEdit(true); });
-addEventListener('keyup', (e) => { if (!e.altKey && S.edit && !S.node) setEdit(false); });
-addEventListener('blur', () => { if (!S.node) setEdit(false); });
+addEventListener('keyup', (e) => { if (!e.altKey && S.edit) setEdit(false); });
+addEventListener('blur', () => setEdit(false));
 
 /* page navigation — the mock site has two routes */
 const ROUTES = {
@@ -1227,11 +1529,15 @@ document.addEventListener('click', (e) => {
 });
 
 $('#launcher').onclick = () => toggleTree(true);
-$('#pgSource').onclick = () => toast(`Opened ${ROUTES[CURRENT].file}`);
+$('#pgSource').onclick = () => openPeek(ROUTES[CURRENT].file, 1);
 $('#bSettings').onclick = () => { $('#backdrop').hidden = false; $('#settings').hidden = false; };
 $('#mCopy').onclick = () => { $('#menu').hidden = true; toast('Page context copied — route, template, chain'); };
 $('#mRescan').onclick = () => { $('#menu').hidden = true; toast('Re-scanned the usage index — 9 components, 14 usages'); };
-addEventListener('scroll', () => { const n = S.node || S.hover; if (n && !$('#hl').hidden) drawHl(n, !!S.node); if (S.hover && !$('#pill').hidden) place(S.hover, $('#pill')); }, { passive:true });
+addEventListener('scroll', () => {
+  const n = S.node || S.hover;
+  if (n && !$('#hl').hidden) drawHl(n, !!S.node);
+  if (S.hover && !$('#pill').hidden) place(S.hover, $('#pill'));
+}, { passive:true });
 
 /* =============================== SCENES =============================== */
 const pick = (sel) => document.querySelector(sel.startsWith('#') ? sel : '#host ' + sel);
@@ -1242,8 +1548,10 @@ function reset(page = 'home') {
   document.querySelectorAll('#host img[data-src0]').forEach((i) => { i.dataset.src = i.dataset.src0; i.setAttribute('src', i.dataset.url0); });
   Object.keys(MODEL).forEach((k) => { MODEL[k].value = MODEL[k].original; });
   document.querySelectorAll('#host [data-bind]').forEach((n) => {
-    const m = MODEL[n.dataset.bind]; if (m) n.textContent = m.value; n.dataset.live = '0';
+    const m = MODEL[n.dataset.bind]; if (m) n.textContent = m.value; n.dataset.dirty = '0';
   });
+  suspendTextEdit();
+  document.querySelectorAll('#host [data-dirty]:not([data-bind])').forEach((x) => { if (x.__orig != null) x.textContent = x.__orig; x.dataset.dirty = '0'; });
   $('#insp').classList.remove('left'); $('#toasts').innerHTML = '';
   getSelection()?.removeAllRanges(); scrollTo({ top:0 });
 }
@@ -1257,6 +1565,10 @@ const SCENES = [
     ['Asleep — just the launcher', () => reset()],
     ['Holding ⌥', () => { reset(); setEdit(true); }],
     ['Tree open', () => { reset(); toggleTree(true); }],
+    ['⌥ released — page live again', () => { reset(); setEdit(true);
+      const n = pick('.hero-sub'); n.scrollIntoView({ block:'center' });
+      setTimeout(() => { openInspector(n); setEdit(false);
+        toast('Selection kept · the page takes clicks again', 'warn'); }, 20); }],
   ]],
   ['Hover', [
     ['Compact pill', () => hover('.hero-sub', false)],
@@ -1269,6 +1581,13 @@ const SCENES = [
     ['Slot text · button', () => show('.btn')],
     ['Image · browse + upload', () => show('.hero-art')],
     ['Image · inferred chain', () => show('.avatar')],
+    ['Unsaved · nothing written yet', () => { reset(); setEdit(true);
+      const n = pick('.hero-sub'); n.scrollIntoView({ block:'center' });
+      setTimeout(() => {
+        openInspector(n);
+        n.textContent = 'Edited on the page — still unsaved.';
+        n.dispatchEvent(new InputEvent('input', { bubbles:true }));
+      }, 20); }],
     ['Inferred chain', () => show('.quote-text')],
     ['Read-only · island', () => show('.badge')],
   ]],
@@ -1279,9 +1598,9 @@ const SCENES = [
     ['Markdown body', () => show('[data-bind="md.7"]', undefined, 'service')],
     ['Markdown heading', () => show('[data-bind="md.9"]', undefined, 'service')],
     ['Entry cover image', () => show('.prose-fig', undefined, 'service')],
-    ['Rich paragraph — refused', () => show('#page-service .prose p:last-of-type', undefined, 'service')],
+    ['Markdown paragraph — view code', () => show('#page-service .prose p:last-of-type', undefined, 'service')],
     ['Tree on the .md route', () => { reset('service'); toggleTree(true); }],
-    ['Peek the entry', () => { reset('service'); openPeek('src/content/services/product-design.md', 7); }],
+    ['View the entry code', () => { reset('service'); openPeek('src/content/services/product-design.md', 7); }],
   ]],
   ['Panels', [
     ['Tree + inspector', () => { reset(); toggleTree(true); setEdit(true);

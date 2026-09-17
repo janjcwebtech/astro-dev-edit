@@ -72,15 +72,15 @@
       </div>
       <div class="chip">
         <div class="chip-k">Markdown routes</div>
-        <div class="chip-v">Frontmatter fields and plain body lines<small>Matched by rendered text; anything with inline markup is refused. Keeps <code>patcher/frontmatter.ts</code> as a value writer.</small></div>
+        <div class="chip-v">View code → Open in editor<small>Frontmatter and body content point to the backing file when known. No browser writes or body-line matching.</small></div>
       </div>
       <div class="chip">
         <div class="chip-k">One panel</div>
-        <div class="chip-v">The inspector opens on every click<small>Same five sections every time; only the Edit section changes shape. No modal refusal, no modal image panel.</small></div>
+        <div class="chip-v">The inspector opens on every click<small>Values, chain, CSS — every time. Everything writable is a Values row with one field and one Save, literal text included.</small></div>
       </div>
       <div class="chip">
         <div class="chip-k">Prop editing</div>
-        <div class="chip-v">Editable at the usage site, within a proven boundary<small>String literals and one-hop traces. Imports, computed values and spreads stay read-only with a reason. Closes #61.</small></div>
+        <div class="chip-v">Editable at the usage site, within a proven boundary<small>String literals and one-hop traces, including whole HTML strings. Braces, angle brackets and quotes are allowed; source syntax and rendering behavior are preserved. Imports, computed values and spreads retain their boundaries.</small></div>
       </div>
       <div class="chip">
         <div class="chip-k">Composition surface</div>
@@ -262,9 +262,9 @@
             <div class="crumb" style="padding: 4px 0;">
               <span>index.astro</span><span class="sep">›</span><span>Services.astro</span><span class="sep">›</span><span class="cur">ServiceCard.astro</span>
             </div>
-            <div class="wbox is-new" style="font-size: 10px; text-align: left; line-height: 1.8; display: block;">EDIT · prop value<br><span class="mono">title</span><br>[ Build things that outlast… ]</div>
+            <div class="wbox is-new" style="font-size: 10px; text-align: left; line-height: 1.8; display: block;">VALUES<br><span class="mono">title</span> · selected<br>[ Build things that outlast… ]<br>[ ✓ Save ] [ ↺ Revert ]<br><span class="mono">eyebrow · href · slot</span></div>
             <div class="wbox ghost" style="font-size: 10px; text-align: left; line-height: 1.8; display: block;">CHAIN (indented)<br>└ Base.astro<br>&nbsp;&nbsp;└ Hero.astro · presentation</div>
-            <div class="wbox ghost" style="font-size: 10px; text-align: left;">props · slot · CSS (collapsed)</div>
+            <div class="wbox ghost" style="font-size: 10px; text-align: left;">CSS (collapsed)</div>
             <div style="display: flex; gap: 5px;">
               <span class="mini">Open component</span><span class="mini">Open usage</span>
             </div>
@@ -273,7 +273,7 @@
       </div>
     </div>
     <ul class="callouts">
-      <li><span class="callout-n">7</span><span><strong>No modal.</strong> Non-modal inspector; a refusal is just one shape of the Edit section. <code>src/client/editors/notice.ts</code> (rewrite)</span></li>
+      <li><span class="callout-n">7</span><span><strong>No modal.</strong> Non-modal inspector; a refusal is a Values group with no rows and a named reason. <code>src/client/editors/notice.ts</code> (rewrite)</span></li>
       <li><span class="callout-n">8</span><span><strong>Indented chain + presentation/content badges</strong> — nesting is drawn, not implied.</span></li>
       <li><span class="callout-n">9</span><span><strong>Props editable where provable</strong> — literals and one-hop traces; the rest read-only with a reason.</span></li>
     </ul>
@@ -297,7 +297,7 @@
       <div class="fork">
         <div class="fork-col">
           <div class="fork-label">editable</div>
-          <div class="node terminal-ok"><b>Inline edit or popup</b><span>verify-then-patch, atomic write</span></div>
+          <div class="node terminal-ok"><b>Values field — one Save</b><span>literal text also takes the caret; verify-then-patch</span></div>
         </div>
         <div class="fork-col">
           <div class="fork-label">not editable</div>
