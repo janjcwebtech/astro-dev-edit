@@ -60,6 +60,31 @@ function chevronUrl(color: string): string {
 
 export function overlayCss(): string {
   return `
+.atx-inspector {
+  display: none; position: fixed; right: 8px; top: 8px; bottom: 8px;
+  width: min(460px, calc(100vw - 16px)); z-index: ${Z + 4};
+  color: var(--atx-foreground); background: var(--atx-background);
+  border: 1px solid var(--atx-border); border-radius: var(--atx-radius-xl);
+  box-shadow: 0 8px 32px #0005; overflow: hidden;
+}
+.atx-inspector[data-on] { display: flex; flex-direction: column; }
+.atx-inspector-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--atx-border); }
+.atx-inspector-title { font: 500 14px var(--atx-font-ui); }
+.atx-inspector-body { overflow: auto; min-height: 0; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.atx-inspector-body > .atx-card { flex: 0 0 auto; }
+.atx-inspector .atx-item { flex-wrap: wrap; }
+.atx-inspector .atx-item-content { min-width: 0; flex-basis: 180px; }
+.atx-inspector .atx-item-title { overflow-wrap: anywhere; }
+.atx-inspector-code { font: 12px/1.6 var(--atx-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; max-height: 220px; overflow: auto; }
+.atx-inspector-note { font: 12px/1.5 var(--atx-font-ui); color: var(--atx-muted-fg); overflow-wrap: anywhere; margin: 8px 0; }
+.atx-inspector-details { font: 12px/1.5 var(--atx-font-ui); margin: 8px 0; }
+.atx-inspector-details > summary { cursor: pointer; color: var(--atx-muted-fg); }
+.atx-inspector-tree-header { padding: 8px 12px; border-bottom: 1px solid var(--atx-border); }
+.atx-inspector-tree-header > span { display: inline-block; margin-right: 8px; }
+.atx-inspector-hover { display: none; position: fixed; pointer-events: none; border: 2px solid var(--atx-primary); box-sizing: border-box; z-index: ${Z}; }
+.atx-inspector-hover[data-on] { display: block; }
+.atx-inspector-pill { display: none; position: fixed; pointer-events: none; z-index: ${Z + 1}; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--atx-card); color: var(--atx-foreground); border: 1px solid var(--atx-border); border-radius: var(--atx-radius-md); padding: 5px 8px; font: 12px var(--atx-font-ui); }
+.atx-inspector-pill[data-on] { display: block; }
 :host {
   /* The guard. Everything the host page could inherit into the overlay stops
      here; the declarations below are what the overlay inherits instead. */

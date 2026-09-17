@@ -158,7 +158,9 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         const overlayUrl = new URL('./client/overlay.ts', import.meta.url);
         injectScript('page', `import ${JSON.stringify(fileURLToPath(overlayUrl))};`);
 
-        logger.info('edit mode available — toggle it from the admin bar at the top of the page');
+        logger.info(userOptions.composition
+          ? 'read-only inspector available — hold Alt / Option and click, or open the left-edge element tree'
+          : 'edit mode available — toggle it from the admin bar at the top of the page');
       },
 
       // Astro's answer to "which file is this route written in", which the DOM

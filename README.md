@@ -54,6 +54,7 @@ Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6
 
 ## Other features
 
+- **Component inspector** — opt in with `devEdit({ composition: true })` for a read-only inspector with component chains, native slots, source links and CSS. Hold Alt/Option and click, or select from the left-edge element tree. See [Component tracing and inspector](documentation/COMPOSITION-API.md).
 - **CSS peek**
 - **Code peek**
 - **Structure tree view**

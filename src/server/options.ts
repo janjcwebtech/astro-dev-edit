@@ -81,8 +81,8 @@ export interface DevEditOptions {
    * dev-toolbar requirement on 5/6); `'off'` never injects.
    */
   sourceAnnotations?: 'auto' | 'force' | 'off';
-  /** Opt-in dev tracing and read-only composition API. Config-only: installs
-   * a pre-compiler transform; no inspector UI is enabled by this option. */
+  /** Opt-in read-only inspector and composition API. Config-only: installs
+   * a pre-compiler transform and selects the inspector instead of editing. */
   composition?: boolean;
   /**
    * The CMS-style entry panel for content-collection pages that emit the
@@ -232,7 +232,7 @@ interface OptionSpec {
 const OPTION_SPECS: readonly OptionSpec[] = [
   {
     key: 'composition', label: 'Component tracing',
-    help: 'Experimental Astro component tracing and read-only API. Requires a dev-server restart; the inspector UI is separate.',
+    help: 'Read-only component inspector and tracing API. Replaces the editing UI; requires a dev-server restart.',
     type: 'boolean', group: 'general', configOnly: true,
     fallback: DEFAULTS.composition, read: (o) => o.composition,
   },

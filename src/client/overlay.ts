@@ -35,6 +35,7 @@ import { has, setFeatures } from './features.ts';
 import { clearHighlight, initHover } from './hover.ts';
 import { onPageSourceChange, pageSource, resolvePageSource } from './page-source.ts';
 import { initRouter } from './router.ts';
+import { initInspectorApp } from './inspector-app.ts';
 import { cacheSourceMappings, sourceFor, startCapture } from './source-map.ts';
 import { initTree } from './tree.ts';
 import * as state from './state.ts';
@@ -65,6 +66,7 @@ let treeWanted = false;
 // From /health: the absolute project root, so copied source paths come out
 // repo-relative (Astro's annotations are absolute). Null until boot completes.
 let projectRoot: string | null = null;
+let inspectorMode = false;
 
 // ---------------------------------------------------------------------------
 // Navigate-while-held: holding Ctrl or Alt/Option suspends editing so clicks
@@ -399,6 +401,7 @@ const bar = initAdminBar({
 // strips them again. (spec §4.2 / §7.4, adapted for attribute-stripping)
 if (import.meta.hot) {
   import.meta.hot.on('vite:afterUpdate', () => {
+    if (inspectorMode) return;
     clearHighlight();
     invalidateClassifications(); // the source changed — cached verdicts are stale
     cacheSourceMappings();
@@ -426,6 +429,11 @@ async function boot(): Promise<void> {
   // so the media modal can see them without importing the composition root and
   // so a Settings save updates them in place. (see features.ts)
   setFeatures(info);
+  if (info.composition) {
+    inspectorMode = true;
+    initInspectorApp();
+    return;
+  }
   mount(
     ...hover.elements,
     tree.selectionOutline,

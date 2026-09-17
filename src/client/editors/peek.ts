@@ -6,6 +6,7 @@ import { trapFocus } from '../focus.ts';
 import * as state from '../state.ts';
 import { basename, buildBackdrop, buildPanel, footButton, isolateScroll, styled } from '../ui.ts';
 import { mount } from '../shadow.ts';
+import { has } from '../features.ts';
 
 /**
  * Source-peek panel: a read-only, syntax-tinted view of the source file,
@@ -95,10 +96,10 @@ export function openPeekPanel(src: SourceLoc, openSource: (src: SourceLoc) => vo
   const foot = panel.querySelector('[data-foot]') as HTMLElement;
   foot.append(
     footButton('Close', 'outline', close),
-    footButton('Open in editor', 'default', () => {
+    ...(has('openInEditor') ? [footButton('Open in editor', 'default', () => {
       close();
       openSource(src);
-    }),
+    })] : []),
   );
 
   mount(backdrop, panel);

@@ -10,8 +10,46 @@ devEdit({ composition: true })
 `composition` defaults to `false` and is config-only: changing it requires a dev
 server restart. It installs the version-2 annotation transform, even when
 `sourceAnnotations` is `off`. Builds and previews install neither the transform
-nor the API. The existing editing UI remains; this option does not add the new
-inspector, staged edits, prop writes or HTML-string writes.
+nor the API. This option selects the read-only inspector described below.
+Staged edits, prop writes and HTML-string writes are not part of this layer.
+
+## Read-only inspector
+
+The left-edge launcher opens the element tree. Click a tree row, or hold
+Alt/Option and click an element on the page, to inspect it. Releasing the key
+returns clicks to the page while keeping the selection and inspector open.
+Close or Escape clears the selection. With `composition: false`, the existing
+editing UI remains available.
+
+The panel shows:
+
+- **Values:** a read-only rendered text or image-attribute snapshot and its
+  original source location. A known page backing file has a separate source
+  link; it does not claim that every value comes from that file.
+- **Component chain:** a proven runtime chain, an explicitly inferred static
+  path, separate candidate paths, or a named refusal. Component rows offer
+  **View code** for the component and **Open parent** for its usage site.
+  Usage details show prop and slot source text without evaluating it.
+- **Slot relationships:** all enclosing native-slot insertion boundaries,
+  including forwarded slots and fallback content, with links to the receiving
+  `<slot>` locations. The selected element's own source remains separate.
+- **CSS:** inline declarations, computed values and readable matched selectors
+  in stylesheet order. Conditional matches may be inactive, and inaccessible
+  cross-origin sheets are omitted. Available stylesheet sources offer an
+  **Open in editor** jump; selector location is best-effort.
+
+Source buttons open the existing read-only preview. Its **Open in editor**
+action respects the `openInEditor` option; CSS also respects `cssInspector`.
+Occurrence counts distinguish repeated insertions of the selected source
+element. Route-scoped usage counts describe source sites, including unrendered
+branches, rather than runtime instances.
+
+Generated HTML descendants never acquire a chain from copied annotations or
+their container. Malformed render/slot metadata is refused. Incomplete graph
+coverage is displayed separately from a proven chain. Source changes during
+discovery are retried once; rapid selection changes and closed panels discard
+late responses. Navigation, HMR and removal of the selected DOM node clear the
+selection, so render identities are not carried onto a replacement page.
 
 Run `npm run dev:composition` for a fixture using this integration. `/advanced`
 exercises repeated components and slots; `/cached` contains replayed HTML.
@@ -104,7 +142,7 @@ coordinates over legacy compiler annotations. Keep API results and render IDs
 scoped to the current page/render; do not treat usage IDs as stable data-record
 identities or the watcher revision as a write precondition.
 
-The next inspector can combine these read APIs with the existing CSS inspector
+The inspector combines these read APIs with the existing CSS inspector
 and source links. Markdown-backed values open their known backing file in the
 IDE; they do not require a Markdown write API. Whole-string content editing and
 Save/Revert belong to the separate value-writing layer.
@@ -121,12 +159,23 @@ an asynchronous read.
 
 Verified on the committed fixture with Astro 5.18.2 and 7.1.1: all 45 annotated
 `/advanced` elements resolve through the typed API to proven chains, all 45
-source locations match the original coordinates, and all 17 native-slot
-placements remain after toolbar initialization. Discovery covers 11 files with
-no coverage issues. On `/cached`, the four copied roots remain untracked and do
-not acquire editable source locations. This is fixture evidence, not the full
-hydration or real-site compatibility matrix.
+source locations match the original coordinates, and all 18 native-slot
+placements across 14 elements remain after toolbar initialization. Discovery
+covers 11 files with no coverage issues. On `/cached`, the four copied roots
+remain untracked and do not acquire editable source locations. This is fixture
+evidence, not the full hydration or real-site compatibility matrix.
 
-`npm run typecheck` and `ATX_ASTRO5_ROOT=examples/sf-sf npm test` pass: 942 tests
-across 44 files. Vitest still reports the pre-existing shutdown timeout after a
-successful run.
+The inspector's request-generation and occurrence-grouping tests live in
+`inspector-model.test.ts`. The browser surface issues only read queries and
+explicit source-opening requests; it does not enter the legacy editing router.
+
+Browser verification on the fixture covers all 43 selectable annotated elements
+on `/advanced`: proven chains, original source-preview lines, repeated insertion
+counts, forwarded slot boundaries and page/tree selection. All four copied roots
+on `/cached` remain untracked without composition requests. Computed CSS,
+selection removal and navigation invalidation are also checked. This is fixture
+evidence, not a full hydration or browser compatibility matrix.
+
+`npm run typecheck` and `ATX_ASTRO5_ROOT=examples/sf-sf npm test` are the validation
+commands. Without `ATX_ASTRO5_ROOT`, `composition-render.test.ts` silently skips its
+Go-compiler leg — 5 tests instead of 10 — and reports a pass either way.

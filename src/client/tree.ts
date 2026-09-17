@@ -33,6 +33,11 @@ import { basename, isolateScroll, onChromeInset, outlineRect, styled } from './u
 // --- View --------------------------------------------------------------------
 
 export interface TreeDeps {
+  /** Inspector mode keeps selection after releasing the interception key. */
+  readOnly?: boolean;
+  onSelect?(el: HTMLElement): void;
+  describe?(el: HTMLElement): string | null;
+  header?: HTMLElement;
   isEditMode(): boolean;
   /** Drive the hover outline + verdict pill for a row (tree → page). */
   highlight(el: HTMLElement): void;
@@ -64,6 +69,7 @@ export interface TreeHandle {
   syncActive(el: HTMLElement | null): void;
   clearSelection(): void;
   hasSelection(): boolean;
+  selectElement(el: HTMLElement): void;
 }
 
 
@@ -101,7 +107,9 @@ export function initTree(deps: TreeDeps): TreeHandle {
   const body = styled('div', 'atx-tree-body');
   isolateScroll(body);
 
-  root.append(bar, body);
+  root.append(bar);
+  if (deps.header) root.append(deps.header);
+  root.append(body);
 
   // Keep clear of the admin bar, whichever edge it is docked to. Fires once on
   // subscribe, so the panel is correct however the two modules boot.
@@ -197,7 +205,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
   document.addEventListener(
     'click',
     (e) => {
-      if (!deps.isEditMode() || !selectedEl) return;
+      if (deps.readOnly || !deps.isEditMode() || !selectedEl) return;
       if (isOwnUi(e)) return; // clicks on the tree / pills / panels don't deselect
       clearSelection();
     },
@@ -261,6 +269,13 @@ export function initTree(deps: TreeDeps): TreeHandle {
     tag.textContent = `<${el.tagName.toLowerCase()}>`;
 
     row.append(chevron, tag);
+    const description = deps.describe?.(el);
+    if (description) {
+      const boundary = styled('span', 'atx-tree-preview');
+      boundary.textContent = description;
+      boundary.title = description;
+      row.append(boundary);
+    }
 
     // A short text preview for leaf text elements aids scanning.
     if (!hasChildren) {
@@ -288,8 +303,13 @@ export function initTree(deps: TreeDeps): TreeHandle {
       if (deps.isEditMode()) deps.highlight(el);
     });
     row.addEventListener('mouseleave', () => deps.clearHighlight());
-    row.addEventListener('click', () => select(el));
-    row.addEventListener('dblclick', () => deps.openEditor(el));
+    row.tabIndex = 0;
+    const activate = () => { select(el); deps.onSelect?.(el); };
+    row.addEventListener('click', activate);
+    row.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
+    });
+    if (!deps.readOnly) row.addEventListener('dblclick', () => deps.openEditor(el));
 
     rowFor.set(el, row);
     paintRow(el);
@@ -344,7 +364,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     // nothing live to point at, and the bar's Elements button reopens both.
     tab.toggleAttribute('data-on', deps.isEditMode());
     syncActive(null);
-    clearSelection();
+    if (!deps.readOnly) clearSelection();
   }
 
   function isOpen(): boolean {
@@ -362,5 +382,6 @@ export function initTree(deps: TreeDeps): TreeHandle {
     syncActive,
     clearSelection,
     hasSelection,
+    selectElement: select,
   };
 }
