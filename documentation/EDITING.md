@@ -70,6 +70,17 @@ get — the pill in words (**editable**, **image**, or **dynamic**), the box in
 colour. Verdicts are remembered until the file next changes, so known elements
 show theirs instantly.
 
+With [`composition: true`](COMPOSITION-API.md) the tool shows a different pill.
+It is read-only and has no verdict to claim, so it reads `file:line:col ·
+inspect` on one row and costs no request. Rest on one element and it grows a
+second row — the breadcrumb of files responsible for what you are pointing at,
+`index.astro › Services.astro › ServiceCard.astro › <h2>`, ending in the element
+itself. Each file is a button: it opens the inspector on the element you are
+hovering, scrolled to that link's row in the **Component chain**, so a segment
+is a way into the panel rather than a different selection. A segment the chain
+could not resolve is drawn dashed and does nothing. Ids resolve in one batched
+request per page, not one per hover.
+
 Clicking the pill's `file:loc` label opens a **source peek** — a wide
 read-only panel showing the whole file syntax-highlighted, with line numbers,
 scrolled to the element's line (highlighted and centered; scroll for full

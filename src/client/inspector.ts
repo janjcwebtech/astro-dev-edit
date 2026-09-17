@@ -29,13 +29,37 @@ export function initInspector(deps: InspectorDeps) {
   const loader = createInspectorLoader(api);
   let selected: HTMLElement | null = null;
   let generation = 0;
+  /** The chain card of the current selection, for {@link focusUsage}. */
+  let chainBody: HTMLElement | null = null;
 
   function close() {
     generation++;
     loader.invalidate();
     selected = null;
+    chainBody = null;
     root.removeAttribute('data-on');
     deps.onClose();
+  }
+
+  /**
+   * Bring one chain row to the eye: the hover pill's breadcrumb names a usage
+   * id (or `'route'`), and the panel answers by marking and scrolling to that
+   * row — never by reselecting, because the clicked element is what the rest of
+   * the panel describes and a breadcrumb is a way *into* it, not a new
+   * selection. An id the chain does not carry marks nothing rather than
+   * scrolling to something adjacent and implying it is the answer.
+   */
+  function focusUsage(id: string | null): void {
+    if (!chainBody) return;
+    for (const marked of chainBody.querySelectorAll(':scope > [data-focus]')) marked.removeAttribute('data-focus');
+    if (!id) return;
+    // Scoped to the chain's own rows: the "usages on this route" list below it
+    // renders the same links, and a focus that could land there would mark a
+    // source usage site as if it were the one that rendered this element.
+    const row = chainBody.querySelector(`:scope > [data-usage="${CSS.escape(id)}"]`);
+    if (!(row instanceof HTMLElement)) return;
+    row.setAttribute('data-focus', '');
+    row.scrollIntoView({ block: 'nearest' });
   }
 
   function note(parent: HTMLElement, text: string) {
@@ -51,8 +75,10 @@ export function initInspector(deps: InspectorDeps) {
   }
 
   function sourceRow(parent: HTMLElement, label: string, src: SourceLoc, description?: string) {
-    parent.append(item({ title: label, description: description ?? `${basename(src.file)}:${src.loc}`,
-      actions: [codeButton(src)] }).root);
+    const row = item({ title: label, description: description ?? `${basename(src.file)}:${src.loc}`,
+      actions: [codeButton(src)] }).root;
+    parent.append(row);
+    return row;
   }
 
   function coverage(parent: HTMLElement, value: CompositionCoverage) {
@@ -89,7 +115,10 @@ export function initInspector(deps: InspectorDeps) {
       details.append(value);
     }
     row.content.append(details);
+    // The breadcrumb names a link by id; the row it opens has to be findable.
+    row.root.dataset.usage = link.id;
     parent.append(row.root);
+    return row.root;
   }
 
   function css(el: HTMLElement) {
@@ -128,8 +157,13 @@ export function initInspector(deps: InspectorDeps) {
     return section.root;
   }
 
-  async function select(el: HTMLElement) {
+  /** `focus` names a chain row to mark once the chain has resolved — a
+   *  breadcrumb segment. Reselecting the element already shown keeps the panel
+   *  as it is and only moves the mark. */
+  async function select(el: HTMLElement, focus?: string) {
+    if (selected === el && chainBody) return focusUsage(focus ?? null);
     selected = el;
+    chainBody = null;
     const current = ++generation;
     loader.invalidate();
     const pathname = location.pathname;
@@ -154,6 +188,7 @@ export function initInspector(deps: InspectorDeps) {
     if (backing) sourceRow(values.body, 'Page backing file', { file: backing, loc: '1:1' }, 'Route content file; individual value mapping is not proven.');
     const chain = card({ title: 'Component chain' });
     const slots = card({ title: 'Slot relationships' });
+    chainBody = chain.body;
     body.append(values.root, chain.root, slots.root, css(el));
 
     // Never climb from an untracked descendant to manufacture its ownership.
@@ -198,7 +233,9 @@ export function initInspector(deps: InspectorDeps) {
       const labels = { proven: 'Proven chain', inferred: 'Inferred source path · rendered instance is not proven',
         candidates: 'Multiple possible source paths · no path selected', none: 'No chain' };
       note(chain.body, `${labels[answer.chain.tier]}${answer.chain.reason ? ' · ' + answer.chain.reason : ''}`);
-      if (answer.chain.route) sourceRow(chain.body, 'Route', { file: answer.chain.route, loc: '1:1' });
+      if (answer.chain.route) {
+        sourceRow(chain.body, 'Route', { file: answer.chain.route, loc: '1:1' }).dataset.usage = 'route';
+      }
       for (const link of answer.chain.links) usage(chain.body, link);
       for (const [index, candidate] of (answer.chain.candidates ?? []).entries()) {
         const details = styled('details', 'atx-inspector-details');
@@ -218,6 +255,7 @@ export function initInspector(deps: InspectorDeps) {
       answer.uses.links.forEach(link => usage(uses, link));
       coverage(uses, answer.uses.coverage);
       chain.body.append(uses);
+      focusUsage(focus ?? null);
     } catch (error) {
       if (alive()) loading.textContent = `Could not load composition · ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
@@ -229,6 +267,9 @@ export function initInspector(deps: InspectorDeps) {
     if (selected && !selected.isConnected) close();
   }).observe(document.documentElement, { childList: true, subtree: true });
 
-  return { root, select, close, isOpen: () => selected !== null,
+  return { root, select, focusUsage, close, isOpen: () => selected !== null,
+    /** Whether `el` is what the panel currently describes — a breadcrumb asks
+     *  before deciding between moving its mark and opening the panel. */
+    shows: (el: HTMLElement) => selected === el,
     invalidate() { close(); } };
 }

@@ -7,7 +7,7 @@ plan:
   priority: high
   created: "2026-09-13"
   updated: "2026-09-17"
-  progress: 41
+  progress: 49
   visual: narrow-to-editor-inspector.plan.html
   mockup: narrow-to-editor-inspector.mockup.html
   tags: [scope-reduction, astro, composition, annotations]
@@ -270,14 +270,14 @@ Rules it must obey:
 - [x] **P1** — delete the CMS, Unsplash and the asset picker; fix the ~12 composition points. `client/page-source.ts` **stays**: the inspector's route anchor reads the page's own meta declaration, and only the `/entry/resolve` half went
 - [x] **P1** — rewrite `notice.ts`; revise README + the owning docs; delete `ENTRY-EDITOR.md`
 - [x] **P1** — dead CSS out of `styles.ts`, its own commit, after green — 831 lines
-- [ ] **P2** — compact/pinned hover pill; refusal folded into the inspector; Settings slimmed
+- [x] **P2** — compact hover pill with a breadcrumb row (the inspector's; `hover.ts`'s editing pill is untouched and still carries the chips row); refusal folded into the inspector — `showDynamicNotice` has one caller, `router.ts`; Settings slimmed to three tabs and twelve options
 - [ ] **P3** — emit `data-atx-*` on all versions + dev-only parity counter; fix `<slot>` and `custom-element` gaps; correct `ASTRO-COMPAT.md`
 - [x] **P4** — `protocol.ts` shapes, then `usage-parse.ts`, `usage-index.ts`, `composition.ts`, `composition-routes.ts`
 - [x] **P5** — component-usage injection in `annotate.ts` behind the `composition` option
 - [x] **P6** — `composition-model.ts`, `composition-dom.ts`, component-aware tree
-- [ ] **P6** — hover-pill breadcrumb; today the pill reads `file:loc · inspect`
+- [x] **P6** — hover-pill breadcrumb: one row at rest, the chain of resolved files on dwell, each segment focusing that link's chain row without unpinning the clicked element. `composition.ts` batches ids per page — seven dwells, one request
 - [x] **P6a** — hold-to-activate replaces edit mode; the admin bar becomes a left-edge launcher plus a panel header carrying route and source
-- [ ] **P6a** — menu and settings in that header
+- [x] **P6a** — menu and settings in that header: `☰` (Copy page context, Re-scan the page) and `⚙` Settings, then close, with the route, its template and *View code* below
 - [x] **P6b** — one read-only inspector for every click: Values, Component chain, Slot relationships, CSS, one *View code* verb
 - [ ] **P6b** — staged values and one Save per row; replaces the refusal modal and the image modal
 - [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
@@ -291,10 +291,10 @@ Rules it must obey:
 
 Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unreleased]` and the owning doc updated in the same commit.
 
-- [x] `npm run typecheck` clean and `npm test` green after every phase — 45 files / 950 tests (was 38 / 851)
+- [x] `npm run typecheck` clean and `npm test` green after every phase — 33 files / 523 tests (`ATX_ASTRO5_ROOT=examples/sf-sf` is required, or `composition-render.test.ts` drops its Astro-5 leg silently)
 - [x] Element annotations are **byte-identical** with composition on and off — the single most important regression guard in the feature
 - [ ] 205/205 playground loc parity retained; no newlines added by the transform; classify/apply round-trip green
-- [x] `usage-parse.ts`, `composition.ts`, `composition-model.ts`, `usage-id.ts` unit-tested with fixtures covering spreads, shorthand props, `class:list`, `Fragment slot=`, dotted names and `.map()`
+- [x] `usage-parse.ts`, `composition.ts` (server), `client/composition.ts`, `composition-model.ts`, `usage-id.ts` unit-tested with fixtures covering spreads, shorthand props, `class:list`, `Fragment slot=`, dotted names and `.map()`
 - [x] Clicking a component-rendered element shows a chain whose last link resolves to that element's own file; a `{...Astro.props}` forwarder shows `inferred` or `candidates`, never a wrong chain
 - [x] Slotted content is marked as slotted, and its chain is a strict prefix of its DOM parent's
 - [ ] `data-atx-file` count in the live DOM equals the served count on Astro 5.18 and 7.1.1, with the dev toolbar both on and off
@@ -306,7 +306,7 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [ ] Imported, computed and spread props render read-only with a named reason — never an editable field that fails on save
 - [ ] Clicking any element opens the inspector; no modal refusal or modal image panel remains
 - [ ] Nothing reaches disk before Save: a typed change, a picked image and an upload all leave the source byte-identical, and the element stays marked unsaved until Save
-- [ ] Releasing ⌥ restores ordinary navigation while the inspector keeps its selection and any pending edit
+- [x] Releasing ⌥ restores ordinary navigation while the inspector keeps its selection (no pending edit exists yet — that is P6b)
 - [ ] A pending edit survives an unrelated HMR update, and is discarded with a toast when its own file changed
 - [ ] A literal rendered on two routes edits as one value and writes one line, and both elements mark unsaved together
 - [ ] A value writable in another file reads `elsewhere` with that file named — never `read-only`

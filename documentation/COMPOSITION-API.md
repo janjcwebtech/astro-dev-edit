@@ -21,6 +21,18 @@ returns clicks to the page while keeping the selection and inspector open.
 Close or Escape clears the selection. With `composition: false`, the existing
 editing UI remains available.
 
+The tree panel's own header carries every tool-wide action, because this mode
+mounts no toolbar:
+
+- **Title bar:** a `☰` menu, a `⚙` settings button opening the integration
+  settings drawer, then close. The menu holds **Copy page context** — the
+  route, its template, a declared backing content file, annotated-element
+  counts and the components resolved on this route, as markdown — and
+  **Re-scan the page**, which re-reads annotations and rebuilds the tree.
+- **Route row:** the current path, the file the route is written in, and a
+  **View code** button opening that file. The route source is resolved once per
+  page; until it resolves the row reads `route source unresolved`.
+
 The panel shows:
 
 - **Values:** a read-only rendered text or image-attribute snapshot and its
@@ -37,6 +49,10 @@ The panel shows:
   in stylesheet order. Conditional matches may be inactive, and inaccessible
   cross-origin sheets are omitted. Available stylesheet sources offer an
   **Open in editor** jump; selector location is best-effort.
+
+A component chain row can also be reached from the hover pill's breadcrumb
+(below): the segment marks its chain row and scrolls to it, and never replaces
+the element the rest of the panel describes.
 
 Source buttons open the existing read-only preview. Its **Open in editor**
 action respects the `openInEditor` option; CSS also respects `cssInspector`.
@@ -136,6 +152,16 @@ inner-element relationship; a malformed placement graph is refused. The source-l
 copied annotations beneath `data-atx-boundary="html"`, while retaining the
 container's own source target. Editing a known whole HTML string is separate
 from tracing its generated descendants.
+
+`src/client/composition.ts` is the batching read side. `chainIds(element)`
+parses `data-atx-chain` — `!` (rendered by the route itself) and `?` (threading
+broke) are empty chains, and any other shape is refused whole rather than
+part-parsed. `createChainLinks(api)` resolves ids through
+`getCompositionLinks`, caching per pathname: an id is asked for once, an id the
+server reports as `missing` is cached as a miss rather than re-asked, and two
+callers wanting the same ids share one request. Call `invalidate()` on
+navigation and on every HMR update — ids survive a server restart but not an
+edit to the file that mints them.
 
 `src/client/source-map.ts` prefers original `data-atx-file` / `data-atx-loc`
 coordinates over legacy compiler annotations. Keep API results and render IDs

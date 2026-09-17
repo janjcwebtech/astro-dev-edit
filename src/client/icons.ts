@@ -47,6 +47,7 @@ export type IconName =
   | "external"
   | "settings"
   | "collections"
+  | "menu"
   | "lock"
   | "image"
   | "search"
@@ -110,6 +111,9 @@ const PATHS: Record<IconName, string> = {
   // stacked-cylinder mark is the right one.
   collections:
     '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+  // menu: the overflow list a panel header opens. Three rules, not a "kebab" —
+  // the list it opens is a list of actions, not more of the row it sits in.
+  menu: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
   // A closed padlock — marks a setting the project's own config owns.
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   image:

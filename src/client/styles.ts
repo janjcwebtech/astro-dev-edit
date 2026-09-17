@@ -79,12 +79,37 @@ export function overlayCss(): string {
 .atx-inspector-note { font: 12px/1.5 var(--atx-font-ui); color: var(--atx-muted-fg); overflow-wrap: anywhere; margin: 8px 0; }
 .atx-inspector-details { font: 12px/1.5 var(--atx-font-ui); margin: 8px 0; }
 .atx-inspector-details > summary { cursor: pointer; color: var(--atx-muted-fg); }
-.atx-inspector-tree-header { padding: 8px 12px; border-bottom: 1px solid var(--atx-border); }
-.atx-inspector-tree-header > span { display: inline-block; margin-right: 8px; }
+/* The panel header's second row: which page the tool is pointed at, and the one
+   door onto its source. The title bar above it carries the tool's own controls
+   (menu, settings, close) — see .atx-tree-action. */
+.atx-inspector-tree-header { padding: 8px 12px 10px; border-bottom: 1px solid var(--atx-border); }
+.atx-inspector-route { display: flex; align-items: center; gap: 10px; }
+.atx-inspector-route-labels { min-width: 0; flex: 1 1 auto; }
+.atx-inspector-route-path { font: 600 12px var(--atx-font-mono); color: var(--atx-foreground); overflow-wrap: anywhere; }
+.atx-inspector-route-file { font: 10.5px var(--atx-font-mono); color: var(--atx-faint-fg); overflow-wrap: anywhere; }
+.atx-inspector-route-file[data-unresolved] { font-style: italic; }
+.atx-inspector-route > .atx-btn { flex: 0 0 auto; }
+.atx-inspector-tree-header > .atx-inspector-note { margin: 8px 0 0; }
+/* The chain row a breadcrumb segment named. A ring, not a fill: the row keeps
+   whatever it was already saying about itself. */
+.atx-inspector [data-usage][data-focus] { border-color: var(--atx-primary); box-shadow: 0 0 0 3px ${hexToRgba(COLOR.primary, 0.25)}; }
 .atx-inspector-hover { display: none; position: fixed; pointer-events: none; border: 2px solid var(--atx-primary); box-sizing: border-box; z-index: ${Z}; }
 .atx-inspector-hover[data-on] { display: block; }
-.atx-inspector-pill { display: none; position: fixed; pointer-events: none; z-index: ${Z + 1}; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--atx-card); color: var(--atx-foreground); border: 1px solid var(--atx-border); border-radius: var(--atx-radius-md); padding: 5px 8px; font: 12px var(--atx-font-ui); }
-.atx-inspector-pill[data-on] { display: block; }
+/* The pill itself never takes the pointer — it sits over the page and must not
+   eat a click meant for it. The breadcrumb row inside it does, because a
+   segment is a button; the app's mousemove handler knows to leave the highlight
+   alone while the pointer is travelling over the pill to reach one. */
+.atx-inspector-pill { display: none; flex-direction: column; position: fixed; pointer-events: none; z-index: ${Z + 1}; max-width: min(460px, calc(100vw - 24px)); background: var(--atx-card); color: var(--atx-foreground); border: 1px solid var(--atx-border); border-radius: var(--atx-radius-md); font: 12px var(--atx-font-ui); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36); }
+.atx-inspector-pill[data-on] { display: flex; }
+.atx-inspector-pill-row { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 5px 8px; }
+.atx-inspector-crumbs { display: none; pointer-events: auto; flex-wrap: wrap; align-items: center; gap: 4px; padding: 7px 8px; border-top: 1px solid var(--atx-border); font: 11px var(--atx-font-mono); }
+.atx-inspector-crumbs[data-on] { display: flex; }
+.atx-crumb { border: 1px solid var(--atx-input); border-radius: var(--atx-radius-sm); background: var(--atx-control-bg); color: var(--atx-brand-text); font: inherit; padding: 2px 7px; }
+button.atx-crumb { cursor: pointer; }
+button.atx-crumb:hover { background: var(--atx-accent); color: var(--atx-foreground); }
+.atx-crumb[data-refused] { border-style: dashed; border-color: var(--atx-warning); color: var(--atx-warning); }
+.atx-crumb:last-child:not(button) { background: var(--atx-primary); border-color: var(--atx-primary); color: var(--atx-primary-fg); font-weight: 700; }
+.atx-crumb-sep { color: var(--atx-faint-fg); }
 :host {
   /* The guard. Everything the host page could inherit into the overlay stops
      here; the declarations below are what the overlay inherits instead. */
@@ -1295,7 +1320,8 @@ input[type='checkbox'].atx-switch:disabled {
   flex: 1 1 auto;
 }
 
-.atx-tree-close {
+.atx-tree-close,
+.atx-tree-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1310,7 +1336,8 @@ input[type='checkbox'].atx-switch:disabled {
   cursor: pointer;
 }
 
-.atx-tree-close:hover {
+.atx-tree-close:hover,
+.atx-tree-action:hover {
   background: var(--atx-accent);
   color: var(--atx-foreground);
 }

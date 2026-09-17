@@ -35,6 +35,11 @@ import { basename, isolateScroll, onChromeInset, outlineRect, styled } from './u
 export interface TreeDeps {
   /** Inspector mode keeps selection after releasing the interception key. */
   readOnly?: boolean;
+  /** Icon buttons for the title bar, placed before the close button — the
+   *  inspector's menu and settings. Without an admin bar there is nowhere else
+   *  for a tool-wide action to live, and the title bar is the panel's own row
+   *  of controls rather than a second place to put content. */
+  titleActions?: readonly HTMLElement[];
   onSelect?(el: HTMLElement): void;
   describe?(el: HTMLElement): string | null;
   header?: HTMLElement;
@@ -90,7 +95,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     hide();
     deps.onToggle?.(false);
   });
-  bar.append(barText, closeBtn);
+  bar.append(barText, ...(deps.titleActions ?? []), closeBtn);
 
   // What the panel leaves behind while edit mode is still on: a tab on the left
   // edge that brings it back, so closing the tree is never a one-way door (the
