@@ -21,7 +21,7 @@ const link = (id: string, file: string, over: Partial<UsageLink> = {}): UsageLin
 });
 
 const input = (over: Partial<ValueRowsInput> = {}): ValueRowsInput => ({
-  selection: { source: { file: '/Card.astro', loc: '5:3' }, opaque: false, viaSlot: false, text: 'Protected' },
+  selection: { source: { file: '/Card.astro', loc: '5:3' }, opaque: false, viaSlot: false, text: 'Protected', tag: 'h2' },
   classification: { kind: 'text', reason: 'Literal text.' },
   links: [],
   ...over,
@@ -117,11 +117,56 @@ describe('every usage-site value becomes a row that keeps its own verdict', () =
     expect(title.details.some(line => line.startsWith('bytes · '))).toBe(true);
   });
 
+  it('addresses a usage-site value by its byte range, not by a parsed key', () => {
+    const { rows } = buildValueRows(input({
+      links: [link('k3f9', '/Page.astro', {
+        props: [prop('title', '"Protected"', { start: 40, end: 51 })],
+        slots: [slot('Start', { start: 60, end: 65 })],
+      })],
+    }));
+    expect(rows[1].target).toEqual({ kind: 'usage', usageId: 'k3f9', file: '/Page.astro', loc: '9:3',
+      name: 'title', slot: false, start: 40, end: 51 });
+    expect(rows[2].target).toMatchObject({ kind: 'usage', slot: true, name: 'default', start: 60, end: 65 });
+  });
+
   it('gives every row a key of its own, so two props holding one string stay two rows', () => {
     const { rows } = buildValueRows(input({ links: [link('a', '/Page.astro', { props: [
       prop('alt', "'same'", { start: 10, end: 16 }), prop('other', "'same'", { start: 30, end: 36 }),
     ] })] }));
     expect(new Set(rows.map(row => row.key)).size).toBe(rows.length);
+  });
+});
+
+/**
+ * A row's address is fields, not a formatted string. Staging reads it back —
+ * `key.split('|')` was the alternative — and the two kinds differ in a way
+ * that matters: an element's `file:loc` survives an edit landing earlier in
+ * the file, and a usage site's byte range does not.
+ */
+describe('every row names the target it would write into', () => {
+  it('addresses the clicked element by loc and target type, as /apply does', () => {
+    const { rows } = buildValueRows(input());
+    expect(rows[0].target).toEqual({ kind: 'element', file: '/Card.astro', loc: '5:3',
+      tag: 'h2', targetType: 'text' });
+  });
+
+  it('gives markup and an expression their own target types at one loc', () => {
+    const markup = buildValueRows(input({
+      classification: { kind: 'markup', reason: 'Inline markup.', markup: { html: 'a <b>b</b>' } },
+    })).rows[0];
+    const expression = buildValueRows(input({
+      classification: { kind: 'expression', reason: 'Traced.', expression: { property: 'title', label: 'title' } },
+    })).rows[0];
+    expect(markup.target).toMatchObject({ targetType: 'markup' });
+    expect(expression.target).toMatchObject({ targetType: 'expression' });
+  });
+
+  it('gives an image its two attribute targets', () => {
+    const { rows } = buildValueRows(input({
+      selection: { ...input().selection, image: { src: '/hero.jpg', alt: 'A hill' } },
+      classification: { kind: 'image', reason: 'Image.', attrs: { src: 'static', alt: 'static' } },
+    }));
+    expect(rows.map(row => row.target)).toMatchObject([{ targetType: 'src' }, { targetType: 'alt' }]);
   });
 });
 

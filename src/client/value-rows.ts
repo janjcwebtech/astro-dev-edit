@@ -1,4 +1,5 @@
-import type { ClassifyResult, SourceLoc, UsageLink, UsageRefusal, UsageVerdict, UsageWrite } from '../shared/protocol.ts';
+import type { ClassifyResult, SourceLoc, TargetType, UsageLink, UsageRefusal, UsageVerdict, UsageWrite } from '../shared/protocol.ts';
+import type { ValueTarget } from './value-model.ts';
 
 /**
  * The Values card as data: every value the selection is made of, in one
@@ -21,8 +22,10 @@ import type { ClassifyResult, SourceLoc, UsageLink, UsageRefusal, UsageVerdict, 
  * Both become rows. Grouping by transport is what hid a slot's words behind a
  * read-only preview while its sibling props sat there editable.
  *
- * Nothing here writes, stages or offers a field: every row is read-only and
- * says which of the three verdicts it is.
+ * Nothing here writes or stages. A row says which of the three verdicts it is
+ * and names the target it would write into; whether a field appears under it
+ * is `value-model.ts::stageable`'s answer, not this module's — one place says
+ * what a value *is*, another says what the write path can serve.
  */
 
 export type ValueBadge = 'selected element' | 'via slot';
@@ -32,8 +35,19 @@ export type ValueBadge = 'selected element' | 'via slot';
 export type ChainBadge = 'presentation' | 'content';
 
 export interface ValueRow {
-  /** Stable within one selection — the render keys rows off it. */
+  /** Stable within one selection — the render keys rows off it. Derived from
+   *  {@link ValueRow.target}, and never parsed back apart: what a caller needs
+   *  from a row is on the target, in fields. */
   key: string;
+  /**
+   * What this row writes into, addressed the way the write path addresses it —
+   * an element's `file:loc` and target type, or a usage site's byte range.
+   *
+   * It is the row's identity rather than a formatted string because staging
+   * reads it back: `key.split('|')` was the alternative, and a value's address
+   * is not a display concern.
+   */
+  target: ValueTarget;
   /** What the row is called: a prop name, `text`, `slot`, `src`. */
   label: string;
   verdict: UsageVerdict;
@@ -41,7 +55,8 @@ export interface ValueRow {
   reason?: UsageRefusal | 'imported';
   /** One line naming what this value *is*, in no mechanism vocabulary. */
   caption: string;
-  /** The value as the source spells it. Read-only in this iteration. */
+  /** The value as the source spells it — the field's starting text, and the
+   *  apply op's `original`. */
   value: string;
   /** Where *View code* lands — the file holding the words, not the file the
    *  element was rendered into. Null when nothing is proven. */
@@ -81,6 +96,9 @@ export interface ValueSelection {
   text: string;
   /** For an `img`, what it currently renders. */
   image?: { src: string; alt: string };
+  /** Lowercased tag name — the apply request carries it, so the row's target
+   *  has to. */
+  tag: string;
 }
 
 export interface ValueRowsInput {
@@ -141,40 +159,44 @@ function pinnedRows(input: ValueRowsInput): ValueRow[] {
   const source = selection.source;
   if (!source || !classification) return [];
   const badges: ValueBadge[] = ['selected element', ...(selection.viaSlot ? ['via slot' as const] : [])];
-  const row = (o: Pick<ValueRow, 'label' | 'value' | 'caption'> & Partial<ValueRow>): ValueRow => ({
-    key: `${source.file}|${source.loc}|${o.label}`, verdict: 'editable', destination: source,
+  const at = (targetType: TargetType): ValueTarget =>
+    ({ kind: 'element', file: source.file, loc: source.loc, tag: selection.tag, targetType });
+  const row = (targetType: TargetType,
+    o: Pick<ValueRow, 'label' | 'value' | 'caption'> & Partial<ValueRow>): ValueRow => ({
+    key: `${source.file}|${source.loc}|${targetType}`, target: at(targetType),
+    verdict: 'editable', destination: source,
     badges, pinned: true, depth: -1, details: [`classified · ${classification.kind}`], ...o,
   });
-  const refused = (label: string, value: string, reason: UsageRefusal): ValueRow =>
-    row({ label, value, verdict: 'read-only', reason, caption: CAPTIONS[reason],
+  const refused = (targetType: TargetType, label: string, value: string, reason: UsageRefusal): ValueRow =>
+    row(targetType, { label, value, verdict: 'read-only', reason, caption: CAPTIONS[reason],
       details: [`classified · ${classification.kind}`, `reason · ${classification.reason}`] });
 
   switch (classification.kind) {
     case 'text':
-      return [row({ label: 'text', value: selection.text,
+      return [row('text', { label: 'text', value: selection.text,
         caption: 'A literal in the template — the caret lands on the page.' })];
     case 'markup':
-      return [row({ label: 'inline markup', value: classification.markup?.html ?? selection.text,
+      return [row('markup', { label: 'inline markup', value: classification.markup?.html ?? selection.text,
         caption: 'Literal text and inline tags, edited as the source spells them.' })];
     case 'expression':
-      return [row({ label: classification.expression?.label ?? 'value', value: selection.text,
+      return [row('expression', { label: classification.expression?.label ?? 'value', value: selection.text,
         caption: 'One hop to a string in this file’s frontmatter.',
         details: [`classified · expression`, `trace · ${classification.expression?.label ?? '—'}`] })];
     case 'image': {
       const attrs = classification.attrs ?? { src: 'dynamic' as const, alt: 'dynamic' as const };
       const image = selection.image ?? { src: '', alt: '' };
       const attr = (label: 'src' | 'alt') => attrs[label] === 'static'
-        ? row({ label, value: image[label], caption: 'A quoted attribute on the element.' })
-        : refused(label, image[label], attrs[label] === 'missing' ? 'absent' : 'computed');
+        ? row(label, { label, value: image[label], caption: 'A quoted attribute on the element.' })
+        : refused(label, label, image[label], attrs[label] === 'missing' ? 'absent' : 'computed');
       return [attr('src'), attr('alt')];
     }
     // ≥2 elements share this loc, or none does: either way the bytes do not
     // confirm what the page showed, so there is no provable target.
     case 'ambiguous':
     case 'unresolved':
-      return [refused('text', selection.text, 'unlocated')];
+      return [refused('text', 'text', selection.text, 'unlocated')];
     case 'dynamic':
-      return [refused('text', selection.text, 'computed')];
+      return [refused('text', 'text', selection.text, 'computed')];
     case 'empty':
       return [];
   }
@@ -192,6 +214,8 @@ function usageRows(links: readonly UsageLink[]): ValueRow[] {
       const write = verdictOf(prop);
       rows.push({
         key: `${link.id}|prop|${prop.name}|${prop.start ?? 'unlocated'}`,
+        target: { kind: 'usage', usageId: link.id, file: link.file, loc: link.loc,
+          name: prop.name, slot: false, start: prop.start, end: prop.end },
         label: prop.name, ...write, value: prop.source, destination: at,
         badges: [], pinned: false, depth,
         caption: write.verdict !== 'editable' ? write.caption
@@ -206,6 +230,8 @@ function usageRows(links: readonly UsageLink[]): ValueRow[] {
       const write = verdictOf(slot);
       rows.push({
         key: `${link.id}|slot|${slot.start}`,
+        target: { kind: 'usage', usageId: link.id, file: link.file, loc: link.loc,
+          name: slot.name, slot: true, start: slot.start, end: slot.end },
         label: slot.name === 'default' ? 'slot' : `slot: ${slot.name}`,
         ...write, value: slot.source, destination: at,
         // Slot words arrive through the wrapper the caller passed, which is
