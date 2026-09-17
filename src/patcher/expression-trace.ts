@@ -84,24 +84,59 @@ export function traceExpression(
   const expr = expressionText(children[0]);
   if (!expr) return null;
 
-  if (BARE_IDENT.test(expr)) return { property: expr, label: expr };
+  // The nearest enclosing expression is the one that can bind a member's
+  // parameter; for a mapped element it is the `.map()` call itself.
+  let head: string | null = null;
+  for (let node = parentOf.get(el); node; node = parentOf.get(node)) {
+    if (node.type !== 'expression') continue;
+    head = headText(node);
+    break;
+  }
+  return traceExpressionSource(expr, head);
+}
 
-  const member = MEMBER.exec(expr);
+/**
+ * The same trace from plain strings — the expression's source text, and the
+ * head of the expression enclosing it (`null` when nothing encloses it).
+ *
+ * A prop at a usage site has no element to walk up from, so this is the entry
+ * point {@link traceExpression} is built on rather than a second tracer: one
+ * set of shapes is understood, in one place, and everything else refuses.
+ */
+export function traceExpressionSource(
+  expr: string,
+  enclosingHead: string | null,
+): ExpressionTrace | null {
+  const text = expr.trim();
+  if (BARE_IDENT.test(text)) return { property: text, label: text };
+
+  const member = MEMBER.exec(text);
   if (!member) return null;
   const [, param, property] = member;
 
-  // Bind the parameter through the nearest enclosing expression, which for a
-  // mapped element is the `.map()` call itself.
-  for (let node = parentOf.get(el); node; node = parentOf.get(node)) {
-    if (node.type !== 'expression') continue;
-    const map = MAP_HEAD.exec(headText(node));
-    if (!map) return null; // an enclosing expression we don't understand
-    const array = map[1];
-    const bound = map[2] ?? map[3];
-    if (bound !== param) return null; // shadowed, or bound somewhere else
-    return { property, array, label: `${array}[].${property}` };
-  }
-  return null;
+  if (enclosingHead === null) return null;
+  const map = MAP_HEAD.exec(enclosingHead);
+  if (!map) return null; // an enclosing expression we don't understand
+  const array = map[1];
+  const bound = map[2] ?? map[3];
+  if (bound !== param) return null; // shadowed, or bound somewhere else
+  return { property, array, label: `${array}[].${property}` };
+}
+
+/**
+ * The identifier an expression reads *from*, when it is a bare name or a
+ * single `name.property` hop — `title` and `site` respectively. Null for
+ * anything deeper or computed.
+ *
+ * It answers a different question from a trace: whether the name is bound by
+ * an import, which makes the value writable in another file rather than
+ * unwritable. A trace that fails still leaves that name worth reporting.
+ */
+export function expressionRoot(expr: string): string | null {
+  const text = expr.trim();
+  if (BARE_IDENT.test(text)) return text;
+  const member = MEMBER.exec(text);
+  return member ? member[1] : null;
 }
 
 // ---------------------------------------------------------------------------

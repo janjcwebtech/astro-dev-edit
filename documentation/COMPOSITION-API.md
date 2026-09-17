@@ -184,6 +184,14 @@ anything yet.
   the same string, so a write target is a byte range and never a search of the
   tag text. Both are absent when the source does not read back the way the AST
   describes it, and a caller must then refuse rather than fall back to a scan.
+- **`UsageProp.verdict` / `UsageSlot.verdict`**, in three states rather than
+  two. `editable` is a value this file can write, `elsewhere` is one that is
+  writable in the module the same object names in `from`, and `read-only` is
+  one with no string to write. Every verdict but `editable` carries a named
+  `reason` — `styling`, `directive`, `spread`, `boolean`, `computed`,
+  `template`, `untraced`, `markup`, `empty`, `unlocated`, `unsupported`,
+  `imported` — decided in `usage-parse.ts` beside the byte range it needs.
+  `elsewhere` names a module; it never resolves or follows one.
 - **`expression-trace.ts::locateEntryValue`**, the one-hop trace from
   `{s.title}` to the entry an ordinal names. It proves the correspondence
   first: the array is a literal in this file's frontmatter, holding no spread

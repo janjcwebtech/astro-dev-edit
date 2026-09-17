@@ -146,3 +146,126 @@ const services = [{ title: 'Design' }, { title: 'Build' }];
     if (found.ok) expect(source.slice(source.indexOf('---') + 3 + found.span.from, source.indexOf('---') + 3 + found.span.to)).toBe("'Build'");
   });
 });
+
+/**
+ * The three-state write verdict, decided where the source is parsed.
+ *
+ * Two states were not enough: `eyebrow={site.tagline}` is a writable string in
+ * another file, and folding it into `read-only` made it read as unwritable as
+ * `featured={i === 0}`, which has no string at all. Every refusal is named —
+ * nothing reaches a verdict by falling through.
+ */
+describe('a prop carries its write verdict', () => {
+  const parse = async (body: string, frontmatter = "import Card from './Card.astro';") => {
+    const source = `---\n${frontmatter}\n---\n${body}`;
+    const usages = await parseUsages(source);
+    return Object.fromEntries(usages.flatMap(u => u.props).map(p => [p.name, p]));
+  };
+
+  it('accepts a quoted string literal, empty string included', async () => {
+    const props = await parse('<Card title="Build things" flag="" />');
+    expect(props.title).toMatchObject({ verdict: 'editable' });
+    expect(props.flag).toMatchObject({ verdict: 'editable' });
+  });
+
+  it('names the module an imported value comes from rather than calling it read-only', async () => {
+    const props = await parse('<Card eyebrow={site.tagline} line={TAGLINE} all={everything.x} />', [
+      "import Card from './Card.astro';",
+      "import site from '../data/site.ts';",
+      "import { TAGLINE } from '../data/copy.ts';",
+      "import * as everything from '../data/all.ts';",
+    ].join('\n'));
+    expect(props.eyebrow).toMatchObject({ verdict: 'elsewhere', reason: 'imported', from: '../data/site.ts' });
+    expect(props.line).toMatchObject({ verdict: 'elsewhere', reason: 'imported', from: '../data/copy.ts' });
+    expect(props.all).toMatchObject({ verdict: 'elsewhere', reason: 'imported', from: '../data/all.ts' });
+  });
+
+  it('ignores a type-only import, which binds no value to write', async () => {
+    const props = await parse('<Card title={Props.title} />', [
+      "import Card from './Card.astro';",
+      "import type { Props } from './types.ts';",
+    ].join('\n'));
+    expect(props.title).toMatchObject({ verdict: 'read-only', reason: 'untraced' });
+  });
+
+  it('traces one hop to a literal in this file, including through a map', async () => {
+    const props = await parse('{services.map((s) => <Card title={s.title} {greeting} />)}', [
+      "import Card from './Card.astro';",
+      "const services = [{ title: 'Design' }, { title: 'Build' }];",
+      "const greeting = 'Hello';",
+    ].join('\n'));
+    expect(props.title).toMatchObject({ verdict: 'editable',
+      trace: { property: 'title', array: 'services', label: 'services[].title' } });
+    expect(props.greeting).toMatchObject({ verdict: 'editable', trace: { property: 'greeting', label: 'greeting' } });
+  });
+
+  it('refuses a hop it cannot land on a literal, rather than offering the edit', async () => {
+    // The const exists but holds a call, and the mapped array is imported —
+    // both are one hop from *something*, and neither is one hop from a string.
+    const props = await parse('{list.map((s) => <Card title={s.title} subtitle={built} />)}', [
+      "import Card from './Card.astro';",
+      'const built = compute();',
+    ].join('\n'));
+    expect(props.title).toMatchObject({ verdict: 'read-only', reason: 'untraced' });
+    expect(props.subtitle).toMatchObject({ verdict: 'read-only', reason: 'untraced' });
+  });
+
+  it('refuses each unwritable shape by its own name', async () => {
+    const props = await parse(
+      '<Card featured={i === 0} tpl={`a${b}`} plain class="x" class:list={[1]} style="color:red" ' +
+      'slot="detail" client:load {...Astro.props} />');
+    expect(props.featured).toMatchObject({ verdict: 'read-only', reason: 'computed' });
+    expect(props.tpl).toMatchObject({ verdict: 'read-only', reason: 'template' });
+    expect(props.plain).toMatchObject({ verdict: 'read-only', reason: 'boolean' });
+    expect(props.class).toMatchObject({ verdict: 'read-only', reason: 'styling' });
+    expect(props['class:list']).toMatchObject({ verdict: 'read-only', reason: 'styling' });
+    expect(props.style).toMatchObject({ verdict: 'read-only', reason: 'styling' });
+    expect(props.slot).toMatchObject({ verdict: 'read-only', reason: 'directive' });
+    expect(props['client:load']).toMatchObject({ verdict: 'read-only', reason: 'directive' });
+    expect(props['Astro.props']).toMatchObject({ verdict: 'read-only', reason: 'spread' });
+  });
+
+  it('never leaves a verdict unnamed', async () => {
+    const source = `---
+import Card from './Card.astro';
+const greeting = 'Hello';
+---
+<Card a="x" b={greeting} c={site.x} d={1 + 1} e f={\`t\`} class="g" {...rest} />`;
+    for (const prop of (await parseUsages(source)).flatMap(u => u.props)) {
+      expect(prop.verdict, prop.name).toMatch(/^(editable|elsewhere|read-only)$/);
+      if (prop.verdict !== 'editable') expect(prop.reason, prop.name).toBeTruthy();
+    }
+  });
+});
+
+describe('a slot run carries its write verdict', () => {
+  const slotsOf = async (body: string) =>
+    (await parseUsages(`---\nimport Card from './Card.astro';\n---\n${body}`)).flatMap(u => u.slots);
+
+  it('accepts literal slot text', async () => {
+    expect(await slotsOf('<Card>Start a project</Card>'))
+      .toMatchObject([{ source: 'Start a project', verdict: 'editable' }]);
+  });
+
+  it('leaves markup that wraps values read-only — the values inside get rows of their own', async () => {
+    expect(await slotsOf('<Card><b>Rich</b> text</Card>')).toMatchObject([
+      { source: '<b>Rich</b>', verdict: 'read-only', reason: 'markup' },
+      { source: ' text', verdict: 'editable' },
+    ]);
+  });
+
+  it('refuses an expression and a nested component tag by name', async () => {
+    expect(await slotsOf('<Card>{greeting}</Card>'))
+      .toMatchObject([{ verdict: 'read-only', reason: 'computed' }]);
+    expect((await slotsOf('<Card><Card /></Card>'))[0])
+      .toMatchObject({ verdict: 'read-only', reason: 'markup' });
+  });
+
+  it('refuses whitespace, which has no words to edit', async () => {
+    const slots = await slotsOf('<Card>\n  <b>x</b>\n</Card>');
+    expect(slots.filter(s => !s.source.trim())).not.toHaveLength(0);
+    for (const slot of slots.filter(s => !s.source.trim())) {
+      expect(slot).toMatchObject({ verdict: 'read-only', reason: 'empty' });
+    }
+  });
+});

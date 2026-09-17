@@ -29,6 +29,64 @@ export type CompositionRefusal =
   | 'chain-break' | 'unresolved' | 'spread' | 'reserved-attribute'
   | 'invalid-chain' | 'incomplete-index' | 'too-many-paths' | 'no-path' | 'recursive'
   | 'disabled' | 'no-route' | 'stale-index' | 'index-limit' | 'path-refused' | 'untracked-html';
+/**
+ * Whether a value at a usage site can be written, in **three** states rather
+ * than two.
+ *
+ * `elsewhere` is the one that has to exist. `eyebrow={site.tagline}` is a
+ * perfectly writable string — in the module it is imported from — and folding
+ * it into `read-only` made it look as unwritable as `featured={i === 0}`,
+ * which has no string to write at all. A boolean cannot carry that middle
+ * state, so the verdict is a union and the reason travels with it.
+ */
+export type UsageVerdict = 'editable' | 'elsewhere' | 'read-only';
+
+/** Why a value is not editable here. Named, never defaulted: a caller renders
+ *  the reason, and `usage-parse.ts` refuses by name rather than falling
+ *  through to a catch-all verdict. */
+export type UsageRefusal =
+  /** `class`, `class:list`, `style` — styling, not content. */
+  | 'styling'
+  /** `client:*`, `set:*`, `transition:*`, `slot="name"` — structure, not content. */
+  | 'directive'
+  /** `{...Astro.props}` — the values arrive from the caller's caller. */
+  | 'spread'
+  /** A bare attribute with no value: a flag, not a string. */
+  | 'boolean'
+  /** An expression that is not a name — a call, an operator, an object. */
+  | 'computed'
+  /** A template literal: interpolation, not a fixed string. */
+  | 'template'
+  /** A name we could not prove reaches a string literal in this file. */
+  | 'untraced'
+  /** Slot children that are markup or a component tag, not literal text. */
+  | 'markup'
+  /** Slot children that are only whitespace: nothing to edit. */
+  | 'empty'
+  /** The AST describes a value the bytes do not confirm, so there is no
+   *  provable write target (rule 6). */
+  | 'unlocated'
+  /** A value shape this parser does not model. */
+  | 'unsupported';
+
+/** The frontmatter string an editable one-hop expression reads. */
+export interface UsageTrace {
+  /** Frontmatter key holding the string: `title`. */
+  property: string;
+  /** The array const the value lives in, for a `.map()` loop. */
+  array?: string;
+  /** How to name the target: `title`, or `benefits[].title`. */
+  label: string;
+}
+
+/** The verdict half of a prop or a slot, as a union so the three states cannot
+ *  be mixed up: only `elsewhere` names a module, only `editable` may omit a
+ *  reason, and only `editable` carries a trace. */
+export type UsageWrite =
+  | { verdict: 'editable'; reason?: undefined; from?: undefined; trace?: UsageTrace }
+  | { verdict: 'elsewhere'; reason: 'imported'; from: string; trace?: undefined }
+  | { verdict: 'read-only'; reason: UsageRefusal; from?: undefined; trace?: undefined };
+
 /** One attribute at a component usage site.
  *
  *  `start`/`end` bound `source` in the file named by the owning
@@ -37,19 +95,23 @@ export type CompositionRefusal =
  *  text, which two props holding the same string would break. Absent when the
  *  source does not read back the way the AST describes it; a caller must then
  *  refuse rather than fall back to a search. */
-export interface UsageProp {
+export type UsageProp = {
   name: string;
   kind: string;
   source: string;
   start?: number;
   end?: number;
-}
-export interface UsageSlot {
+} & UsageWrite;
+
+/** One run of slot children at a usage site. Literal text is editable where it
+ *  stands; markup that *wraps* values stays read-only, because the values
+ *  inside it are rows of their own. */
+export type UsageSlot = {
   name: string;
   start: number;
   end: number;
   source: string;
-}
+} & UsageWrite;
 export interface UsageLink {
   id: string;
   file: string;
