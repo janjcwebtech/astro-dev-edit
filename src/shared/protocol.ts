@@ -20,7 +20,7 @@ export interface SourceLoc {
 /** What an edit targets: the element's text content, its inner source when
  *  that text carries inline markup, the frontmatter string an `{expression}`
  *  renders, or an img attribute. */
-export type TargetType = 'text' | 'markup' | 'expression' | 'src' | 'alt';
+export type TargetType = 'text' | 'markup' | 'expression' | 'html' | 'src' | 'alt';
 
 // Composition proof: usage ids identify source sites, never runtime instances.
 export type CompositionTier = 'proven' | 'inferred' | 'candidates' | 'none';
@@ -293,6 +293,7 @@ export type ClassifyKind =
   | 'text' // children are exclusively literal text → editable inline
   | 'markup' // literal text plus safelisted inline tags → editable as raw source
   | 'expression' // {expression} traced to a frontmatter string → editable by value
+  | 'html' // set:html holding a known string → the whole string is editable
   | 'image' // an element whose src/alt attrs may be editable (see attrs)
   | 'empty' // no children; nothing to text-edit
   | 'dynamic' // expression / child elements / component content
@@ -502,6 +503,21 @@ export interface ClassifyResult {
    * being edited is only settled by the text the client sends on apply.
    */
   expression?: { property: string; label: string };
+  /**
+   * For `html` targets: the whole string `set:html` is given, as the source
+   * spells it — a quoted attribute's entities decoded, or the frontmatter
+   * literal the attribute's expression names.
+   *
+   * Sent, unlike an `expression`'s value, because the page cannot supply it:
+   * what the DOM holds is the browser's *re-serialisation* of that string,
+   * with its own idea of quoting, attribute order and optional tags. Only the
+   * source knows what was written.
+   *
+   * It describes the string and nothing below it. The elements the HTML
+   * produces have no source in this file, which is why `annotate.ts` stamps
+   * the container `data-atx-boundary="html"` and its descendants keep refusing.
+   */
+  html?: { value: string };
 }
 
 // --- POST /apply -------------------------------------------------------------

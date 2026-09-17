@@ -177,7 +177,8 @@ and slot placements. An occurrence marked `untracked-html` has no proven
 inner-element relationship; a malformed placement graph is refused. The source-location reader also ignores
 copied annotations beneath `data-atx-boundary="html"`, while retaining the
 container's own source target. Editing a known whole HTML string is separate
-from tracing its generated descendants.
+from tracing its generated descendants: the container owns the string, and the
+elements it produces stay untracked.
 
 A `set:html` on a **component** tag keeps its `chain-break` refusal, so its prop
 never reaches the panel. The injected HTML lands in the component's slot, where
@@ -266,8 +267,9 @@ and source links. Markdown-backed values open their known backing file in the
 IDE; they do not require a Markdown write API. Element values are staged and
 saved through `/apply`; a prop or slot value at a usage site goes through
 `/composition/apply` ([Staged values and Save](EDITING.md#staged-values-and-save)).
-A `set:html` prop is written like any other, as a whole HTML string.
-`set:html` on a plain element is not written from either yet.
+A whole HTML string goes through whichever of the two owns its destination: a
+`set:html` container through `/apply` as an `html` target, a `set:html` prop at
+a usage site through `/composition/apply`.
 
 ## Verification
 

@@ -195,6 +195,11 @@ function pinnedRows(input: ValueRowsInput): ValueRow[] {
       return [row('expression', { label: classification.expression?.label ?? 'value', value: selection.text,
         caption: 'One hop to a string in this file’s frontmatter.',
         details: [`classified · expression`, `trace · ${classification.expression?.label ?? '—'}`] })];
+    // The container owns one value and says so plainly. Its descendants are a
+    // different selection and keep their own refusal — `selection.opaque`.
+    case 'html':
+      return [row('html', { label: 'html', value: classification.html?.value ?? '',
+        caption: 'Rendered as HTML. The whole string is edited here.' })];
     case 'image': {
       const attrs = classification.attrs ?? { src: 'dynamic' as const, alt: 'dynamic' as const };
       const image = selection.image ?? { src: '', alt: '' };

@@ -118,10 +118,32 @@ staged against.
 
 `src` and `alt` belong to the image picker rather than to a field. Everything
 else with an `editable` verdict has one: the literal-text targets — text,
-inline markup, a traced expression — and the prop and slot values at a
-component usage site, `set:html` among them: its value is a whole HTML string,
-edited raw. A row that is `elsewhere` or `read-only` keeps its sentence and its
-**View code** and has no field at all.
+inline markup, a traced expression — the whole HTML string a `set:html` holds,
+and the prop and slot values at a component usage site. A row that is
+`elsewhere` or `read-only` keeps its sentence and its **View code** and has no
+field at all.
+
+### A value the page renders as HTML
+
+`set:html` names a value rather than structure, so it is judged like any other
+one. `<div set:html={intro}>` gets a row for the whole string, and so does
+`set:html` passed at a usage site. The field is **raw**, never a structural
+editor: angle brackets, braces and quotes are content, and nothing claims to
+know what the elements the HTML produces correspond to — the elements inside it
+keep saying they have no proven source.
+
+Two destinations spell the value differently, and the difference is load-bearing:
+
+- a **frontmatter `const`** takes it as written, escaping only the quote and
+  the backslash the JavaScript literal needs;
+- a **quoted attribute** takes it verbatim, because Astro injects that
+  attribute's source text without decoding entities. So the field shows what
+  the source spells — `&amp;`, not `&` — and a value containing the quote that
+  would close the attribute is refused, since there is no entity that spells
+  one there. Move it into a frontmatter `const` to use it.
+
+The caret never goes on the page for one: its tags would become the elements
+they describe.
 
 ## The hover pill and source peek
 

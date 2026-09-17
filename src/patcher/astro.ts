@@ -2,8 +2,10 @@ import { parse } from '@astrojs/compiler';
 import type { AttrState, ClassifyResult } from '../shared/protocol.ts';
 import type { ApplyResult, Patcher, PatchRequest } from './types.ts';
 import {
+  constLiteral,
   encodeLiteral,
   hasCandidates,
+  type LiteralSpan,
   locateValue,
   traceExpression,
 } from './expression-trace.ts';
@@ -423,6 +425,57 @@ function innerSpan(starts: number[], el: AstNode): { from: number; to: number } 
   return { from, to };
 }
 
+/**
+ * `set:html` on a plain element, resolved to the one string it renders.
+ *
+ * The attribute is the whole value: there is no text node to edit, and the
+ * elements the string produces are not written in this file at all. That is
+ * already the page's story — `annotate.ts` stamps the container
+ * `data-atx-boundary="html"` so its descendants refuse — and this is the
+ * matching half, giving the container the one row it does own.
+ *
+ * Two destinations, and nothing else: a quoted attribute, or a `const` in this
+ * file's frontmatter named by a **bare identifier**. `set:html={items[i].body}`
+ * is deliberately refused rather than traced — which entry a container read is
+ * the same unproven question a mapped prop faces, and a wrong one here would
+ * replace a whole document.
+ *
+ * ## A quoted `set:html` is raw, not decoded
+ *
+ * Astro injects a quoted `set:html` value's **source text** as HTML: write
+ * `set:html="&lt;b>x&lt;/b>"` and the page shows the characters `<b>x</b>`,
+ * not a bold `x`. So the value here is the bytes between the quotes, never the
+ * compiler's decoded `value` — reading the decoded one and writing it back
+ * escaped turns every tag in the string into visible punctuation while
+ * round-tripping perfectly, which is precisely the failure that spelling out
+ * the destination is supposed to prevent.
+ */
+type HtmlTarget =
+  | { kind: 'quoted'; attr: AstNode; span: { from: number; to: number; quote: string }; value: string }
+  | { kind: 'literal'; attr: AstNode; span: LiteralSpan; value: string }
+  | { kind: 'refused'; reason: string };
+
+function htmlTarget(el: AstNode, source: string, starts: number[], res?: Resolution): HtmlTarget | null {
+  const attr = (el.attributes ?? []).find((a) => a.name === 'set:html');
+  if (!attr) return null;
+  if (attr.kind === 'quoted') {
+    const span = attrValueSpan(source, starts, attr);
+    return span
+      ? { kind: 'quoted', attr, span, value: source.slice(span.from, span.to) }
+      : { kind: 'refused', reason: 'Could not locate this element’s set:html value in the source.' };
+  }
+  const refused = {
+    kind: 'refused' as const,
+    reason:
+      'This element’s HTML comes from an expression this file cannot prove reaches a string, so it must be edited in the source.',
+  };
+  if (attr.kind !== 'expression') return refused;
+  const name = (attr.value ?? '').trim();
+  if (!/^[A-Za-z_$][\w$]*$/.test(name) || !res?.frontmatter) return refused;
+  const span = constLiteral(res.frontmatter.text, name);
+  return span ? { kind: 'literal', attr, span, value: span.value } : refused;
+}
+
 function classifyResolved(
   el: AstNode,
   source: string,
@@ -438,6 +491,18 @@ function classifyResolved(
       reason: 'image element',
       attrs: { src: attrState(el, 'src'), alt: attrState(el, 'alt') },
     };
+  }
+
+  // Before the children are consulted at all: `set:html` *replaces* them, so
+  // an element holding one has no text content and a great deal to say.
+  const html = htmlTarget(el, source, starts, res);
+  if (html) {
+    return html.kind === 'refused'
+      ? { kind: 'dynamic', reason: html.reason }
+      : { kind: 'html', html: { value: html.value },
+          // A sentence, because the click-to-edit path shows this one verbatim:
+          // there is no caret for a value whose tags would become elements.
+          reason: 'This element renders a whole HTML string. It is edited as a raw value in the inspector panel rather than on the page.' };
   }
 
   if (!children.length) {
@@ -757,6 +822,54 @@ function patchExpression(
   };
 }
 
+/**
+ * Write the whole string a `set:html` renders.
+ *
+ * **Content is accepted; source syntax is preserved.** Angle brackets, braces
+ * and quotes are the value here in the most literal sense — they are what
+ * makes it HTML — so each destination is spelled the one way that keeps a tag
+ * a tag:
+ *
+ * - a **JavaScript literal** through `encodeLiteral`, which touches only the
+ *   quote and the backslash and leaves `<`, `&` and `{` exactly as typed;
+ * - a **quoted attribute** verbatim, because Astro injects that attribute's
+ *   source text without decoding it. There is therefore no escape for the
+ *   quote that closes it, so a value containing one is refused rather than
+ *   written into a destination that cannot hold it (rule 6).
+ *
+ * It writes a string and claims nothing about the elements that string makes.
+ */
+function patchHtmlValue(
+  source: string,
+  starts: number[],
+  el: AstNode,
+  res: Resolution,
+  original: string,
+  newText: string,
+): ApplyResult {
+  const target = htmlTarget(el, source, starts, res);
+  if (!target) {
+    return { ok: false, code: 'unresolved', error: 'This element has no set:html value — the file may have changed. Reload and try again.' };
+  }
+  if (target.kind === 'refused') return { ok: false, code: 'dynamic', error: target.reason };
+  if (target.value !== original) {
+    return { ok: false, code: 'mismatch', error: 'The HTML in the source no longer matches what the page showed. Reload and try again.' };
+  }
+  const text = newText.trim();
+  if (target.kind === 'quoted') {
+    const { from, to, quote } = target.span;
+    if (text.includes(quote)) {
+      return { ok: false, code: 'unsupported',
+        error: `A ${quote === '"' ? 'double' : 'single'} quote would close this attribute, and set:html does not decode entities here, so there is no way to spell one. Move the HTML into a frontmatter const to use it.` };
+    }
+    return { ok: true, newSource: source.slice(0, from) + text + source.slice(to) };
+  }
+  const at = res.frontmatter!.at;
+  const { from, to, quote } = target.span;
+  return { ok: true, newSource: source.slice(0, at + from) +
+    quote + encodeLiteral(text, quote) + quote + source.slice(at + to) };
+}
+
 export async function applyAstro(source: string, req: PatchRequest): Promise<ApplyResult> {
   const res = await resolveElement(source, req.loc, req.tag);
   if (res.status === 'ambiguous') {
@@ -780,6 +893,20 @@ export async function applyAstro(source: string, req: PatchRequest): Promise<App
   }
   if (req.targetType === 'expression') {
     return patchExpression(source, el, res, req.original, req.newText);
+  }
+  if (req.targetType === 'html') {
+    const patched = patchHtmlValue(source, starts, el, res, req.original, req.newText);
+    if (!patched.ok) return patched;
+    // Read back: the same resolve, the same classify, and the value has to be
+    // exactly what was typed. An encoding that does not round-trip refuses
+    // here with the file still untouched — the guarantee is checked, not
+    // asserted, because an HTML value is where escaping is easiest to get
+    // subtly wrong and hardest to notice.
+    const after = await classifyAstro(patched.newSource, req.loc, req.tag);
+    if (after.kind !== 'html' || after.html?.value !== req.newText.trim()) {
+      return { ok: false, code: 'unsupported', error: 'The HTML could not be written so that it reads back unchanged, so nothing was written.' };
+    }
+    return patched;
   }
   return patchAttribute(source, starts, el, req.targetType, req.original, req.newText);
 }

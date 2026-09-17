@@ -16,7 +16,7 @@ Writing an entry — one line, past tense, no essay:
 
 ### Added
 
-- `set:html` at a component usage site now earns a write verdict like any other prop — it names a value, not structure — so a known string reaching the page as HTML is editable as one whole value. The rest of the `set:*` family stays refused as a directive.
+- A value the page renders as HTML is now editable as one whole string. `set:html` at a component usage site earns a write verdict like any other prop — it names a value, not structure — and `<div set:html={intro}>` gets a row for the string it renders while the elements inside it keep refusing. Both give a raw-value field, never a structural HTML editor, and neither says anything about what the resulting HTML corresponds to.
 - A quoted `set:html` is read and written as its own source text rather than the decoded value, because Astro injects that attribute undecoded; a value containing the quote that would close it is refused, since no entity can spell one there.
 - Prop and slot rows with an `editable` verdict now carry the same field, Save and Revert that literal text has, through the one staged-value store. The field holds the words, not the bytes — a quoted prop loses its quotes — and the component instance the value was passed to wears the amber outline, so one card of a `.map()` marks on its own. `elsewhere` and `read-only` rows keep their sentence and their *View code*, unchanged.
 - Fixed Save and Revert on a pending edit re-selected after a restore or on another route: the row took its `original` from the page, which a pending edit has already changed, so Revert found nothing and Save would have sent the text it was about to replace.

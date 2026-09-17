@@ -10,6 +10,7 @@ import Card from './Card.astro';
 import Shared from './Shared.astro';
 import { TAGLINE } from './site-data.mjs';
 const cards = [{ title: 'Card one' }, { title: 'Card two' }];
+const intro = '<p data-rich-copy>Rich <b>intro</b> copy</p>';
 ---
 <html><body>
   {[1, 2].map(label => <Rootless label={label} />)}
@@ -19,6 +20,8 @@ const cards = [{ title: 'Card one' }, { title: 'Card two' }];
   <Card title="Plain" instance="plain">Start a project</Card>
   <Shared />
   <Shared />
+  <div data-rich set:html={intro}></div>
+  <div data-rich-quoted set:html="<b data-rich-inner>Quoted &amp; raw</b>"></div>
   <RepeatSlots>
     <span data-repeated-slot>Repeated words</span>
     <Rootless slot="detail" label="slotted" />

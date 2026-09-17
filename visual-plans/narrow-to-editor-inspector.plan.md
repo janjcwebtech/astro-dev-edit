@@ -7,7 +7,7 @@ plan:
   priority: high
   created: "2026-09-13"
   updated: "2026-09-18"
-  progress: 72
+  progress: 75
   visual: narrow-to-editor-inspector.plan.html
   mockup: narrow-to-editor-inspector.mockup.html
   tags: [scope-reduction, astro, composition, annotations]
@@ -284,7 +284,7 @@ Rules it must obey:
 - [x] **P6b** — staged values and one Save per row, for the literal-text targets (`text` / `markup` / `expression`): a field and one Save/Revert pair under each editable row, the caret on the page for `text`, amber on the element, verify-then-patch unchanged, and a pending edit kept across an unrelated reload or dropped by name
 - [x] **P6b** — the same field, Save and Revert for props and slot text, through the one staged-value store; `elsewhere` and `read-only` rows keep their sentence and their *View code*. The image grid in place of the modal is P6e
 - [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
-- [ ] **P6c** — prop and slot-text editing at proven source targets, with destination-aware encoding, lands via `/composition/apply` and `usage-write.ts`; the render ordinal earns back `unproven-entry` for a proven 1:1 `.map()`; `set:html` at a usage site earns a verdict. **The element destination is outstanding**, so the box stays open and #61 is not yet closed
+- [x] **P6c** — prop and slot-text editing at proven source targets, with destination-aware encoding, lands via `/composition/apply` and `usage-write.ts`; the render ordinal earns back `unproven-entry` for a proven 1:1 `.map()`; and a known whole HTML string is editable at both destinations — `set:html` at a usage site, and a `set:html` container through `/apply`'s `html` target
 - [ ] **P6d** — Markdown-backed routes: source-file navigation for frontmatter and body content; no browser writes
 - [ ] **P6e** — image picker: filter across the project's assets, paged browsing, and upload into the configured `uploadDir`
 - [ ] **P7** — committed fixture site with a genuine 3-deep chain; real-site pass on both fixtures
@@ -305,7 +305,7 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [x] A quoted prop edited from the inspector lands as a byte-level patch at the usage site, and a stale one refuses rather than writes
 - [x] A `{s.title}` prop inside a `.map()` edits **only** the clicked instance, and names which array entry it wrote
 - [x] String values containing braces, angle brackets and quotes save and read back unchanged at a usage site, and at an HTML-valued destination — where the same characters are the tags themselves and reach the page as tags
-- [ ] A known HTML string is editable as a whole even when its generated descendants have no proven component relationships
+- [x] A known HTML string is editable as a whole even when its generated descendants have no proven component relationships — the container carries the row, and every element inside the HTML it renders refuses
 - [x] Computed, spread, styling and untraceable props render `read-only` with a named reason, and imported ones `elsewhere` naming their module
 - [x] No refused value ever offers an editable field that then fails on save — a field appears only for an `editable` verdict whose target the write path serves, which is what `unproven-entry` exists to keep true
 - [ ] Clicking any element opens the inspector; no modal refusal or modal image panel remains

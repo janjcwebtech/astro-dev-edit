@@ -72,11 +72,13 @@ export type ValueTarget = ElementTarget | UsageTarget;
  * The target types this write path serves.
  *
  * `text`, `markup` and `expression` are the literal-text targets `/classify`
- * proves and `/apply` already writes. `src` and `alt` are element targets too,
- * and deliberately absent: they are the image picker's, and a field that wrote
- * a path while the grid beside it did not would be two ways to set one value.
+ * proves and `/apply` already writes; `html` is a `set:html` container's whole
+ * string, which is a value like any other once it is edited raw. `src` and
+ * `alt` are element targets too, and deliberately absent: they are the image
+ * picker's, and a field that wrote a path while the grid beside it did not
+ * would be two ways to set one value.
  */
-const STAGEABLE: ReadonlySet<TargetType> = new Set<TargetType>(['text', 'markup', 'expression']);
+const STAGEABLE: ReadonlySet<TargetType> = new Set<TargetType>(['text', 'markup', 'expression', 'html']);
 
 /** Whether typing on the page itself can drive this value.
  *
@@ -85,7 +87,9 @@ const STAGEABLE: ReadonlySet<TargetType> = new Set<TargetType>(['text', 'markup'
  *  normalised `innerHTML`, so a caret on the page would rewrite the spelling
  *  of every tag in the element as the price of fixing one word. `expression`
  *  renders a string that lives in the frontmatter, which is not the text node
- *  at all, and a usage-site value is rendered somewhere inside a component. */
+ *  at all; `html` is a raw string whose tags a caret would turn into the very
+ *  elements they describe; and a usage-site value is rendered somewhere inside
+ *  a component. */
 export const typesOnPage = (target: ValueTarget): boolean =>
   target.kind === 'element' && target.targetType === 'text';
 

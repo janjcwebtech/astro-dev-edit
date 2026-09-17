@@ -173,13 +173,24 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
    */
   function findElements(entry: StagedValue): HTMLElement[] {
     if (entry.target.kind === 'usage') return instanceElements(entry.target);
-    const wanted = [entry.rendered.trim(), entry.current.trim()];
     const target = entry.target;
-    return annotatedElements().filter(el => {
+    const here = annotatedElements().filter(el => {
       const src = sourceFor(el);
-      if (!src || src.file !== target.file || src.loc !== target.loc) return false;
-      return wanted.includes((el.textContent ?? '').trim());
+      return !!src && src.file === target.file && src.loc === target.loc;
     });
+    // An HTML value is not the words on screen. The browser re-serialises what
+    // the string produced — its own quoting, its own optional tags — so there
+    // is nothing here to compare the source against, and the container is
+    // identified by its loc and by still being a boundary. Two containers
+    // rendering one string are two views of one value and both go amber, which
+    // is the rule this module already follows for a literal on two routes; a
+    // source that has moved on is caught where it always is, by the server
+    // verifying `original` before it writes (rule 5).
+    if (target.targetType === 'html') {
+      return here.filter(el => el.getAttribute('data-atx-boundary') === 'html');
+    }
+    const wanted = [entry.rendered.trim(), entry.current.trim()];
+    return here.filter(el => wanted.includes((el.textContent ?? '').trim()));
   }
 
   /**

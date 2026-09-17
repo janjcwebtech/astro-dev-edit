@@ -231,10 +231,21 @@ describe('a chain row says which file owns the look and which holds the words', 
 });
 
 /**
- * `set:html` at a usage site is a value like any other, plus one fact about
- * where it is going: the page reads it as HTML rather than as text.
+ * A `set:html` container and a `set:html` prop are the same promise made at
+ * two destinations: one whole string, edited raw, saying nothing about the
+ * elements it produces.
  */
 describe('an HTML value is one whole row, and says so', () => {
+  it('gives the container a row of its own where the children would be empty', () => {
+    const { rows } = buildValueRows(input({
+      classification: { kind: 'html', reason: 'set:html.', html: { value: '<p>Hello <b>there</b></p>' } },
+    }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ label: 'html', verdict: 'editable', pinned: true,
+      value: '<p>Hello <b>there</b></p>', caption: 'Rendered as HTML. The whole string is edited here.' });
+    expect(rows[0].target).toMatchObject({ kind: 'element', targetType: 'html' });
+  });
+
   it('marks a usage-site prop as HTML without changing what makes it editable', () => {
     const { rows } = buildValueRows(input({
       links: [link('a', '/Page.astro', { props: [
