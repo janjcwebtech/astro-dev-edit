@@ -7,7 +7,7 @@ plan:
   priority: high
   created: "2026-09-13"
   updated: "2026-09-17"
-  progress: 55
+  progress: 60
   visual: narrow-to-editor-inspector.plan.html
   mockup: narrow-to-editor-inspector.mockup.html
   tags: [scope-reduction, astro, composition, annotations]
@@ -72,6 +72,7 @@ Verified this session at `f1966ba` unless stated.
 - **A Markdown body carries no annotation at all.** `<Content />` is the Markdown renderer, not an `.astro` component, so neither source attributes nor the chain reach what it emits. The chain ends at that usage. Link to the backing `.md` file when the route-to-entry relationship is known; otherwise link to the known Astro template and name the unresolved relationship. No body-line matching is required.
 - **Keep the `atx-` prefix when surfaces merge.** `atx-outline` is the hover highlight (`hover.ts:62`, `styles.ts:1136`); `'outline'` is a `ButtonKind` passed to `footButton` (`ui.ts:894`). They do not collide today, and folding the refusal panel into the inspector is exactly when unprefixed names start meeting each other.
 - **Two pre-existing `annotate.ts` gaps**, to fix as small independent issues: `<slot>` is stamped although the Go compiler does not stamp it, and hyphenated custom elements parse as `custom-element` rather than `element`, so force mode silently loses their annotation. `internal-documentation/ASTRO-COMPAT.md` is also wrong on why double annotation is harmless — our attribute is spliced **first** and the HTML parser keeps the first duplicate; the values are *not* identical, because the Go compiler computes its loc from the already-injected source and emits a column-shifted duplicate.
+- **Astro dev answers an `.astro` change with a full page reload, not a module update.** Verified on the composition fixture: a sentinel on `window` is gone after touching any component. So "a pending edit survives an unrelated HMR update" cannot be met by an in-memory store — the store is mirrored into `sessionStorage` and each entry is re-found on boot by its source loc, kept only while its element still reads the text it was staged against. That check subsumes the file-level rule: an unrelated change leaves it true, and a change to the value's own line does not. A toast shown in the moment before a reload is destroyed unread, so a drop is *queued* and drained by the next boot or by `vite:afterUpdate`, whichever the update turns out to be.
 - **Baseline health.** 38 test files, 851 tests green; `tsc --noEmit` clean.
 
 ## UI
@@ -280,7 +281,8 @@ Rules it must obey:
 - [x] **P6a** — menu and settings in that header: `☰` (Copy page context, Re-scan the page) and `⚙` Settings, then close, with the route, its template and *View code* below
 - [x] **P6b** — one read-only inspector for every click: Values, Component chain, Slot relationships, CSS, one *View code* verb
 - [x] **P6b** — the row model: every value on a selection is a Values row carrying its own three-state verdict, the clicked value pinned and badged, slot-wrapped values badged `via slot`, and the destination named once behind a `Details` disclosure. `/classify` joins the selection load, since the DOM cannot tell a resolved `{expression}` from literal text
-- [ ] **P6b** — staged values and one Save per row; replaces the refusal modal and the image modal
+- [x] **P6b** — staged values and one Save per row, for the literal-text targets (`text` / `markup` / `expression`): a field and one Save/Revert pair under each editable row, the caret on the page for `text`, amber on the element, verify-then-patch unchanged, and a pending edit kept across an unrelated reload or dropped by name
+- [ ] **P6b** — the same field for props and slot text (Iteration 4), and the image grid in place of the modal (P6e)
 - [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
 - [ ] **P6c** — prop and slot-text editing at proven source targets, including whole HTML string values and destination-aware encoding (closes #61)
 - [ ] **P6d** — Markdown-backed routes: source-file navigation for frontmatter and body content; no browser writes
@@ -305,11 +307,11 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [ ] String values containing braces, angle brackets and quotes save and read back unchanged; text remains text and HTML-valued destinations retain HTML behavior
 - [ ] A known HTML string is editable as a whole even when its generated descendants have no proven component relationships
 - [x] Computed, spread, styling and untraceable props render `read-only` with a named reason, and imported ones `elsewhere` naming their module
-- [ ] No refused value ever offers an editable field that then fails on save
+- [x] No refused value ever offers an editable field that then fails on save — a field appears only for an `editable` verdict whose target the write path serves, which is what `unproven-entry` exists to keep true
 - [ ] Clicking any element opens the inspector; no modal refusal or modal image panel remains
 - [ ] Nothing reaches disk before Save: a typed change, a picked image and an upload all leave the source byte-identical, and the element stays marked unsaved until Save
-- [x] Releasing ⌥ restores ordinary navigation while the inspector keeps its selection (no pending edit exists yet — that is P6b)
-- [ ] A pending edit survives an unrelated HMR update, and is discarded with a toast when its own file changed
+- [x] Releasing ⌥ restores ordinary navigation while the inspector keeps its selection, and leaves any pending edit pending rather than committing it
+- [x] A pending edit survives an unrelated HMR update, and is discarded with a toast when its own file changed
 - [ ] A literal rendered on two routes edits as one value and writes one line, and both elements mark unsaved together
 - [x] A value writable in another file reads `elsewhere` with that file named — never `read-only`
 - [x] A value wrapped in slot markup is an editable row badged `via slot`, not a read-only slot preview

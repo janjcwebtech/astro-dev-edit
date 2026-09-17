@@ -10,6 +10,7 @@ import { createMenu } from './menu.ts';
 import { pageSource, resolvePageSource } from './page-source.ts';
 import { isOwnUi, mount } from './shadow.ts';
 import { annotatedElements, cacheSourceMappings, sourceFor } from './source-map.ts';
+import { createStagedValues } from './staged-values.ts';
 import * as state from './state.ts';
 import { initTree } from './tree.ts';
 import { basename, footButton, outlineRect, setChromeInset, styled, toast } from './ui.ts';
@@ -43,6 +44,9 @@ export function initInspectorApp() {
   let routeFile: string | null = null;
   const descriptions = new Map<Element, string>();
   const chainLinks = createChainLinks(api);
+  /** Every pending edit on this page, and the amber it wears. One store, so
+   *  the panel's field and the caret on the page are two views of one value. */
+  const staging = createStagedValues({ apply: api.apply });
 
   const hoverOutline = styled('div', 'atx-inspector-hover');
   const pill = styled('div', 'atx-inspector-pill');
@@ -181,6 +185,7 @@ export function initInspectorApp() {
   const inspector = initInspector({
     viewCode,
     backingFile: pageSource,
+    staging,
     openRule: (file, selector) => {
       void api.inspectOpen({ file, selector }).then(result => {
         if (!result.loc) toast('Selector location unavailable; opened the source file.', 'warn');
@@ -343,7 +348,11 @@ export function initInspectorApp() {
     if (event.key === 'Alt' && !isOwnUi(event) && !state.get()) {
       event.preventDefault(); setHeld(true);
     }
-    if (event.key === 'Escape' && !state.get()) { inspector.close(); clearHighlight(); }
+    // Escape belongs to whatever is innermost. This listener is on `document`
+    // in the capture phase, so it reaches the key before the element being
+    // typed into does — and a caret in the page means Escape is that edit's
+    // Revert, never the panel's Close.
+    if (event.key === 'Escape' && !state.get() && !staging.isEditing()) { inspector.close(); clearHighlight(); }
   }, true);
   document.addEventListener('keyup', event => { if (event.key === 'Alt') setHeld(false); }, true);
   window.addEventListener('blur', () => setHeld(false));
@@ -361,6 +370,10 @@ export function initInspectorApp() {
     const el = event.altKey ? target(event) : null;
     if (!el) return;
     event.preventDefault(); event.stopImmediatePropagation();
+    // The click is swallowed, so the browser never places a caret for it.
+    // Where it landed is remembered, and a value the page can type into puts
+    // the caret there rather than at the start of the element.
+    staging.notePoint(event.clientX, event.clientY);
     clearHighlight();
     tree.selectElement(el);
     void inspector.select(el);
@@ -409,18 +422,88 @@ export function initInspectorApp() {
     inspector.invalidate();
     if (state.get()?.kind === 'panel') state.dismiss();
   }
+
+  /**
+   * Which project file an HMR update carries, as the annotations spell it.
+   *
+   * Vite names a module by its root-relative URL (`/src/pages/index.astro`,
+   * with a cache-busting query); `data-atx-file` carries the absolute path the
+   * Vite transform was handed. The URL is a suffix of the path, which is
+   * enough to decide the only question being asked — did *this* file change —
+   * and it errs towards dropping a pending edit rather than keeping one whose
+   * source may have moved.
+   */
+  function changedFiles(payload: unknown): string[] {
+    const updates = (payload as { updates?: { path?: string; acceptedPath?: string }[] })?.updates ?? [];
+    const out: string[] = [];
+    for (const update of updates) {
+      for (const named of [update.acceptedPath, update.path]) {
+        const path = named?.split('?')[0];
+        if (path) out.push(path);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * A pending edit outlives an unrelated update and is dropped loudly when its
+   * own file changed.
+   *
+   * Never the third option: saving against source that has moved. The page is
+   * about to re-render from disk, and the `original` a pending edit would send
+   * described the version before the update — so the server would either
+   * refuse it or, worse, land it on text that is no longer there. Rule 5's
+   * safety model is the git tree, so this is the moment to say so out loud.
+   */
+  function dropEditsIn(payload: unknown) {
+    const changed = changedFiles(payload);
+    if (!changed.length) return;
+    const dropped = staging.pending().filter(entry =>
+      changed.some(path => entry.target.file === path || entry.target.file.endsWith(path)));
+    // Not announced here. Astro answers an `.astro` change with a full reload,
+    // and a toast shown in the moment before one is destroyed unread — so the
+    // notice is queued, and drained by `vite:afterUpdate` or by the next boot,
+    // whichever the update turns out to be.
+    for (const file of new Set(dropped.map(entry => entry.target.file))) staging.dropFile(file);
+  }
+
+  /** Say what was dropped, once, wherever the drop is finally reportable. */
+  function announceDrops(dropped: readonly { target: { file: string; loc: string } }[]) {
+    for (const entry of dropped) {
+      toast(`An unsaved edit to ${basename(entry.target.file)}:${entry.target.loc} was dropped — that source changed. Nothing was written.`, 'warn');
+    }
+  }
+
   document.addEventListener('astro:before-swap', invalidate);
-  document.addEventListener('astro:page-load', () => { invalidate(); rebuild(); });
-  window.addEventListener('popstate', () => { invalidate(); rebuild(); });
+  document.addEventListener('astro:page-load', () => { invalidate(); rebuild(); staging.repaint(); });
+  window.addEventListener('popstate', () => { invalidate(); rebuild(); staging.repaint(); });
   if (import.meta.hot) {
-    import.meta.hot.on('vite:beforeUpdate', invalidate);
+    import.meta.hot.on('vite:beforeUpdate', payload => { dropEditsIn(payload); invalidate(); });
+    // A full reload throws the whole page away, the store with it — there is
+    // nothing left to re-find and nothing to say that the reload does not.
     import.meta.hot.on('vite:beforeFullReload', invalidate);
-    import.meta.hot.on('vite:afterUpdate', rebuild);
+    // The nodes were replaced; the source locs were not. Every surviving
+    // pending value finds its new element and goes amber again.
+    import.meta.hot.on('vite:afterUpdate', () => {
+      rebuild();
+      staging.repaint();
+      // The update completed without a reload, so this is the moment a drop
+      // can be shown and read.
+      announceDrops(staging.drainNotices());
+    });
   }
   mount(hoverOutline, pill, tree.root, tree.tab, tree.selectionOutline, menu.root, inspector.root);
   tree.tab.title = 'Open source inspector · hold Alt / ⌥ to select on the page';
   tree.tab.setAttribute('aria-label', 'Open source inspector');
   tree.hide();
   rebuild();
+  // A full reload is how Astro answers an `.astro` change, so an edit staged
+  // before one has to be taken back rather than mourned. Anything whose source
+  // no longer reads the way it did is dropped here, by name.
+  const taken = staging.restore();
+  if (taken.restored) {
+    toast(`${taken.restored} unsaved ${taken.restored === 1 ? 'edit is' : 'edits are'} still pending — marked on the page`, 'warn');
+  }
+  announceDrops(taken.dropped);
   return { invalidate, rebuild };
 }

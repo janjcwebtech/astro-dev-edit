@@ -6,7 +6,9 @@ import { has } from './features.ts';
 import { card, item, itemGroup } from './group.ts';
 import { createInspectorLoader, occurrenceSummary } from './inspector-model.ts';
 import { nearestOwnSource, sourceFor } from './source-map.ts';
-import { basename, footButton, isolateScroll, styled } from './ui.ts';
+import type { StagedValues } from './staged-values.ts';
+import { basename, footButton, inputEl, isolateScroll, setButtonEnabled, styled, toast } from './ui.ts';
+import { stageable, typesOnPage, type ElementTarget } from './value-model.ts';
 import { buildValueRows, chainBadges, type ValueRow, type ValueRows, type ValueSelection } from './value-rows.ts';
 
 export interface InspectorDeps {
@@ -14,16 +16,23 @@ export interface InspectorDeps {
   openRule(file: string, selector: string): void;
   backingFile(): string | null;
   onClose(): void;
+  /** The one staged-value store the panel and the page share. */
+  staging: StagedValues;
 }
 
-/** Read-only view. No classification, interaction slot, or write API. */
+/** One panel per click. Values that the write path can serve carry a field and
+ *  one Save/Revert pair; everything else is read-only and says why. */
 export function initInspector(deps: InspectorDeps) {
   const root = styled('aside', 'atx-inspector');
   root.setAttribute('aria-label', 'Source inspector');
   const header = styled('div', 'atx-inspector-header');
   const title = styled('strong', 'atx-inspector-title');
+  /** Whether what is on screen for this selection is what is on disk. It sits
+   *  in the header because it is the selection's answer, not a row's — and it
+   *  is the one place a panel covering the page can still report the amber. */
+  const saveState = styled('span', 'atx-value-chip');
   const closeButton = footButton('Close', 'ghost', close);
-  header.append(title, closeButton);
+  header.append(title, saveState, closeButton);
   const body = styled('div', 'atx-inspector-body');
   isolateScroll(body);
   root.append(header, body);
@@ -32,13 +41,42 @@ export function initInspector(deps: InspectorDeps) {
   let generation = 0;
   /** The chain card of the current selection, for {@link focusUsage}. */
   let chainBody: HTMLElement | null = null;
+  /** One per field on screen: a field reads the store, so it has to stop
+   *  reading it when the row it belongs to is replaced. */
+  let bindings: (() => void)[] = [];
+  /** The selection's own value, when the page can be typed into for it. Kept
+   *  so re-clicking the element already selected puts the caret back rather
+   *  than answering with the panel it is already showing. */
+  let pageEdit: { target: ElementTarget; original: string } | null = null;
+
+  function unbind() {
+    for (const stop of bindings) stop();
+    bindings = [];
+  }
+
+  function paintSaveState() {
+    const dirty = deps.staging.pending().length;
+    saveState.textContent = dirty ? `${dirty} unsaved` : 'saved';
+    saveState.dataset.chip = dirty ? 'unsaved' : 'editable';
+  }
+  deps.staging.onChange(paintSaveState);
 
   function close() {
+    const wasOpen = selected !== null;
     generation++;
     loader.invalidate();
+    unbind();
+    deps.staging.stopEditing();
     selected = null;
+    pageEdit = null;
     chainBody = null;
     root.removeAttribute('data-on');
+    // Leaving with work pending is allowed and is the point — but it is never
+    // silent, because the only other signal is an outline on a page the panel
+    // was covering. Only on a real close: an invalidation of a panel that was
+    // not open has nothing to report.
+    const pending = wasOpen ? deps.staging.pending().length : 0;
+    if (pending) toast(`Closed with ${pending} unsaved ${pending === 1 ? 'value' : 'values'} — still marked on the page`, 'warn');
     deps.onClose();
   }
 
@@ -164,6 +202,93 @@ export function initInspector(deps: InspectorDeps) {
   }
 
   /**
+   * The field, and the one Save/Revert pair that belongs to it.
+   *
+   * There is exactly one of each per value — that is the decision the block
+   * exists to hold. The page and this field are two views of one store entry,
+   * so typing in either moves both, and a floating bar over the element would
+   * be a second pair of buttons for the same gesture.
+   *
+   * Enter saves and Esc reverts, here and on the page. **Blur does neither**:
+   * the row keeps the change, the element keeps its amber outline, and the
+   * only way to disk is deliberate.
+   */
+  function valueField(parent: HTMLElement, row: ValueRow, target: ElementTarget) {
+    const original = row.value;
+    // A sentence of prose does not belong in a 32px input; Shift+Enter breaks
+    // its lines, because Enter is spoken for.
+    const long = original.length > 70 || original.includes('\n');
+    const input = inputEl(long ? 'textarea' : 'input', 'atx-value-input');
+    if (input instanceof HTMLTextAreaElement) input.rows = Math.min(8, Math.ceil(original.length / 52) + 1);
+    input.value = original;
+    input.spellcheck = false;
+
+    const error = styled('p', 'atx-value-error');
+    error.hidden = true;
+    const commit = styled('div', 'atx-value-commit');
+    const saveButton = footButton('Save', 'default', () => void write());
+    const revertButton = footButton('Revert', 'outline', () => discard());
+    for (const button of [saveButton, revertButton]) {
+      button.classList.add('atx-btn-sm');
+      // A button steals focus on mousedown, which would collapse the caret
+      // before the click lands — and for the page's contenteditable that is
+      // the caret the user is typing with.
+      button.addEventListener('mousedown', event => event.preventDefault());
+    }
+    const pendingNote = styled('span', 'atx-value-pending');
+    pendingNote.textContent = 'unsaved';
+    commit.append(saveButton, revertButton, pendingNote);
+    parent.append(input, error, commit);
+
+    /** Read the store, never the control: the page may have moved the value. */
+    const paint = () => {
+      const entry = deps.staging.get(target, original);
+      commit.hidden = !entry;
+      if (input !== document.activeElement) input.value = entry?.current ?? original;
+    };
+    const type = () => {
+      error.hidden = true;
+      deps.staging.stage(target, original, input.value, original);
+      commit.hidden = !deps.staging.get(target, original);
+    };
+    async function write() {
+      const entry = deps.staging.get(target, original);
+      if (!entry) return;
+      setButtonEnabled(saveButton, false);
+      const refusal = await deps.staging.save(entry.key);
+      setButtonEnabled(saveButton, true);
+      if (refusal) {
+        error.hidden = false;
+        error.textContent = refusal;
+        return;
+      }
+      toast(`Saved — ${basename(target.file)}:${target.loc}`, 'ok');
+    }
+    function discard() {
+      const entry = deps.staging.get(target, original);
+      error.hidden = true;
+      if (entry) deps.staging.revert(entry.key);
+      input.value = original;
+    }
+
+    input.addEventListener('input', type);
+    // Through the element type rather than the union: `input | textarea` has no
+    // single `addEventListener` overload, so the event would arrive untyped.
+    const control: HTMLElement = input;
+    control.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        void write();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        discard();
+      }
+    });
+    bindings.push(deps.staging.onChange(paint));
+    paint();
+  }
+
+  /**
    * One Values row, in three bands — **what it is** (label, verdict, badges,
    * caption) · **the value** · **where it goes** — with the destination named
    * once and the mechanism vocabulary folded behind `Details`, so the label
@@ -176,9 +301,24 @@ export function initInspector(deps: InspectorDeps) {
     if (row.pinned) built.root.dataset.pinned = '';
     built.title.append(chip(row.verdict, row.verdict), ...row.badges.map(badge => chip(badge, 'badge')));
 
-    const value = styled('pre', 'atx-inspector-code');
-    value.textContent = row.value.slice(0, 4000) || '(empty)';
-    built.content.append(value);
+    // A field replaces the read-only value rather than sitting under it: two
+    // copies of one string, one of them editable, is a question about which
+    // is the value.
+    const target = row.verdict === 'editable' ? stageable(row.target) : null;
+    if (target) valueField(built.content, row, target);
+    else {
+      const value = styled('pre', 'atx-inspector-code');
+      value.textContent = row.value.slice(0, 4000) || '(empty)';
+      built.content.append(value);
+      // An `editable` verdict says the source proves a target; it does not say
+      // this build can write to it. Saying which is missing beats a disabled
+      // control that repeats the value above it and does nothing.
+      if (row.verdict === 'editable') {
+        note(built.content, row.target.kind === 'usage'
+          ? 'Writable at its usage site — editing props and slot text from here is not built yet. View code opens it.'
+          : 'Edited with the image picker, not as text.');
+      }
+    }
 
     const foot = styled('div', 'atx-value-foot');
     if (row.destination) foot.append(codeButton(row.destination));
@@ -207,6 +347,9 @@ export function initInspector(deps: InspectorDeps) {
     model: ValueRows,
     jump: { label: string; src: SourceLoc; description: string } | null,
   ) {
+    // Every field on screen is about to be discarded, so every subscription
+    // reading the store on its behalf has to go with it.
+    unbind();
     section.body.replaceChildren();
     if (!model.rows.length) {
       note(section.body, `Nothing writable on this selection. ${model.refusal ?? ''}`.trim());
@@ -234,17 +377,28 @@ export function initInspector(deps: InspectorDeps) {
    *  breadcrumb segment. Reselecting the element already shown keeps the panel
    *  as it is and only moves the mark. */
   async function select(el: HTMLElement, focus?: string) {
-    if (selected === el && chainBody) return focusUsage(focus ?? null);
+    if (selected === el && chainBody) {
+      // Already showing this element: the panel has nothing to redo, but a
+      // click on the page is still a click asking for the caret.
+      if (pageEdit) deps.staging.editOnPage(el, pageEdit.target, pageEdit.original);
+      return focusUsage(focus ?? null);
+    }
+    // Typing on the previous element stops; what was typed stays staged and
+    // stays amber. Nothing commits because attention moved (WF-4 item 10).
+    deps.staging.stopEditing();
+    pageEdit = null;
     selected = el;
     chainBody = null;
     const current = ++generation;
     loader.invalidate();
     const pathname = location.pathname;
     const alive = () => current === generation && el.isConnected && pathname === location.pathname;
-    title.textContent = `<${el.tagName.toLowerCase()}> · Read-only`;
+    title.textContent = `<${el.tagName.toLowerCase()}>`;
+    paintSaveState();
     root.setAttribute('data-on', '');
     body.replaceChildren();
-    const values = card({ title: 'Values', description: 'Every value on this selection, one row each · read-only' });
+    const values = card({ title: 'Values',
+      description: 'Every value on this selection, one row each · Enter saves, Esc reverts' });
     const chain = card({ title: 'Component chain' });
     const slots = card({ title: 'Slot relationships' });
     chainBody = chain.body;
@@ -254,7 +408,7 @@ export function initInspector(deps: InspectorDeps) {
     const source = sourceFor(el);
     const opaque = !!el.parentElement?.closest('[data-atx-boundary="html"]');
     const selection: ValueSelection = {
-      source: source ?? null, opaque, viaSlot: false,
+      source: source ?? null, opaque, viaSlot: false, tag: el.tagName.toLowerCase(),
       text: (el.textContent ?? '').trim().slice(0, 4000),
       // The attribute, not `currentSrc`: the row describes what the file holds.
       ...(el instanceof HTMLImageElement
@@ -329,10 +483,20 @@ export function initInspector(deps: InspectorDeps) {
       return;
     }
     if (!answer || !alive()) return;
-    renderValues(values, buildValueRows({
+    const model = buildValueRows({
       selection, classification: answer.classification, classifyError: answer.classifyError,
       links: answer.chain?.links ?? [],
-    }), jump);
+    });
+    renderValues(values, model, jump);
+    // The caret belongs where the click landed, not in a panel on the right —
+    // so for a value the page can type into, the element itself becomes the
+    // other view of the field that was just built. Both drive one store entry.
+    const pinned = model.rows.find(row => row.pinned && row.verdict === 'editable');
+    const onPage = pinned && stageable(pinned.target);
+    if (pinned && onPage && typesOnPage(onPage)) {
+      pageEdit = { target: onPage, original: pinned.value };
+      deps.staging.editOnPage(el, onPage, pinned.value);
+    }
     if (!answer.chain || !answer.uses) return;
     chain.body.replaceChildren();
     const labels = { proven: 'Proven chain', inferred: 'Inferred source path · rendered instance is not proven',

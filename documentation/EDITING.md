@@ -4,6 +4,7 @@ What the overlay can and can't edit, and every surface it puts on the page.
 The [README](../README.md) has the short version; this is the whole of it.
 
 - [What it can edit](#what-it-can-edit)
+- [Staged values and Save](#staged-values-and-save)
 - [The hover pill and source peek](#the-hover-pill-and-source-peek)
 - [Copy context for an AI assistant](#copy-context-for-an-ai-assistant)
 - [CSS inspector](#css-inspector)
@@ -59,6 +60,53 @@ Every refusal names its reason and offers one *View code* jump — a read-only s
 ![A value editor titled Value · benefits[].title, editing the string in index.astro that the expression resolves to](images/expression.png)
 
 ![A notice reading Can't edit this here, explaining the text comes from a template expression, with the source location and a View code button](images/refusal.png)
+
+## Staged values and Save
+
+In the [`composition: true`](COMPOSITION-API.md) inspector, an edit is **staged**
+before it is written. Every value the write path can serve gets a field in
+**Values** and exactly one **Save** / **Revert** pair under that field. The page
+and the field are two views of one value: type in either, save from either.
+
+- **Nothing reaches a file until Save.** **Enter** or **Save** writes;
+  **Esc** or **Revert** discards. Anything else — clicking another element,
+  releasing ⌥, closing the panel — leaves the change pending and says so.
+  Blur commits nothing.
+- **The element wears an amber outline while it is pending**, inside the purple
+  selection frame. The two are deliberately different colours: "this is what I
+  picked" must never read as "this is on disk". The panel header carries the
+  same answer as a `saved` / `N unsaved` badge.
+- **Literal text is typed on the page.** Alt-clicking text puts the caret where
+  you clicked and mirrors what you type into the field. Inline markup and a
+  traced expression are typed in the field only — markup's value is the
+  element's *source*, which a browser hands back re-spelled, and an
+  expression's words live in the frontmatter rather than in the text node.
+- **A value is a source location, not an element.** A literal a layout renders
+  on two routes is one value writing one line, so both elements go amber
+  together and one Save covers them.
+- **Prose over ~70 characters opens as a textarea.** Shift+Enter breaks the
+  line, because Enter is Save.
+- **Verify-then-patch is unchanged.** Save sends the text the page showed as
+  the op's `original`; a source that has moved on is refused, the refusal shows
+  in the row, and the value stays pending rather than being thrown away.
+- **There is no in-app undo.** Past a Save the git tree is the way back.
+
+### What happens when the source changes underneath
+
+Astro answers an `.astro` change with a full page reload, so pending edits are
+kept in `sessionStorage` and taken back on boot — but never blindly. Each one
+has to still find its element, at its source location, reading the text it was
+staged against.
+
+- **An unrelated file changed** → the pending edit is restored, amber and all.
+- **The value's own source changed** → it is dropped, with a toast naming the
+  file and location, and **nothing is written**. Saving against source that
+  moved is not one of the options.
+
+Only the literal-text targets are writable from the panel today: text, inline
+markup and a traced expression. A prop or slot value at a component usage site
+shows its verdict and its **View code**, with no field; `src` and `alt` belong
+to the image picker.
 
 ## The hover pill and source peek
 

@@ -35,7 +35,7 @@ mounts no toolbar:
 
 The panel shows:
 
-- **Values:** one row per value on the selection, read-only. The clicked
+- **Values:** one row per value on the selection. The clicked
   value is pinned first, marked *selected element*, and badged *via slot* when
   slot markup wraps it; below it come the values each usage site passes,
   nearest site first, with the rest folded behind *Further up the chain*. Every
@@ -44,6 +44,9 @@ The panel shows:
   holding the words, named once. Mechanism vocabulary sits behind *Details*. A
   selection with no value at all collapses the card to *nothing writable on
   this selection* plus the reason and a jump to whatever source is known.
+  A row the write path serves carries a field and one Save/Revert pair instead
+  of a read-only value — see [Staged values and Save](EDITING.md#staged-values-and-save).
+  A usage-site prop or slot value says so and offers **View code** only.
 - **Component chain:** a proven runtime chain, an explicitly inferred static
   path, separate candidate paths, or a named refusal. Component rows offer
   **View code** for the component and **Open parent** for its usage site, and
@@ -216,8 +219,12 @@ anything yet.
 
 The inspector combines these read APIs with the existing CSS inspector
 and source links. Markdown-backed values open their known backing file in the
-IDE; they do not require a Markdown write API. Whole-string content editing and
-Save/Revert belong to the separate value-writing layer.
+IDE; they do not require a Markdown write API. Writing goes through the
+existing `/apply` endpoint and no other: the literal-text targets `/classify`
+proves are staged and saved from the panel
+([Staged values and Save](EDITING.md#staged-values-and-save)); prop and slot
+values at a usage site are still read-only here, and whole-string content
+editing belongs with them.
 
 ## Verification
 

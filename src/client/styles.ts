@@ -88,6 +88,22 @@ export function overlayCss(): string {
 .atx-value-chip[data-chip="editable"] { border-color: var(--atx-success-text); color: var(--atx-success-text); }
 .atx-value-chip[data-chip="elsewhere"] { border-color: var(--atx-warning); color: var(--atx-warning); }
 .atx-value-chip[data-chip="badge"] { border-style: dashed; color: var(--atx-faint-fg); }
+/* Unsaved wears the amber the element wears, and deliberately not the
+   selection colour: "this is what I picked" must never read as "this is on
+   disk". */
+.atx-value-chip[data-chip="unsaved"] { border-color: var(--atx-warning); color: var(--atx-warning); }
+.atx-inspector-header > .atx-value-chip { margin-left: auto; }
+/* The field, and the one Save/Revert pair under it. Nothing floats over the
+   element: a second pair of buttons for the same value is what this design
+   removes. What rides with the element is the amber outline, which reports
+   state without acting. */
+.atx-value-input { width: 100%; box-sizing: border-box; margin: 10px 0 0; font-family: var(--atx-font-mono); font-size: 12px; }
+textarea.atx-value-input { min-height: 64px; resize: vertical; }
+.atx-value-commit { display: flex; align-items: center; gap: 8px; margin: 9px 0 0; }
+.atx-value-commit[hidden] { display: none; }
+.atx-value-pending { font: 700 10px var(--atx-font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--atx-warning); }
+.atx-value-error { font: 12px/1.5 var(--atx-font-ui); color: var(--atx-destructive); overflow-wrap: anywhere; margin: 7px 0 0; }
+.atx-value-error[hidden] { display: none; }
 .atx-value-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
 .atx-value-where { min-width: 0; font: 11px var(--atx-font-mono); color: var(--atx-faint-fg); overflow-wrap: anywhere; }
 .atx-inspector .atx-item[data-pinned] { border-left: 2px solid var(--atx-primary); }
