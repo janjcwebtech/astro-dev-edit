@@ -683,15 +683,6 @@ button {
   font-size: 12.8px;
 }
 
-/* Icon-only: a square, so the glyph sits in the middle of it rather than in
-   the middle of a label-shaped box that has no label. */
-.atx-btn-icon {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: var(--atx-radius-md);
-}
-
 /* An icon inside a button is sized to the type, not to the button, and sits
    6px from its label -- the gap above. */
 .atx-btn-default > .atx-ico,
@@ -830,8 +821,8 @@ button:disabled,
 
 /* -- Form controls ---------------------------------------------------------
    Inputs, textareas and selects, keyed off [data-input] rather than a class
-   because every caller names its own (atx-field-input, atx-collections-input,
-   atx-settings-key ...) and there is no shared class to match.
+   because every caller names its own (atx-field-input, atx-media-filter ...)
+   and there is no shared class to match.
 
    **A control has no border at rest.** Its edge is where the fill stops, and
    the 1px border is transparent, held in reserve for focus and for an invalid
@@ -1786,12 +1777,12 @@ input[type='checkbox'].atx-switch:disabled {
   background: var(--atx-info);
 }
 
-/* == Entry drawer fields ===================================================
-   editors/fields.ts and editors/entry.ts. One control per FieldType, all
-   wrapped in the same label/error/help chrome. Two states are attributes
-   rather than inline writes: [data-locked] on a field whose option the
-   project's config owns, and [data-on] on the error line, which is the only
-   part of the stack that is conditionally present. */
+/* == Settings fields =======================================================
+   editors/fields.ts. One control per OptionControl, all wrapped in the same
+   label/error/help chrome. Two states are attributes rather than inline
+   writes: [data-locked] on a field whose option the project's config owns,
+   and [data-on] on the error line, which is the only part of the stack that
+   is conditionally present. */
 
 /* No margin of its own: distance between fields belongs to the group that
    holds them (.atx-field-group), so a field is the same object wherever it is
@@ -1857,15 +1848,6 @@ input[type='checkbox'].atx-switch:disabled {
   cursor: pointer;
 }
 
-/* field-sizing grows the box with the prose in it, which is what a excerpt or
-   a description wants; min-height is the floor for browsers without it, so the
-   fallback is a fixed textarea rather than a collapsed one. */
-.atx-field-textarea {
-  min-height: 64px;
-  field-sizing: content;
-  max-height: 40vh;
-}
-
 /* A shape the panel cannot edit: read-only, monospaced, and dimmed so it
    reads as a report of the file rather than as an input. */
 .atx-field-json {
@@ -1875,8 +1857,6 @@ input[type='checkbox'].atx-switch:disabled {
   resize: vertical;
 }
 
-
-
 /* == Settings drawer =======================================================
    editors/settings-panel.ts. The option controls themselves come from
    fields.ts; what is here is the drawer's own prose, the Unsplash key section
@@ -1885,7 +1865,7 @@ input[type='checkbox'].atx-switch:disabled {
    and gitignore-warning lines, [data-hidden] on the clear-key button, and
    [data-tone] / [data-mono] on a status word. */
 
-/* A stack of cards under the tab strip, spaced like the entry drawer's. */
+/* A stack of cards under the tab strip. */
 .atx-settings-pane {
   display: flex;
   flex-direction: column;
@@ -1894,20 +1874,9 @@ input[type='checkbox'].atx-switch:disabled {
 }
 
 .atx-settings-status,
-.atx-settings-key-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font: 13px var(--atx-font-ui);
-}
 
 .atx-settings-status {
   margin: 0;
-}
-
-.atx-settings-key-status {
-  margin: 0 0 10px;
-  color: var(--atx-foreground);
 }
 
 .atx-settings-error {
@@ -1932,56 +1901,6 @@ input[type='checkbox'].atx-switch:disabled {
 /* The access key is a secret with its own endpoint, not an option, so it is a
    card of its own rather than a heading inside the options card. It dims
    whole while the photo source it belongs to is off. */
-
-.atx-settings-key-section[data-off] {
-  opacity: 0.55;
-}
-
-/* Body size, muted -- a card description that happens to carry a link, so it
-   matches .atx-card-desc rather than being a size down from it. */
-.atx-settings-blurb {
-  margin: 0 0 12px;
-  color: var(--atx-muted-fg);
-  font: 400 14px/1.45 var(--atx-font-ui);
-}
-
-.atx-settings-link {
-  color: var(--atx-brand-text);
-}
-
-.atx-settings-hint {
-  margin: 8px 0 0;
-  color: var(--atx-muted-fg);
-  font: 12px/1.5 var(--atx-font-ui);
-}
-
-.atx-settings-row {
-  display: flex;
-  gap: 6px;
-}
-
-.atx-settings-key {
-  flex: 1 1 auto;
-}
-
-/* The reveal toggle keeps its own width beside the growing key field. */
-.atx-settings-row > .atx-btn-outline {
-  flex: 0 0 auto;
-}
-
-.atx-settings-key-actions {
-  display: flex;
-}
-
-/* A destructive button pushes itself to the far left of a footer; here it is
-   the only thing in its own row, so that margin has nothing to do. */
-.atx-settings-key-actions > .atx-btn-destructive {
-  margin-right: 0;
-}
-
-.atx-settings-key-actions > .atx-btn-destructive[data-hidden] {
-  display: none;
-}
 
 .atx-settings-text {
   font: 13px var(--atx-font-ui);
@@ -2017,433 +1936,12 @@ input[type='checkbox'].atx-switch:disabled {
   font: 12px/1.45 var(--atx-font-ui);
 }
 
-/* == Collections drawer ====================================================
-   editors/collections-panel.ts. A field row spans two stores, and the drawer's
-   job is to keep saying which is which, so most of what is here is the chrome
-   that does the saying: the legend, the two captioned groups, the badges.
-   States are attributes: [data-removed] on a card whose removal is queued,
-   [data-off] on the schema half of a field the project keeps read-only,
-   [data-hidden] on the Options row, which only a select field has,
-   [data-on] on the error line, and [data-tone] on a badge or a note. */
-
-.atx-collections {
-  padding-top: 12px;
-}
-
-/* The entry rows are whole-width buttons that read as rows in a list. The
-   collection rows come from group.ts::item and only add the pointer -- these
-   carry the same box as one, so both lists in the drawer are the same object. */
-.atx-collections-item {
-  display: block;
-  width: 100%;
-  margin-bottom: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: var(--atx-card);
-  color: var(--atx-foreground);
-  text-align: left;
-  cursor: pointer;
-}
-
-.atx-collections-row {
-  cursor: pointer;
-}
-
-/* Hover moves the surface, the way a menu item and a tree row do. The chevron
-   is the affordance at rest; the fill is the confirmation under the pointer. */
-.atx-collections-row:hover,
-.atx-collections-row:focus-visible {
-  background: var(--atx-accent);
-  outline: none;
-}
-
-.atx-collections-row:focus-visible {
-  box-shadow: 0 0 0 2px var(--atx-ring);
-}
-
-.atx-collections-item-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* The row's title comes from group.ts::item, which already sets the type; it
-   only needs room for the badges that sit beside the name. */
-.atx-collections-row .atx-item-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: visible;
-}
-
-.atx-collections-item-title {
-  font: 500 14px var(--atx-font-ui);
-}
-
-.atx-collections-item-meta,
-.atx-collections-meta {
-  color: var(--atx-muted-fg);
-  font: 12px var(--atx-font-mono);
-}
-
-/* Monospaced, because it is a path and two counts -- data about the row, not
-   prose. Same size as any other item description.
-
-   It wraps rather than ellipsing, unlike every other item description: the
-   switch and its label take real width out of this row, and a truncated
-   directory tells you less than a wrapped one. The separators are spaces, so a
-   wrap lands between two facts rather than inside a path. */
-.atx-collections-row .atx-item-desc {
-  overflow: visible;
-  white-space: normal;
-  text-overflow: clip;
-  font-family: var(--atx-font-mono);
-}
-
-.atx-collections-item-meta {
-  margin-top: 4px;
-}
-
-/* The line under a collection's name: which directory, how many entries, what
-   kind of schema. 12px is the item-description size, not a size below it -- it
-   is read, and shrinking it was the reason the header felt crowded. */
-.atx-collections-meta {
-  margin-top: 4px;
-  margin-bottom: 16px;
-  font-size: 12px;
-}
-
-/* The one button on the collections list, under the rows. */
-.atx-collections-list > .atx-btn-outline {
-  margin-top: 8px;
-}
-
-.atx-collections-fieldspane,
-.atx-collections-items {
-  padding-top: 16px;
-}
-
-.atx-collections-head,
-.atx-collections-itembar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.atx-collections-head {
-  margin-bottom: 8px;
-}
-
-.atx-collections-head-create {
-  margin-bottom: 16px;
-}
-
-.atx-collections-itembar {
-  margin-bottom: 16px;
-}
-
-.atx-collections-title {
-  color: var(--atx-foreground);
-  font: 500 14px var(--atx-font-ui);
-}
-
-.atx-collections-spacer {
-  flex: 1 1 auto;
-}
-
-.atx-collections-itemcount {
-  flex: 1 1 auto;
-  color: var(--atx-muted-fg);
-  font: 14px var(--atx-font-ui);
-}
-
-/* A column with a gap rather than a margin on each card: the gap belongs to
-   the list, so a card is the same object wherever it is mounted and the last
-   one does not push a space below itself. 12px is the item-group rung. */
-.atx-collections-fields,
-.atx-collections-newfields {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.atx-collections-error {
-  display: none;
-  margin: 16px 0 0;
-  color: var(--atx-warning);
-  font: 13px/1.5 var(--atx-font-ui);
-}
-
-.atx-collections-error[data-on] {
-  display: block;
-}
-
-/* The footer band's action slot, filled by whichever view the pane is showing.
-   display:contents so an empty slot takes no space in the band and a filled one
-   lays its button out as if the slot were not there -- the list view leaves it
-   empty, and a 0-width flex item would still collect the band's gap. */
-.atx-collections-primary {
-  display: contents;
-}
-
-/* One field: its name and remove control, then the two stores side by side.
-   16px all round and on the item rung for radius -- this is a card in a list
-   of cards, and the 10/12 it used to carry made a form of nine of them read as
-   one dense block rather than nine things. */
-.atx-collections-field {
-  padding: 16px;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: var(--atx-card);
-}
-
-/* Queued for removal, not removed: the card dims and the button offers the
-   undo, and nothing is written until Save. */
-.atx-collections-field[data-removed] {
-  opacity: 0.45;
-}
-
-.atx-collections-field-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.atx-collections-field-name {
-  color: var(--atx-foreground);
-  font: 600 12px var(--atx-font-mono);
-}
-
-/* The zod expression this field currently compiles to, verbatim. Set off by
-   the card's own rule, so it reads as a footnote about the field rather than
-   as one more line of it. */
-.atx-collections-expr {
-  display: block;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--atx-border);
-  color: var(--atx-muted-fg);
-  font: 12px var(--atx-font-mono);
-  word-break: break-all;
-}
-
-.atx-collections-addfield {
-  margin-top: 16px;
-  padding: 16px;
-  border: 1px dashed var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-}
-
-.atx-collections-addfield > .atx-btn-outline {
-  margin-top: 12px;
-}
-
-/* The two-store legend — the one piece of chrome that explains the drawer. */
-.atx-collections-legend {
-  padding: 16px;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-xl);
-  background: var(--atx-background);
-  color: var(--atx-muted-fg);
-  font: 13px/1.6 var(--atx-font-ui);
-}
-
-/* The colour is repeated from the wrapper rather than inherited: a host page's
-   own paragraph colour rule outranks an inherited value, and silently
-   repainted this legend in the page's body colour. */
-.atx-collections-legend-line {
-  margin: 0;
-  color: var(--atx-muted-fg);
-}
-
-.atx-collections-legend-word {
-  color: var(--atx-foreground);
-}
-
-/* The field's two stores, side by side: they describe the *same* field, and
-   the card's whole job is letting you read one against the other. auto-fit
-   rather than a fixed pair -- a drawer narrow enough that a control would be
-   squeezed off its label stacks them again instead. */
-.atx-collections-stores {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  align-items: start;
-  gap: 16px 20px;
-}
-
-.atx-collections-group {
-  min-width: 0;
-  padding-left: 14px;
-  border-left: 2px solid var(--atx-border);
-}
-
-.atx-collections-group[data-off] {
-  opacity: 0.6;
-}
-
-.atx-collections-caption {
-  margin-bottom: 12px;
-  color: var(--atx-muted-fg);
-  font: 500 12px var(--atx-font-ui);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-/* Muted sits on the label below, not here: colour set on the row is inherited
-   by whatever the row holds, which quietly greys the value as well as the word
-   naming it. */
-.atx-collections-control {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 12px;
-  color: var(--atx-foreground);
-  font: 14px var(--atx-font-ui);
-}
-
-/* The last control in a store carries no gap of its own -- the card's padding
-   is the space under it. */
-.atx-collections-control:last-child {
-  margin-bottom: 0;
-}
-
-/* Options belong to a select field and to nothing else. */
-.atx-collections-control[data-hidden] {
-  display: none;
-}
-
-.atx-collections-control-label {
-  flex: 0 0 78px;
-  color: var(--atx-muted-fg);
-}
-
-/* min-width:0 so a control shrinks with its column: side by side, a store
-   is half the card wide, and an input's intrinsic width would otherwise push
-   the row past it. */
-.atx-collections-input,
-.atx-collections-select {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.atx-collections-checkbox {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: 6px;
-}
-
-.atx-collections-check {
-  margin: 0;
-  accent-color: var(--atx-primary);
-}
-
-.atx-collections-check-hint {
-  color: var(--atx-muted-fg);
-  font: 14px var(--atx-font-ui);
-}
-
-/* The Content editor switch rides in a collection row's action slot, beside the
-   chevron. Its label is a fixed two words, so nothing shifts as it flips. */
-.atx-collections-pageedit {
-  flex: 0 0 auto;
-}
-
-/* The detail route a collection was matched to. Its own line under the
-   description, one step quieter, because it answers a different question: not
-   what this collection is, but where the switch beside it takes effect. */
-.atx-collections-route {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 3px;
-  color: var(--atx-faint-fg);
-  font: 11px/1.4 var(--atx-font-mono);
-}
-
-/* The meta-tag snippet a collection with no detected route offers. The note is
-   a row of icon + text until it carries one; then the block and its copy button
-   each take a line of their own. */
-.atx-collections-note-snippet {
-  flex-wrap: wrap;
-}
-
-.atx-collections-snippet {
-  flex: 1 0 100%;
-  margin: 8px 0 6px;
-  padding: 8px 10px;
-  overflow-x: auto;
-  border-radius: var(--atx-radius-md);
-  background: var(--atx-background);
-  color: var(--atx-foreground);
-  font: 11px/1.55 var(--atx-font-mono);
-  white-space: pre;
-}
-
-/* A field typed into the add form but not yet written. Outlined in the brand
-   colour because it is the only thing on screen that is not yet in the file. */
-.atx-collections-new {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--atx-brand);
-  border-radius: var(--atx-radius-lg);
-  background: var(--atx-card);
-}
-
-.atx-collections-new-name {
-  color: var(--atx-foreground);
-  font: 600 12px var(--atx-font-mono);
-}
-
-.atx-collections-new-meta {
-  flex: 1 1 auto;
-  color: var(--atx-muted-fg);
-  font: 12px var(--atx-font-ui);
-}
-
-/* The way back out of a collection. It wears the corner-action shape from the
-   button system and adds only the one thing that shape cannot know: the
-   chevron points the other way, since it is the forward one turned around.
-
-   Neutral, not brand: brandText means *this is on your page and editable*,
-   and a back button is the tool talking about its own navigation. */
-.atx-collections-back > .atx-ico:first-child {
-  transform: rotate(180deg);
-}
-
-.atx-collections-blurb {
-  margin: 0 0 12px;
-  color: var(--atx-muted-fg);
-  font: 13px/1.5 var(--atx-font-ui);
-}
-
-.atx-collections-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 5px;
-  margin: 0 0 10px;
-  font: 12px/1.5 var(--atx-font-ui);
-}
-
-.atx-collections-note[data-tone='warn'] {
-  color: var(--atx-warning);
-}
-
-.atx-collections-note[data-tone='muted'] {
-  color: var(--atx-muted-fg);
-}
-
-/* == Image panel and asset picker ==========================================
-   editors/image.ts (the in-page <img> panel) and editors/asset-picker.ts (the
-   entry drawer's image field). Both show a preview over a checkerboard, so a
-   transparent PNG reads as transparent rather than as a hole. An <img> that
-   fails to load takes [data-hidden] rather than showing a broken-image glyph;
-   a retry that finally succeeds removes it again — see ui.ts::setFreshSrc. */
+/* == Image panel ===========================================================
+   editors/image.ts, the in-page <img> panel. It shows a preview over a
+   checkerboard, so a transparent PNG reads as transparent rather than as a
+   hole. An <img> that fails to load takes [data-hidden] rather than showing a
+   broken-image glyph; a retry that finally succeeds removes it again — see
+   ui.ts::setFreshSrc. */
 
 .atx-image-preview {
   width: 100%;
@@ -2568,68 +2066,13 @@ input[type='checkbox'].atx-switch:disabled {
 
 .atx-image-preview-img[data-hidden],
 .atx-image-recent-thumb[data-hidden],
-.atx-image-field-thumb[data-hidden],
-.atx-image-field-empty[data-hidden],
 .atx-media-thumb[data-hidden],
 .atx-media-rail-img[data-hidden] {
   display: none;
 }
 
-.atx-image-field {
-  display: grid;
-  gap: 8px;
-}
-
-.atx-image-field-preview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 240px;
-  height: 160px;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: ${CHECKER(16)};
-  cursor: pointer;
-}
-
-.atx-image-field-thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.atx-image-field-empty {
-  color: var(--atx-muted-fg);
-  font: 400 13px var(--atx-font-ui);
-  pointer-events: none;
-}
-
-.atx-image-field-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.atx-image-field-path {
-  flex: 1 1 auto;
-  min-width: 0;
-  font: 12px var(--atx-font-mono);
-}
-
 /* Sits beside the path field in a flex row, so it takes the field's height
    and shape rather than a button's own. */
-/* Wears the shared outline button; the flex basis is the only thing left that
-   belongs to this row rather than to the button system. */
-.atx-image-field-browse {
-  flex: 0 0 auto;
-}
-
-.atx-image-field-hint {
-  color: var(--atx-muted-fg);
-  font: 400 12px var(--atx-font-mono);
-}
 
 /* == Media grid ============================================================
    editors/media-grid.ts. One tile shape for both panes; the caption sits
@@ -2927,12 +2370,6 @@ input[type='checkbox'].atx-switch:disabled {
 }
 
 .atx-media-sort,
-.atx-unsplash-orient,
-.atx-unsplash-width {
-  flex: 0 0 auto;
-  width: auto;
-  font: 13px var(--atx-font-ui);
-}
 
 /* --- the detail rail --- */
 
@@ -2990,67 +2427,6 @@ input[type='checkbox'].atx-switch:disabled {
   color: var(--atx-brand-text);
   font: 13px/1.5 var(--atx-font-ui);
   word-break: normal;
-}
-
-/* == Unsplash pane =========================================================
-   editors/unsplash-pane.ts. The search box is a div wearing the control
-   baseline, because the magnifier and the field share one bordered box. */
-
-.atx-unsplash-search {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 4px 8px;
-}
-
-.atx-unsplash-search > .atx-ico {
-  opacity: 0.6;
-}
-
-.atx-unsplash-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--atx-foreground);
-  font: 14px var(--atx-font-ui);
-  outline: none;
-}
-
-.atx-media-error-more {
-  margin-left: 10px;
-  color: var(--atx-warning);
-  font: 13px var(--atx-font-ui);
-}
-
-.atx-media-error-title {
-  margin: 0 0 6px;
-  color: var(--atx-foreground);
-  font: 500 14px var(--atx-font-ui);
-}
-
-.atx-media-error-detail {
-  margin: 0 0 12px;
-  color: var(--atx-muted-fg);
-  font: 13px/1.6 var(--atx-font-ui);
-}
-
-/* The only button inside a full-width grid message, so it centres itself. */
-.atx-media-error-action {
-  margin: 0 auto;
-}
-
-.atx-unsplash-rate {
-  margin: 14px 0 0;
-  color: var(--atx-muted-fg);
-  font: 11px var(--atx-font-mono);
-}
-
-/* The last few requests of the hour are worth noticing. */
-.atx-unsplash-rate[data-tone='warn'] {
-  color: var(--atx-warning);
 }
 
 /* == Icons =================================================================
@@ -3325,197 +2701,5 @@ input[type='checkbox'].atx-switch:disabled {
 .atx-css-token[data-css='variable'] { color: var(--atx-chart1); }
 .atx-css-token[data-css='keyword'] { color: var(--atx-chart4); }
 .atx-css-token[data-css='punct'] { color: var(--atx-muted-fg); }
-
-/* == Markdown body editor ==================================================
-   editors/body-editor.ts. Everything here is the editor's *chrome* — the
-   toolbar, the heading menu, the image panel. The writing surface itself
-   (.atx-rte-content) is deliberately absent: it stays in the light DOM so
-   Safari's selection and execCommand APIs can see it, and ::slotted() loses
-   to the document, so its whole box lives in that module's CONTENT_CSS.
-
-   Three states: [data-on] on the heading menu and the image panel, which are
-   both closed until asked for, and [data-hidden] on the format buttons, which
-   are the half of the toolbar that means nothing in raw-markdown mode. */
-
-.atx-rte-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding-bottom: 6px;
-  background: var(--atx-card);
-}
-
-.atx-rte-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  padding: 5px;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: var(--atx-card);
-}
-
-.atx-rte-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  height: 28px;
-  padding: 0 8px;
-  border: none;
-  border-radius: var(--atx-radius-md);
-  background: transparent;
-  color: var(--atx-foreground);
-  font: 500 13px/1 var(--atx-font-ui);
-  outline: none;
-  transition: background 120ms, color 120ms;
-  cursor: pointer;
-}
-
-.atx-rte-btn:focus-visible {
-  box-shadow: 0 0 0 2px ${hexToRgba(COLOR.ring, 0.7)};
-}
-
-/* Each button wears what it does. */
-.atx-rte-btn-bold {
-  font-weight: 800;
-}
-
-.atx-rte-btn-italic {
-  font-family: serif;
-  font-style: italic;
-}
-
-.atx-rte-btn-strike {
-  text-decoration: line-through;
-}
-
-.atx-rte-btn-pre {
-  font: 700 10px var(--atx-font-mono);
-}
-
-.atx-rte-btn-code {
-  font: 700 13px var(--atx-font-mono);
-}
-
-/* The MD/Rich toggle is the only thing on the right of the toolbar. It is the
-   editor talking about itself, so it stays neutral. */
-.atx-rte-mode {
-  margin-left: auto;
-  font: 600 11px var(--atx-font-mono);
-  letter-spacing: 0.04em;
-}
-
-.atx-rte-divider {
-  width: 1px;
-  align-self: stretch;
-  margin: 3px;
-  background: var(--atx-border);
-}
-
-.atx-rte-btn[data-hidden],
-.atx-rte-divider[data-hidden],
-.atx-rte-heading[data-hidden] {
-  display: none;
-}
-
-.atx-rte-heading {
-  position: relative;
-  display: inline-flex;
-}
-
-.atx-rte-heading-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 3;
-  display: none;
-  min-width: 150px;
-  padding: 4px;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: var(--atx-card);
-  box-shadow: 0 0 0 1px var(--atx-border), 0 8px 28px rgba(0, 0, 0, 0.4);
-}
-
-.atx-rte-heading-menu[data-on] {
-  display: block;
-}
-
-.atx-rte-heading-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 6px 10px;
-  border: none;
-  border-radius: var(--atx-radius-md);
-  background: transparent;
-  color: var(--atx-foreground);
-  font: 400 13px var(--atx-font-ui);
-  text-align: left;
-  cursor: pointer;
-}
-
-.atx-rte-btn:hover,
-.atx-rte-heading-item:hover {
-  background: var(--atx-accent);
-  color: var(--atx-foreground);
-}
-
-.atx-rte-heading-chip {
-  min-width: 20px;
-  font: 700 11px var(--atx-font-mono);
-  opacity: 0.7;
-}
-
-/* Each row previews its own level, so the size is the caller's. */
-.atx-rte-heading-name {
-  font: 600 12px var(--atx-font-ui);
-}
-
-/* Insert or replace an image, sharing the asset picker with the image field. */
-.atx-rte-image-panel {
-  display: none;
-  margin: 6px 0 0;
-  padding: 12px;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: var(--atx-background);
-}
-
-.atx-rte-image-panel[data-on] {
-  display: block;
-}
-
-.atx-rte-image-alt-label {
-  display: block;
-  margin: 10px 0 6px;
-  color: var(--atx-foreground);
-  font: 500 14px/1 var(--atx-font-ui);
-}
-
-.atx-rte-image-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-/* Smaller than a footer button: these sit inside a panel inside a toolbar. */
-
-/* The raw-markdown half of the MD/Rich toggle. */
-.atx-body-input {
-  display: none;
-  min-height: 40vh;
-  padding: 12px;
-  font: 400 13px/1.6 var(--atx-font-mono);
-  resize: vertical;
-}
-
-.atx-body-input[data-on] {
-  display: block;
-}
 `;
 }
