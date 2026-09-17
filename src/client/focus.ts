@@ -16,14 +16,11 @@ import { overlayActiveElement } from './shadow.ts';
  *
  * Two things make it more than a `querySelectorAll` loop:
  *
- * - **The composed tree, not the shadow tree.** The rich-text editor's
- *   `contenteditable` is a light-DOM node `<slot>`-ed into the drawer (see
- *   `shadow.ts::mountLight`), so `shell.querySelectorAll` cannot see it and a
- *   trap built on that query would lock the user out of the body they came to
- *   write. Slots are followed, in slot order, so Tab order matches what the eye
- *   sees.
- * - **Traps stack.** The media modal opens over the CMS drawer, and the
- *   Settings drawer over the media modal. Only the innermost trap acts; the one
+ * - **The composed tree, not the shadow tree.** Slots are followed, in slot
+ *   order, so Tab order matches what the eye sees rather than what
+ *   `shell.querySelectorAll` happens to find.
+ * - **Traps stack.** The media modal opens over a drawer, and the Settings
+ *   drawer over the media modal. Only the innermost trap acts; the one
  *   underneath resumes when it is released, exactly like `state.releaseTo`.
  */
 

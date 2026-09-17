@@ -1,25 +1,22 @@
 import type { SourceLoc } from '../../shared/protocol.ts';
 import { clearHighlight } from '../hover.ts';
-import { pageEntryInfo, pageSource, resolvePageSource } from '../page-source.ts';
+import { pageSource } from '../page-source.ts';
 import { trapFocus } from '../focus.ts';
 import * as state from '../state.ts';
-import { basename, buildBackdrop, buildPanel, styled, toast, wirePanelButtons } from '../ui.ts';
-import * as api from '../api.ts';
-import { openEntryPanel } from './entry.ts';
+import { basename, buildBackdrop, buildPanel, styled, wirePanelButtons } from '../ui.ts';
 import { mount } from '../shadow.ts';
 
 /**
- * Refusal notice for content that can't be edited in place (expressions,
- * nested markup, components). Offers "Open source" — and, when the page
- * declares a backing content file, a primary "Edit page content" action that
- * opens the CMS entry drawer for it.
+ * Refusal notice for content that can't be edited in place — expressions,
+ * nested markup, package components.
  *
- * There is a third case between those two, and it is the one worth explaining.
- * The server can often name the entry backing a page whose collection the user
- * has **not** switched on — it knows the file, it knows the collection, and the
- * only thing missing is permission. Saying nothing there would be the old
- * silence this feature exists to end: you clicked text that plainly comes from
- * somewhere, and the tool knows where. So the notice offers the switch by name.
+ * **It names a destination, and offers one verb to reach it.** *View code*
+ * opens the read-only source popup, which carries its own *Open in editor*;
+ * the panel never pairs a peek button with a jump button for the same file,
+ * because a destination belongs to the row that owns it. Where the page
+ * declares a backing content file, that file is named as the place the words
+ * actually live — it is not browser-editable, and the notice says so rather
+ * than offering a field.
  */
 
 export interface NoticeOptions {
@@ -51,8 +48,6 @@ export interface NoticeOptions {
    * It is a **jump, not an edit**. The ancestor is the markup around the
    * component, so opening it puts the cursor at the call site — where the
    * props are written — rather than making this element editable in place.
-   * Editing an `<Image>`'s src or alt from the page would mean tracing them
-   * back through the component's props, which the patchers do not do.
    */
   usedAt?: SourceLoc;
 }
@@ -60,7 +55,6 @@ export interface NoticeOptions {
 export function showDynamicNotice(
   src: SourceLoc,
   reason: string,
-  openSource: (src: SourceLoc) => void,
   openPeek: (src: SourceLoc) => void,
   opts: NoticeOptions = {},
 ): void {
@@ -70,7 +64,7 @@ export function showDynamicNotice(
 
   // A package-owned `src` cannot be opened — /open refuses it, the same way
   // /peek and /classify do. So every jump this panel offers goes to the usage
-  // site when there is one, and the buttons below say which file that is.
+  // site when there is one, and the button below says which file that is.
   const jumpTo = opts.usedAt ?? src;
 
   if (opts.clickedTag) {
@@ -89,7 +83,7 @@ export function showDynamicNotice(
   // needed to see *why* this content refused, without leaving the page.
   const where = styled('p', 'atx-notice-loc');
   where.textContent = `${basename(src.file)}:${src.loc}`;
-  where.title = 'Peek at the source code';
+  where.title = 'View the source code';
   where.addEventListener('click', () => {
     close();
     openPeek(src);
@@ -105,50 +99,18 @@ export function showDynamicNotice(
     body.append(used);
   }
 
-  // On a detail page whose content lives in a markdown/MDX file, that file is
+  // On a detail page that declares a backing markdown/MDX file, that file is
   // almost always the *right* place to edit this text — not the template line
-  // the source loc points at. Offer a direct jump to it. (spec §16.2)
+  // the source loc points at. Named, not offered as a field: Markdown-backed
+  // values are edited in the IDE.
   const contentFile = pageSource();
   if (contentFile) {
     const hint = styled('p', 'atx-notice-hint');
-    hint.textContent = `This page's content comes from ${basename(contentFile)} — that's where its title and body text are edited.`;
-    body.append(hint);
-  }
-
-  // Found the entry, but its collection is switched off — and not by the config,
-  // which would make the offer a button that refuses.
-  const found = pageEntryInfo();
-  const offer =
-    !contentFile &&
-    found?.refusal === 'not-enabled' &&
-    found.collection &&
-    found.entryFile &&
-    !found.pageEditingLocked
-      ? { collection: found.collection, file: found.entryFile }
-      : null;
-  if (offer) {
-    const hint = styled('p', 'atx-notice-hint');
     hint.textContent =
-      `This page's content is in ${basename(offer.file)}, from the ${offer.collection} ` +
-      'collection. Page editing is off for it — switch it on and this text is editable ' +
-      'as form fields.';
+      `This page declares ${basename(contentFile)} as its content file — that's where its ` +
+      'title and body text are edited.';
     body.append(hint);
   }
-
-  /** Switch the collection on, then open the drawer the user was after. The
-   *  re-resolve is what puts Edit entry in the admin bar, through the
-   *  page-source subscription. */
-  const enableAndEdit = async (collection: string, file: string): Promise<void> => {
-    try {
-      await api.setCollectionPageEditing({ collection, enabled: true });
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not switch page editing on', 'err');
-      return;
-    }
-    await resolvePageSource();
-    toast(`Page editing on for ${collection}`, 'ok');
-    void openEntryPanel(file);
-  };
 
   const close = (): void => {
     state.releaseIf(token);
@@ -159,38 +121,20 @@ export function showDynamicNotice(
   const backdrop = buildBackdrop(close);
   const token = state.begin({ kind: 'panel', close });
 
-  // cancel = close, "Open template" = jump to the .astro loc, and (when the
-  // page declares a content file) a primary "Edit page content" that opens
-  // the entry drawer for it. The drawer claims the state slot itself, so the
-  // notice just closes first.
+  // cancel = close; the one action views the code at the loc the refusal is
+  // about, and the popup it opens carries Open in editor.
   wirePanelButtons(
     panel,
     close,
     () => {
       close();
-      if (contentFile) {
-        void openEntryPanel(contentFile);
-      } else if (offer) {
-        void enableAndEdit(offer.collection, offer.file);
-      } else {
-        openSource(jumpTo);
-      }
+      openPeek(jumpTo);
     },
-    contentFile || offer
-      ? {
-          confirmLabel: contentFile ? 'Edit page content' : `Turn on for ${offer!.collection}`,
-          secondaryLabel: 'Open template',
-          onSecondary: () => {
-            openSource(jumpTo);
-            close();
-          },
-        }
-      : {
-          // Naming the file is the point when it is not the one on the loc line
-          // above: "Open source" over a package path is the button that used to
-          // error.
-          confirmLabel: opts.usedAt ? `Open ${basename(opts.usedAt.file)}` : 'Open source',
-        },
+    {
+      // Naming the file is the point when it is not the one on the loc line
+      // above: "View code" over a package path is the button that used to error.
+      confirmLabel: opts.usedAt ? `View ${basename(opts.usedAt.file)}` : 'View code',
+    },
   );
   mount(backdrop, panel);
   const releaseFocus = trapFocus(panel);

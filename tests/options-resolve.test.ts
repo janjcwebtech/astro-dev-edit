@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { EntryEditorOptions } from '../src/server/content-config.ts';
 import {
   applyOptionPatch,
   coerceOptionPatch,
@@ -22,8 +21,8 @@ import { readStoredOptions, saveStoredOptions, SETTINGS_FILE } from '../src/serv
  * the project set in code must resolve to that value and be reported `locked`,
  * so the panel renders it read-only instead of storing something resolution
  * would silently discard. The mirror property is just as load-bearing: an option
- * the config is *silent* about must stay writable, which is what makes
- * `unsplash: {}` reachable from the UI on a fresh project.
+ * the config is *silent* about must stay writable, which is what makes an
+ * option reachable from the UI on a fresh project.
  */
 
 let root: string;
@@ -50,7 +49,6 @@ describe('precedence', () => {
     const { options, described } = await resolve();
     expect(options.contentRoots).toEqual(DEFAULTS.contentRoots);
     expect(options.cssInspector).toBe(true);
-    expect(options.unsplash).toBe(false);
     expect(describedBy(described, 'cssInspector').source).toBe('default');
     expect(describedBy(described, 'cssInspector').locked).toBe(false);
   });
@@ -81,16 +79,15 @@ describe('precedence', () => {
   });
 
   it('leaves an option the config is silent about writable — the fresh-project case', async () => {
-    // `unsplash: {}` is exactly what the old Settings panel told users to add to
-    // astro.config.mjs by hand. Absent from the config, the panel owns it.
+    // Absent from the config, the panel owns the option outright.
     const before = await resolve({});
-    expect(before.options.unsplash).toBe(false);
-    expect(describedBy(before.described, 'unsplashEnabled').locked).toBe(false);
+    expect(before.options.cssInspector).toBe(true);
+    expect(describedBy(before.described, 'cssInspector').locked).toBe(false);
 
-    const after = await resolve({}, { unsplashEnabled: true });
-    expect(after.options.unsplash).not.toBe(false);
-    expect(describedBy(after.described, 'unsplashEnabled').value).toBe(true);
-    expect(describedBy(after.described, 'unsplashEnabled').source).toBe('file');
+    const after = await resolve({}, { cssInspector: false });
+    expect(after.options.cssInspector).toBe(false);
+    expect(describedBy(after.described, 'cssInspector').value).toBe(false);
+    expect(describedBy(after.described, 'cssInspector').source).toBe('file');
   });
 });
 
@@ -137,136 +134,19 @@ describe('degradation', () => {
   });
 });
 
-describe('entryEditor merging', () => {
-  it('merges collections per field, config leaf winning', async () => {
-    const { options } = await resolve(
-      { entryEditor: { collections: { blog: { fields: { excerpt: { widget: 'textarea' } } } } } },
-      {
-        entryEditorEnabled: true,
-        entryEditor: {
-          collections: {
-            blog: { fields: { excerpt: { widget: 'text' }, title: { label: 'Headline' } } },
-            notes: { dir: 'src/data/notes' },
-          },
-        },
-      },
-    );
-    expect(options.entryEditor).not.toBe(false);
-    const ee = options.entryEditor as Exclude<typeof options.entryEditor, false>;
-    // The config's widget wins where it speaks...
-    expect(ee.collections!.blog.fields!.excerpt.widget).toBe('textarea');
-    // ...while a field only the panel knows about survives...
-    expect(ee.collections!.blog.fields!.title.label).toBe('Headline');
-    // ...as does a whole collection only the panel added.
-    expect(ee.collections!.notes.dir).toBe('src/data/notes');
-  });
-
-  it('merges pageEditing per collection, config winning, without disturbing siblings', async () => {
-    // The page-editing switch is a new sibling key inside the same per-collection
-    // object as `fields` and `dir`, and it rides the same merge — which is why
-    // adding it needed no resolver change. What has to hold is that the config
-    // owns the collections it names and only those.
-    const { options } = await resolve(
-      { entryEditor: { collections: { blog: { pageEditing: false } } } },
-      {
-        entryEditorEnabled: true,
-        entryEditor: {
-          collections: {
-            blog: { pageEditing: true, fields: { title: { label: 'Headline' } } },
-            works: { pageEditing: true },
-          },
-        },
-      },
-    );
-    const ee = options.entryEditor as Exclude<typeof options.entryEditor, false>;
-    // The config speaks about blog, so it wins — even saying "off".
-    expect(ee.collections!.blog.pageEditing).toBe(false);
-    // ...and the panel's own field override beside it is untouched.
-    expect(ee.collections!.blog.fields!.title.label).toBe('Headline');
-    // A collection the config says nothing about keeps what the panel stored.
-    expect(ee.collections!.works.pageEditing).toBe(true);
-  });
-
-  it('leaves pageEditing absent when nothing sets it, so off is the default', async () => {
-    const { options } = await resolve({}, { entryEditorEnabled: true, entryEditor: { collections: { blog: {} } } });
-    const ee = options.entryEditor as Exclude<typeof options.entryEditor, false>;
-    expect(ee.collections!.blog.pageEditing).toBeUndefined();
-  });
-
-  it('drops the merged detail when the feature resolves off', async () => {
-    const { options } = await resolve(
-      { entryEditor: false },
-      { entryEditorEnabled: true, entryEditor: { collections: {} } },
-    );
-    expect(options.entryEditor).toBe(false);
-  });
-});
-
-describe('unsplash import width', () => {
-  // The option is a `select`, so its wire and stored form is text while the
-  // config accepts a plain number — this is where the two meet.
-  it('defaults to 2400, the width every import used before it was choosable', async () => {
-    const { options, described } = await resolve({ unsplash: {} });
-    expect(options.unsplash && options.unsplash.importWidth).toBe(2400);
-    const d = describedBy(described, 'unsplashImportWidth');
-    expect(d.value).toBe('2400');
-    expect(d.choices).toEqual(['800', '1600', '2400', 'original']);
-    expect(d.source).toBe('default');
-  });
-
-  it('takes a numeric config value and reports it as the matching choice', async () => {
-    const { options, described } = await resolve({ unsplash: { importWidth: 800 } });
-    expect(options.unsplash && options.unsplash.importWidth).toBe(800);
-    const d = describedBy(described, 'unsplashImportWidth');
-    // Stringified by `read`, or the panel's select would match no option and
-    // render as if the value were unset.
-    expect(d.value).toBe('800');
-    expect(d.locked).toBe(true);
-  });
-
-  it("carries 'original' through both layers", async () => {
-    const fromFile = await resolve({ unsplash: {} }, { unsplash: { importWidth: 'original' } });
-    expect(fromFile.options.unsplash && fromFile.options.unsplash.importWidth).toBe('original');
-    const fromConfig = await resolve({ unsplash: { importWidth: 'original' } });
-    expect(fromConfig.options.unsplash && fromConfig.options.unsplash.importWidth).toBe('original');
-  });
-
-  it('falls back rather than resolving to a width the import route would refuse', async () => {
-    // Only reachable by hand-editing the settings file; resolving it would send
-    // the picker a default its own import would 400 on.
-    const { options } = await resolve(
-      { unsplash: {} },
-      { unsplash: { importWidth: 4321 as unknown as 800 } },
-    );
-    expect(options.unsplash && options.unsplash.importWidth).toBe(2400);
-  });
-
-  it('stores a saved width parsed, not stringly-typed', async () => {
-    const { values, errors } = coerceOptionPatch({ unsplashImportWidth: '800' });
-    expect(errors).toEqual({});
-    const next = applyOptionPatch({}, values);
-    expect(next.unsplash).toEqual({ importWidth: 800 });
-  });
-
-  it('refuses a width that is not one of the offered choices', () => {
-    const { errors } = coerceOptionPatch({ unsplashImportWidth: '12000' });
-    expect(errors.unsplashImportWidth).toContain('expected one of');
-  });
-});
-
 describe('coerceOptionPatch', () => {
   it('accepts well-typed values', () => {
     const { values, errors } = coerceOptionPatch({
       cssInspector: false,
       uploadDir: '  public/images  ',
       contentRoots: ['src', ' public '],
-      unsplashPerPage: '12',
+      revealWriteDelayMs: '250',
     });
     expect(errors).toEqual({});
     expect(values.get('cssInspector')).toBe(false);
     expect(values.get('uploadDir')).toBe('public/images');
     expect(values.get('contentRoots')).toEqual(['src', 'public']);
-    expect(values.get('unsplashPerPage')).toBe(12);
+    expect(values.get('revealWriteDelayMs')).toBe(250);
   });
 
   it('refuses a cleared field as empty rather than as the wrong type', () => {
@@ -294,12 +174,6 @@ describe('coerceOptionPatch', () => {
     expect(errors.contentRoots).toContain('at least one');
   });
 
-  it('orders values by the option table, so a toggle precedes what it gates', () => {
-    // JSON key order puts the sub-option first; the patch must still apply the
-    // toggle first, or the sub-option would be dropped as "feature is off".
-    const { values } = coerceOptionPatch({ unsplashAppName: 'my app', unsplashEnabled: true });
-    expect([...values.keys()]).toEqual(['unsplashEnabled', 'unsplashAppName']);
-  });
 });
 
 describe('applyOptionPatch', () => {
@@ -311,59 +185,21 @@ describe('applyOptionPatch', () => {
     expect(next).toEqual({ uploadDir: 'public/a', cssInspector: false, openInEditor: false });
   });
 
-  it('turns the unsplash feature on and off without losing its sub-options', () => {
-    const on = patch({}, { unsplashEnabled: true, unsplashAppName: 'my app' });
-    expect(on.unsplashEnabled).toBe(true);
-    expect(on.unsplash).toEqual({ appName: 'my app' });
-
-    const off = patch(on, { unsplashEnabled: false });
-    expect(off.unsplashEnabled).toBe(false);
-    // The detail survives the toggle — that is what `StoredOptions` is for.
-    expect(off.unsplash).toEqual({ appName: 'my app' });
-
-    const again = patch(off, { unsplashEnabled: true });
-    expect(again.unsplashEnabled).toBe(true);
-    expect(again.unsplash).toEqual({ appName: 'my app' });
-  });
-
-  it('keeps entryEditor collections across an off/on cycle', () => {
-    const detail: EntryEditorOptions = {
-      collections: { blog: { fields: { excerpt: { widget: 'textarea' } } } },
-    };
-    const configured: StoredOptions = { entryEditorEnabled: true, entryEditor: detail };
-    const off = patch(configured, { entryEditor: false });
-    expect(off.entryEditorEnabled).toBe(false);
-    expect(off.entryEditor).toEqual(detail);
-    const on = patch(off, { entryEditor: true });
-    expect(on.entryEditorEnabled).toBe(true);
-    expect(on.entryEditor).toEqual(detail);
-  });
-
   it('round-trips a toggle through the store, so the next resolve sees it', async () => {
     // The end-to-end property the panel depends on: save, then resolve, with no
     // dev-server restart in between.
     await saveStoredOptions(root, applyOptionPatch({}, coerceOptionPatch({
-      unsplashEnabled: true,
-      unsplashAppName: 'round trip',
+      cssInspector: false,
+      uploadDir: 'public/round-trip',
     }).values));
     const { options } = await resolve();
-    expect(options.unsplash).toEqual({ appName: 'round trip', perPage: 20, importWidth: 2400 });
-  });
-
-  it('never persists the access key through the option path', () => {
-    // The secret has exactly one home — the document's top-level `unsplash`
-    // compartment, written only by `saveUnsplashKey`.
-    const next = applyOptionPatch(
-      { unsplashEnabled: true, unsplash: { accessKey: 'leaked', appName: 'old' } },
-      coerceOptionPatch({ unsplashAppName: 'new' }).values,
-    );
-    expect(next.unsplash).toEqual({ appName: 'new' });
-    expect(JSON.stringify(next)).not.toContain('leaked');
+    expect(options.cssInspector).toBe(false);
+    expect(options.uploadDir).toBe('public/round-trip');
   });
 
   it('does not mutate the document it was given', () => {
-    const current: StoredOptions = { unsplash: { accessKey: 'k', appName: 'old' } };
-    patch(current, { unsplashAppName: 'new' });
-    expect(current.unsplash).toEqual({ accessKey: 'k', appName: 'old' });
+    const current: StoredOptions = { uploadDir: 'public/a', cssInspector: true };
+    patch(current, { uploadDir: 'public/b' });
+    expect(current).toEqual({ uploadDir: 'public/a', cssInspector: true });
   });
 });

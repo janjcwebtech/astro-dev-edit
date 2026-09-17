@@ -76,12 +76,9 @@ export interface AdminBarDeps {
   hideTree(): void;
   isTreeOpen(): boolean;
   /** Whether this page declares a backing content entry. */
-  hasEntry(): boolean;
-  openEntry(): void;
   /** Open the file this page is written in, in the user's editor. */
   openPageSource(): void;
   /** Open the collection and field designer. */
-  openCollections(): void;
   /** Open the integration settings drawer. Injected because admin-bar.ts
    *  imports nothing from `editors/`. */
   openSettings(): void;
@@ -500,15 +497,6 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
   });
 
   register({
-    id: 'atx-entry',
-    label: 'Edit entry',
-    icon: 'file',
-    title: 'Edit this page’s content entry',
-    visible: () => deps.hasEntry(),
-    onSelect: () => deps.openEntry(),
-  });
-
-  register({
     id: 'atx-bar-pin',
     label: 'Pin the bar',
     icon: () => (prefs.pinned ? 'pin' : 'pinOff'),
@@ -576,21 +564,6 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     // The whole item is a launch-my-editor action, so it goes when that is off.
     visible: () => has('openInEditor'),
     onSelect: () => deps.openPageSource(),
-  });
-
-  // Collections is a *peer* of Settings, not a tab inside it: a collection's
-  // shape is the project's own committed source, while an option is a switch on
-  // this tool. Reaching the designer should not mean going through settings.
-  register({
-    id: 'atx-menu-collections',
-    place: 'menu',
-    label: 'Collections',
-    icon: 'collections',
-    title: 'Design your content collections — fields, types and entries',
-    // The whole designer sits behind the entry editor server-side, so the item
-    // goes when that is off rather than opening a drawer that can only refuse.
-    visible: () => has('entryEditor'),
-    onSelect: () => deps.openCollections(),
   });
 
   register({

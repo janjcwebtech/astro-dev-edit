@@ -265,9 +265,9 @@ describe('POST /page-source', () => {
       logger,
       root,
       optionsResolver: stubOptions(root, options),
-      schemaProvider: null,
+
       routeManifest: routes === null ? null : manifest(routes),
-      unsplash: null,
+
     });
   }
 

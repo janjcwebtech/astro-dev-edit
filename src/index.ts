@@ -1,21 +1,13 @@
 import type { AstroIntegration } from 'astro';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
-import { UNSPLASH_DEFAULT_IMPORT_WIDTH } from './shared/unsplash.ts';
 import { createAnnotatePlugin } from './server/annotate.ts';
 import { createCompositionPlugin } from './server/composition-plugin.ts';
 import { createCompositionService, type CompositionService } from './server/composition-service.ts';
-import { createSchemaProvider } from './server/content-config.ts';
 import { createMiddleware } from './server/middleware.ts';
 import { createPrivateFilesPlugin } from './server/private-files.ts';
 import { createRouteManifest, type ResolvedRouteLike } from './server/route-manifest.ts';
-import {
-  createOptionsResolver,
-  DEFAULTS,
-  UNSPLASH_MAX_PER_PAGE,
-  type DevEditOptions,
-} from './server/options.ts';
-import { resolveUnsplashKey } from './server/settings.ts';
+import { createOptionsResolver, DEFAULTS, type DevEditOptions } from './server/options.ts';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -36,8 +28,7 @@ import { fileURLToPath } from 'node:url';
  * config-owned, and collapsing it into `DEFAULTS` here would erase exactly that.
  */
 
-export type { DevEditOptions, UnsplashOptions, ResolvedOptions } from './server/options.ts';
-export type { EntryEditorOptions, EntryFieldOverride } from './server/content-config.ts';
+export type { DevEditOptions, ResolvedOptions } from './server/options.ts';
 
 /** The project's installed Astro major, resolved from the project root (the
  *  integration's own tree has no astro). null when resolution fails. */
@@ -196,75 +187,17 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
             publicDir,
             optionsResolver,
             composition,
-            // Always constructed: the entry editor can now be switched on from
-            // the panel, so a provider built only when it started enabled would
-            // leave the feature schema-less until the next restart. The routes
-            // check the live gate themselves.
-            schemaProvider: createSchemaProvider(server, projectRoot, async () => {
-              const { options } = await optionsResolver.resolve();
-              return options.entryEditor === false ? {} : options.entryEditor;
-            }),
-            // Always constructed, like schemaProvider: the array is simply
-            // empty until the routes hook has fired, and the route then answers
-            // an explicit refusal rather than guessing at a file.
+            // Always constructed: the array is simply empty until the routes
+            // hook has fired, and the route then answers an explicit refusal
+            // rather than guessing at a file.
             routeManifest: createRouteManifest({
               root: projectRoot,
               base,
               routes: () => resolvedRoutes,
             }),
-            unsplash: {
-              // Thunks, not values: both the key and the sub-options resolve
-              // per request, so anything entered through the Settings panel
-              // takes effect without a dev-server restart and nothing depends
-              // on hook ordering.
-              resolve: async () => {
-                const { options } = await optionsResolver.resolve();
-                const configKey =
-                  options.unsplash === false ? undefined : options.unsplash.accessKey;
-                return resolveUnsplashKey(projectRoot, configKey);
-              },
-              appName: async () => {
-                const { options } = await optionsResolver.resolve();
-                const o = options.unsplash;
-                return (o === false ? '' : o.appName) || 'astro-dev-edit';
-              },
-              perPage: async () => {
-                const { options } = await optionsResolver.resolve();
-                const o = options.unsplash;
-                const raw = (o === false ? undefined : o.perPage) ?? 20;
-                return Math.min(Math.max(1, Math.trunc(raw)), UNSPLASH_MAX_PER_PAGE);
-              },
-              importWidth: async () => {
-                const { options } = await optionsResolver.resolve();
-                const o = options.unsplash;
-                // Already safelisted by the resolver; the fallback is only for
-                // the feature-off shape, which never reaches an import anyway.
-                return (o === false ? undefined : o.importWidth) ?? UNSPLASH_DEFAULT_IMPORT_WIDTH;
-              },
-              enabled: async () => {
-                const { options } = await optionsResolver.resolve();
-                return options.unsplash !== false;
-              },
-            },
           }),
         );
 
-        if (userOptions.unsplash) {
-          if (userOptions.unsplash.accessKey) {
-            logger.warn(
-              'unsplash.accessKey is set in your Astro config. That file is ' +
-                'committed and is read by `astro build`, so the key travels ' +
-                'with the repo — prefer UNSPLASH_ACCESS_KEY in .env.local, ' +
-                'which the overlay’s Settings panel writes for you.',
-            );
-          }
-          logger.info(
-            'Unsplash photo source enabled' +
-              (userOptions.unsplash.accessKey
-                ? ''
-                : ' — add an access key from the admin bar’s Settings panel'),
-          );
-        }
       },
     },
   };

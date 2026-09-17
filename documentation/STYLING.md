@@ -16,7 +16,6 @@ Two consequences, and they are the whole of this page:
 
 - [Custom properties](#custom-properties)
 - [Parts](#parts)
-- [The rich-text editor is the exception](#the-rich-text-editor-is-the-exception)
 - [Internal class hooks](#internal-class-hooks)
 - [Sites with smooth scrolling](#sites-with-smooth-scrolling)
 - [Native form chrome](#native-form-chrome)
@@ -103,7 +102,7 @@ its box — the overlay exposes six parts:
 | --- | --- |
 | `bar` | the admin bar |
 | `panel` | the centred modal panel shell |
-| `drawer` | the side drawer shell (entry editor, settings, collections) |
+| `drawer` | the side drawer shell (Settings) |
 | `backdrop` | the dim behind a panel or drawer |
 | `pill` | the hover pill that names the element under the cursor |
 | `toast` | the save confirmation |
@@ -118,25 +117,6 @@ The set is deliberately small — each part is a promise to keep that element's
 shape stable. Buttons, fields and rows are not parts: recolour them with the
 properties above. If you need one that is not here, open an issue rather than
 reaching for a workaround; there isn't one.
-
-## The rich-text editor is the exception
-
-The entry drawer's markdown writing surface, `.atx-rte-content`, lives in the
-**light DOM** and is slotted into the drawer. It has to: Safari's selection and
-`execCommand` APIs do not operate on a `contenteditable` inside a shadow root,
-which would leave the formatting toolbar doing nothing at all.
-
-So that one element — and the headings, lists, quotes and code blocks you create
-by typing inside it — is styled by an ordinary document stylesheet,
-`#atx-rte-style`, scoped under `.atx-rte-content`. Those rules are reachable
-from your CSS, and overriding them needs specificity, not `!important`:
-
-```css
-.atx-rte-content blockquote { border-left-color: #888; }
-```
-
-It is also the one place your own page styles can bleed into the overlay. If a
-global `p { color: … }` shows up in the editor, that is why.
 
 ## Internal class hooks
 

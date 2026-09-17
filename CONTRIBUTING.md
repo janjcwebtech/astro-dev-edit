@@ -35,7 +35,7 @@ Check anything that touches the overlay by hand in `examples/playground`, never 
 Two more things, if the change is visible to someone using the tool:
 
 - A line under `[Unreleased]` in `CHANGELOG.md`. One sentence, past tense, no essay.
-- The doc in [`documentation/`](documentation/) that owns the surface you changed, in the same commit — options go in `CONFIGURATION.md`, editing behaviour in `EDITING.md`, the entry drawer in `ENTRY-EDITOR.md`, images in `MEDIA.md`, `--atx-*` and `::part()` names in `STYLING.md`.
+- The doc in [`documentation/`](documentation/) that owns the surface you changed, in the same commit — options go in `CONFIGURATION.md`, editing behaviour in `EDITING.md`, the inspector and tracing API in `COMPOSITION-API.md`, images in `MEDIA.md`, `--atx-*` and `::part()` names in `STYLING.md`.
 
 ## Sign your commits
 

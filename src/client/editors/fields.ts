@@ -1,22 +1,42 @@
-import type { FieldDescriptor, FieldType } from '../../shared/protocol.ts';
+import type { OptionControl } from '../../shared/protocol.ts';
 import { inputEl, styled } from '../ui.ts';
-import { buildImageField } from './asset-picker.ts';
 
 /**
- * Field controls for the entry drawer *and* the Settings drawer: one builder per
- * FieldType, looked up through a registry (mirroring src/patcher/registry.ts).
- * Adding a widget = add the FieldType to protocol.ts, register a builder here,
- * and (if it should be schema-derived rather than config-forced) map it in
- * server/schema-introspect.ts. Unknown types degrade to the read-only `json`
- * builder, so a stale client never crashes on a new wire value.
+ * Field controls for the Settings drawer: one builder per {@link OptionControl},
+ * looked up through a registry (mirroring src/patcher/registry.ts). Adding a
+ * widget = add the member to `OptionControl` in protocol.ts and register a
+ * builder here. Unknown types degrade to the read-only `json` builder, so a
+ * stale client never crashes on a new wire value.
  *
- * The Settings drawer describes each integration option as a synthesized
- * {@link FieldDescriptor} and comes through here too, rather than growing a
- * parallel control system. That is what `readOnly` and `help` on the descriptor
- * are for: an option `astro.config.mjs` owns must render disabled (accepting
- * input for a value resolution would discard is a lie), and an option needs a
- * line of prose next to it far more often than a frontmatter key does.
+ * The panel describes each server-declared option as a {@link FieldDescriptor}
+ * rather than knowing option names. `readOnly` and `help` are what make that
+ * work: an option `astro.config.mjs` owns must render disabled (accepting input
+ * for a value resolution would discard is a lie), and an option needs a line of
+ * prose next to it.
  */
+
+/** One control's worth of description — what the panel synthesizes from an
+ *  {@link OptionDescriptor}, and all `buildControl` needs to render it. */
+export interface FieldDescriptor {
+  /** Wire key a change is reported under. */
+  name: string;
+  label: string;
+  type: OptionControl | 'json';
+  /** Marks the label with `*`; an option always has a value, so this is only
+   *  ever set by a caller that wants the mark. */
+  required: boolean;
+  /** Enum values, for `select`. */
+  options?: string[];
+  /** One-line prose under the control. */
+  help?: string;
+  /** Whether a value is set at all — drives the checkbox's "not set" word and
+   *  the select's blank entry. */
+  present: boolean;
+  /** Shown as placeholder when the key is absent. */
+  defaultValue?: unknown;
+  /** Rendered disabled and never reported dirty. */
+  readOnly?: boolean;
+}
 
 export interface FieldControl {
   field: FieldDescriptor;
@@ -46,24 +66,19 @@ interface ControlParts {
 
 interface ControlContext {
   field: FieldDescriptor;
-  /** Raw parsed frontmatter value (undefined for a new entry). */
+  /** The effective option value. */
   raw: unknown;
   /** `raw` rendered for display (see displayValue). */
   initial: string;
-  /** Schema-default hint shown when the key is absent from the file. */
+  /** Default hint shown when nothing is set. */
   placeholder: string;
   /** Mount point: append the control's element(s) here. */
   root: HTMLElement;
-  /** Repo-relative path of the entry being edited; '' for a new one. Needed by
-   *  controls whose values are relative to the file (see FieldDescriptor.assetRef). */
-  entryFile: string;
 }
 
 type ControlBuilder = (ctx: ControlContext) => ControlParts;
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
-
-/** Initial display value for a control, from the parsed frontmatter. */
+/** Initial display value for a control. */
 function displayValue(field: FieldDescriptor, raw: unknown): string {
   if (raw === undefined || raw === null) return '';
   if (field.type === 'tags' && Array.isArray(raw)) return raw.join(', ');
@@ -73,19 +88,11 @@ function displayValue(field: FieldDescriptor, raw: unknown): string {
 
 // --- builders ----------------------------------------------------------------
 
-/** text / date / number / tags share a plain input. */
+/** text / number / tags share a plain input. */
 const plainInput: ControlBuilder = ({ field, initial, placeholder, root }) => {
   const input = inputEl('input', 'atx-field-input');
-  if (field.type === 'date' && (initial === '' || DATE_RE.test(initial))) {
-    input.type = 'date';
-    input.value = initial.slice(0, 10);
-  } else if (field.type === 'number') {
-    input.type = 'number';
-    input.value = initial;
-  } else {
-    input.type = 'text';
-    input.value = initial;
-  }
+  input.type = field.type === 'number' ? 'number' : 'text';
+  input.value = initial;
   input.placeholder = placeholder;
   const started = input.value;
   root.append(input);
@@ -155,28 +162,6 @@ const select: ControlBuilder = ({ field, initial, placeholder, root }) => {
   return { value: () => el.value, dirty: () => el.value !== initial };
 };
 
-const textarea: ControlBuilder = ({ initial, placeholder, root }) => {
-  const input = inputEl('textarea', 'atx-field-input atx-field-textarea');
-  input.value = initial;
-  input.placeholder = placeholder;
-  root.append(input);
-  return { value: () => input.value, dirty: () => input.value !== initial };
-};
-
-const image: ControlBuilder = ({ field, initial, root, entryFile }) => {
-  let current = initial;
-  root.append(
-    buildImageField({
-      initial,
-      onChange: (next) => (current = next),
-      // An image() field stores a path relative to the entry file, not a web
-      // URL — the control resolves previews and writes picks in that shape.
-      ...(field.assetRef ? { assetRef: field.assetRef, entryFile } : {}),
-    }),
-  );
-  return { value: () => current, dirty: () => current !== initial };
-};
-
 /** Shapes the panel can't edit render read-only; saves never touch them. */
 const json: ControlBuilder = ({ raw, initial, root }) => {
   const input = inputEl('textarea', 'atx-field-input atx-field-json');
@@ -187,15 +172,12 @@ const json: ControlBuilder = ({ raw, initial, root }) => {
   return { value: () => raw, dirty: () => false };
 };
 
-const CONTROL_BUILDERS: Record<FieldType, ControlBuilder> = {
+const CONTROL_BUILDERS: Record<FieldDescriptor['type'], ControlBuilder> = {
   text: plainInput,
-  date: plainInput,
   number: plainInput,
   tags: plainInput,
   boolean: checkbox,
   select,
-  textarea,
-  image,
   json,
 };
 
@@ -205,11 +187,7 @@ const CONTROL_BUILDERS: Record<FieldType, ControlBuilder> = {
  *  is enough to keep `for`/`aria-describedby` unambiguous. */
 let controlSeq = 0;
 
-export function buildControl(
-  field: FieldDescriptor,
-  raw: unknown,
-  entryFile = '',
-): FieldControl {
+export function buildControl(field: FieldDescriptor, raw: unknown): FieldControl {
   const root = styled('div', 'atx-field');
   const id = `atx-field-${++controlSeq}`;
 
@@ -241,14 +219,11 @@ export function buildControl(
       : '';
 
   const builder = CONTROL_BUILDERS[field.type] ?? json;
-  const parts = builder({ field, raw, initial, placeholder, root, entryFile });
+  const parts = builder({ field, raw, initial, placeholder, root });
 
   // The visible label has to *be* the control's name, not a sibling that reads
   // like one: a builder mounts whatever it likes, so the association is made
-  // here, on the first form element it mounted. That is the control proper in
-  // every builder — the image field's preview and Browse are buttons around
-  // its path input, and both open the same picker the label's click does not
-  // need to.
+  // here, on the first form element it mounted.
   const control = root.querySelector('input, textarea, select');
   if (control) control.id = id;
 
@@ -285,9 +260,8 @@ export function buildControl(
   return { field, root, value: parts.value, dirty: parts.dirty, setError };
 }
 
-/** The frontmatter payload for changed fields only. Clearing an optional
- *  field maps to null (= remove the key); required fields send '' and let the
- *  server's schema validation answer. */
+/** The patch payload for changed fields only. Clearing an optional field maps
+ *  to null; the server refuses an emptied option by name. */
 export function collectChanges(controls: FieldControl[]): Record<string, unknown> {
   const changes: Record<string, unknown> = {};
   for (const c of controls) {

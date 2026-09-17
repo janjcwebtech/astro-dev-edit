@@ -75,9 +75,9 @@ beforeAll(async () => {
     logger,
     root,
     optionsResolver: stubOptions(root, { openInEditor: false }),
-    schemaProvider: null,
+
     routeManifest: null,
-    unsplash: null,
+
   };
   handler = createMiddleware(deps);
   openHandler = createMiddleware({
@@ -897,7 +897,7 @@ it('reveals source changes with manual Open disabled and excludes uploads', asyn
   await writeFile(join(root, 'src/pages/index.astro'), PAGE_ASTRO);
   const via = createMiddleware({
     logger, root, optionsResolver: stubOptions(root, { revealWrites: true, revealWriteDelayMs: 0, openInEditor: false }),
-    schemaProvider: null, routeManifest: null, unsplash: null,
+    routeManifest: null,
   });
   const result = await request({ via, method: 'POST', url: '/__dev-edit/apply', body: {
     file: 'src/pages/index.astro', loc: locOf(PAGE_ASTRO, 'Editable text'), tag: 'p',

@@ -101,7 +101,6 @@ export function initRouter(deps: RouterDeps): RouterHandle {
         showDynamicNotice(
           src,
           'Both the image file and its alt text are set from code, so they must be edited in the source.',
-          deps.openSource,
           deps.openPeek,
           via,
         );
@@ -119,7 +118,6 @@ export function initRouter(deps: RouterDeps): RouterHandle {
         src,
         server.reason ??
           'This content is generated from a template expression or a loop, so editing it here could change behaviour, not just words. Edit it at the source instead.',
-        deps.openSource,
         deps.openPeek,
         via,
       );

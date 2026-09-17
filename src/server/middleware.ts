@@ -13,11 +13,7 @@ import type {
   UploadRequest,
 } from '../shared/protocol.ts';
 import { dataUrlMime, listAssets, saveUpload } from './assets.ts';
-import type { EntrySchemaProvider } from './content-config.ts';
 import { launchInEditor } from './editor.ts';
-import { createDetailRoutes } from './entry-detect.ts';
-import { createEntryResolveRoutes } from './entry-resolve-routes.ts';
-import { createEntryRoutes } from './entry-routes.ts';
 import { createInspectRoutes } from './inspect-routes.ts';
 import type { OptionsResolver, ResolvedOptions } from './options.ts';
 import { createPageSourceRoutes } from './page-source-routes.ts';
@@ -31,17 +27,15 @@ import {
 } from './paths.ts';
 import { BASE, dispatch, json, type Route } from './router.ts';
 import type { RouteManifest } from './route-manifest.ts';
-import { createSchemaRoutes } from './schema-routes.ts';
 import { createSettingsRoutes } from './settings-routes.ts';
-import { createUnsplashRoutes, type UnsplashConfig } from './unsplash-routes.ts';
 
 /**
  * Dev-server middleware for astro-dev-edit — the composition point for every
  * /__dev-edit route group. This file owns the core loc-based editing routes
  * (health, assets, upload, open, peek, classify, apply) and the localhost gate;
- * feature route groups (the /entry* CMS endpoints in entry-routes.ts, the
- * page-source lookup in page-source-routes.ts, and the rest) export
- * their own `Route[]` and are concatenated here. Every endpoint rejects
+ * feature route groups (the page-source lookup in page-source-routes.ts, the
+ * composition API in composition-routes.ts, and the rest) export their own
+ * `Route[]` and are concatenated here. Every endpoint rejects
  * non-localhost requests — this API is strictly for the developer's own
  * machine. (spec §8)
  */
@@ -62,27 +56,19 @@ interface MiddlewareDeps {
    * `astro.config.mjs`, the settings file the Settings panel writes, and the
    * defaults, in that order, and the panel can change the middle layer at any
    * time. Resolving per request is what lets a saved option take effect without
-   * a dev-server restart; it is the same shape, for the same reason, as
-   * `unsplash.resolve`.
+   * a dev-server restart.
    *
    * The consequence for this table: a feature gate can no longer decide whether
    * a route group is *registered*, so every group is registered unconditionally
-   * and each handler checks its own gate. That was already the pattern the
-   * Unsplash group used, so clients get an explicit `disabled` code rather than
-   * a 404 they would have to guess the meaning of.
+   * and each handler checks its own gate, so clients get an explicit `disabled`
+   * code rather than a 404 they would have to guess the meaning of.
    */
   optionsResolver: OptionsResolver;
-  /** Collection/schema lookup for the entry editor; null → inference only. */
-  schemaProvider: EntrySchemaProvider | null;
   /** Astro's route manifest, for "which file is this page written in"; null
    *  when none is available (an Astro that never fired the routes hook, or a
    *  test) → the page-source route refuses rather than guessing. */
   routeManifest: RouteManifest | null;
   composition?: CompositionService | null;
-  /** Unsplash photo source. Its access key and its per-page/appName settings
-   *  both resolve lazily, per request; null → no key resolver is available at
-   *  all (the feature can still be switched on from the panel). */
-  unsplash: UnsplashConfig | null;
 }
 
 const NO_PATCHER_REASON = 'Only .astro templates support in-place editing so far.';
@@ -111,18 +97,6 @@ const OUT_OF_ROOT_REASON =
  *  file from flooding the response and the panel's DOM. */
 const PEEK_CONTEXT = 1000;
 
-/** Whether the Unsplash source is usable: enabled AND a key resolves. Degrades
- *  to false rather than throwing — /health must answer even when a settings
- *  file is unreadable, and the key itself never reaches the response. */
-async function hasUnsplashKey(cfg: UnsplashConfig | null): Promise<boolean> {
-  if (!cfg) return false;
-  try {
-    return Boolean((await cfg.resolve()).key.trim());
-  } catch {
-    return false;
-  }
-}
-
 /** Reject anything that isn't a same-machine request. (spec §8) */
 function isLocalRequest(req: Connect.IncomingMessage): boolean {
   const remote = req.socket.remoteAddress ?? '';
@@ -146,7 +120,7 @@ function isLocalRequest(req: Connect.IncomingMessage): boolean {
 }
 
 export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFunction {
-  const { logger, root, optionsResolver, routeManifest, schemaProvider, unsplash } = deps;
+  const { logger, root, optionsResolver, routeManifest } = deps;
   const publicDir = deps.publicDir ?? 'public';
   const textWrites = createTextWrites({ root, optionsResolver, logger });
   const writeText = textWrites.write;
@@ -184,16 +158,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
             cssInspector: o.cssInspector,
             composition: o.composition && Boolean(deps.composition),
             openInEditor: o.openInEditor,
-            entryEditor: o.entryEditor !== false,
             root,
-            // Enabled *and* holding a usable key — the overlay uses this to
-            // decide whether to render the Unsplash tab at all, and a tab that
-            // errors on click is worse than no tab. Resolved here rather than
-            // cached so a key entered through Settings shows up on the next poll.
-            unsplash: o.unsplash !== false && (await hasUnsplashKey(unsplash)),
-            // Where the picker's size select starts. Read live like the rest,
-            // so changing it in Settings moves the select without a reload.
-            ...(o.unsplash === false ? {} : { unsplashImportWidth: o.unsplash.importWidth }),
           },
         };
       },
@@ -446,40 +411,15 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
   // see `MiddlewareDeps.optionsResolver`. A client that asks about a disabled
   // feature gets an explicit `disabled` refusal rather than a 404 it would have
   // to guess the meaning of.
-  // Built here rather than injected: it is derived entirely from two deps this
-  // function already holds, and it owns a cache that should live as long as the
-  // route table does. Two groups share the one instance so they share the cache.
-  const detailRoutes = createDetailRoutes({ root, routeManifest });
-
   const routes: Route[] = [
     ...coreRoutes,
     ...createInspectRoutes({ logger, root, optionsResolver }),
     ...createPageSourceRoutes({ logger, optionsResolver, routeManifest }),
     ...createCompositionRoutes({ root, optionsResolver, routeManifest, composition: deps.composition ?? null }),
-    ...createEntryRoutes({ writeText, logger, root, optionsResolver, schemaProvider }),
-    ...createEntryResolveRoutes({
-      logger,
-      root,
-      optionsResolver,
-      schemaProvider,
-      routeManifest,
-      detailRoutes,
-    }),
-    ...createSchemaRoutes({ writeText, logger, root, optionsResolver, schemaProvider, detailRoutes }),
-    ...createSettingsRoutes({ writeText, logger, root, optionsResolver, unsplash }),
-    ...createUnsplashRoutes({
-      logger,
-      root,
-      publicDir,
-      dirs: async () => assetTargetDirs(await opts()),
-      unsplash,
-    }),
+    ...createSettingsRoutes({ writeText, logger, root, optionsResolver }),
   ];
 
-  const textMutationPaths = new Set([
-    '/apply', '/entry/apply', '/entry/create', '/entry/delete',
-    '/collection/schema/apply', '/collection/create', '/collection/page-editing', '/settings',
-  ]);
+  const textMutationPaths = new Set(['/apply', '/settings']);
   for (const route of routes) {
     if (route.method !== 'POST' || !textMutationPaths.has(route.path)) continue;
     const handler = route.handler;

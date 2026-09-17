@@ -17,23 +17,6 @@ export default defineConfig({
       // Uploads land beside the existing images (web-servable in prod) rather
       // than in src/assets, so a swapped-in <img src> survives a real build.
       uploadDir: 'public/images',
-      // Turn the Unsplash photo source on in the media picker. No key here on
-      // purpose: this file is committed and is read by `astro build`. Add one
-      // from the overlay's Settings panel (admin bar → Settings), which writes
-      // UNSPLASH_ACCESS_KEY into this directory's gitignored .env.local.
-      unsplash: {},
-      // Entry-editor field tweaks: the schema drives everything else; these
-      // just pick nicer widgets than the plain-string default.
-      entryEditor: {
-        collections: {
-          blog: {
-            fields: {
-              excerpt: { widget: 'textarea' },
-              image: { widget: 'image' },
-            },
-          },
-        },
-      },
     }),
   ],
 });

@@ -1,6 +1,5 @@
 import type { AssetInfo, MediaPick } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
-import { hasUnsplash } from '../features.ts';
 import { trapFocus } from '../focus.ts';
 import { clearHighlight } from '../hover.ts';
 import { icon } from '../icons.ts';
@@ -18,7 +17,6 @@ import {
   toast,
 } from '../ui.ts';
 import { buildMediaGrid, type GridTile, type MediaGridHandle } from './media-grid.ts';
-import { createUnsplashPane } from './unsplash-pane.ts';
 import { mount } from '../shadow.ts';
 
 /**
@@ -109,7 +107,6 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
       if (settled) return;
       settled = true;
       projectPane.dispose();
-      unsplashPane?.dispose();
       // Hand the slot back to the drawer/panel underneath, not just release it
       // — see state.ts::releaseTo.
       state.releaseTo(token, heldBefore);
@@ -193,12 +190,8 @@ export function openMediaModal(opts: MediaModalOptions = {}): Promise<MediaPick 
     };
 
     const projectPane = createProjectPane(paneDeps, opts);
-    // A project that never opted in gets a single-source modal — not a tab that
-    // errors when clicked, and not a hidden one.
-    const unsplashPane = hasUnsplash() ? createUnsplashPane(paneDeps) : null;
     const panes: Array<{ id: string; label: string; pane: MediaPane }> = [
       { id: 'project', label: 'Project', pane: projectPane },
-      ...(unsplashPane ? [{ id: 'unsplash', label: 'Unsplash', pane: unsplashPane }] : []),
     ];
 
     const byId = new Map(panes.map((p) => [p.id, p.pane]));

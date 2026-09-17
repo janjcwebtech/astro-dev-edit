@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLOR, PAPER } from '../src/client/ui.ts';
+import { COLOR } from '../src/client/ui.ts';
 
 /**
  * Contrast guard for the overlay's design tokens.
@@ -13,9 +13,6 @@ import { COLOR, PAPER } from '../src/client/ui.ts';
  * grounds the overlay paints, "which surfaces does this ink appear on" stops
  * being a question a reader of this file has to answer correctly.
  *
- * `PAPER` is checked separately against its own ground, because the rich-text
- * editor is a light island and mixing the two sets is exactly the mistake these
- * assertions exist to catch.
  *
  * **Translucent tokens have no single contrast value.** `border`, `input` and
  * `inputBg` are white at a low alpha so that one value is right on every
@@ -237,25 +234,6 @@ describe('control boundaries', () => {
         contrast(COLOR.foreground, hex),
         `foreground in an outline button on ${surface}`,
       ).toBeGreaterThanOrEqual(AA_TEXT);
-    }
-  });
-});
-
-describe('the rich-text editor is a light island', () => {
-  for (const ground of ['bg', 'muted'] as const) {
-    it(`paper ink and links clear AA on paper ${ground}`, () => {
-      expect(contrast(PAPER.fg, PAPER[ground])).toBeGreaterThanOrEqual(AA_TEXT);
-      expect(contrast(PAPER.link, PAPER[ground])).toBeGreaterThanOrEqual(AA_TEXT);
-    });
-  }
-
-  // The hazard the two sets create is mixing them: paper ink on an overlay
-  // surface is invisible (1.0:1), and it is a plausible mistake because both
-  // tokens are called some kind of "foreground". Pinned so the failure is a
-  // red test rather than a blank panel.
-  it('paper ink is invisible on overlay surfaces, so the sets must not be mixed', () => {
-    for (const surface of SURFACES) {
-      expect(contrast(PAPER.fg, COLOR[surface])).toBeLessThan(AA_NON_TEXT);
     }
   });
 });

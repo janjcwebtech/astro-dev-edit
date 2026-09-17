@@ -1,20 +1,18 @@
-import type { FieldDescriptor, OptionDescriptor, SettingsResponse } from '../../shared/protocol.ts';
+import type { OptionDescriptor, SettingsResponse } from '../../shared/protocol.ts';
 import * as api from '../api.ts';
 import { setFeatures } from '../features.ts';
-import { coerceImportWidth } from '../../shared/unsplash.ts';
 import { clearHighlight } from '../hover.ts';
 import { icon } from '../icons.ts';
-import {
-  inputEl,
-  buildTabs,
-  footButton,
-  setButtonEnabled,
-  styled,
-  toast,
-} from '../ui.ts';
+import { buildTabs, footButton, setButtonEnabled, styled, toast } from '../ui.ts';
 import { card, fieldGroup } from '../group.ts';
 import { openDrawer } from './drawer.ts';
-import { applyFieldErrors, buildControl, collectChanges, type FieldControl } from './fields.ts';
+import {
+  applyFieldErrors,
+  buildControl,
+  collectChanges,
+  type FieldControl,
+  type FieldDescriptor,
+} from './fields.ts';
 
 /**
  * The Settings drawer — every integration option, editable in place.
@@ -24,43 +22,14 @@ import { applyFieldErrors, buildControl, collectChanges, type FieldControl } fro
  * provenance — and this module renders whatever arrives, grouped into tabs by
  * the `group` each one declares. Adding an option is one entry in the server's
  * `OPTION_SPECS` table and no client change at all. Each descriptor becomes a
- * synthesized {@link FieldDescriptor} so the controls come from the entry
- * editor's own `buildControl` registry rather than a parallel one.
+ * {@link FieldDescriptor} so the controls come from `buildControl`'s registry
+ * rather than a parallel one.
  *
  * **`locked` is rendered, not hidden.** An option `astro.config.mjs` sets cannot
  * be changed from here, because config wins at resolve time. The control renders
  * disabled and says where the value came from. Hiding those rows would be worse:
  * the user would wonder why the option they can see in their config isn't listed.
- *
- * **The access key has two axes, not one.** `locked` is a single bit; a key can
- * be *writable but not clearable* — one in `.env` is overridden by the
- * `.env.local` a save writes, yet removing a line from `.env.local` cannot unset
- * it. So the server sends `writable` and `clearable` separately and this panel
- * renders them, rather than re-deriving either from `source`: which env file won
- * decides the answer, and a second copy of that precedence here would drift.
- *
- * **The access key stays one-way.** It is never pre-filled — a read returns only
- * a masked hint — the input is `type="password"` with an explicit reveal, and the
- * value goes straight to the localhost-gated `/settings` endpoint. That POST is
- * the one moment the key crosses the wire in plaintext, unavoidable for a
- * paste-it-here UI, and its destination is the same `.env.local` a developer
- * would otherwise have opened in their editor.
  */
-
-const UNSPLASH_APPS_URL = 'https://unsplash.com/oauth/applications';
-
-/** Where a resolved key came from, in words. `env-file` prefers the actual
- *  filename the server reported, since which file it is decides what the user
- *  has to do about it. */
-const SOURCE_LABEL: Record<string, string> = {
-  config: 'astro.config.mjs',
-  'env-shell': 'an exported shell variable',
-  'env-file': 'a .env file',
-  file: '.astro-dev-edit.json (older location)',
-};
-
-const sourceLabel = (u: SettingsResponse['unsplash']): string =>
-  (u.source === 'env-file' && u.sourceFile) || SOURCE_LABEL[u.source ?? ''] || 'stored settings';
 
 /** Tabs, in render order. A group with no options is dropped, so a server that
  *  predates a group simply shows fewer tabs. */
@@ -80,16 +49,10 @@ const GROUPS: ReadonlyArray<{ id: string; label: string; blurb: string }> = [
     label: 'Media',
     blurb: 'Where images are read from, and where new ones are written.',
   },
-  {
-    id: 'unsplash',
-    label: 'Unsplash',
-    blurb: 'An optional photo source in the media picker.',
-  },
 ];
 
 export interface SettingsPanelOptions {
-  /** Open on a particular tab. Used by the media modal's "no key configured"
-   *  card, which wants the Unsplash tab specifically. */
+  /** Open on a particular tab. */
   tab?: string;
   /** Stacking layer, when opened above something already raised — that same
    *  card opens this from the media modal's own layer. */
@@ -104,12 +67,9 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   let controls: FieldControl[] = [];
   let current: SettingsResponse | null = null;
   let saving = false;
-  /** Set once the key input has been typed into — the only dirty state the key
-   *  field can report, since it never pre-fills. */
-  const keyDirty = (): boolean => keyInput.value.trim().length > 0;
 
   const isDirty = (): boolean =>
-    !saving && (keyDirty() || Object.keys(collectChanges(controls)).length > 0);
+    !saving && Object.keys(collectChanges(controls)).length > 0;
 
   const shell = openDrawer('Settings', {
     isDirty,
@@ -130,49 +90,6 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   const status = styled('p', 'atx-settings-status');
 
   const error = styled('p', 'atx-settings-error');
-
-  // --- the Unsplash key section, which is not an option ----------------------
-  const keyCard = card({ title: 'Access key' });
-  const keySection = keyCard.root;
-  keySection.classList.add('atx-settings-key-section');
-
-  const keyBlurb = styled('p', 'atx-settings-blurb');
-  const appsLink = styled('a', 'atx-settings-link');
-  appsLink.href = UNSPLASH_APPS_URL;
-  appsLink.target = '_blank';
-  appsLink.rel = 'noreferrer';
-  appsLink.textContent = 'Create an application';
-  keyBlurb.append(
-    appsLink,
-    document.createTextNode(' to get an access key — the demo tier allows 50 searches an hour.'),
-  );
-
-  const keyStatus = styled('p', 'atx-settings-key-status');
-
-  const keyRow = styled('div', 'atx-settings-row');
-  // No masked input exists anywhere else in the overlay, so this is a plain
-  // control wearing the shared baseline rather than a reusable widget.
-  const keyInput = inputEl('input', 'atx-settings-key');
-  keyInput.type = 'password';
-  keyInput.autocomplete = 'off';
-  keyInput.spellcheck = false;
-  keyInput.placeholder = 'Paste your Unsplash access key';
-
-  const reveal = footButton('Show', 'outline', () => {
-    const hidden = keyInput.type === 'password';
-    keyInput.type = hidden ? 'text' : 'password';
-    reveal.textContent = hidden ? 'Hide' : 'Show';
-  });
-  keyRow.append(keyInput, reveal);
-
-  const keyHint = styled('p', 'atx-settings-hint');
-
-  const clearKeyBtn = footButton('Clear key', 'destructive', () => void save({ clearKey: true }));
-  const keyActions = styled('div', 'atx-settings-key-actions');
-  keyActions.append(clearKeyBtn);
-
-  keyCard.body.append(keyBlurb, keyStatus, keyRow, keyHint);
-  keyCard.foot().append(keyActions);
 
   const warning = styled('p', 'atx-settings-warning');
 
@@ -210,94 +127,22 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
         pane.append(optionCard.root);
       }
 
-      // The access key belongs to the Unsplash tab but is not an option: it is
-      // a secret with its own endpoint semantics and its own precedence — so
-      // it is a card of its own rather than a heading inside the options one.
-      if (g.id === 'unsplash') pane.append(keySection);
     }
 
-    paintKey(data);
     paintWarning(data);
     setButtonEnabled(saveBtn, true);
   };
 
-  const paintKey = (data: SettingsResponse): void => {
-    const u = data.unsplash;
-    keyStatus.textContent = '';
-
-    if (!u.enabled) {
-      // The old dead end lived here: this used to read "add `unsplash: {}` to
-      // astro.config.mjs, then restart the dev server". The toggle above is now
-      // the answer, so point at it instead.
-      keyStatus.append(
-        icon('dot', 16),
-        text('Turn the photo source on above to add a key', 'muted'),
-      );
-      keySection.toggleAttribute('data-off', true);
-      keyInput.disabled = true;
-      setButtonEnabled(reveal, false);
-      keyHint.textContent = '';
-      clearKeyBtn.toggleAttribute('data-hidden', true);
-      return;
-    }
-
-    keySection.toggleAttribute('data-off', false);
-
-    if (u.configured) {
-      keyStatus.append(icon('check', 16), text(`Configured via ${sourceLabel(u)}`, 'ok'));
-      if (u.hint) keyStatus.append(text(u.hint, 'muted', true));
-    } else {
-      keyStatus.append(icon('dot', 16), text('Not configured', 'muted'));
-    }
-
-    // `writable` is the server's answer, not ours — see the header.
-    const overridden = !u.writable;
-    keyInput.disabled = overridden;
-    setButtonEnabled(reveal, !overridden);
-    keyInput.placeholder = overridden
-      ? 'Overridden — remove the other key first'
-      : 'Paste your Unsplash access key';
-
-    if (overridden) {
-      keyHint.textContent =
-        `A key from ${sourceLabel(u)} takes precedence over the .env.local this panel ` +
-        'writes. Remove it to manage the key from here.';
-    } else if (u.staleStoredKey) {
-      // The one case worth nagging about: a secret in a file that is not where
-      // secrets go any more. Saving anything moves it.
-      keyHint.textContent =
-        'An older copy of your key is still stored in .astro-dev-edit.json. Save a key here ' +
-        'to move it into .env.local and remove that copy.';
-    } else if (!u.clearable && u.configured) {
-      keyHint.textContent =
-        `A key is also set in ${u.sourceFile ?? '.env'}. Saving here writes .env.local, which ` +
-        'takes precedence — remove that one when you are ready.';
-    } else {
-      keyHint.textContent =
-        'Saved to .env.local at your project root as UNSPLASH_ACCESS_KEY, readable only by ' +
-        'you (0600). It is never sent back to the browser.';
-    }
-    clearKeyBtn.toggleAttribute('data-hidden', !(u.configured && u.clearable));
-  };
-
-  /**
-   * The uncommitted-secret warning, painted from `paint` rather than from
-   * `paintKey`: it is a fact about files, not about the key. Scoping it to the
-   * key left it unreachable in exactly the case it is for — the photo source
-   * off, so `paintKey` returns early, while a file already sits untracked on
-   * disk holding whatever General or Media last saved. It lives under the tab
-   * host for the same reason, so it is on screen whichever tab is open.
-   *
-   * The server sends the list, because whether `.env.local` is even present is
-   * a question only it can answer.
-   */
+  /** The uncommitted-settings warning. It lives under the tab host so it is on
+   *  screen whichever tab is open, and the server sends the list because
+   *  whether the file is even present is a question only it can answer. */
   const paintWarning = (data: SettingsResponse): void => {
     const files = data.gitignoreWarning ?? [];
     if (files.length > 0) {
       const subject = files.length === 1 ? `${files[0]} is not listed` : `${files.join(' and ')} are not listed`;
       warning.textContent =
-        `${subject} in this project’s .gitignore. They hold your settings and your Unsplash ` +
-        'access key — add them to your ignore rules before either can be committed. ' +
+        `${subject} in this project’s .gitignore. It holds this project’s overlay ` +
+        'settings — add it to your ignore rules before it can be committed. ' +
         '(This integration cannot edit your ignore rules for you.)';
       warning.toggleAttribute('data-on', true);
     } else {
@@ -331,20 +176,12 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     return note;
   };
 
-  /** Freeze the drawer during a write. Un-freezing repaints from the current
-   *  response rather than blanket-enabling, so a control disabled *by state* —
-   *  a config-overridden key field — stays that way. */
+  /** Freeze the drawer during a write. */
   const setBusy = (busy: boolean): void => {
     saving = busy;
-    keyInput.readOnly = busy;
     for (const btn of shell.body.querySelectorAll('button')) setButtonEnabled(btn, !busy);
     for (const btn of foot.querySelectorAll('button')) setButtonEnabled(btn, !busy);
-    if (!busy) {
-      // Rebuilt by the paint that follows a successful save; on a failure this
-      // restores the pre-save enablement.
-      if (current) paintKey(current);
-      setButtonEnabled(saveBtn, current !== null);
-    }
+    if (!busy) setButtonEnabled(saveBtn, current !== null);
   };
 
   const showError = (message: string): void => {
@@ -352,24 +189,19 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     error.toggleAttribute('data-on', true);
   };
 
-  const save = async (o: { clearKey?: boolean } = {}): Promise<void> => {
+  const save = async (): Promise<void> => {
     error.toggleAttribute('data-on', false);
     applyFieldErrors(controls, {});
 
     const options = collectChanges(controls);
-    const key = o.clearKey ? '' : keyInput.value;
-    const sendKey = o.clearKey || key.trim().length > 0;
-    if (Object.keys(options).length === 0 && !sendKey) {
+    if (Object.keys(options).length === 0) {
       showError('Nothing has changed yet.');
       return;
     }
 
     setBusy(true);
     try {
-      const next = await api.saveSettings({
-        ...(Object.keys(options).length > 0 ? { options } : {}),
-        ...(sendKey ? { unsplash: { accessKey: key } } : {}),
-      });
+      const next = await api.saveSettings({ options });
       // Feature flags the overlay reads are option-derived, so a save repaints
       // the page's affordances without a reload.
       setFeatures({
@@ -379,22 +211,9 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
         root: '',
         cssInspector: valueOf(next, 'cssInspector') === true,
         openInEditor: valueOf(next, 'openInEditor') === true,
-        entryEditor: valueOf(next, 'entryEditor') === true,
-        unsplash: next.unsplash.configured,
-        // A `select`'s value is a string on the wire; setFeatures parses it, so
-        // the picker's size select moves with a saved default. `?? undefined`
-        // because a null here would read as "the server has no such option".
-        unsplashImportWidth:
-          coerceImportWidth(valueOf(next, 'unsplashImportWidth')) ?? undefined,
       });
-      keyInput.value = '';
-      keyInput.type = 'password';
-      reveal.textContent = 'Show';
       paint(next);
-      toast(
-        o.clearKey ? 'Unsplash access key cleared' : 'Settings saved',
-        'ok',
-      );
+      toast('Settings saved', 'ok');
     } catch (err) {
       if (err instanceof api.SettingsRefusal) {
         applyFieldErrors(controls, err.fieldErrors);
@@ -415,7 +234,6 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   // --- boot ------------------------------------------------------------------
   status.append(icon('spinner', 16), text('Reading settings…', 'muted'));
   setButtonEnabled(saveBtn, false);
-  clearKeyBtn.toggleAttribute('data-hidden', true);
 
   void api.getSettings().then(
     (data) => {
@@ -444,7 +262,6 @@ function toFieldDescriptor(o: OptionDescriptor): FieldDescriptor {
     type: o.type,
     required: false,
     present: true,
-    source: 'inferred',
     help: o.help,
     ...(o.choices ? { options: o.choices } : {}),
     ...(o.locked ? { readOnly: true } : {}),

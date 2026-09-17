@@ -150,10 +150,10 @@ map back to the original file. Astro's first legacy loc can be shifted on Go;
   a parity check when client code can remove both halves of a boundary.
 - The tracing API discovers the graph reachable from a requested route, not
   every caller in the repository. Its completeness and freshness rules are in
-  [the API contract](COMPOSITION-API.md). The user-facing inspector, staged-value
-  store, prop and HTML-string writes, and CMS/Unsplash removal are not implemented.
+  [the API contract](COMPOSITION-API.md). The read-only inspector consumes it;
+  the staged-value store and prop and HTML-string writes are a separate layer
+  and are not implemented.
 
 The stronger mechanism resolves the original spread and multi-root limitations
 within the tested Astro scope. It provides concrete instance and slot-placement
-data for the next inspector slice, with explicit refusals at the remaining
-boundaries.
+data to the inspector, with explicit refusals at the remaining boundaries.

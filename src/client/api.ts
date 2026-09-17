@@ -9,30 +9,11 @@ import type {
   AssetsResponse,
   ClassifyRequest,
   ClassifyResult,
-  CollectionApplyResponse,
-  CollectionCreateRequest,
-  CollectionCreateResponse,
-  CollectionEntriesRequest,
-  CollectionEntriesResponse,
-  CollectionOpenRequest,
-  CollectionPageEditingRequest,
-  CollectionPageEditingResponse,
-  CollectionSchemaApplyRequest,
-  CollectionsResponse,
-  EntryApplyRequest,
-  EntryCreateRequest,
-  EntryCreateResponse,
-  EntryDeleteRequest,
-  EntryErrorResponse,
-  EntryRequest,
-  EntryResponse,
   HealthResponse,
   InspectOpenRequest,
   InspectOpenResponse,
   OpenRequest,
   OpenResponse,
-  EntryResolveRequest,
-  EntryResolveResponse,
   PageSourceRequest,
   PageSourceResponse,
   PeekRequest,
@@ -40,12 +21,6 @@ import type {
   SettingsErrorResponse,
   SettingsResponse,
   SettingsUpdateRequest,
-  UnsplashErrorCode,
-  UnsplashErrorResponse,
-  UnsplashImportRequest,
-  UnsplashImportResponse,
-  UnsplashSearchRequest,
-  UnsplashSearchResponse,
   UploadRequest,
   UploadResponse,
 } from '../shared/protocol.ts';
@@ -143,15 +118,6 @@ export async function resolvePageSource(req: PageSourceRequest): Promise<PageSou
   return (await res.json()) as PageSourceResponse;
 }
 
-/** Which content entry backs `pathname`, when the tool can tell. What replaces
- *  hand-emitting the page-source meta tag; `refusal` set means no entry, and
- *  `not-enabled` additionally names the collection whose switch is off. */
-export async function resolveEntry(req: EntryResolveRequest): Promise<EntryResolveResponse> {
-  const res = await post('/entry/resolve', req);
-  if (!res.ok) throw new Error((await errorMessage(res)) ?? `entry resolve failed (${res.status})`);
-  return (await res.json()) as EntryResolveResponse;
-}
-
 /** Open a CSS rule's source in the editor: the server best-effort locates the
  *  selector and jumps there (or to the file top). */
 export async function inspectOpen(req: InspectOpenRequest): Promise<InspectOpenResponse> {
@@ -194,96 +160,9 @@ export async function routeExists(url: string): Promise<boolean> {
   }
 }
 
-// --- Entry editor ------------------------------------------------------------
+// --- Settings ----------------------------------------------------------------
 
-/** Entry-endpoint failure carrying the code and per-field validation messages
- *  the panel needs for inline rendering — richer than the string-only errors
- *  the loc-based endpoints get away with. */
-export class EntryApplyError extends Error {
-  code?: EntryErrorResponse['code'];
-  fieldErrors?: Record<string, string>;
-  constructor(body: EntryErrorResponse, status: number) {
-    super(body.error || `request failed (${status})`);
-    this.name = 'EntryApplyError';
-    this.code = body.code;
-    this.fieldErrors = body.fieldErrors;
-  }
-}
-
-async function entryPost<T>(path: string, payload: unknown, what: string): Promise<T> {
-  const res = await post(path, payload);
-  const body = (await res.json().catch(() => ({ error: `${what} failed (${res.status})` }))) as
-    | T
-    | EntryErrorResponse;
-  if (!res.ok) throw new EntryApplyError(body as EntryErrorResponse, res.status);
-  return body as T;
-}
-
-/** Read a collection entry as typed fields + markdown body. */
-export async function getEntry(req: EntryRequest): Promise<EntryResponse> {
-  return entryPost<EntryResponse>('/entry', req, 'entry read');
-}
-
-/** Atomic multi-field save; throws EntryApplyError on conflict/validation. */
-export async function applyEntry(req: EntryApplyRequest): Promise<void> {
-  await entryPost<{ ok: true }>('/entry/apply', req, 'save');
-}
-
-/** Create a new entry in a collection; resolves to its repo-relative path. */
-export async function createEntry(req: EntryCreateRequest): Promise<EntryCreateResponse> {
-  return entryPost<EntryCreateResponse>('/entry/create', req, 'create');
-}
-
-/** Delete an entry (etag-guarded; undo is git). */
-export async function deleteEntry(req: EntryDeleteRequest): Promise<void> {
-  await entryPost<{ ok: true }>('/entry/delete', req, 'delete');
-}
-
-// --- Unsplash + settings -----------------------------------------------------
-
-/** Unsplash-endpoint failure carrying the server's `code`, which is what the
- *  pane branches on: a bad key or a disabled feature needs a settings change,
- *  while a timeout or an upstream fault is worth a Retry button. Mirrors the
- *  EntryApplyError/entryPost pair. */
-export class UnsplashError extends Error {
-  code: UnsplashErrorCode | 'unknown';
-  constructor(body: Partial<UnsplashErrorResponse>, status: number) {
-    super(body.error || `Unsplash request failed (${status})`);
-    this.name = 'UnsplashError';
-    this.code = body.code ?? 'unknown';
-  }
-  /** Whether offering a Retry makes sense. Configuration faults do not fix
-   *  themselves, so the pane shows a link to Settings instead. */
-  get retryable(): boolean {
-    return !['disabled', 'unconfigured', 'unauthorized', 'expired'].includes(this.code);
-  }
-}
-
-async function unsplashPost<T>(path: string, payload: unknown): Promise<T> {
-  const res = await post(path, payload);
-  const body = (await res.json().catch(() => ({}))) as T | UnsplashErrorResponse;
-  if (!res.ok) throw new UnsplashError(body as UnsplashErrorResponse, res.status);
-  return body as T;
-}
-
-/** Search Unsplash through the dev server, which holds the key and reshapes
- *  every photo. Throws UnsplashError. */
-export async function unsplashSearch(
-  req: UnsplashSearchRequest,
-): Promise<UnsplashSearchResponse> {
-  return unsplashPost<UnsplashSearchResponse>('/unsplash/search', req);
-}
-
-/** Download a searched photo into the project. Throws UnsplashError — notably
- *  `expired` when the dev server restarted since the search. */
-export async function unsplashImport(
-  req: UnsplashImportRequest,
-): Promise<UnsplashImportResponse> {
-  return unsplashPost<UnsplashImportResponse>('/unsplash/import', req);
-}
-
-/** Read every integration option plus the access-key status. Never returns the
- *  key itself — only whether one resolved, from where, and a masked hint. */
+/** Read every integration option, with its effective value and provenance. */
 export async function getSettings(): Promise<SettingsResponse> {
   const res = await fetch(`${API}/settings`);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `settings failed (${res.status})`);
@@ -291,8 +170,8 @@ export async function getSettings(): Promise<SettingsResponse> {
 }
 
 /**
- * Save a sparse option patch and/or the Unsplash access key. Resolves to the
- * same shape a read would, so the panel needs no follow-up request.
+ * Save a sparse option patch. Resolves to the same shape a read would, so the
+ * panel needs no follow-up request.
  *
  * A 422 carries per-option messages, so the rejection is thrown as a
  * {@link SettingsRefusal} the drawer can paint onto individual controls rather
@@ -319,73 +198,4 @@ export class SettingsRefusal extends Error {
     super(message);
     this.name = 'SettingsRefusal';
   }
-}
-
-/** A collection-designer refusal, carrying the server's code so the panel can
- *  tell "reopen the tab" (a conflict) from "this shape can't be patched". */
-export class CollectionRefusalError extends Error {
-  constructor(
-    message: string,
-    readonly code: string | undefined,
-    readonly status: number,
-  ) {
-    super(message);
-    this.name = 'CollectionRefusalError';
-  }
-}
-
-async function collectionPost<T>(path: string, payload: unknown): Promise<T> {
-  const res = await post(path, payload);
-  const body = (await res.json().catch(() => ({}))) as T & { error?: string; code?: string };
-  if (!res.ok) {
-    throw new CollectionRefusalError(
-      body.error ?? `${path} failed (${res.status})`,
-      body.code,
-      res.status,
-    );
-  }
-  return body;
-}
-
-/** Every collection, its fields, and the content-config etag every write needs. */
-export async function listCollections(): Promise<CollectionsResponse> {
-  return collectionPost<CollectionsResponse>('/collections', {});
-}
-
-/** Schema edits and/or editor overrides for one collection. The schema half is
- *  etag-guarded and all-or-nothing; the response says which half landed. */
-export async function applyCollectionSchema(
-  req: CollectionSchemaApplyRequest,
-): Promise<CollectionApplyResponse> {
-  return collectionPost<CollectionApplyResponse>('/collection/schema/apply', req);
-}
-
-/** One collection's entry files, newest first. Reaches drafts and entries no
- *  rendered page links to — which is the point of the Items view. */
-export async function listCollectionEntries(
-  req: CollectionEntriesRequest,
-): Promise<CollectionEntriesResponse> {
-  return collectionPost<CollectionEntriesResponse>('/collection/entries', req);
-}
-
-/** Launch the editor on the content config, at a collection's own line when one
- *  is named. Carries no path — the server opens the config it discovered. */
-export async function openCollectionSource(req: CollectionOpenRequest): Promise<void> {
-  await collectionPost<{ ok: true }>('/collection/open', req);
-}
-
-/** Switch one collection's in-page entry drawer on or off. Saves on the flip —
- *  the list view it is drawn in has no Save button — and refuses when
- *  `astro.config.mjs` owns the flag. */
-export async function setCollectionPageEditing(
-  req: CollectionPageEditingRequest,
-): Promise<CollectionPageEditingResponse> {
-  return collectionPost<CollectionPageEditingResponse>('/collection/page-editing', req);
-}
-
-/** Append a collection to the content config and make its entry directory. */
-export async function createCollection(
-  req: CollectionCreateRequest,
-): Promise<CollectionCreateResponse> {
-  return collectionPost<CollectionCreateResponse>('/collection/create', req);
 }

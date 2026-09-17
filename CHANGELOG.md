@@ -19,14 +19,15 @@ Writing an entry — one line, past tense, no essay:
 - Added a read-only inspector for `composition: true`: Alt/Option selection, a persistent element-tree selection, component chains and usage details, native-slot relationships, source previews, and CSS inspection. Staged editing remains a separate layer.
 - Added opt-in `composition: true` tracing through the normal integration, with read-only chain, batch-link and route-scoped usage APIs, bounded source discovery, and file-change invalidation. The existing source reader prefers original `data-atx-*` locations and ignores copied annotations inside generated HTML.
 - Added an isolated component-tracing fixture (`npm run dev:composition`) with source usage chains, protected per-render identities, and native-slot insertion boundaries. Spread recursion and repeated multi-root components are traced; replayed `set:html` output is explicitly untracked.
-- Data collections — `.json`, `.yml` and `.yaml` entries — are listed and counted instead of reporting `0 entries`. They are not editable yet: the row says why, detail pages don't offer **Edit entry** for one, and `POST /entry` refuses one in words. `editableExtensions` no longer gates them, so no configuration can hide a data entry.
+
+### Removed
+
+- **Breaking.** Removed the entry editor, the collection designer and the rich body editor, with the `entryEditor` and `schemaEditor` options and every `/entry*` and `/collection*` endpoint. Markdown and MDX content is no longer edited in the browser: a page that declares a backing file is told which file holds its words, and `documentation/ENTRY-EDITOR.md` is gone.
+- **Breaking.** Removed the Unsplash photo source, with the `unsplash` option, both `/unsplash/*` endpoints and the access-key half of `/settings`. The media picker is a single project-asset grid, and the integration writes no `.env.local`.
 
 ### Fixed
 
 - Self-annotation now skips `<slot>` and includes hyphenated custom elements.
-- A collection whose glob loader pairs a broad `base` with a narrow `pattern` — `glob({ pattern: 'settings.yml', base: './src/content' })` — no longer claims every file beneath that base as its own. The loader's `pattern` is read alongside its `base` and both are honoured; a pattern using anything beyond `**`, `*`, `?` and `{a,b}` is not read, and entries fall back to matching on extension. This affected 0.12.0 only.
-- Creating an entry in a collection whose pattern admits only data is refused, rather than writing a markdown file Astro would never load.
-- A collection whose glob loader declares a `base` that differs from its name — `useCases` over `src/content/use-cases/`, the shape Astro's own docs encourage — is no longer read as empty. The entry directory comes from the loader's `base` where the config writes it as a string literal, then from the `src/content/<name>` convention; an explicit `entryEditor.collections.<name>.dir` still outranks both. A `base` built from a variable or a template is refused rather than guessed at, and falls back to the convention.
 
 ## [0.12.0] - 2026-09-13
 

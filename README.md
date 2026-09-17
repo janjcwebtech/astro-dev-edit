@@ -48,9 +48,9 @@ Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6
 - **Literal text in a template.** Click it and type. The pill above the element names the file and the line the change will land in. Enter saves, escape cancels.
 - **Strings that arrive through an expression.** A value pulled from the frontmatter is followed back to the string that produced it, and you edit that string, with the trace of where it came from.
 - **Text carrying inline markup.** A heading broken by a `<br>`, or a sentence with a `<strong>` in it, opens over the raw source with a row of insertable tags: `br`, `strong`, `em`, `b`, `i`, `u`, `a`, `span`, `code`, `small`, `sup`, `sub`.
-- **Images.** Click one and you get a preview, the file name and size, the alt text, and the six images most recently added to the project. The full picker lists everything in your asset directories, with a filter, an upload button and an Unsplash tab if you add an access key.
-- **Markdown and MDX entries.** Switch a collection on in the **Collections** drawer and its pages get **Edit entry**: a drawer of typed form fields generated from your own zod schema, and the body as rich text or as raw markdown. It looks like a small CMS panel, but it reads and writes the entry file directly. The tool finds the backing entry from the URL, so there is nothing to add to your templates. You can create and delete entries from here too.
-- **Collection schemas.** The designer lists every collection you declare and lets you add a field, retype one, remove one, or build a collection from scratch. Those edits patch your `content.config.ts`.
+- **Images.** Click one and you get a preview, the file name and size, the alt text, and the six images most recently added to the project. The full picker lists everything in your asset directories, with a filter and an upload button.
+
+Content that lives in a Markdown or MDX entry is not edited in the browser. A page that declares its backing file is told which file holds its words, so you open that file in your IDE instead of typing over rendered text.
 
 ## Other features
 
@@ -67,14 +67,6 @@ Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6
 
 _Editing a heading in place. The pill names the file, the line and the column, and it stays there while you type._
 
-![The body field of the entry drawer showing a formatting toolbar above rendered headings, paragraphs and a code block](https://raw.githubusercontent.com/janjcwebtech/astro-dev-edit/main/documentation/images/body-editor.png)
-
-_The body of a markdown entry in the rich text editor. The toolbar covers headings, emphasis, lists, quotes, code, links, images and horizontal rules, and you can switch to the raw markdown at any point._
-
-![The Unsplash tab of the picker showing search results for mountains, each tile credited to its photographer, with shape and size selects](https://raw.githubusercontent.com/janjcwebtech/astro-dev-edit/main/documentation/images/unsplash.jpg)
-
-_With an Unsplash access key, a second tab in the picker searches Unsplash from inside your own site and imports the photo you pick at the width you choose._
-
 ![The hover pill showing class chips for btn and btn-primary, with a popup listing the CSS rules applied by btn-primary and the file they are written in](https://raw.githubusercontent.com/janjcwebtech/astro-dev-edit/main/documentation/images/css-inspector.png)
 
 _The class chips on the pill show which CSS rules apply to the element and which file they are written in, so adjusting a transition is one click rather than a search._
@@ -85,9 +77,7 @@ _**Copy Context** puts the whole context of the element on your clipboard: the s
 
 ## Configuration
 
-Everything is optional. Pass what you want to `devEdit({ … })`, or set it from the **Settings** drawer, which saves your choices in `.astro-dev-edit.json` and applies them to the next request without a restart. Anything you set in `astro.config.mjs` wins over that file and renders read-only in the drawer, with a note saying where the value came from.
-
-Your Unsplash key goes somewhere else: the drawer writes it to `.env.local` at `0600`. Gitignore that and `.astro-dev-edit.json` — the drawer names either one your ignore rules miss.
+Everything is optional. Pass what you want to `devEdit({ … })`, or set it from the **Settings** drawer, which saves your choices in `.astro-dev-edit.json` and applies them to the next request without a restart. Anything you set in `astro.config.mjs` wins over that file and renders read-only in the drawer, with a note saying where the value came from. Gitignore `.astro-dev-edit.json` — the drawer says so if your ignore rules miss it.
 
 Every option, with its default and what it does: [Configuration reference](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/CONFIGURATION.md).
 
@@ -95,17 +85,15 @@ Every option, with its default and what it does: [Configuration reference](https
 
 - No undo and no edit history. Every save writes the file immediately, so your git tree is the safety net: start from a clean tree, review with `git diff`, discard with `git checkout <file>`. Writes are atomic and verified against what the page showed, so a stale click fails rather than corrupting the file.
 - Content, never structure. Inline edited text is escaped so it cannot introduce a tag, an expression or an entity. The markup popup lets tags through, but only the inline safelist, only with presentational attributes, and only well nested.
-- The rich body editor covers a markdown subset. Anything past it, so tables, raw HTML or MDX, footnotes and nested lists, stays editable as markdown source.
-- The collection designer reads only the schema shapes it can prove: `schema: z.object({ … })` and `schema: ({ image }) => z.object({ … })` with a plain field list. Anything else is reported as unreadable, with _Open source_ offered instead.
-- Unsplash is free tier only, and a photo is importable only while the dev server that searched for it is still running.
+- Markdown and MDX content is not browser-editable. The overlay names the backing file and points you at it; nothing writes a `.md` frontmatter key or body line for you.
 
 ## Documentation
 
 | Doc                                  | What's in it                                                 |
 | ------------------------------------ | ------------------------------------------------------------ |
 | Editing reference                    | Everything the overlay can edit, and every surface it draws  |
-| Entry editor and collection designer | The CMS drawer, switching it on per collection, schema editing |
-| Media picker and Unsplash            | Choosing, uploading and importing images                     |
+| Component tracing and inspector      | The read-only inspector, chains, slots and the tracing API   |
+| Media picker                         | Choosing and uploading images                                |
 | Configuration reference              | Every option, the Settings drawer, and which source wins     |
 | Styling reference                    | The --atx-\* properties and ::part() names you can theme     |
 | Architecture                         | How the layers fit together, and where a new capability goes |

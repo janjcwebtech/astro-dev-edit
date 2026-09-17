@@ -18,8 +18,8 @@ The [README](../README.md) has the short version; this is the whole of it.
 | Text carrying inline markup | a **markup popup** | the element's source |
 | Text rendered through an `{expression}` | a **value popup** | the string in the frontmatter |
 | A static `<img>` | the **image panel** | `src` and `alt` |
-| A page declaring a backing `.md`/`.mdx` | the **Edit entry** drawer — see [Entry editor](ENTRY-EDITOR.md) | frontmatter fields and body |
-| Anything else | a notice with the reason and an *Open source* jump | nothing |
+| A page declaring a backing `.md`/`.mdx` | a notice naming that file, to open in your IDE | nothing |
+| Anything else | a notice with the reason and a *View code* jump | nothing |
 
 ### Inline markup
 
@@ -42,9 +42,13 @@ A frontmatter const (`<h1>{title}</h1>`), or one item of an array a `.map()` loo
 
 Swap a static `src` from the project's images (with thumbnails) or upload a new file, and edit `alt`. Only statically-quoted attributes are editable — `src={…}` and `<Image>` are treated as dynamic.
 
+### Markdown-backed content
+
+Content that lives in a `.md` or `.mdx` entry is **not** edited in the browser. Where the page declares its backing file, the notice names it so you can open it in your IDE; nothing writes a frontmatter key or a body line for you. Literal content written in the Astro route template stays editable as usual.
+
 ### What refuses, and why
 
-Every refusal names its reason and offers an *Open source* jump. On a detail page it also offers **Edit page content**, which opens the entry drawer.
+Every refusal names its reason and offers one *View code* jump — a read-only source popup carrying its own **Open in editor**. On a page that declares a backing content file it also names that file as the place the words live.
 
 - **Not traceable to a string** — an expression the AST cannot resolve, a component, `set:html`, or block-level nested markup.
 - **Rendered by a component or a slot** — it has no source location of its own, because Astro annotates only what is written in the file, so the click is answered about the nearest element that *has* one. The notice names the tag you clicked, since the reason belongs to that ancestor: a one-word button can be refused for "containing nested markup" that lives in the wrapper around it.
@@ -54,7 +58,7 @@ Every refusal names its reason and offers an *Open source* jump. On a detail pag
 
 ![A value editor titled Value · benefits[].title, editing the string in index.astro that the expression resolves to](images/expression.png)
 
-![A notice reading Can't edit this here, explaining the text comes from a template expression, with the source location and Open template and Edit page content buttons](images/refusal.png)
+![A notice reading Can't edit this here, explaining the text comes from a template expression, with the source location and a View code button](images/refusal.png)
 
 ## The hover pill and source peek
 
@@ -136,8 +140,6 @@ Every global control lives in a slim bar across the top of the page:
   mode on with it, since the tree's row highlights only mean anything while
   editing.
 - **Edit page** — the edit-mode toggle.
-- **Edit entry** — on pages that declare a backing content file, opens the
-  [entry drawer](ENTRY-EDITOR.md).
 - **The pin** — lit while the bar is pinned. Unpin it and the bar slides off the
   edge leaving a thin accent line, returning the moment the pointer reaches that
   edge again. **Edit mode overrides it**: while you are editing, the bar stays out
@@ -148,11 +150,8 @@ Every global control lives in a slim bar across the top of the page:
   *Open page source*, which opens **the file the page itself is written in** —
   resolved from Astro's own route manifest, so a page that mostly composes
   components opens the page rather than the busiest component, and a URL that
-  matches no route says so instead of guessing;
-  *Collections*, the [collection and field designer](ENTRY-EDITOR.md#collections--the-collection-designer);
-  and *Settings*, where [every integration option](CONFIGURATION.md) is editable,
-  alongside the [Unsplash access key](MEDIA.md#unsplash-photo-picker), which is
-  not an option and has its own rules about where it can be stored.
+  matches no route says so instead of guessing; and *Settings*, where
+  [every integration option](CONFIGURATION.md) is editable.
 
 The bar **overlays** the page rather than pushing it down: the top edge is where
 sticky site headers live, and reflowing the page would change the very layout
@@ -179,7 +178,7 @@ Tab cycles through its own controls and wraps, the page behind it and the bar
 above it are out of reach, Escape closes it, and focus returns to whatever you
 were on when it opened. Each announces itself as a dialog, named by its title.
 
-![The Settings drawer with General, Editing, Media and Unsplash tabs, showing controls for integration enabled, source annotations, content roots and editable extensions](images/settings.png)
+![The Settings drawer with General, Editing and Media tabs, showing controls for integration enabled, source annotations, content roots and editable extensions](images/settings.png)
 
 ## Element tree
 
@@ -194,7 +193,7 @@ element on the page highlights its row and scrolls the tree to it.
 - **Click a row** to select the element — a persistent outline that stays put while you move the mouse onto the element to inspect it. Plain hovering never changes it; the selection clears on **Escape**, a click elsewhere on the page, or another row.
 - **Double-click a row** to open the editor for that element, exactly as a page click would.
 - **Click a row's `line:col`** to open that file at that line in your editor — the same `/open` the hover pill's **open** button uses.
-- The tree collapses per node, rebuilds after each save, and is overlaid by the entry drawer while that is open.
+- The tree collapses per node, rebuilds after each save, and is overlaid by any drawer while that is open.
 - Leaving edit mode hides it. Closing it with its ✕ while still editing leaves the left-edge tab that brings it back, as does **Elements** on the bar.
 - Whether it was open is remembered for the session, so a save-triggered reload restores it the way you left it.
 

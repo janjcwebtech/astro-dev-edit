@@ -250,32 +250,6 @@ export const COLOR = {
 } as const;
 
 /**
- * The one light surface in a dark-only overlay: the rich-text editor's page,
- * which shows a Markdown body as it will look once published rather than as
- * overlay chrome. Its own token group instead of `COLOR` inverted, because the
- * two are not the same idea — `COLOR.foreground` is *ink*, and using it as this
- * surface's background would couple a piece of paper to the colour of text.
- *
- * Same OKLCH-authored, contrast-verified rules as `COLOR`: body ink is 18.1:1
- * on `bg` and 16.2:1 on `muted`. `link` is the brand hue darkened for paper
- * (7.2:1); the overlay's own `primary` would also clear AA here at 6.3:1, but
- * it is tuned to sit on a dark ground and reads thin as body-text link on
- * white, so paper gets its own.
- */
-export const PAPER = {
-  /** The page itself. oklch(1 0 0) */
-  bg: '#ffffff',
-  /** Body ink. oklch(0.200 0 0) */
-  fg: '#161616',
-  /** Inset blocks — code, pre, blockquote fill. oklch(0.960 0 0) */
-  muted: '#f2f2f2',
-  /** Rules and block edges. oklch(0.880 0 0) */
-  border: '#d7d7d7',
-  /** Links, the brand hue at paper contrast. oklch(0.480 0.200 285) */
-  link: '#593ec7',
-} as const;
-
-/**
  * Corner radii, one ladder derived from a single 10px base the way shadcn's
  * `--radius` is: 0.6x, 0.8x, 1x, 1.4x.
  *

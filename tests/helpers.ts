@@ -1,4 +1,3 @@
-import type { EntrySchemaProvider } from '../src/server/content-config.ts';
 import { createOptionsResolver, type OptionsResolver, type DevEditOptions } from '../src/server/options.ts';
 
 /**
@@ -38,28 +37,3 @@ export function stubOptions(
   return createOptionsResolver({ root, configOptions });
 }
 
-/**
- * An {@link EntrySchemaProvider} with every method defaulted to "nothing here",
- * so a suite states only the lookups it cares about. The real provider needs a
- * Vite dev server; this is the seam that keeps the entry and schema routes
- * testable without one.
- */
-export function stubSchemaProvider(
-  overrides: Partial<EntrySchemaProvider> = {},
-): EntrySchemaProvider {
-  return {
-    async forFile() {
-      return null;
-    },
-    async forCollection() {
-      return null;
-    },
-    async listCollections() {
-      return [];
-    },
-    async configPath() {
-      return null;
-    },
-    ...overrides,
-  };
-}

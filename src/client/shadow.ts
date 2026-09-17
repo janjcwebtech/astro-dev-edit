@@ -57,7 +57,7 @@ export function overlayRoot(): ShadowRoot {
 }
 
 /** The host element. Needed for `composedPath().includes(host)` and as the
- *  parent for light-DOM content that is slotted back in (see `mountLight`). */
+ *  parent for the shadow root. */
 export function overlayHost(): HTMLElement {
   ensure();
   return host as HTMLElement;
@@ -69,27 +69,6 @@ export function mount(...nodes: Node[]): void {
   ensure().append(...nodes);
 }
 
-/**
- * Mount a node into the **light DOM**, as a child of the host, for `<slot>`-ing
- * back into the shadow tree.
- *
- * Exactly one thing needs this: the rich-text editor's `contenteditable`.
- * Safari's selection and `execCommand` APIs are inert against a node inside a
- * shadow root — `document.execCommand` silently does nothing and
- * `getSelection().anchorNode` retargets to `<body>` — which would kill the
- * markdown toolbar outright. A slotted node is composed into the shadow tree
- * for layout while remaining a light-DOM node, so selection keeps working in
- * every engine. Verified in Chrome, Firefox and WebKit.
- *
- * The cost is that host-page CSS *can* reach a slotted node. That is unchanged
- * from how the editor already worked (its `CONTENT_CSS` is a document-level
- * stylesheet), and it is the reason `content-visibility` of the RTE is styled
- * there rather than in `overlayCss()`.
- */
-export function mountLight(node: Node): void {
-  ensure();
-  (host as HTMLElement).append(node);
-}
 
 /**
  * True when an event originated inside the overlay's own UI.

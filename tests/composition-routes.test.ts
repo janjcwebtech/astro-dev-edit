@@ -28,7 +28,7 @@ const request = (path: string, body?: unknown, remote = '127.0.0.1', origin?: st
 };
 function mount(composition = true) {
   middleware = createMiddleware({ root, logger, optionsResolver: stubOptions(root, { composition }),
-    schemaProvider: null, unsplash: null,
+
     routeManifest: createRouteManifest({ root, base: '/docs', routes: () => [
       { pattern: '/', patternRegex: /^\/$/, type: 'page', entrypoint: 'src/pages/index.astro' },
     ] }),

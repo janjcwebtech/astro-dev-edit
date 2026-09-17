@@ -10,21 +10,13 @@ import type { AstroIntegrationLogger } from 'astro';
 import type { Connect } from 'vite';
 import { createMiddleware } from '../src/server/middleware.ts';
 import type { DevEditOptions } from '../src/server/options.ts';
-import { ENV_TARGET, SETTINGS_FILE } from '../src/server/settings.ts';
-import type { UnsplashConfig } from '../src/server/unsplash-routes.ts';
+import { SETTINGS_FILE } from '../src/server/settings.ts';
 import { stubOptions } from './helpers.ts';
 
 /**
- * The **option** half of `GET`/`POST /settings` — the surface the Settings
- * drawer reads and writes.
+ * `GET`/`POST /settings` — the surface the Settings drawer reads and writes.
  *
- * The access-key half stays in `tests/unsplash-routes.test.ts`: those cases
- * exercise the key through the injected `UnsplashConfig` seam, and one of them
- * asserts a stored key reaches the very next *search*, which needs that suite's
- * recording fetch fake. Splitting the key tests away from it would mean
- * duplicating ~80 lines of stub to test the same thing less well.
- *
- * What this file pins instead: that options round-trip through the settings
+ * What this file pins: that options round-trip through the settings
  * file with no dev-server restart, that a refused patch writes **nothing**, and
  * that an option `astro.config.mjs` owns cannot be overwritten from the browser.
  */
@@ -53,20 +45,11 @@ afterEach(async () => {
 /** A middleware whose options resolve for real against `root`, so a write is
  *  visible to the next read without a restart — the property the drawer needs. */
 function mount(configOptions: DevEditOptions = {}): Connect.NextHandleFunction {
-  const unsplash: UnsplashConfig = {
-    resolve: async () => ({ key: '', source: null }),
-    enabled: async () => true,
-    appName: async () => 'test',
-    perPage: async () => 20,
-    importWidth: async () => 2400,
-  };
   return createMiddleware({
     logger,
     root,
     optionsResolver: stubOptions(root, configOptions),
-    schemaProvider: null,
     routeManifest: null,
-    unsplash,
   });
 }
 
@@ -268,25 +251,6 @@ describe('POST /settings', () => {
   });
 });
 
-describe('the fresh-project case', () => {
-  it('turns the Unsplash source on from the panel, with no config edit', async () => {
-    // This is the whole point of the option editor: the panel used to say "add
-    // `unsplash: {}` to astro.config.mjs, then restart the dev server".
-    const via = mount();
-    expect((await get(via)).body.unsplash.enabled).toBe(false);
-    expect(opt((await get(via)).body, 'unsplashEnabled')).toMatchObject({
-      value: false,
-      locked: false,
-    });
-
-    const saved = await put({ unsplashEnabled: true }, via);
-    expect(saved.status).toBe(200);
-    expect(saved.body.unsplash.enabled).toBe(true);
-    expect(opt(saved.body, 'unsplashEnabled').value).toBe(true);
-  });
-});
-
-
 describe('write reveal settings', () => {
   it('defaults off with a 1000ms delay, and respects config locks', async () => {
     const defaults = await get(mount());
@@ -303,12 +267,13 @@ describe('write reveal settings', () => {
     expect(existsSync(join(root, SETTINGS_FILE))).toBe(false);
   });
 
-  it('captures mode for the whole request including a combined key save', async () => {
-    const via = mount({ unsplash: {}, openInEditor: false });
+  it('captures reveal mode for the whole request, from the same patch that sets it', async () => {
+    const via = mount({ openInEditor: false });
     const enabled = await request({ via, url: '/__dev-edit/settings', body: {
-      options: { revealWrites: true, revealWriteDelayMs: 0 }, unsplash: { accessKey: 'example-key' },
+      options: { revealWrites: true, revealWriteDelayMs: 0 },
     } });
     expect(enabled.status).toBe(200);
+    // The request that turns revealing on runs under the mode it started with.
     expect(launchInEditor).not.toHaveBeenCalled();
     expect(opt((await get(mount())).body, 'revealWrites').value).toBe(true);
     expect((await put({ cssInspector: false }, via)).status).toBe(200);
@@ -317,10 +282,6 @@ describe('write reveal settings', () => {
     expect(launchInEditor).toHaveBeenCalledTimes(2);
     await put({ cssInspector: true }, via);
     expect(launchInEditor).toHaveBeenCalledTimes(2);
-    // The key rides the same queued request as the options, but lands in the
-    // other file — and never in the one this suite's other cases read.
-    expect(await readFile(join(root, ENV_TARGET), 'utf8')).toContain('UNSPLASH_ACCESS_KEY=example-key');
-    expect(JSON.parse(await readFile(join(root, SETTINGS_FILE), 'utf8')).unsplash).toBeUndefined();
   });
 
   it('preserves both concurrent sparse settings patches', async () => {

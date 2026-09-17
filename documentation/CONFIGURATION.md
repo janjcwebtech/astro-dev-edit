@@ -22,7 +22,7 @@ export default defineConfig({
   integrations: [
     devEdit({
       assetDirs: ["src/assets", "public", "src/images"],
-      unsplash: { appName: "my-site" },
+      cssInspector: false,
     }),
   ],
 });
@@ -42,9 +42,6 @@ export default defineConfig({
 | `cssInspector` | `true` | The hover pill's class and ID CSS inspector. |
 | `sourceAnnotations` | `'auto'` | Who emits `data-astro-source-*`: `'auto'`, `'force'` or `'off'`. Config only, because it registers a Vite plugin. |
 | `composition` | `false` | Read-only inspector, tracing API and version-2 source annotations. Config only; when true, replaces the editing UI and supersedes `sourceAnnotations`. See [Component tracing and inspector](COMPOSITION-API.md). |
-| `entryEditor` | `{}` | The entry drawer. `false` disables it. Sub-options: `configPath`, and per collection `pageEditing`, `dir`, `extension`, `fields` — `pageEditing` is normally set from the Collections drawer, and setting it here locks that switch. See [Entry editor](ENTRY-EDITOR.md). |
-| `schemaEditor` | `true` | Whether the collection designer may write your `content.config.ts`. |
-| `unsplash` | `false` | The Unsplash source. `{}` turns it on. Sub-options: `accessKey`, `appName`, `perPage`, `importWidth`. See [Unsplash](MEDIA.md#unsplash-photo-picker). |
 
 ## Where a value can come from
 
@@ -76,7 +73,7 @@ compiler provides.
 ## The Settings drawer
 
 *Settings* in the admin bar's overflow menu opens a drawer holding every option
-above, grouped into General, Editing, Media and Unsplash tabs. Options are
+above, grouped into General, Editing and Media tabs. Options are
 resolved on every request, so a change applies to the next one and the dev
 server keeps running.
 
@@ -85,23 +82,13 @@ where the value came from, because the drawer writes the settings file and the
 config file outranks it. The drawer is server declared: the endpoint sends the
 option records and the panel renders whatever arrives.
 
-## Where settings and your key are stored
-
-Two files, because one of them holds a secret and the other does not.
+## Where settings are stored
 
 `.astro-dev-edit.json` sits in your project root and holds the options the
-drawer writes plus the entry drawer's per-field editor overrides.
+drawer writes. Nothing secret is ever written to it.
 
-Your Unsplash access key goes to **`.env.local`** instead, as
-`UNSPLASH_ACCESS_KEY`, written at `0600` — see
-[the access key](MEDIA.md#your-access-key) for the full resolution order and
-what the drawer can and cannot change. A key written by an older version, in
-`.astro-dev-edit.json`, still works and is moved across the next time you save
-one. Access keys never come back out of either file in a response.
-
-**Gitignore both.** The drawer names any of them your ignore rules miss, and the
-warning clears as soon as they are covered. A `.env*` line counts, which is what
-Astro's own starters ship.
+**Gitignore it.** The drawer says so if your ignore rules miss it, and the
+warning clears as soon as it is covered.
 
 The dev server does not serve it. A request for `/.astro-dev-edit.json`, in any
 spelling — through `/@fs/`, with a query, percent-encoded — is refused with a
@@ -122,14 +109,9 @@ save follows after a pause — **Delay before writing (ms)**
 to watch until it exists. A save whose content already matches the file on disk
 opens nothing.
 
-Every text write is covered: text and image edits made on the page, entry saves
-and creations, a collection's schema, a new collection, and the field overrides
-and options in `.astro-dev-edit.json`, and `.env.local` when you save an access
-key. A collection save that writes both stores reveals each file immediately
-before its own write — `src/content.config.ts`, then the settings file.
-Uploaded and imported images, deleted entries and Astro's own generated files
-are left alone. Bear in mind that `.env.local` holds your access key, so it is
-one you may not want on screen.
+Every text write is covered: text and image edits made on the page, and the
+options in `.astro-dev-edit.json`. Uploaded images and Astro's own generated
+files are left alone.
 
 The timing is best-effort by nature. The launcher is the one behind *Open
 source*, and it cannot report that your editor has actually brought the file

@@ -21,13 +21,7 @@ import type { PageSourceResponse, SourceLoc } from '../shared/protocol.ts';
 import { initAdminBar } from './admin-bar.ts';
 import * as api from './api.ts';
 import { invalidateClassifications } from './classify-cache.ts';
-import {
-  clearPendingCollection,
-  openCollectionsPanel,
-  takePendingCollection,
-} from './editors/collections-panel.ts';
 import { openCopyPanel } from './editors/copy-panel.ts';
-import { openEntryPanel, resumePendingNavigation } from './editors/entry.ts';
 import { openPeekPanel } from './editors/peek.ts';
 import { openSettingsPanel } from './editors/settings-panel.ts';
 import { collectContext, formatContext } from './element-context.ts';
@@ -380,19 +374,9 @@ const bar = initAdminBar({
     bar.refresh();
   },
   isTreeOpen: () => tree.isOpen(),
-  // Both halves are live: the page must declare a backing entry, *and* the
-  // entry editor must be switched on — which the Settings drawer can change
-  // without a reload.
-  hasEntry: () => has('entryEditor') && pageSource() !== null,
-  openEntry: () => {
-    const file = pageSource();
-    if (file) void openEntryPanel(file);
-  },
   openPageSource: () => void openPageSource(),
-  openCollections: () => openCollectionsPanel({ onClose: () => bar.refresh() }),
-  // Saving settings changes what the bar should show (the entry button, the
-  // page-source item, Collections itself), so the bar re-evaluates its specs
-  // once the drawer is gone.
+  // Saving settings changes what the bar should show (the page-source item),
+  // so the bar re-evaluates its specs once the drawer is gone.
   openSettings: () => openSettingsPanel({ onClose: () => bar.refresh() }),
 });
 
@@ -460,23 +444,6 @@ async function boot(): Promise<void> {
     // sessionStorage unavailable — start with edit mode off.
   }
 
-  // Creating an entry reloads the page for the same reason, while the create
-  // is still waiting for the new route to answer. Pick that wait back up.
-  resumePendingNavigation();
-
-  // A schema write reloads the page (Astro resyncs its content layer), which
-  // would otherwise close the drawer the user was working in. Reopen it where
-  // they were.
-  const resumeCollection = takePendingCollection();
-  if (resumeCollection) {
-    openCollectionsPanel({
-      collection: resumeCollection,
-      onClose: () => {
-        clearPendingCollection();
-        bar.refresh();
-      },
-    });
-  }
 }
 
 if (document.readyState === 'loading') {
