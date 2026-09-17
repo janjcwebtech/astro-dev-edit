@@ -26,3 +26,7 @@ examples/airbnb/
 examples/sf-sf/
 examples/01-example-site-2/
 examples/astro-cloudflare-starter/
+
+# Files the composition fixture's image picker uploads while it is being driven
+tests/fixtures/composition/public/uploads/*
+!tests/fixtures/composition/public/uploads/.gitkeep

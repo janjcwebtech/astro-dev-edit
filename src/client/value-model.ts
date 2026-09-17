@@ -30,7 +30,7 @@ import type { TargetType } from '../shared/protocol.ts';
  * starts there.
  *
  * {@link writable} is the one place that says which targets the write path
- * serves at all — `src` and `alt` are the image picker's, not a field's.
+ * serves at all.
  */
 
 /** The clicked element's own value, addressed the way `/apply` addresses it. */
@@ -73,12 +73,25 @@ export type ValueTarget = ElementTarget | UsageTarget;
  *
  * `text`, `markup` and `expression` are the literal-text targets `/classify`
  * proves and `/apply` already writes; `html` is a `set:html` container's whole
- * string, which is a value like any other once it is edited raw. `src` and
- * `alt` are element targets too, and deliberately absent: they are the image
- * picker's, and a field that wrote a path while the grid beside it did not
- * would be two ways to set one value.
+ * string, which is a value like any other once it is edited raw.
+ *
+ * `src` and `alt` are here too, now that picking a tile *stages* rather than
+ * writes. They were held out while the grid wrote on its own, because a field
+ * that wrote a path beside a grid that also wrote one would be two ways to set
+ * one value; a grid that stages is not a second way to write but a second view
+ * of the same store entry, which is the shape everything else on a row already
+ * has.
  */
-const STAGEABLE: ReadonlySet<TargetType> = new Set<TargetType>(['text', 'markup', 'expression', 'html']);
+const STAGEABLE: ReadonlySet<TargetType> = new Set<TargetType>(
+  ['text', 'markup', 'expression', 'html', 'src', 'alt']);
+
+/** Whether this value is an attribute of the element rather than its content —
+ *  so what the page *shows* for it is read off the attribute, never off the
+ *  text. The one place that distinction is spelled, because three separate
+ *  readers need it and each guessing would be three chances to disagree. */
+export const attributeOf = (target: ValueTarget): 'src' | 'alt' | null =>
+  target.kind === 'element' && (target.targetType === 'src' || target.targetType === 'alt')
+    ? target.targetType : null;
 
 /** Whether typing on the page itself can drive this value.
  *
@@ -88,13 +101,14 @@ const STAGEABLE: ReadonlySet<TargetType> = new Set<TargetType>(['text', 'markup'
  *  of every tag in the element as the price of fixing one word. `expression`
  *  renders a string that lives in the frontmatter, which is not the text node
  *  at all; `html` is a raw string whose tags a caret would turn into the very
- *  elements they describe; and a usage-site value is rendered somewhere inside
- *  a component. */
+ *  elements they describe; `src` and `alt` are attributes, with no text node to
+ *  put a caret in; and a usage-site value is rendered somewhere inside a
+ *  component. */
 export const typesOnPage = (target: ValueTarget): boolean =>
   target.kind === 'element' && target.targetType === 'text';
 
 /** The target this row writes through, or null when the write path does not
- *  serve it — today that is only an image attribute, which the picker owns. */
+ *  serve it. */
 export function writable(target: ValueTarget): ValueTarget | null {
   return target.kind === 'usage' || STAGEABLE.has(target.targetType) ? target : null;
 }

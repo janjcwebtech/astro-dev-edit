@@ -75,7 +75,8 @@ export async function health(): Promise<HealthResponse | null> {
 
 /** List the project's swap-candidate images, with size, mtime and whether a
  *  build still serves them — plus the public dir the last of those is measured
- *  against, so a picker can name it when it refuses a file. */
+ *  against, so a picker can name it when it refuses a file, and the upload dir
+ *  the picker has to show before anything is written into it. */
 export async function getAssets(): Promise<AssetsResponse> {
   const res = await fetch(`${API}/assets`);
   if (!res.ok) throw new Error(`server returned ${res.status}`);
@@ -91,6 +92,7 @@ export async function getAssets(): Promise<AssetsResponse> {
   return {
     files: body.files.map((f) => ({ ...f, servable: f.servable ?? true })),
     publicDir: body.publicDir || 'public',
+    uploadDir: body.uploadDir || 'public',
   };
 }
 

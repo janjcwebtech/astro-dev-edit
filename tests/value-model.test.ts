@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  createValueStore, typesOnPage, valueKey, writable,
+  attributeOf, createValueStore, typesOnPage, valueKey, writable,
   type ElementTarget, type UsageTarget, type ValueTarget,
 } from '../src/client/value-model.ts';
 
@@ -27,10 +27,20 @@ describe('only a target the write path serves gets a field', () => {
     }
   });
 
-  it('refuses an image attribute, which the picker owns', () => {
-    // Two ways to set one value is the split this design removes: a field that
-    // wrote a path while the grid beside it did not.
-    for (const targetType of ['src', 'alt'] as const) expect(writable(at({ targetType }))).toBeNull();
+  it('serves an image attribute, which the picker stages into', () => {
+    // The picker writes nothing: a tile click stages through this store, so
+    // the grid and the `src` field are two views of one value rather than two
+    // ways to set it. That is what let these join.
+    for (const targetType of ['src', 'alt'] as const) {
+      expect(writable(at({ targetType }))).not.toBeNull();
+    }
+  });
+
+  it('names the attribute a value is read off, so nothing reads it off the text', () => {
+    expect(attributeOf(at({ targetType: 'src' }))).toBe('src');
+    expect(attributeOf(at({ targetType: 'alt' }))).toBe('alt');
+    expect(attributeOf(at({ targetType: 'text' }))).toBeNull();
+    expect(attributeOf(usage())).toBeNull();
   });
 
   it('serves a usage-site value, which writes through its own endpoint', () => {

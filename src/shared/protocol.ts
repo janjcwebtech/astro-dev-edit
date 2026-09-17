@@ -354,6 +354,18 @@ export interface AssetsResponse {
   /** The project's public directory, root-relative — what a picker names when
    *  it explains why a non-servable file cannot be used. */
   publicDir: string;
+  /**
+   * The configured `uploadDir`, root-relative — where an upload from the
+   * picker lands.
+   *
+   * Sent because the picker has to say it on screen. The rule that bites is
+   * that an upload must come to rest under {@link AssetsResponse.publicDir} or
+   * the `src` it produces 404s in the built site, and a picker that names the
+   * directory lets that be seen before a file is written rather than after.
+   * The server owns the value; no client derives it from an option it has not
+   * been told.
+   */
+  uploadDir: string;
 }
 
 // --- POST /upload ------------------------------------------------------------

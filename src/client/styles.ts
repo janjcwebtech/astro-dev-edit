@@ -725,6 +725,17 @@ button {
   cursor: pointer;
 }
 
+/* The display above beats the UA's [hidden] rule, so a button hidden by state
+   would still be laid out -- and would still be read aloud. Every variant is
+   listed, because the one that is missing is the one that shows. */
+.atx-btn-default[hidden],
+.atx-btn-secondary[hidden],
+.atx-btn-outline[hidden],
+.atx-btn-ghost[hidden],
+.atx-btn-destructive[hidden] {
+  display: none;
+}
+
 /* One size down, for a button that is not the point of the surface it sits on:
    a header's corner action, a row's own control. Smaller in every dimension
    at once -- height, type, gap and radius -- because a button that only loses
@@ -1992,149 +2003,48 @@ input[type='checkbox'].atx-switch:disabled {
   font: 12px/1.45 var(--atx-font-ui);
 }
 
-/* == Image panel ===========================================================
-   editors/image.ts, the in-page <img> panel. It shows a preview over a
-   checkerboard, so a transparent PNG reads as transparent rather than as a
-   hole. An <img> that fails to load takes [data-hidden] rather than showing a
-   broken-image glyph; a retry that finally succeeds removes it again — see
-   ui.ts::setFreshSrc. */
+/* == Image picker =========================================================
+   editors/image.ts, the picker card above Values. The grid itself is
+   editors/media-grid.ts; what is here is the card's own furniture — the
+   filter, the upload row and the sentence naming uploadDir. */
 
-.atx-image-preview {
+.atx-inspector-picker:empty {
+  display: none;
+}
+
+.atx-asset-filter {
   width: 100%;
-  height: 180px;
-  max-height: 180px;
-  margin-bottom: 10px;
-  overflow: hidden;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: ${CHECKER(14)};
-}
-
-/* No display of its own, deliberately: it inherits the inline default, which
-   the 180px overflow-hidden box above clips to the same pixels a block would
-   occupy. Plan 2 can settle it; a conversion may not. */
-.atx-image-preview-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.atx-image-meta {
-  margin: 0 0 12px;
-  overflow: hidden;
-  color: var(--atx-muted-fg);
-  font: 11px var(--atx-font-mono);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.atx-note {
-  margin: 0 0 12px;
-  color: var(--atx-warning);
-  font: 400 13px/1.5 var(--atx-font-ui);
-}
-
-.atx-alt-label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--atx-foreground);
-  font: 500 14px/1 var(--atx-font-ui);
-}
-
-/* Hand-built rather than via inputEl, so it carries the control baseline
-   itself. Keep it in step with [data-input]. */
-.atx-alt-input {
-  width: 100%;
-  min-height: 32px;
   box-sizing: border-box;
-  margin-bottom: 16px;
-  padding: 4px 10px;
-  border: 1px solid transparent;
-  border-radius: var(--atx-radius-lg);
-  background: var(--atx-input-bg);
-  color: var(--atx-foreground);
-  font: 400 14px/1.45 var(--atx-font-ui);
-  outline: none;
-  transition: background 200ms, border-color 200ms, box-shadow 200ms;
+  margin-bottom: 10px;
+  font: 12px var(--atx-font-mono);
 }
 
-.atx-alt-input:focus-visible {
-  border-color: var(--atx-ring);
-  box-shadow: 0 0 0 3px ${hexToRgba(COLOR.ring, 0.3)};
-}
-
-/* Alt text that comes from an expression: readable, but not yours to type in. */
-.atx-alt-input[data-off] {
-  opacity: 0.5;
-}
-
-/* The six most recent assets. Mirrors RECENTS in editors/image.ts. */
-.atx-image-recents {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
-}
-
-.atx-image-recents-label {
+.atx-picker-upload {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  margin: 0 0 8px;
-  color: var(--atx-foreground);
-  font: 500 14px/1 var(--atx-font-ui);
+  padding-top: 10px;
 }
 
-/* The strip is a convenience; if its listing fails it goes away quietly and
-   the modal's Browse all still works. */
-.atx-image-recents-label[data-hidden] {
+/* A file input is driven by the button beside it and is never seen. */
+.atx-media-file {
   display: none;
 }
 
-/* Wears the corner-action shape; the only thing left here is where it sits. */
-.atx-image-browse-all {
-  margin-left: auto;
+/* The one line that has to be read before a file is written: an uploadDir
+   outside the public directory produces a src the built site cannot serve. */
+.atx-inspector-note[data-warn] {
+  color: var(--atx-warning);
 }
 
-.atx-image-recent {
-  width: 100%;
-  padding: 0;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  outline: none;
-  background: ${CHECKER(10)};
-  cursor: pointer;
-}
-
-/* The one already on the page. */
-.atx-image-recent[data-current] {
-  border-color: var(--atx-primary);
-  outline: 1px solid var(--atx-primary);
-}
-
-.atx-image-recent-thumb {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.atx-image-preview-img[data-hidden],
-.atx-image-recent-thumb[data-hidden],
-.atx-media-thumb[data-hidden],
-.atx-media-rail-img[data-hidden] {
+.atx-media-thumb[data-hidden] {
   display: none;
 }
-
-/* Sits beside the path field in a flex row, so it takes the field's height
-   and shape rather than a button's own. */
 
 /* == Media grid ============================================================
-   editors/media-grid.ts. One tile shape for both panes; the caption sits
-   outside the pick button so a credit link is clickable. [data-selected] is
-   the ring and the tick together, and [aria-busy] — which the tile already
-   carries for assistive tech — is also what dims it during an import. */
+   editors/media-grid.ts. One tile shape; the caption sits outside the pick
+   button, because the filename is not part of what you press. [data-selected]
+   is the ring and the tick together. */
 
 .atx-media-pane {
   flex: 1 1 auto;
@@ -2182,14 +2092,8 @@ input[type='checkbox'].atx-switch:disabled {
   outline-color: var(--atx-primary);
 }
 
-.atx-media-pick[aria-busy='true'] {
-  opacity: 0.45;
-  pointer-events: none;
-  cursor: progress;
-}
-
-/* A tile that cannot be picked *here* -- an image() asset in a web-path picker
-   or the reverse. It stays on screen and says why: the dimming is the shared
+/* A tile that cannot be picked *here* -- a file the built site would not
+   serve. It stays on screen and says why: the dimming is the shared
    :disabled rule above, and this is only the band that carries the reason.
    Text over the thumbnail, so it needs its own scrim rather than a token. */
 .atx-media-reason {
@@ -2304,185 +2208,6 @@ input[type='checkbox'].atx-switch:disabled {
   font: 11px/1.4 var(--atx-font-mono);
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-/* A credit is prose, not a filename. It is permanently visible rather than
-   revealed on hover: that is what the API guidelines ask for. */
-.atx-media-cap[data-credit] {
-  font: 12px/1.4 var(--atx-font-ui);
-}
-
-.atx-unsplash-credit {
-  color: var(--atx-brand-text);
-}
-
-/* == Media modal ===========================================================
-   editors/media-modal.ts. The sized panel that holds both panes, the detail
-   rail and the drop target. [data-on] opens the drag overlay and reveals the
-   scope toggle, which only a scoped listing has anything to say with. */
-
-/* Matched at the sized panel's own specificity: .atx-panel[data-sized]
-   .atx-panel-body makes the body the scrolling region, and this body is the
-   one that must not scroll — the grid inside it does. */
-.atx-media-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.atx-panel[data-sized] .atx-media-body {
-  overflow: hidden;
-}
-
-.atx-media-tabhost {
-  flex: 0 0 auto;
-}
-
-.atx-media-upload {
-  margin-left: auto;
-}
-
-.atx-media-file {
-  display: none;
-}
-
-.atx-media-content {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.atx-media-panes {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  min-height: 0;
-}
-
-.atx-media-rail {
-  flex: 0 0 280px;
-  width: 280px;
-  margin-left: 14px;
-  padding-left: 14px;
-  border-left: 1px solid var(--atx-border);
-  overflow-y: auto;
-}
-
-.atx-media-drop {
-  flex: 0 0 auto;
-  color: var(--atx-muted-fg);
-  font: 11px var(--atx-font-mono);
-  text-align: center;
-}
-
-.atx-media-foot-status {
-  grid-column: auto;
-  margin-right: auto;
-  padding: 0;
-  font: 13px var(--atx-font-ui);
-  text-align: left;
-}
-
-/* A dedicated dashed box would eat grid height, so the modal itself is the
-   drop target and this tints it while a file is over it. */
-.atx-media-dropzone {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: none;
-  border: 2px dashed var(--atx-primary);
-  border-radius: var(--atx-radius-md);
-  background: ${hexToRgba(COLOR.primary, 0.18)};
-  pointer-events: none;
-}
-
-.atx-media-dropzone[data-on] {
-  display: block;
-}
-
-.atx-media-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.atx-asset-filter {
-  flex: 1 1 auto;
-  min-width: 0;
-  font: 12px var(--atx-font-mono);
-}
-
-/* Hidden until a listing has folders worth scoping to, so its display is a
-   state rather than the shared inline-flex above. */
-.atx-asset-scope {
-  display: none;
-  flex: 0 0 auto;
-}
-
-.atx-asset-scope[data-on] {
-  display: inline-flex;
-}
-
-.atx-media-sort,
-
-/* --- the detail rail --- */
-
-.atx-media-rail-empty {
-  margin: 0;
-  color: var(--atx-muted-fg);
-  font: 13px/1.6 var(--atx-font-ui);
-}
-
-.atx-media-rail-preview {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  margin-bottom: 10px;
-  overflow: hidden;
-  border: 1px solid var(--atx-border);
-  border-radius: var(--atx-radius-lg);
-  background: ${CHECKER(12)};
-}
-
-.atx-media-rail-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.atx-media-rail-title {
-  margin: 0 0 8px;
-  overflow: hidden;
-  color: var(--atx-foreground);
-  font: 500 14px var(--atx-font-ui);
-  text-overflow: ellipsis;
-}
-
-.atx-media-rail-line {
-  margin: 0 0 6px;
-}
-
-.atx-media-rail-key {
-  display: block;
-  color: var(--atx-muted-fg);
-  font: 500 11px var(--atx-font-ui);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.atx-media-rail-value {
-  display: block;
-  color: var(--atx-foreground);
-  font: 11px/1.5 var(--atx-font-mono);
-  word-break: break-all;
-}
-
-.atx-media-rail-link {
-  color: var(--atx-brand-text);
-  font: 13px/1.5 var(--atx-font-ui);
-  word-break: normal;
 }
 
 /* == Icons =================================================================

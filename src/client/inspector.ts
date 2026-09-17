@@ -3,6 +3,7 @@ import * as api from './api.ts';
 import { readRenderOccurrences } from './composition-dom.ts';
 import { chainOrdinals } from './render-occurrences.ts';
 import { rulesForElement } from './css-inspect.ts';
+import { buildImagePicker } from './editors/image.ts';
 import { has } from './features.ts';
 import { card, item, itemGroup } from './group.ts';
 import { createInspectorLoader, occurrenceSummary } from './inspector-model.ts';
@@ -317,7 +318,7 @@ export function initInspector(deps: InspectorDeps) {
       // An `editable` verdict says the source proves a target; it does not say
       // this build can write to it. Saying which is missing beats a disabled
       // control that repeats the value above it and does nothing.
-      if (row.verdict === 'editable') note(built.content, 'Edited with the image picker, not as text.');
+      if (row.verdict === 'editable') note(built.content, 'This build has no field for this value.');
     }
 
     const foot = styled('div', 'atx-value-foot');
@@ -338,6 +339,35 @@ export function initInspector(deps: InspectorDeps) {
     for (const line of row.details) note(details, line);
     built.content.append(details);
     return built.root;
+  }
+
+  /**
+   * The image picker, above Values, when the selection has a `src` this build
+   * can write.
+   *
+   * Two views of one value, never two ways to write one: a tile click stages
+   * through the same store the `src` field does, so the field follows the grid
+   * and the grid follows the field. Nothing reaches disk until that row's Save.
+   *
+   * Absent when the `src` is not writable — an `{expression}` or an
+   * `astro:assets` `<Image>`. A grid of tiles that could not be picked would
+   * be an offer the row beside it has already refused.
+   */
+  function mountPicker(host: HTMLElement, model: ValueRows) {
+    host.replaceChildren();
+    const row = model.rows.find(r => r.pinned && r.target.kind === 'element'
+      && r.target.targetType === 'src' && r.verdict === 'editable');
+    const target = row && writable(row.target);
+    if (!row || !target) return;
+    const original = deps.staging.pendingFor(target, row.value)?.original ?? row.value;
+    const picker = buildImagePicker({
+      currentSrc: () => deps.staging.get(target, original)?.current ?? original,
+      pick: url => deps.staging.stage(target, original, url, original),
+    });
+    host.append(picker.root);
+    // The field and the grid are the same value: typing a path, or reverting
+    // one, has to move the ring too.
+    bindings.push(deps.staging.onChange(picker.repaint));
   }
 
   /** The Values card, rendered from the model and nothing else. A refusal
@@ -402,7 +432,11 @@ export function initInspector(deps: InspectorDeps) {
     const chain = card({ title: 'Component chain' });
     const slots = card({ title: 'Slot relationships' });
     chainBody = chain.body;
-    body.append(values.root, chain.root, slots.root, css(el));
+    // The one block that may sit above Values, and it is empty until the
+    // selection turns out to be an image with a writable `src` — a list of
+    // fields cannot show pictures, and nothing else has earned the place.
+    const picker = styled('div', 'atx-inspector-picker');
+    body.append(picker, values.root, chain.root, slots.root, css(el));
     note(values.body, 'Resolving values…');
 
     const source = sourceFor(el);
@@ -494,6 +528,7 @@ export function initInspector(deps: InspectorDeps) {
       links: answer.chain?.links ?? [],
     });
     renderValues(values, model, jump);
+    mountPicker(picker, model);
     // The caret belongs where the click landed, not in a panel on the right —
     // so for a value the page can type into, the element itself becomes the
     // other view of the field that was just built. Both drive one store entry.

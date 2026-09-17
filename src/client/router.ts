@@ -1,7 +1,6 @@
 import type { ClassifyResult, SourceLoc } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { beginExpressionEdit } from './editors/expression.ts';
-import { beginImageEdit } from './editors/image.ts';
 import { beginMarkupEdit } from './editors/markup.ts';
 import type { NoticeOptions } from './editors/notice.ts';
 import { showDynamicNotice } from './editors/notice.ts';
@@ -95,18 +94,16 @@ export function initRouter(deps: RouterDeps): RouterHandle {
       return;
     }
 
-    if (server.kind === 'image' && el instanceof HTMLImageElement) {
-      const attrs = server.attrs ?? { src: 'dynamic', alt: 'dynamic' };
-      if (attrs.src !== 'static' && attrs.alt === 'dynamic') {
-        showDynamicNotice(
-          src,
-          'Both the image file and its alt text are set from code, so they must be edited in the source.',
-          deps.openPeek,
-          via,
-        );
-        return;
-      }
-      void beginImageEdit(el, src, attrs);
+    // Images are the source inspector's: the picker is a block above its
+    // Values rows, where `src` and `alt` are ordinary fields. There is no modal
+    // image panel any more, so this build answers with the reason and a jump.
+    if (server.kind === 'image') {
+      showDynamicNotice(
+        src,
+        'Images are edited in the source inspector — turn on the `composition` option to pick one here. Until then, edit src and alt in the source.',
+        deps.openPeek,
+        via,
+      );
     } else if (server.kind === 'text') {
       beginTextEdit(el, src);
     } else if (server.kind === 'markup' && server.markup) {

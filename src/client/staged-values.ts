@@ -2,7 +2,7 @@ import type { ApplyRequestWire, UsageApplyRequest } from '../shared/protocol.ts'
 import { annotatedElements, sourceFor } from './source-map.ts';
 import { COLOR } from './ui.ts';
 import {
-  createValueStore, typesOnPage,
+  attributeOf, createValueStore, typesOnPage,
   type ElementTarget, type StagedValue, type ValueTarget,
 } from './value-model.ts';
 
@@ -190,6 +190,15 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
       return here.filter(el => el.getAttribute('data-atx-boundary') === 'html');
     }
     const wanted = [entry.rendered.trim(), entry.current.trim()];
+    // An image attribute is not the element's words, so the same question —
+    // "is this element still showing what the edit was staged against?" — is
+    // asked of the attribute. It is the identical staleness check the text
+    // case makes, which is what keeps a picked image dropped by name when its
+    // own line changed rather than silently written over it.
+    const attribute = attributeOf(target);
+    if (attribute) {
+      return here.filter(el => wanted.includes((el.getAttribute(attribute) ?? '').trim()));
+    }
     return here.filter(el => wanted.includes((el.textContent ?? '').trim()));
   }
 
@@ -289,11 +298,21 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
 
   // --- Typing ---------------------------------------------------------------
 
-  /** Show the pending text on every element bound to the value except the one
+  /** Show the pending value on every element bound to it, except the one
    *  holding the caret — rewriting that node collapses the selection to its
-   *  start on every keystroke. Only for `text`: an expression's words live in
-   *  the frontmatter and markup's value is source, so neither is this node. */
+   *  start on every keystroke.
+   *
+   *  Text, or an image attribute. Not an expression (its words live in the
+   *  frontmatter), not markup (its value is source), and not a usage-site
+   *  value (it is rendered somewhere inside a component). A picked image is
+   *  the one of these the eye most needs: a grid tile with a ring on it says
+   *  which file, and only the page says what it looks like there. */
   function mirror(entry: StagedValue, except: HTMLElement | null) {
+    const attribute = attributeOf(entry.target);
+    if (attribute) {
+      for (const el of elementsFor(entry)) el.setAttribute(attribute, entry.current);
+      return;
+    }
     if (!typesOnPage(entry.target)) return;
     for (const el of elementsFor(entry)) if (el !== except) el.textContent = entry.current;
   }
@@ -308,7 +327,9 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
     if (!entry) return;
     // Put the page back before the entry goes: once it is gone there is
     // nothing left that knows which elements were showing the pending words.
-    if (typesOnPage(entry.target)) for (const el of elementsFor(entry)) el.textContent = entry.original;
+    const attribute = attributeOf(entry.target);
+    if (attribute) for (const el of elementsFor(entry)) el.setAttribute(attribute, entry.rendered);
+    else if (typesOnPage(entry.target)) for (const el of elementsFor(entry)) el.textContent = entry.original;
     store.discard(key);
   }
 

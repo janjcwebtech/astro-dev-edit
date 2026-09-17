@@ -1,44 +1,53 @@
-# Media picker
+# Image picker
 
-One picker serves every place you choose an image. The
-[README](../README.md) has the summary.
+One picker, in one place: a block at the top of the inspector panel, above
+**Values**. The [README](../README.md) has the summary.
 
-Anywhere you choose an image the same picker opens: a grid of your project's
-images, a filter, a folder scope toggle, and a details rail showing the
-selected file's path, size and modified time.
+It sits there because a list of fields cannot show pictures. Everything else
+about an image — its `src`, its `alt` — is an ordinary Values row with its own
+field and its own Save, so the picker adds the thumbnails and nothing else.
 
-Three things about how it behaves:
+## Picking writes nothing
 
-- **Newest first by default.** A file you uploaded a minute ago is the first
-  thing you see, not something to hunt for alphabetically. Switch the sort to
-  **Name** if you prefer.
-- **Picking is staged, not applied.** Clicking a tile selects it; the footer's
-  **Use image** is what hands it back to the field. **Cancel** or **Escape**
-  writes nothing at all — which matters, because this modal can open on top of
-  another panel, and closing it must never disturb what is underneath.
-- **A file the field cannot take is shown, dimmed, with the reason.** `assetDirs`
-  spans both `public/` and `src/assets`, because the two kinds of image field
-  need opposite halves of it. An `image()` field needs a file Astro can import,
-  which means under `src/`. A plain `<img src>` needs a
-  URL the **built** site has, which only your public directory gives —
-  `/src/assets/hero.svg` is served in dev and absent from `dist/`. So the tile
-  stays on screen and says which one it is rather than disappearing, and it
-  cannot be selected. The rule is applied at pick time, where it is still cheap
-  to choose something else.
+Clicking a tile **stages** the `src`, exactly as typing into the field does.
+The element goes amber, the panel header reads *1 unsaved*, and the source file
+is untouched until you press **Save** on that row. **Revert** or Esc throws the
+choice away.
 
-Uploading works from the **Upload file…** button or by dropping a file anywhere
-on the modal. Uploads land in `uploadDir` — or, for an `image()` field, beside
-the field's existing asset. `uploadDir` has to be somewhere the browser can
-fetch from, which means under your public directory (`public/`, unless your
-Astro config sets `publicDir`): a file there becomes a plain `<img src>`, so a
-`src/`-relative directory works in dev and 404s in a production build. A
-preflight warning fires at startup if the configured directory isn't
-web-servable.
+The one thing that does reach disk immediately is an **upload** — the bytes have
+to exist before a grid can show them. It writes a new file into `uploadDir` and
+never touches a `.astro` file; the `src` it produces is staged like any other
+value and is still one Save away.
 
-The swap panel keeps a shortcut for the common case: a preview of the image you
-are editing, and a strip of the **six most recently added** images, with
-**Browse all** opening the full picker.
+## What it shows
 
-![The media picker showing the Project tab with a grid of project images, a filter box, a sort select and an Upload file button](images/media-picker.png)
+- **Newest first**, so a file uploaded a minute ago is the first tile rather
+  than something to hunt for alphabetically.
+- **Eight at a time**, with a *Show more* button. Paging and the filter are both
+  views over the one listing `GET /assets` returns; the server pages nothing.
+- **Filter** matches anywhere in the path, so `hero`, `.svg` and `blog/` all
+  work.
+- **A file a build would not serve is shown, dimmed, with the reason.**
+  `assetDirs` spans `src/assets` and your public directory on purpose, but a
+  build copies only the public directory: `/src/assets/hero.svg` is a truthful
+  dev URL and a 404 in `dist/`. The tile stays on screen and says which it is
+  rather than disappearing, and it cannot be picked. The server decides this per
+  file — nothing infers it from a path prefix.
 
-![An image panel showing a preview, the file name and size, an alt text input, and a strip of recently added images](images/image-swap.png)
+## Uploads and `uploadDir`
+
+The **Upload** button writes into `uploadDir`, and the line under it names that
+directory before you use it. The rule it exists for is the one a byte-perfect
+save cannot catch: `uploadDir` has to sit under your public directory
+(`public/`, unless your Astro config sets `publicDir`), or the `src` it produces
+reads back exactly as written and 404s in the built site. When it does not, that
+line says so in the warning colour. A preflight warning also fires at startup.
+
+## Alt text
+
+`alt` is a Values row like any other where the attribute exists. Where it does
+not, the row reads *no alt attribute — add it in the IDE*: this pass never
+inserts an attribute the source does not contain, because a patcher cannot be
+pointed at something that is not there.
+
+![The inspector's Pick an image block: a filter box, a grid of project thumbnails with one marked Current, a Show more button, an Upload button and the line naming uploadDir](images/media-picker.png)

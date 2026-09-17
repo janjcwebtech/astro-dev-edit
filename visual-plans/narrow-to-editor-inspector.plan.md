@@ -286,7 +286,7 @@ Rules it must obey:
 - [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
 - [x] **P6c** — prop and slot-text editing at proven source targets, with destination-aware encoding, lands via `/composition/apply` and `usage-write.ts`; the render ordinal earns back `unproven-entry` for a proven 1:1 `.map()`; and a known whole HTML string is editable at both destinations — `set:html` at a usage site, and a `set:html` container through `/apply`'s `html` target
 - [ ] **P6d** — Markdown-backed routes: source-file navigation for frontmatter and body content; no browser writes
-- [ ] **P6e** — image picker: filter across the project's assets, paged browsing, and upload into the configured `uploadDir`
+- [x] **P6e** — the image picker as a block above Values: filter across the project's assets, eight at a time through the grid's own footer (`/assets` pages nothing), upload into the configured `uploadDir` with that directory named on screen, and `src`/`alt` as ordinary rows. Picking and uploading both **stage**; the modal and its `image.ts` swap panel are gone
 - [ ] **P7** — committed fixture site with a genuine 3-deep chain; real-site pass on both fixtures
 - [ ] **P7** — remove the legacy annotation read path, parity counter as evidence
 
@@ -308,8 +308,8 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [x] A known HTML string is editable as a whole even when its generated descendants have no proven component relationships — the container carries the row, and every element inside the HTML it renders refuses
 - [x] Computed, spread, styling and untraceable props render `read-only` with a named reason, and imported ones `elsewhere` naming their module
 - [x] No refused value ever offers an editable field that then fails on save — a field appears only for an `editable` verdict whose target the write path serves, which is what `unproven-entry` exists to keep true
-- [ ] Clicking any element opens the inspector; no modal refusal or modal image panel remains
-- [ ] Nothing reaches disk before Save: a typed change, a picked image and an upload all leave the source byte-identical, and the element stays marked unsaved until Save
+- [x] Clicking any element opens the inspector; no modal refusal or modal image panel remains
+- [x] Nothing reaches disk before Save: a typed change, a picked image and an upload all leave the source byte-identical, and the element stays marked unsaved until Save
 - [x] Releasing ⌥ restores ordinary navigation while the inspector keeps its selection, and leaves any pending edit pending rather than committing it
 - [x] A pending edit survives an unrelated HMR update, and is discarded with a toast when its own file changed
 - [x] A literal rendered on two routes edits as one value and writes one line, and both elements mark unsaved together

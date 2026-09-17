@@ -137,7 +137,7 @@ const CAPTIONS: Record<UsageRefusal | 'imported', string> = {
   empty: 'Whitespace only — nothing to edit.',
   unlocated: 'The source does not read back the way the page described it.',
   unsupported: 'A value shape this inspector does not model.',
-  absent: 'Not in the source. Add the attribute in the IDE.',
+  absent: 'No alt attribute — add it in the IDE. Nothing is inserted for you.',
   imported: 'Written in another module.',
 };
 
@@ -200,11 +200,21 @@ function pinnedRows(input: ValueRowsInput): ValueRow[] {
     case 'html':
       return [row('html', { label: 'html', value: classification.html?.value ?? '',
         caption: 'Rendered as HTML. The whole string is edited here.' })];
+    // Two rows, and the picker above them is the third view of the first: a
+    // list of fields cannot show pictures, so the grid shows them and stages
+    // into this same row rather than writing on its own.
     case 'image': {
       const attrs = classification.attrs ?? { src: 'dynamic' as const, alt: 'dynamic' as const };
       const image = selection.image ?? { src: '', alt: '' };
+      const CAPTION = {
+        src: 'A quoted attribute — pick a file above, or type the path.',
+        alt: 'A quoted attribute on the element.',
+      };
       const attr = (label: 'src' | 'alt') => attrs[label] === 'static'
-        ? row(label, { label, value: image[label], caption: 'A quoted attribute on the element.' })
+        ? row(label, { label, value: image[label], caption: CAPTION[label] })
+        // `missing` is only ever `alt`: an `img` with no `src` renders nothing
+        // to click. Refused rather than inserted — rule 6 will not point a
+        // patcher at an attribute the source does not contain.
         : refused(label, label, image[label], attrs[label] === 'missing' ? 'absent' : 'computed');
       return [attr('src'), attr('alt')];
     }

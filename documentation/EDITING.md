@@ -19,7 +19,7 @@ The [README](../README.md) has the short version; this is the whole of it.
 | Text carrying inline markup | a **markup popup** | the element's source |
 | Text rendered through an `{expression}` | a **value popup** | the string in the frontmatter |
 | A prop or slot value at a component usage site | a **Values** row with a field | the attribute, the frontmatter string, or the slot text — in the caller's file |
-| A static `<img>` | the **image panel** | `src` and `alt` |
+| A static `<img>` | the inspector's **image picker**, above its `src` and `alt` rows | `src` and `alt` |
 | A page declaring a backing `.md`/`.mdx` | a notice naming that file, to open in your IDE | nothing |
 | Anything else | a notice with the reason and a *View code* jump | nothing |
 
@@ -42,7 +42,7 @@ A frontmatter const (`<h1>{title}</h1>`), or one item of an array a `.map()` loo
 
 ### Images
 
-Swap a static `src` from the project's images (with thumbnails) or upload a new file, and edit `alt`. Only statically-quoted attributes are editable — `src={…}` and `<Image>` are treated as dynamic.
+`src` and `alt` are Values rows with fields of their own, and above them sits the image picker — thumbnails of the project's images, a filter, and an upload. **Picking stages the value; only Save writes it.** Only statically-quoted attributes are editable — `src={…}` and `<Image>` are treated as dynamic — and an `alt` the source does not contain is named rather than inserted. [MEDIA.md](MEDIA.md) has the whole of it.
 
 ### Markdown-backed content
 
@@ -116,10 +116,11 @@ staged against.
   file and location, and **nothing is written**. Saving against source that
   moved is not one of the options.
 
-`src` and `alt` belong to the image picker rather than to a field. Everything
-else with an `editable` verdict has one: the literal-text targets — text,
-inline markup, a traced expression — the whole HTML string a `set:html` holds,
-and the prop and slot values at a component usage site. A row that is
+Every `editable` verdict has a field: the literal-text targets — text, inline
+markup, a traced expression — the whole HTML string a `set:html` holds, the
+prop and slot values at a component usage site, and an image's `src` and `alt`.
+The image picker is a second view of that `src` row rather than a second way to
+write it: a tile click stages into the same store the field does. A row that is
 `elsewhere` or `read-only` keeps its sentence and its **View code** and has no
 field at all.
 

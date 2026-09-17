@@ -2,37 +2,31 @@ import { isolateScroll, setFreshSrc, styled } from '../ui.ts';
 import { icon } from '../icons.ts';
 
 /**
- * The tile grid shared by both of the media modal's panes. One builder, two
- * caption modes: a filename for a project asset, a photographer credit for an
- * Unsplash photo.
+ * The tile grid the image picker fills.
  *
- * Tile anatomy matters and is easy to get wrong. `atx-media-tile` wraps a
- * `<button>` (the pick target) and the caption as **siblings** — the credit
- * caption contains `<a>` elements, and an anchor nested inside a button is
- * invalid HTML whose click the button would swallow. So a credit link opens the
- * photographer's profile without also selecting the photo.
+ * A standalone factory rather than a corner of the panel that hosts it, which
+ * is what let the picker move out of a modal and into the inspector without
+ * the grid moving at all.
+ *
+ * `atx-media-tile` wraps a `<button>` (the pick target) and the caption as
+ * **siblings** rather than nesting the caption inside the button: a tile is a
+ * picture with a name under it, and the name is not part of what you press.
  *
  * `repeat(auto-fill, minmax(132px, 1fr))` means the column count is correct at
- * any modal width with no media queries and no JS measurement.
+ * any panel width with no media queries and no JS measurement.
  */
 
-export type TileCaption =
-  /** A project asset: its filename, full path on hover. */
-  | { kind: 'name'; text: string; title?: string }
-  /** An Unsplash photo: the attribution the API guidelines require. Both URLs
-   *  arrive from the server already carrying the utm params. */
-  | { kind: 'credit'; photographer: string; photographerUrl: string; pageUrl: string };
+/** A project asset's filename, with its full path on hover. */
+export interface TileCaption { kind: 'name'; text: string; title?: string }
 
 export interface GridTile {
-  /** Stable identity — a web path for project assets, the photo id for Unsplash. */
+  /** Stable identity — the asset's web path. */
   key: string;
   /** What the `<img>` loads. */
   thumbUrl: string;
   /** Written moments ago, so it may still be inside Vite's brief 404 window
    *  and needs the retrying loader (ui.ts::setFreshSrc). */
   fresh?: boolean;
-  /** Average colour, painted behind the thumb so the grid doesn't flash grey. */
-  color?: string;
   /** Accessible name for the pick button. */
   label: string;
   caption: TileCaption;
@@ -65,18 +59,15 @@ export interface MediaGridHandle {
   /** Currently staged key, or null. */
   selected(): string | null;
   select(key: string | null): void;
-  /** Dim one tile and make it inert — an import in flight. Deliberately
-   *  per-tile: taking a global busy lock would break the modal's own Escape
-   *  and backdrop for the duration of a multi-second download. */
-  setTileBusy(key: string, busy: boolean): void;
-  /** Append below the grid (the Load more button lives here). */
+  /** Append below the grid — where the picker's "show more" button lives, and
+   *  the reason paging needs nothing on the wire. */
   footer: HTMLElement;
 }
 
 export interface MediaGridOptions {
-  /** A click on a tile — stages it. */
+  /** The ring moved — a click, or a programmatic {@link MediaGridHandle.select}. */
   onSelect(key: string | null): void;
-  /** Double-click or Enter — the "use this one" shortcut. */
+  /** A tile was chosen: a click, a double-click or Enter. */
   onCommit(key: string): void;
   /** Shown when `setTiles` receives nothing. */
   emptyText?: string;
@@ -84,7 +75,7 @@ export interface MediaGridOptions {
 
 /** How many placeholder tiles a loading grid shows. The tile's own minimum
  *  width lives in styles.ts, where the grid template that uses it is. */
-const SKELETON_COUNT = 6;
+const SKELETON_COUNT = 8;
 
 export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   const el = styled('div', 'atx-media-pane');
@@ -94,7 +85,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   const footer = styled('div', 'atx-media-more');
   el.append(grid, footer);
 
-  /** key → its pick button, for selection and busy state. */
+  /** key → its pick button, for painting the ring. */
   const buttons = new Map<string, HTMLButtonElement>();
   let selectedKey: string | null = null;
 
@@ -114,7 +105,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   };
 
   /** Arrow keys walk the grid. The column count is read from the laid-out
-   *  tiles rather than assumed, so it stays right at any modal width. A
+   *  tiles rather than assumed, so it stays right at any panel width. A
    *  disabled tile still counts, or the geometry the count describes would be
    *  the wrong grid. */
   const columns = (): number => {
@@ -139,8 +130,8 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
   const clearGrid = (): void => {
     grid.textContent = '';
     buttons.clear();
-    // The staged key is gone with its tile; tell the caller so the footer's
-    // "Use image" button can't act on something no longer on screen.
+    // The ringed key is gone with its tile; tell the caller, so nothing acts
+    // on a selection no longer on screen.
     if (selectedKey !== null) {
       selectedKey = null;
       opts.onSelect(null);
@@ -151,10 +142,6 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     const wrap = styled('div', 'atx-media-tile');
 
     const pick = styled('button', 'atx-media-pick');
-    // An Unsplash tile carries the photo's own average colour, so the tile is
-    // never a grey hole while the thumbnail loads. Everything else falls back
-    // to the checkerboard the class already paints.
-    if (tile.color) pick.style.background = tile.color;
     pick.type = 'button';
     pick.setAttribute('aria-label', tile.label);
     pick.title = tile.label;
@@ -167,7 +154,6 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
     // caption still reads and the photo can still be picked.
     img.addEventListener('error', () => {
       img.toggleAttribute('data-hidden', true);
-      pick.style.background = ''; // back to the class's checkerboard
       fallback.toggleAttribute('data-on', true);
     });
     // A retry that finally succeeds must undo that fallback.
@@ -208,8 +194,9 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
       pick.append(note);
     }
 
-    pick.addEventListener('click', () => select(tile.key));
-    pick.addEventListener('dblclick', () => {
+    // One click picks. There is no separate commit button to press afterwards:
+    // picking stages a value, and Save is where the deliberation belongs.
+    pick.addEventListener('click', () => {
       select(tile.key);
       opts.onCommit(tile.key);
     });
@@ -229,9 +216,9 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
         opts.onCommit(tile.key);
       }
     });
-    // Focusing a tile stages it, so keyboard and mouse agree on what "current
-    // choice" means.
-    pick.addEventListener('focus', () => select(tile.key));
+    // Focus deliberately does **not** pick: arrow keys walk the grid to look,
+    // and Enter is what chooses. A focus that picked would stage every tile
+    // swept past on the way to the one wanted.
 
     wrap.append(pick, buildCaption(tile.caption));
     buttons.set(tile.key, pick);
@@ -269,14 +256,6 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
 
     selected: () => selectedKey,
     select,
-
-    setTileBusy(key, busy) {
-      const btn = buttons.get(key);
-      if (!btn) return;
-      // aria-busy is both the accessible state and the style hook; the tile
-      // dims, stops taking clicks and says so with its cursor.
-      btn.setAttribute('aria-busy', busy ? 'true' : 'false');
-    },
   };
 
   /** A full-width row inside the grid — messages must not be laid out as a tile. */
@@ -297,30 +276,7 @@ export function buildMediaGrid(opts: MediaGridOptions): MediaGridHandle {
 /** The caption sits *outside* the pick button — see the module header. */
 function buildCaption(caption: TileCaption): HTMLElement {
   const cap = styled('div', 'atx-media-cap');
-
-  if (caption.kind === 'name') {
-    cap.textContent = caption.text;
-    if (caption.title) cap.title = caption.title;
-    return cap;
-  }
-
-  // Credit is permanently visible rather than revealed on hover: it is what the
-  // API guidelines ask for, and there is no stylesheet to hang a hover on.
-  cap.dataset.credit = '';
-  const author = link('atx-unsplash-author', caption.photographer, caption.photographerUrl);
-  const source = link('atx-unsplash-link', 'Unsplash', caption.pageUrl);
-  cap.append(author, document.createTextNode(' · '), source);
-  cap.title = `${caption.photographer} on Unsplash`;
+  cap.textContent = caption.text;
+  if (caption.title) cap.title = caption.title;
   return cap;
-}
-
-function link(className: string, text: string, href: string): HTMLAnchorElement {
-  const a = styled('a', `atx-unsplash-credit ${className}`);
-  a.href = href;
-  a.target = '_blank';
-  a.rel = 'noreferrer';
-  a.textContent = text;
-  // The tile's own click handler must not fire when the credit is clicked.
-  a.addEventListener('click', (e) => e.stopPropagation());
-  return a;
 }

@@ -16,6 +16,8 @@ Writing an entry — one line, past tense, no essay:
 
 ### Added
 
+- The image picker is a block at the top of the inspector panel instead of a modal: the project's images eight at a time with a filter, the configured `uploadDir` named on screen, and a file a build would not serve dimmed with its reason. **Picking a tile and uploading both stage the `src` and write no source** — the element goes amber and that row's Save is the only thing that touches a file. `src` and `alt` are ordinary Values rows now, with fields of their own; an `alt` the source does not contain is named, never inserted.
+- `GET /__dev-edit/assets` reports `uploadDir` alongside `publicDir`, so the picker can name where an upload will land before one is written.
 - A value the page renders as HTML is now editable as one whole string. `set:html` at a component usage site earns a write verdict like any other prop — it names a value, not structure — and `<div set:html={intro}>` gets a row for the string it renders while the elements inside it keep refusing. Both give a raw-value field, never a structural HTML editor, and neither says anything about what the resulting HTML corresponds to.
 - A quoted `set:html` is read and written as its own source text rather than the decoded value, because Astro injects that attribute undecoded; a value containing the quote that would close it is refused, since no entity can spell one there.
 - Prop and slot rows with an `editable` verdict now carry the same field, Save and Revert that literal text has, through the one staged-value store. The field holds the words, not the bytes — a quoted prop loses its quotes — and the component instance the value was passed to wears the amber outline, so one card of a `.map()` marks on its own. `elsewhere` and `read-only` rows keep their sentence and their *View code*, unchanged.
@@ -37,6 +39,7 @@ Writing an entry — one line, past tense, no essay:
 
 ### Removed
 
+- **Breaking.** Removed the media modal and the `<img>` swap panel. Images are picked in the source inspector (`composition: true`); the legacy overlay answers an image click with the reason and a *View code* jump.
 - **Breaking.** Removed the entry editor, the collection designer and the rich body editor, with the `entryEditor` and `schemaEditor` options and every `/entry*` and `/collection*` endpoint. Markdown and MDX content is no longer edited in the browser: a page that declares a backing file is told which file holds its words, and `documentation/ENTRY-EDITOR.md` is gone.
 - **Breaking.** Removed the Unsplash photo source, with the `unsplash` option, both `/unsplash/*` endpoints and the access-key half of `/settings`. The media picker is a single project-asset grid, and the integration writes no `.env.local`.
 

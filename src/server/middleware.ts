@@ -164,18 +164,25 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
       },
     },
 
-    // Read-only listing for the image-swap panel. No writes anywhere. (spec §6.3)
+    // Read-only listing for the inspector's image picker. No writes anywhere,
+    // and no paging: the whole listing is one metadata array, and which eight
+    // of it are on screen is the picker's own filter and page state. Splitting
+    // that across the wire would put one concern in two places. (spec §6.3)
     {
       method: 'GET',
       path: '/assets',
       label: 'asset listing',
-      handler: async () => ({
-        status: 200,
-        body: {
-          files: await listAssets(root, (await opts()).assetDirs, publicDir),
-          publicDir,
-        },
-      }),
+      handler: async () => {
+        const o = await opts();
+        return {
+          status: 200,
+          body: {
+            files: await listAssets(root, o.assetDirs, publicDir),
+            publicDir,
+            uploadDir: o.uploadDir,
+          },
+        };
+      },
       onError: () => ({ status: 500, body: { error: 'could not list assets' } }),
     },
 
