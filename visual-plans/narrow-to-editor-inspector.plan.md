@@ -7,7 +7,7 @@ plan:
   priority: high
   created: "2026-09-13"
   updated: "2026-09-17"
-  progress: 60
+  progress: 70
   visual: narrow-to-editor-inspector.plan.html
   mockup: narrow-to-editor-inspector.mockup.html
   tags: [scope-reduction, astro, composition, annotations]
@@ -145,7 +145,7 @@ The chain ends honestly at the entry, and that last link is marked **inferred** 
 Classification is unchanged. Composition resolution is new, and runs as its own tiered lookup with every failure named.
 
 1. Click → `/classify` (AST truth; the DOM cannot tell a resolved `{expression}` from literal text).
-2. Editable → a Values row with a field, whatever the transport. For `text` / `markup` the element is *also* made contenteditable so the caret lands where you clicked; both are bound to one value and one Save writes it. Nothing commits on blur — an abandoned edit stays staged and stays marked.
+2. Editable → a Values row with a field, whatever the transport. For `text` alone the element is *also* made contenteditable so the caret lands where you clicked; the field and the page are bound to one value and one Save writes it. `markup`'s value is the element's *source*, which a browser hands back re-spelled, so it is typed in the field only. Nothing commits on blur — an abandoned edit stays staged and stays marked.
 3. Not editable → the inspector opens instead of a modal, carrying the reason.
 4. In parallel, `data-atx-chain` resolves:
    - **present, every id resolves, equation holds at every hop** → `proven`: full chain, props, slot previews, slot relations.
@@ -282,9 +282,9 @@ Rules it must obey:
 - [x] **P6b** — one read-only inspector for every click: Values, Component chain, Slot relationships, CSS, one *View code* verb
 - [x] **P6b** — the row model: every value on a selection is a Values row carrying its own three-state verdict, the clicked value pinned and badged, slot-wrapped values badged `via slot`, and the destination named once behind a `Details` disclosure. `/classify` joins the selection load, since the DOM cannot tell a resolved `{expression}` from literal text
 - [x] **P6b** — staged values and one Save per row, for the literal-text targets (`text` / `markup` / `expression`): a field and one Save/Revert pair under each editable row, the caret on the page for `text`, amber on the element, verify-then-patch unchanged, and a pending edit kept across an unrelated reload or dropped by name
-- [ ] **P6b** — the same field for props and slot text (Iteration 4), and the image grid in place of the modal (P6e)
+- [x] **P6b** — the same field, Save and Revert for props and slot text, through the one staged-value store; `elsewhere` and `read-only` rows keep their sentence and their *View code*. The image grid in place of the modal is P6e
 - [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
-- [ ] **P6c** — prop and slot-text editing at proven source targets, including whole HTML string values and destination-aware encoding (closes #61)
+- [ ] **P6c** — prop and slot-text editing at proven source targets, with destination-aware encoding, lands via `/composition/apply` and `usage-write.ts`; the render ordinal earns back `unproven-entry` for a proven 1:1 `.map()`. **Whole HTML string values and `set:html` destinations are outstanding**, so the box stays open and #61 is not yet closed
 - [ ] **P6d** — Markdown-backed routes: source-file navigation for frontmatter and body content; no browser writes
 - [ ] **P6e** — image picker: filter across the project's assets, paged browsing, and upload into the configured `uploadDir`
 - [ ] **P7** — committed fixture site with a genuine 3-deep chain; real-site pass on both fixtures
@@ -302,9 +302,9 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [x] Slotted content is marked as slotted, and its chain is a strict prefix of its DOM parent's
 - [ ] `data-atx-file` count in the live DOM equals the served count on Astro 5.18 and 7.1.1, with the dev toolbar both on and off
 - [x] No route under `/__dev-edit` answers a CMS path; `/health` reports no `entryEditor` or `unsplash`
-- [ ] A quoted prop edited from the inspector lands as a byte-level patch at the usage site, and a stale one refuses rather than writes
-- [ ] A `{s.title}` prop inside a `.map()` edits **only** the clicked instance, and names which array entry it wrote
-- [ ] String values containing braces, angle brackets and quotes save and read back unchanged; text remains text and HTML-valued destinations retain HTML behavior
+- [x] A quoted prop edited from the inspector lands as a byte-level patch at the usage site, and a stale one refuses rather than writes
+- [x] A `{s.title}` prop inside a `.map()` edits **only** the clicked instance, and names which array entry it wrote
+- [x] String values containing braces, angle brackets and quotes save and read back unchanged at a usage site; HTML-valued destinations are outstanding with P6c's HTML half
 - [ ] A known HTML string is editable as a whole even when its generated descendants have no proven component relationships
 - [x] Computed, spread, styling and untraceable props render `read-only` with a named reason, and imported ones `elsewhere` naming their module
 - [x] No refused value ever offers an editable field that then fails on save — a field appears only for an `editable` verdict whose target the write path serves, which is what `unproven-entry` exists to keep true
@@ -312,7 +312,7 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [ ] Nothing reaches disk before Save: a typed change, a picked image and an upload all leave the source byte-identical, and the element stays marked unsaved until Save
 - [x] Releasing ⌥ restores ordinary navigation while the inspector keeps its selection, and leaves any pending edit pending rather than committing it
 - [x] A pending edit survives an unrelated HMR update, and is discarded with a toast when its own file changed
-- [ ] A literal rendered on two routes edits as one value and writes one line, and both elements mark unsaved together
+- [x] A literal rendered on two routes edits as one value and writes one line, and both elements mark unsaved together
 - [x] A value writable in another file reads `elsewhere` with that file named — never `read-only`
 - [x] A value wrapped in slot markup is an editable row badged `via slot`, not a read-only slot preview
 - [ ] Markdown frontmatter, plain paragraphs and formatted paragraphs all offer source navigation without editable fields or Save

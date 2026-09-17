@@ -24,7 +24,7 @@ import type { ValueTarget } from './value-model.ts';
  *
  * Nothing here writes or stages. A row says which of the three verdicts it is
  * and names the target it would write into; whether a field appears under it
- * is `value-model.ts::stageable`'s answer, not this module's — one place says
+ * is `value-model.ts::writable`'s answer, not this module's — one place says
  * what a value *is*, another says what the write path can serve.
  */
 
@@ -55,8 +55,14 @@ export interface ValueRow {
   reason?: UsageRefusal | 'imported';
   /** One line naming what this value *is*, in no mechanism vocabulary. */
   caption: string;
-  /** The value as the source spells it — the field's starting text, and the
-   *  apply op's `original`. */
+  /**
+   * The words — the field's starting text and the apply op's `original`.
+   *
+   * For an editable value at a usage site that is the server's `value`, not
+   * its `source`: the bytes of `title="Protected"` include the quotes, and a
+   * field editing those would be editing syntax. A refused row shows the
+   * source instead, because there the spelling *is* the thing to look at.
+   */
   value: string;
   /** Where *View code* lands — the file holding the words, not the file the
    *  element was rendered into. Null when nothing is proven. */
@@ -103,6 +109,13 @@ export interface ValueSelection {
 
 export interface ValueRowsInput {
   selection: ValueSelection;
+  /** The route the chain was resolved on. A usage id means nothing without
+   *  it — the index that resolves one is route-scoped. */
+  pathname: string;
+  /** Which render of each usage site produced the selection, keyed by usage
+   *  id. `render-occurrences.ts::chainOrdinals` reads them off the page; a
+   *  site missing from it has an unknown render, which is `0`. */
+  ordinals?: Readonly<Record<string, number>>;
   /** Null when `/classify` was not reached; `classifyError` then says why. */
   classification: ClassifyResult | null;
   classifyError?: string;
@@ -203,7 +216,8 @@ function pinnedRows(input: ValueRowsInput): ValueRow[] {
 }
 
 /** Every value passed at a usage site, nearest site first. */
-function usageRows(links: readonly UsageLink[]): ValueRow[] {
+function usageRows(links: readonly UsageLink[], pathname: string,
+  ordinals: Readonly<Record<string, number>>): ValueRow[] {
   const rows: ValueRow[] = [];
   // Route-first on the wire; nearest-first to read, because the site that
   // handed this element its values is the one worth seeing without scrolling.
@@ -214,9 +228,9 @@ function usageRows(links: readonly UsageLink[]): ValueRow[] {
       const write = verdictOf(prop);
       rows.push({
         key: `${link.id}|prop|${prop.name}|${prop.start ?? 'unlocated'}`,
-        target: { kind: 'usage', usageId: link.id, file: link.file, loc: link.loc,
-          name: prop.name, slot: false, start: prop.start, end: prop.end },
-        label: prop.name, ...write, value: prop.source, destination: at,
+        target: { kind: 'usage', usageId: link.id, pathname, file: link.file, loc: link.loc,
+          name: prop.name, slot: false, ordinal: ordinals[link.id] ?? 0, start: prop.start, end: prop.end },
+        label: prop.name, ...write, value: prop.value ?? prop.source, destination: at,
         badges: [], pinned: false, depth,
         caption: write.verdict !== 'editable' ? write.caption
           : prop.trace ? 'One hop to a literal in this file.'
@@ -230,10 +244,10 @@ function usageRows(links: readonly UsageLink[]): ValueRow[] {
       const write = verdictOf(slot);
       rows.push({
         key: `${link.id}|slot|${slot.start}`,
-        target: { kind: 'usage', usageId: link.id, file: link.file, loc: link.loc,
-          name: slot.name, slot: true, start: slot.start, end: slot.end },
+        target: { kind: 'usage', usageId: link.id, pathname, file: link.file, loc: link.loc,
+          name: slot.name, slot: true, ordinal: ordinals[link.id] ?? 0, start: slot.start, end: slot.end },
         label: slot.name === 'default' ? 'slot' : `slot: ${slot.name}`,
-        ...write, value: slot.source, destination: at,
+        ...write, value: slot.value ?? slot.source, destination: at,
         // Slot words arrive through the wrapper the caller passed, which is
         // exactly what the badge says — and what keeps them from reading as
         // a property of the component that renders them (WF-4 item 9).
@@ -250,7 +264,7 @@ function usageRows(links: readonly UsageLink[]): ValueRow[] {
 /** Build the Values card's rows for one selection. */
 export function buildValueRows(input: ValueRowsInput): ValueRows {
   const { selection, classification, classifyError, links } = input;
-  const rows = [...pinnedRows(input), ...usageRows(links)];
+  const rows = [...pinnedRows(input), ...usageRows(links, input.pathname, input.ordinals ?? {})];
   if (rows.length) return { rows, refusal: null };
   if (selection.opaque) {
     return { rows, refusal: 'Generated HTML — its inner elements have no proven source relationship.' };

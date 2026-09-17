@@ -1,7 +1,10 @@
-import type { ApplyRequestWire } from '../shared/protocol.ts';
+import type { ApplyRequestWire, UsageApplyRequest } from '../shared/protocol.ts';
 import { annotatedElements, sourceFor } from './source-map.ts';
 import { COLOR } from './ui.ts';
-import { createValueStore, typesOnPage, type ElementTarget, type StagedValue } from './value-model.ts';
+import {
+  createValueStore, typesOnPage,
+  type ElementTarget, type StagedValue, type ValueTarget,
+} from './value-model.ts';
 
 /**
  * A staged value, everywhere it shows: the field in the panel, the caret on
@@ -61,13 +64,28 @@ const NOTICE_KEY = 'astro-dev-edit:staged-dropped';
 export interface StagedValues {
   /** Type into a value. `rendered` is what the page showed when the edit began
    *  — for `markup` that is not the value, which is the element's source. */
-  stage(target: ElementTarget, original: string, current: string, rendered?: string): void;
+  stage(target: ValueTarget, original: string, current: string, rendered?: string): void;
   /** Throw the pending edit away and put the page back the way it read. */
   revert(key: string): void;
   /** Write it. Resolves to null on success, or the refusal to show in the row —
    *  a stale source refuses here rather than being overwritten (rule 5). */
   save(key: string): Promise<string | null>;
-  get(target: ElementTarget, original: string): StagedValue | undefined;
+  get(target: ValueTarget, original: string): StagedValue | undefined;
+  /**
+   * The pending value on this target that the page is *currently showing*.
+   *
+   * An element value is keyed by the words the source held, and a pending edit
+   * has already replaced the words on screen — so a row rebuilt from the page
+   * (re-selecting the element, or selecting it on another route after a
+   * restore) knows `current`, not `original`. Asking for it by what is shown
+   * is what keeps that row's Save sending the `original` the server will
+   * verify against, instead of the text it is about to replace.
+   *
+   * Undefined when two pending values on one target were typed to the same
+   * words: which one is being looked at is then unknowable, and a wrong
+   * `original` is worse than a refused save.
+   */
+  pendingFor(target: ValueTarget, shown: string): StagedValue | undefined;
   pending(): readonly StagedValue[];
   /**
    * Drop every pending edit that writes into `file`, returning what went, so
@@ -106,6 +124,9 @@ export interface StagedValues {
 
 export interface StagedValuesDeps {
   apply(request: ApplyRequestWire): Promise<void>;
+  /** The usage-site half. Two endpoints, because the two targets are addressed
+   *  differently — one store, because they are the same gesture. */
+  applyUsage(request: UsageApplyRequest): Promise<void>;
 }
 
 /** What an outline overwrote, so reverting the mark restores the author's own
@@ -151,12 +172,34 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
    * element found while it is being typed into.
    */
   function findElements(entry: StagedValue): HTMLElement[] {
+    if (entry.target.kind === 'usage') return instanceElements(entry.target);
     const wanted = [entry.rendered.trim(), entry.current.trim()];
+    const target = entry.target;
     return annotatedElements().filter(el => {
       const src = sourceFor(el);
-      if (!src || src.file !== entry.target.file || src.loc !== entry.target.loc) return false;
+      if (!src || src.file !== target.file || src.loc !== target.loc) return false;
       return wanted.includes((el.textContent ?? '').trim());
     });
+  }
+
+  /**
+   * What a usage-site value marks: the component instance it was passed to.
+   *
+   * A prop is read somewhere inside that component and a slot run is rendered
+   * inside it, and neither leaves a mark on one element the page could be
+   * asked for — so the honest answer is the instance, and the outermost
+   * elements it rendered are what draws it. The chain ends with the usage id
+   * and the ordinal picks the render, so the second card of a `.map()` goes
+   * amber on its own, which is the whole point.
+   */
+  function instanceElements(target: { usageId: string; ordinal: number }): HTMLElement[] {
+    const inside = annotatedElements().filter(el => {
+      const chain = el.getAttribute('data-atx-chain') ?? '';
+      if (!chain.endsWith('.' + target.usageId)) return false;
+      const ordinal = el.getAttribute('data-atx-ordinal');
+      return !target.ordinal || ordinal === String(target.ordinal);
+    });
+    return inside.filter(el => !inside.some(other => other !== el && other.contains(el)));
   }
 
   function elementsFor(entry: StagedValue): HTMLElement[] {
@@ -187,11 +230,16 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
       if (!Array.isArray(parsed)) return [];
       // Shape-checked rather than trusted: this crossed a storage boundary,
       // and a half-written entry must not become a write target.
-      return parsed.filter((entry): entry is StagedValue =>
-        !!entry && typeof entry.original === 'string' && typeof entry.current === 'string' &&
-        typeof entry.rendered === 'string' && !!entry.target &&
-        entry.target.kind === 'element' && typeof entry.target.file === 'string' &&
-        typeof entry.target.loc === 'string' && typeof entry.target.tag === 'string');
+      return parsed.filter((entry): entry is StagedValue => {
+        if (!entry || typeof entry.original !== 'string' || typeof entry.current !== 'string' ||
+          typeof entry.rendered !== 'string' || !entry.target) return false;
+        const target = entry.target;
+        if (typeof target.file !== 'string' || typeof target.loc !== 'string') return false;
+        return target.kind === 'element' ? typeof target.tag === 'string'
+          : target.kind === 'usage' && typeof target.usageId === 'string' &&
+            typeof target.pathname === 'string' && typeof target.name === 'string' &&
+            typeof target.ordinal === 'number' && typeof target.slot === 'boolean';
+      });
     } catch {
       return [];
     }
@@ -239,7 +287,7 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
     for (const el of elementsFor(entry)) if (el !== except) el.textContent = entry.current;
   }
 
-  function stage(target: ElementTarget, original: string, current: string, rendered = original) {
+  function stage(target: ValueTarget, original: string, current: string, rendered = original) {
     const entry = store.stage(target, original, current, rendered);
     if (entry) mirror(entry, document.activeElement instanceof HTMLElement ? document.activeElement : null);
   }
@@ -256,11 +304,20 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
   async function save(key: string): Promise<string | null> {
     const entry = store.byKey(key);
     if (!entry) return null;
+    const target = entry.target;
     try {
-      await deps.apply({
-        file: entry.target.file, loc: entry.target.loc, tag: entry.target.tag,
-        ops: [{ targetType: entry.target.targetType, original: entry.original, newText: entry.current }],
-      });
+      if (target.kind === 'usage') {
+        await deps.applyUsage({
+          pathname: target.pathname, usageId: target.usageId, ordinal: target.ordinal,
+          target: { kind: target.slot ? 'slot' : 'prop', name: target.name, start: target.start ?? -1 },
+          original: entry.original, newText: entry.current,
+        });
+      } else {
+        await deps.apply({
+          file: target.file, loc: target.loc, tag: target.tag,
+          ops: [{ targetType: target.targetType, original: entry.original, newText: entry.current }],
+        });
+      }
     } catch (error) {
       // The value stays staged and stays amber: a refused write has changed
       // nothing, and dropping what was typed would be a second loss.
@@ -333,6 +390,7 @@ export function createStagedValues(deps: StagedValuesDeps): StagedValues {
     stage, revert, save, editOnPage, stopEditing,
     isEditing: () => editing !== null,
     get: (target, original) => store.get(target, original),
+    pendingFor: (target, shown) => store.showing(target, shown),
     pending: () => store.all(),
     dropFile(file) {
       stopEditing();

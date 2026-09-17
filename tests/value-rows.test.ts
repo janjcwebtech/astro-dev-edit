@@ -11,9 +11,10 @@ import { buildValueRows, chainBadges, type ValueRowsInput } from '../src/client/
  */
 
 const prop = (name: string, source: string, write: Partial<UsageProp> = {}): UsageProp =>
-  ({ name, kind: 'quoted', source, start: 0, end: source.length, verdict: 'editable', ...write } as UsageProp);
+  ({ name, kind: 'quoted', source, start: 0, end: source.length, verdict: 'editable',
+    value: source.replace(/^['"]|['"]$/g, ''), ...write } as UsageProp);
 const slot = (source: string, write: Partial<UsageSlot> = {}): UsageSlot =>
-  ({ name: 'default', start: 0, end: source.length, source, verdict: 'editable', ...write } as UsageSlot);
+  ({ name: 'default', start: 0, end: source.length, source, verdict: 'editable', value: source, ...write } as UsageSlot);
 
 const link = (id: string, file: string, over: Partial<UsageLink> = {}): UsageLink => ({
   id, file, loc: '9:3', offset: 0, name: 'Card', target: '/Card.astro',
@@ -23,6 +24,7 @@ const link = (id: string, file: string, over: Partial<UsageLink> = {}): UsageLin
 const input = (over: Partial<ValueRowsInput> = {}): ValueRowsInput => ({
   selection: { source: { file: '/Card.astro', loc: '5:3' }, opaque: false, viaSlot: false, text: 'Protected', tag: 'h2' },
   classification: { kind: 'text', reason: 'Literal text.' },
+  pathname: '/',
   links: [],
   ...over,
 });
@@ -124,9 +126,27 @@ describe('every usage-site value becomes a row that keeps its own verdict', () =
         slots: [slot('Start', { start: 60, end: 65 })],
       })],
     }));
-    expect(rows[1].target).toEqual({ kind: 'usage', usageId: 'k3f9', file: '/Page.astro', loc: '9:3',
-      name: 'title', slot: false, start: 40, end: 51 });
+    expect(rows[1].target).toEqual({ kind: 'usage', usageId: 'k3f9', pathname: '/', file: '/Page.astro',
+      loc: '9:3', name: 'title', slot: false, ordinal: 0, start: 40, end: 51 });
     expect(rows[2].target).toMatchObject({ kind: 'usage', slot: true, name: 'default', start: 60, end: 65 });
+  });
+
+  it('shows an editable value its words, and a refused one its bytes', () => {
+    const { rows } = buildValueRows(input({
+      ordinals: { k3f9: 2 },
+      links: [link('k3f9', '/Page.astro', {
+        props: [
+          prop('title', '"x &amp; y"', { value: 'x & y' }),
+          prop('featured', 'i === 0', { kind: 'expression', verdict: 'read-only', reason: 'computed', value: undefined }),
+        ],
+      })],
+    }));
+    // A field editing `"x &amp; y"` would be editing syntax; the row's value is
+    // what the words are, and the byte range stays on the target.
+    expect(rows[1]).toMatchObject({ label: 'title', value: 'x & y' });
+    expect(rows[1].target).toMatchObject({ kind: 'usage', ordinal: 2 });
+    // Where the spelling *is* the thing to look at, the source is what shows.
+    expect(rows[2]).toMatchObject({ label: 'featured', value: 'i === 0', verdict: 'read-only' });
   });
 
   it('gives every row a key of its own, so two props holding one string stay two rows', () => {

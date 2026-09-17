@@ -6,12 +6,19 @@ import RepeatSlots from './RepeatSlots.astro';
 import ForwardSlots from './ForwardSlots.astro';
 import Mutating from './Mutating.astro';
 import Delayed from './Delayed.astro';
+import Card from './Card.astro';
+import Shared from './Shared.astro';
 import { TAGLINE } from './site-data.mjs';
+const cards = [{ title: 'Card one' }, { title: 'Card two' }];
 ---
 <html><body>
   {[1, 2].map(label => <Rootless label={label} />)}
   <RecursiveSpread depth={2} />
   <Forward title="Protected" eyebrow={TAGLINE} />
+  {cards.map((card, i) => <Card title={card.title} instance={`mapped-${i}`} />)}
+  <Card title="Plain" instance="plain">Start a project</Card>
+  <Shared />
+  <Shared />
   <RepeatSlots>
     <span data-repeated-slot>Repeated words</span>
     <Rootless slot="detail" label="slotted" />

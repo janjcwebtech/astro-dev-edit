@@ -14,18 +14,23 @@ import type { TargetType } from '../shared/protocol.ts';
  * comparable: the page says what it showed, and a source that has moved on
  * refuses rather than being overwritten.
  *
- * ## Two kinds of target, and why only one of them is written
+ * ## Two kinds of target, addressed two ways
  *
- * A **source loc** does not move when an edit lands earlier in the same file —
- * it is a line and a column the compiler recomputes on every parse. A **byte
- * range** does. That difference is the whole reason a pending edit can be
- * re-found after an unrelated HMR update: the element's `file:loc` still names
- * it, where `start`/`end` would silently point at different bytes.
+ * {@link ElementTarget} is the clicked element's own value, proven by
+ * `/classify` and written through `/apply`. It is addressed by `file:loc`,
+ * which does *not* move when an edit lands earlier in the same file — the
+ * compiler recomputes it on every parse — and that is what lets a pending edit
+ * be re-found after an unrelated HMR update.
  *
- * So {@link ElementTarget} — the clicked element's own value, proven by
- * `/classify` and written through `/apply` — is what stages. A usage-site prop
- * or slot run is a byte range at a usage id, and {@link stageable} refuses it
- * by returning null rather than offering a field the write path cannot serve.
+ * {@link UsageTarget} is a value passed at a component usage site, written
+ * through `/composition/apply`. It is addressed by a **usage id**, and its
+ * `start` is a byte offset the server only ever uses to *select* among the
+ * values it parses for itself. Bytes do move, which is why they are a selector
+ * and not a write offset, and why the server refuses when nothing of its own
+ * starts there.
+ *
+ * {@link writable} is the one place that says which targets the write path
+ * serves at all — `src` and `alt` are the image picker's, not a field's.
  */
 
 /** The clicked element's own value, addressed the way `/apply` addresses it. */
@@ -38,17 +43,25 @@ export interface ElementTarget {
   targetType: TargetType;
 }
 
-/** A value passed at a component usage site: a byte range at a usage id.
- *  Read-only here — writing one is the prop/slot editing layer. */
+/** A value passed at a component usage site, addressed the way
+ *  `/composition/apply` addresses it. */
 export interface UsageTarget {
   kind: 'usage';
   usageId: string;
-  /** The file the usage site is written in — where *View code* lands. */
+  /** The route the id was resolved on. The usage index is route-scoped, so it
+   *  is what turns the id back into a file — and it travels with the value
+   *  because a pending edit outlives the page it was made on. */
+  pathname: string;
+  /** The file the usage site is written in — where *View code* lands, and what
+   *  an HMR drop matches against. Never sent: the server resolves its own. */
   file: string;
   loc: string;
   /** The prop's name, or the slot's. */
   name: string;
   slot: boolean;
+  /** Which render of this usage site the panel was describing. `0` is unknown,
+   *  and a value read from a `.map()` then refuses. */
+  ordinal: number;
   start?: number;
   end?: number;
 }
@@ -67,39 +80,46 @@ const STAGEABLE: ReadonlySet<TargetType> = new Set<TargetType>(['text', 'markup'
 
 /** Whether typing on the page itself can drive this value.
  *
- *  Only `text`. `markup`'s value is the element's *source* — how entities and
- *  attribute quotes were spelled — and a browser hands back normalised
- *  `innerHTML`, so a caret on the page would rewrite the spelling of every
- *  tag in the element as the price of fixing one word. `expression` renders a
- *  string that lives in the frontmatter, which is not the text node at all. */
-export const typesOnPage = (target: ElementTarget): boolean => target.targetType === 'text';
+ *  Only an element's `text`. `markup`'s value is the element's *source* — how
+ *  entities and attribute quotes were spelled — and a browser hands back
+ *  normalised `innerHTML`, so a caret on the page would rewrite the spelling
+ *  of every tag in the element as the price of fixing one word. `expression`
+ *  renders a string that lives in the frontmatter, which is not the text node
+ *  at all, and a usage-site value is rendered somewhere inside a component. */
+export const typesOnPage = (target: ValueTarget): boolean =>
+  target.kind === 'element' && target.targetType === 'text';
 
-/** The element target this row writes through, or null when the write path
- *  does not serve it — a usage-site value, or an image attribute. */
-export function stageable(target: ValueTarget): ElementTarget | null {
-  return target.kind === 'element' && STAGEABLE.has(target.targetType) ? target : null;
+/** The target this row writes through, or null when the write path does not
+ *  serve it — today that is only an image attribute, which the picker owns. */
+export function writable(target: ValueTarget): ValueTarget | null {
+  return target.kind === 'usage' || STAGEABLE.has(target.targetType) ? target : null;
 }
 
 /**
  * One value's identity.
  *
- * `file|loc|targetType` is the value, not the element: a literal rendered on
- * two routes, or a component used twice, is one string on one line, so both
- * elements stage together and both go amber together.
+ * For an element, `file|loc|targetType` is the value rather than the element:
+ * a literal rendered on two routes, or a component used twice, is one string
+ * on one line, so both elements stage together and both go amber together.
+ * `original` is part of it because a `.map()` breaks the other half of that —
+ * every card shares one source loc, and the rendered text is the only thing
+ * separating them, which is exactly what the apply op sends. Two cards reading
+ * identically collapse to one key here, and the server refuses that pair as
+ * ambiguous rather than writing to a guess.
  *
- * `original` is part of the identity because a `.map()` breaks the other half
- * of that: every card shares one source loc, and the rendered text is the only
- * thing separating them — which is exactly what the apply op sends. Two cards
- * reading identically collapse to one key here, and the server refuses that
- * pair as ambiguous rather than writing to a guess.
+ * For a usage-site value the ordinal separates the renders instead, so two
+ * cards reading identically are still two values. It has to: the whole point
+ * of the ordinal is that render 2 writes array entry 2 whatever it says.
  */
-export function valueKey(target: ElementTarget, original: string): string {
-  return `${target.file}|${target.loc}|${target.targetType}|${original}`;
+export function valueKey(target: ValueTarget, original: string): string {
+  return target.kind === 'element'
+    ? `${target.file}|${target.loc}|${target.targetType}|${original}`
+    : `${target.usageId}|${target.slot ? 'slot' : 'prop'}|${target.name}|${target.start}|${target.ordinal}`;
 }
 
 export interface StagedValue {
   key: string;
-  target: ElementTarget;
+  target: ValueTarget;
   /** What the source held when the edit began — the apply op's `original`. */
   original: string;
   /** What has been typed. Never equal to `original`: a value typed back to
@@ -112,12 +132,35 @@ export interface StagedValue {
   rendered: string;
 }
 
+/** Same value, whatever words it is carrying — {@link valueKey} minus the
+ *  `original` an element value is keyed by. */
+export function sameTarget(a: ValueTarget, b: ValueTarget): boolean {
+  if (a.kind !== b.kind) return false;
+  return a.kind === 'element'
+    ? a.file === b.file && a.loc === b.loc && a.targetType === (b as ElementTarget).targetType
+    : valueKey(a, '') === valueKey(b, '');
+}
+
 export interface ValueStore {
   /** Stage `current` against the value `original` names. Typing the original
    *  text back discards the entry rather than keeping a clean one. Returns the
    *  entry, or null when nothing is pending. */
-  stage(target: ElementTarget, original: string, current: string, rendered?: string): StagedValue | null;
-  get(target: ElementTarget, original: string): StagedValue | undefined;
+  stage(target: ValueTarget, original: string, current: string, rendered?: string): StagedValue | null;
+  get(target: ValueTarget, original: string): StagedValue | undefined;
+  /**
+   * The pending value on this target that the page is *currently showing*.
+   *
+   * An element value is keyed by the words the source held, and a pending edit
+   * has already replaced the words on screen — so a row rebuilt from the page
+   * knows `current`, not `original`. Asking by what is shown is what keeps
+   * that row's Save sending the `original` the server verifies against,
+   * instead of the text it is about to replace.
+   *
+   * Undefined when two pending values on one target were typed to the same
+   * words: which one is being looked at is then unknowable, and a wrong
+   * `original` is worse than a refused save.
+   */
+  showing(target: ValueTarget, shown: string): StagedValue | undefined;
   byKey(key: string): StagedValue | undefined;
   /** Every pending value, in the order it was first staged. */
   all(): readonly StagedValue[];
@@ -159,6 +202,13 @@ export function createValueStore(): ValueStore {
       return entry;
     },
     get: (target, original) => staged.get(valueKey(target, original)),
+    showing(target, shown) {
+      const direct = staged.get(valueKey(target, shown));
+      if (direct) return direct;
+      const candidates = [...staged.values()].filter(entry =>
+        sameTarget(entry.target, target) && entry.current.trim() === shown.trim());
+      return candidates.length === 1 ? candidates[0] : undefined;
+    },
     byKey: key => staged.get(key),
     all: () => [...staged.values()],
     discard(key) {

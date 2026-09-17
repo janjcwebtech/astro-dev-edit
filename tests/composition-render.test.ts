@@ -151,8 +151,11 @@ for (const compiler of [...(canRenderGo ? ['go'] : []), ...(hasRust && peerMajor
       expect(named).toHaveLength(2);
       expect(named[0].group).toBe(named[1].group);
       expect(named[0].slots.map(s => s.name)).toEqual(['detail', 'detail']);
+      // The `<RepeatSlots />` fallbacks, plus one `<em>Fallback heading</em>`
+      // per `<Card />` on this route that supplies no heading slot — the two
+      // mapped cards and the one carrying literal slot text.
       const fallback = result.occurrences.filter(o => elements[o.key].startsWith('<em'));
-      expect(fallback).toHaveLength(3);
+      expect(fallback).toHaveLength(6);
       expect(fallback.every(o => o.slots.at(-1)?.fallback)).toBe(true);
       for (const speed of ['slow', 'fast']) {
         const [occurrence] = placed(`data-delayed-slot="${speed}"`);

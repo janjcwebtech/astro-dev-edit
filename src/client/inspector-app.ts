@@ -46,7 +46,7 @@ export function initInspectorApp() {
   const chainLinks = createChainLinks(api);
   /** Every pending edit on this page, and the amber it wears. One store, so
    *  the panel's field and the caret on the page are two views of one value. */
-  const staging = createStagedValues({ apply: api.apply });
+  const staging = createStagedValues({ apply: api.apply, applyUsage: api.applyUsage });
 
   const hoverOutline = styled('div', 'atx-inspector-hover');
   const pill = styled('div', 'atx-inspector-pill');

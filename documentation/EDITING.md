@@ -18,6 +18,7 @@ The [README](../README.md) has the short version; this is the whole of it.
 | Literal text in an `.astro` template | inline edit — Enter or blur saves, Esc cancels | the element's text |
 | Text carrying inline markup | a **markup popup** | the element's source |
 | Text rendered through an `{expression}` | a **value popup** | the string in the frontmatter |
+| A prop or slot value at a component usage site | a **Values** row with a field | the attribute, the frontmatter string, or the slot text — in the caller's file |
 | A static `<img>` | the **image panel** | `src` and `alt` |
 | A page declaring a backing `.md`/`.mdx` | a notice naming that file, to open in your IDE | nothing |
 | Anything else | a notice with the reason and a *View code* jump | nothing |
@@ -77,10 +78,22 @@ and the field are two views of one value: type in either, save from either.
   picked" must never read as "this is on disk". The panel header carries the
   same answer as a `saved` / `N unsaved` badge.
 - **Literal text is typed on the page.** Alt-clicking text puts the caret where
-  you clicked and mirrors what you type into the field. Inline markup and a
-  traced expression are typed in the field only — markup's value is the
-  element's *source*, which a browser hands back re-spelled, and an
-  expression's words live in the frontmatter rather than in the text node.
+  you clicked and mirrors what you type into the field. Everything else is
+  typed in the field only — markup's value is the element's *source*, which a
+  browser hands back re-spelled; an expression's words live in the frontmatter
+  rather than in the text node; and a value passed at a usage site is rendered
+  somewhere inside a component.
+- **A prop or slot value is edited where it is written, not where it is read.**
+  A quoted prop writes the attribute at the usage site, a traced prop writes
+  the frontmatter string it reads, and literal slot text writes the caller's
+  file — never the component's. The field holds the **words**: `title="…"`
+  loses its quotes, and braces, angle brackets and quotes you type are encoded
+  for wherever they are going, so they stay words.
+- **A value inside a `.map()` writes the entry that render read.** Editing the
+  second card moves the second array entry. That needs the chain to be proven;
+  where it is not, the row reads *which array entry it reads is not yet
+  proven* and has no field. The element the value was passed to wears the
+  amber outline, so one card of a loop marks on its own.
 - **A value is a source location, not an element.** A literal a layout renders
   on two routes is one value writing one line, so both elements go amber
   together and one Save covers them.
@@ -103,10 +116,12 @@ staged against.
   file and location, and **nothing is written**. Saving against source that
   moved is not one of the options.
 
-Only the literal-text targets are writable from the panel today: text, inline
-markup and a traced expression. A prop or slot value at a component usage site
-shows its verdict and its **View code**, with no field; `src` and `alt` belong
-to the image picker.
+`src` and `alt` belong to the image picker rather than to a field. Everything
+else with an `editable` verdict has one: the literal-text targets — text,
+inline markup, a traced expression — and the prop and slot values at a
+component usage site. Whole HTML string values are not written from here yet.
+A row that is `elsewhere` or `read-only` keeps its sentence and its **View
+code** and has no field at all.
 
 ## The hover pill and source peek
 

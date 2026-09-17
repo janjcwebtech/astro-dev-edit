@@ -9,7 +9,7 @@ import { createInspectorLoader, occurrenceSummary } from './inspector-model.ts';
 import { nearestOwnSource, sourceFor } from './source-map.ts';
 import type { StagedValues } from './staged-values.ts';
 import { basename, footButton, inputEl, isolateScroll, setButtonEnabled, styled, toast } from './ui.ts';
-import { stageable, typesOnPage, type ElementTarget } from './value-model.ts';
+import { typesOnPage, writable, type ElementTarget, type ValueTarget } from './value-model.ts';
 import { buildValueRows, chainBadges, type ValueRow, type ValueRows, type ValueSelection } from './value-rows.ts';
 
 export interface InspectorDeps {
@@ -214,8 +214,11 @@ export function initInspector(deps: InspectorDeps) {
    * the row keeps the change, the element keeps its amber outline, and the
    * only way to disk is deliberate.
    */
-  function valueField(parent: HTMLElement, row: ValueRow, target: ElementTarget) {
-    const original = row.value;
+  function valueField(parent: HTMLElement, row: ValueRow, target: ValueTarget) {
+    // A row built from the page describes what the page is *showing*, and a
+    // pending edit has already changed that. The store still knows what the
+    // source held, and that is what Save has to send (rule 5).
+    const original = deps.staging.pendingFor(target, row.value)?.original ?? row.value;
     // A sentence of prose does not belong in a 32px input; Shift+Enter breaks
     // its lines, because Enter is spoken for.
     const long = original.length > 70 || original.includes('\n');
@@ -305,7 +308,7 @@ export function initInspector(deps: InspectorDeps) {
     // A field replaces the read-only value rather than sitting under it: two
     // copies of one string, one of them editable, is a question about which
     // is the value.
-    const target = row.verdict === 'editable' ? stageable(row.target) : null;
+    const target = row.verdict === 'editable' ? writable(row.target) : null;
     if (target) valueField(built.content, row, target);
     else {
       const value = styled('pre', 'atx-inspector-code');
@@ -314,11 +317,7 @@ export function initInspector(deps: InspectorDeps) {
       // An `editable` verdict says the source proves a target; it does not say
       // this build can write to it. Saying which is missing beats a disabled
       // control that repeats the value above it and does nothing.
-      if (row.verdict === 'editable') {
-        note(built.content, row.target.kind === 'usage'
-          ? 'Writable at its usage site — editing props and slot text from here is not built yet. View code opens it.'
-          : 'Edited with the image picker, not as text.');
-      }
+      if (row.verdict === 'editable') note(built.content, 'Edited with the image picker, not as text.');
     }
 
     const foot = styled('div', 'atx-value-foot');
@@ -490,7 +489,8 @@ export function initInspector(deps: InspectorDeps) {
     }
     if (!answer || !alive()) return;
     const model = buildValueRows({
-      selection, classification: answer.classification, classifyError: answer.classifyError,
+      selection, pathname, ordinals,
+      classification: answer.classification, classifyError: answer.classifyError,
       links: answer.chain?.links ?? [],
     });
     renderValues(values, model, jump);
@@ -498,10 +498,14 @@ export function initInspector(deps: InspectorDeps) {
     // so for a value the page can type into, the element itself becomes the
     // other view of the field that was just built. Both drive one store entry.
     const pinned = model.rows.find(row => row.pinned && row.verdict === 'editable');
-    const onPage = pinned && stageable(pinned.target);
-    if (pinned && onPage && typesOnPage(onPage)) {
-      pageEdit = { target: onPage, original: pinned.value };
-      deps.staging.editOnPage(el, onPage, pinned.value);
+    const onPage = pinned && pinned.target.kind === 'element' && typesOnPage(pinned.target)
+      ? pinned.target : null;
+    if (pinned && onPage) {
+      // The same correction as the field's: the caret joins the value the
+      // store is holding, not the pending words already on screen.
+      const original = deps.staging.pendingFor(onPage, pinned.value)?.original ?? pinned.value;
+      pageEdit = { target: onPage, original };
+      deps.staging.editOnPage(el, onPage, original);
     }
     if (!answer.chain || !answer.uses) return;
     chain.body.replaceChildren();
