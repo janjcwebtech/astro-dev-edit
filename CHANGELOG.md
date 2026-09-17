@@ -16,6 +16,9 @@ Writing an entry — one line, past tense, no essay:
 
 ### Added
 
+- A `/composition` request now accepts `ordinals`, the render count of each usage id in the chain, and a prop read from a proven 1:1 `.map()` over a literal array reads `editable` again instead of `unproven-entry` — naming the array entry that render actually read. An imported, built or spread array, an ordinal past the end, a duplicated property and a broken chain each still refuse by name.
+- Every `editable` prop or slot verdict now carries `value`, the words it edits with the source syntax removed — a quoted attribute without its quotes or entities, the frontmatter literal a traced prop reads, the text of a slot run.
+- Fixed the byte range of a quoted prop whose value contains an entity: `@astrojs/compiler` truncates its own `raw` to the decoded length, so the range stopped short of the closing quote.
 - Added the inspector panel header's `☰` menu (Copy page context, Re-scan the page) and `⚙` Settings button, plus a route row naming the file the page is written in with its own **View code**. The inspector mode mounts no admin bar, so these were previously unreachable.
 - Added a breadcrumb row to the `composition: true` hover pill: resting on an element names the chain of files that rendered it, and each segment opens the inspector on that link. Ids resolve through one batched `/composition/links` call per page (`src/client/composition.ts`).
 - Added a read-only inspector for `composition: true`: Alt/Option selection, a persistent element-tree selection, component chains and usage details, native-slot relationships, source previews, and CSS inspection. Staged editing remains a separate layer.

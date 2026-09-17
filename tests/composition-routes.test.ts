@@ -93,7 +93,39 @@ describe('composition HTTP contract through real middleware', () => {
       expect((await request(path, {}, '127.0.0.1', 'https://example.com')).status).toBe(403);
     }
   });
-  it.each([null, [], {}, { pathname: 3 }, { ...query(), file: {} }, { ...query(), chain: '.bad' }, { ...query(), traceVersion: 1 }])('rejects malformed requests: %j', async body => {
+  /**
+   * The static index and the live render meet here and nowhere else. The array
+   * is the server's; the render count is the page's; neither is a write target
+   * on its own, which is what `unproven-entry` protects.
+   */
+  it('lets a render ordinal name the array entry a mapped prop read', async () => {
+    const mapped = `---\nimport Card from '../Card.astro';\nconst cards = [{ title: 'One' }, { title: 'Two' }];\n---\n{cards.map((c) => <Card title={c.title} />)}`;
+    await writeFile(join(root, 'src/pages/index.astro'), mapped);
+    const chain = '.' + usageId('src/pages/index.astro', locOf(mapped, '<Card'));
+    const ask = (ordinals?: Record<string, number>) =>
+      request('/composition', { pathname: '/docs/', file: 'src/Card.astro', chain, traceVersion: 2, ordinals });
+    const prop = async (ordinals?: Record<string, number>) => (await ask(ordinals)).body.links[0].props[0];
+
+    // Without the ordinal the trace resolves and the entry still does not.
+    expect(await prop()).toMatchObject({ verdict: 'read-only', reason: 'unproven-entry' });
+    expect(await prop({ [chain.slice(1)]: 2 })).toMatchObject({ verdict: 'editable', value: 'Two' });
+    expect(await prop({ [chain.slice(1)]: 1 })).toMatchObject({ verdict: 'editable', value: 'One' });
+    // `0` is what a broken chain reports, and 3 is past the end of the array.
+    for (const ordinal of [0, 3]) {
+      expect(await prop({ [chain.slice(1)]: ordinal }), String(ordinal))
+        .toMatchObject({ verdict: 'read-only', reason: 'unproven-entry' });
+    }
+    // An inferred path names a possible usage site, never the instance that
+    // rendered this element — so a render count may not be spent on it.
+    const inferred = await request('/composition',
+      { pathname: '/docs/', file: 'src/Card.astro', traceVersion: 2, ordinals: { [chain.slice(1)]: 2 } });
+    expect(inferred.body.tier).toBe('inferred');
+    expect(inferred.body.links[0].props[0]).toMatchObject({ verdict: 'read-only', reason: 'unproven-entry' });
+  });
+
+  it.each([null, [], {}, { pathname: 3 }, { ...query(), file: {} }, { ...query(), chain: '.bad' }, { ...query(), traceVersion: 1 },
+    { ...query(), ordinals: [] }, { ...query(), ordinals: { bad: 1 } }, { ...query(), ordinals: { abcdefgh: -1 } },
+    { ...query(), ordinals: { abcdefgh: 1.5 } }])('rejects malformed requests: %j', async body => {
     expect((await request('/composition', body)).status).toBe(400);
   });
   it('caps batches and chain depth', async () => {

@@ -1,3 +1,5 @@
+import { decodeEntities } from '../patcher/astro.ts';
+
 /** The compiler supplies expression text, so no second JS lexer is needed
  * to skip braces, regexes, templates or nested tags inside attributes. */
 export interface TagAttribute {
@@ -61,8 +63,21 @@ export function attrSpan(source: string, attr: TagAttribute, starts = lineStarts
   const equals = /^\s*=\s*/.exec(source.slice(cursor));
   if (!equals) return null;
   cursor += equals[0].length;
-  // An expression's value text sits inside braces the compiler strips; a
-  // quoted attribute's `raw` carries its own quotes.
+
+  // A quoted attribute is measured against the bytes and proved against the
+  // AST's *decoded* `value`, never against `raw`: the compiler slices `raw` to
+  // the decoded length, so `a="x &amp; y"` reports `"x &amp` — a range that
+  // reads back as a prefix of itself and would patch over the closing quote.
+  if (attr.kind === 'quoted') {
+    const quote = source[cursor];
+    if (quote !== '"' && quote !== "'") return null;
+    const close = source.indexOf(quote, cursor + 1);
+    if (close < 0) return null;
+    if (decodeEntities(source.slice(cursor + 1, close)) !== (attr.value ?? '')) return null;
+    return { start: cursor, end: close + 1, after: close + 1 };
+  }
+
+  // An expression's value text sits inside braces the compiler strips.
   const value = attr.kind === 'expression' ? attr.value ?? '' : attr.raw;
   if (value === undefined) return null;
   const opened = attr.kind === 'expression' ? 1 : 0;

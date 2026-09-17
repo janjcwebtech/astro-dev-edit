@@ -1,8 +1,9 @@
 import type {
   CompositionCoverage, CompositionLinksResponse, CompositionLookupResponse,
-  CompositionRefusal, CompositionUsesResponse,
+  CompositionRefusal, CompositionUsesResponse, RenderOrdinals,
 } from '../shared/protocol.ts';
 import { resolveComposition } from './composition.ts';
+import { proveLink } from './usage-parse.ts';
 import type { CompositionService } from './composition-service.ts';
 import type { OptionsResolver } from './options.ts';
 import { isPackageOwned, validateEditablePath } from './paths.ts';
@@ -18,6 +19,20 @@ export interface CompositionRouteDeps {
 
 /** Read-only routes use the same localhost dispatcher and source-path gate as
  * the editor. Payloads choose a pathname, never the route's source anchor. */
+/** The render ordinals as sent, or null when the payload is not one. Keys are
+ *  usage ids and values are counts, so anything else is a malformed request
+ *  rather than a value to coerce. */
+function ordinalsOf(value: unknown): RenderOrdinals | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > 128) return null;
+  for (const [id, ordinal] of entries) {
+    if (!/^[\w-]{8}$/.test(id)) return null;
+    if (typeof ordinal !== 'number' || !Number.isInteger(ordinal) || ordinal < 0 || ordinal > 1e6) return null;
+  }
+  return Object.fromEntries(entries) as RenderOrdinals;
+}
+
 export function createCompositionRoutes(deps: CompositionRouteDeps): Route[] {
   return ['/composition', '/composition/links', '/composition/uses'].map((path): Route => ({
     method: 'POST', path, label: path.slice(1), maxBytes: 32 * 1024,
@@ -44,6 +59,9 @@ export function createCompositionRoutes(deps: CompositionRouteDeps): Route[] {
           throw new Error('chain must be a root, break, or at most 128 usage ids');
         }
         if (req.traceVersion !== undefined && req.traceVersion !== 2) throw new Error('unsupported traceVersion');
+        if (req.ordinals !== undefined && !ordinalsOf(req.ordinals)) {
+          throw new Error('ordinals must map at most 128 usage ids to render counts');
+        }
       }
       const hit = deps.routeManifest?.forPathname(req.pathname);
       if (!hit?.ok) return fail('no-route');
@@ -71,10 +89,18 @@ export function createCompositionRoutes(deps: CompositionRouteDeps): Route[] {
           ...(stale ? { reason: 'stale-index' } : {}) };
         return { status: 200, body: response };
       }
-      const response: CompositionLookupResponse = { ...common, ...(stale
+      const resolved = stale
         ? { tier: 'none' as const, links: [], reason: 'stale-index' as const }
         : resolveComposition({ route, file, chain: req.chain as string | undefined,
-          traceVersion: req.traceVersion as 2 | undefined }, graph.links, graph.coverage.complete)) };
+          traceVersion: req.traceVersion as 2 | undefined }, graph.links, graph.coverage.complete);
+      // Only a `proven` chain names the instance that rendered this element,
+      // so only a proven chain may meet a render ordinal with its array. An
+      // inferred path or a candidate set names a *possible* usage site, and a
+      // render count aimed at one of those would be a guess wearing a proof.
+      const ordinals = resolved.tier === 'proven' ? ordinalsOf(req.ordinals) : null;
+      const response: CompositionLookupResponse = { ...common, ...resolved,
+        ...(ordinals ? { links: resolved.links.map(link =>
+          proveLink(link, graph.frontmatter.get(link.file) ?? '', ordinals[link.id] ?? 0)) } : {}) };
       return { status: 200, body: response };
     },
   }));

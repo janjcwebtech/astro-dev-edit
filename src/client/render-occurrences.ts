@@ -1,4 +1,4 @@
-import type { SlotPlacement } from '../shared/protocol.ts';
+import type { RenderOrdinals, SlotPlacement } from '../shared/protocol.ts';
 
 export type TraceEvent =
   | { type: 'comment'; text: string }
@@ -55,4 +55,48 @@ export function renderOccurrences(events: readonly TraceEvent[]): { ok: true; oc
     }
   }
   return stack.length ? { ok: false, reason: 'unbalanced-slot-markers' } : { ok: true, occurrences, placements };
+}
+
+/**
+ * Which render of each usage site in an element's chain produced it — the live
+ * half of a `.map()` proof, read off the annotations and nothing else.
+ *
+ * The element's own instance is the last id in its chain, its parent instance
+ * is the one before, and so on, so walking `parent` pointers assigns a render
+ * count to each chain position. A hop whose instance emitted no annotated
+ * element of its own simply stops the walk: that usage site keeps its
+ * `unproven-entry` refusal rather than borrowing a count from elsewhere.
+ *
+ * **Empty on any disagreement.** One usage id reached twice with two different
+ * counts is recursion through a single source site, where "the Nth render"
+ * no longer names one thing — and a wrong entry is the failure the whole
+ * mechanism exists to prevent, so the answer is nothing rather than most of it.
+ */
+export function chainOrdinals(events: readonly TraceEvent[], key: number): RenderOrdinals {
+  const instances = new Map<string, { parent: string; chain: string; ordinal: number }>();
+  let self: string | null = null;
+  for (const event of events) {
+    if (event.type !== 'element' || event.opaque) continue;
+    const ordinal = ordinalOf(event.ordinal);
+    if (ordinal === null || !id(event.instance) || !chain(event.chain)) continue;
+    if (!instances.has(event.instance)) {
+      instances.set(event.instance, { parent: event.parent, chain: event.chain, ordinal });
+    }
+    if (event.key === key) self = event.instance;
+  }
+  const ordinals: RenderOrdinals = {};
+  const seen = new Set<string>();
+  for (let instance = self; instance && !seen.has(instance);) {
+    seen.add(instance);
+    const node = instances.get(instance);
+    if (!node) break;
+    // A root instance's chain is `!` or `?`: no usage site rendered it, so
+    // there is nothing above this hop to count.
+    const usage = node.chain.startsWith('.') ? node.chain.slice(1).split('.').at(-1) : undefined;
+    if (!usage) break;
+    if (ordinals[usage] !== undefined && ordinals[usage] !== node.ordinal) return {};
+    ordinals[usage] = node.ordinal;
+    instance = node.parent;
+  }
+  return ordinals;
 }

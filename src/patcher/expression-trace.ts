@@ -273,12 +273,22 @@ export function propertyLiterals(
  * value-match: which item was clicked is only known once the text is sent.
  */
 export function hasCandidates(frontmatter: string, trace: ExpressionTrace): boolean {
-  if (!trace.array) {
-    const at = declarationEnd(frontmatter, trace.property);
-    return at >= 0 && readLiteral(frontmatter, at) !== null;
-  }
+  if (!trace.array) return constLiteral(frontmatter, trace.property) !== null;
   const span = arraySpan(frontmatter, trace.array);
   return span !== null && propertyLiterals(frontmatter, trace.property, span.from, span.to).length > 0;
+}
+
+/**
+ * The string literal a plain `const name = '…'` holds, or null for a const
+ * that is absent, computed, or not a string at all.
+ *
+ * Separate from {@link locateValue} because it answers without being told what
+ * the page showed: a one-hop trace to a const has exactly one candidate, so
+ * the words are known at parse time and a field can be filled with them.
+ */
+export function constLiteral(frontmatter: string, property: string): LiteralSpan | null {
+  const at = declarationEnd(frontmatter, property);
+  return at < 0 ? null : readLiteral(frontmatter, at);
 }
 
 export type Located =

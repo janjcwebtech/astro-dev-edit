@@ -5,6 +5,9 @@ import { createUsageIndex } from './usage-index.ts';
 export interface CompositionSnapshot {
   links: UsageLink[];
   coverage: CompositionCoverage;
+  /** Each visited file's frontmatter, so a render ordinal can be met with the
+   *  array it names without a second parse. */
+  frontmatter: Map<string, string>;
 }
 export interface CompositionServiceDeps {
   root: string;
@@ -60,10 +63,11 @@ export function createCompositionService(deps: CompositionServiceDeps) {
         }
       }
       if (started !== revision) {
-        return { links: [], coverage: { complete: false, files: 0, revision,
+        return { links: [], frontmatter: new Map(), coverage: { complete: false, files: 0, revision,
           issues: [{ file: route, reason: 'stale-index' }] } };
       }
-      return { links: index.links(), coverage: { complete: !incomplete, files: visited.size, revision, issues } };
+      return { links: index.links(), frontmatter: index.frontmatter(),
+        coverage: { complete: !incomplete, files: visited.size, revision, issues } };
     },
   };
 }

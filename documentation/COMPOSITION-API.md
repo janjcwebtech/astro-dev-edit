@@ -92,7 +92,7 @@ Disabled endpoints return `reason: "disabled"`. `/health` reports `composition`.
 
 | Endpoint | Request | Answer |
 | --- | --- | --- |
-| `/composition` | `{ pathname, file, chain?, traceVersion?: 2 }` | `tier`, ordered `links`, optional `candidates` / `reason`, `route`, `coverage` |
+| `/composition` | `{ pathname, file, chain?, traceVersion?: 2, ordinals? }` | `tier`, ordered `links`, optional `candidates` / `reason`, `route`, `coverage` |
 | `/composition/links` | `{ pathname, ids }` | `links`, `missing`, `route`, `coverage`, optional `reason` |
 | `/composition/uses` | `{ pathname, file }` | matching usage `links`, `route`, `coverage`, optional `reason` |
 
@@ -108,6 +108,10 @@ usage IDs. Pass `traceVersion: 2` with the fixture's annotations. Version 2
 preserves spreads; `?` always returns `none / chain-break`, never a static guess.
 Batches accept at most 128 IDs, remove duplicates, preserve requested order and
 report unknown IDs in `missing`.
+
+`ordinals` maps usage IDs to render counts, at most 128 of them, each a
+non-negative integer — see [Render ordinals](#render-ordinals-and-write-targets).
+They are applied only to a `proven` chain.
 
 `UsageLink` includes its usage ID, caller file, original source location and
 source offsets (JavaScript string indices), component name, resolved target or
@@ -181,34 +185,47 @@ identities or the watcher revision as a write precondition.
 
 ## Render ordinals and write targets
 
-Three things exist for the value-writing layer, and none of them writes
-anything yet.
-
 - **`RenderTrace.ordinal`**, on every version-2 element as `data-atx-ordinal`.
   It is counted by `composition-runtime.ts::child()` as the render happens —
   which render of that usage site, under that parent instance, produced this
   element. A second parent counts from 1 again, and `0` means the chain broke
   so nothing counted it. It is a **render count, not an array index**: nothing
   may read it as a source position without the static proof below.
+- **`render-occurrences.ts::chainOrdinals`**, the client's walk from the
+  selected element up its instance parents, giving each usage ID in the chain
+  the render count that produced the next hop. A hop whose instance emitted no
+  annotated element stops the walk; one usage ID reached with two different
+  counts — recursion through a single source site — answers nothing at all.
+  The result travels as the `ordinals` field of a `/composition` request.
 - **`UsageProp.start` / `.end`**, bounding the prop's `source` in the file the
   `UsageLink` names, exactly as `UsageSlot`'s do. Two props on one tag can hold
   the same string, so a write target is a byte range and never a search of the
   tag text. Both are absent when the source does not read back the way the AST
   describes it, and a caller must then refuse rather than fall back to a scan.
 - **`UsageProp.verdict` / `UsageSlot.verdict`**, in three states rather than
-  two. `editable` is a value this file can write, `elsewhere` is one that is
+  two, with an `editable` verdict carrying the `value` it edits — the words,
+  decoded out of the syntax that carries them: a quoted attribute without its
+  quotes or entities, the frontmatter literal a traced prop reads, the text of
+  a slot run. `source` stays the bytes `start`/`end` bound.
+  `editable` is a value this file can write, `elsewhere` is one that is
   writable in the module the same object names in `from`, and `read-only` is
   one with no string to write. Every verdict but `editable` carries a named
   `reason` — `styling`, `directive`, `spread`, `boolean`, `computed`,
   `template`, `untraced`, `unproven-entry`, `markup`, `empty`, `unlocated`,
   `unsupported`, `imported` — decided in `usage-parse.ts` beside the byte range
   it needs. `elsewhere` names a module; it never resolves or follows one.
-- **`unproven-entry`**, the refusal a value read from a `.map()` carries. The
-  trace resolves and the array holds matching literals, which proves only that
-  *some* entry matches — every card in the loop shares one usage site, so an
-  `editable` verdict would aim every field at entry 1. The entry is named only
-  once the render ordinal reaches `locateEntryValue`. A value in the same loop
-  that does not read from the array is unambiguous and stays `editable`.
+- **`unproven-entry`**, the refusal a value read from a `.map()` carries until
+  its ordinal arrives. The trace resolves and the array holds matching
+  literals, which proves only that *some* entry matches — every card in the
+  loop shares one usage site, so an `editable` verdict would aim every field at
+  entry 1. It is the one refusal that carries its `trace`, because it is the
+  one that can be earned back: `usage-parse.ts::proveEntry` meets it with the
+  ordinal and turns it into `editable` when — and only when —
+  `locateEntryValue` proves the entry. A value in the same loop that does not
+  read from the array is unambiguous and stays `editable`.
+- **Only a `proven` chain spends an ordinal.** An inferred path or a candidate
+  set names a *possible* usage site, never the instance that rendered this
+  element, so a render count aimed at one would be a guess wearing a proof.
 - **`expression-trace.ts::locateEntryValue`**, the one-hop trace from
   `{s.title}` to the entry an ordinal names. It proves the correspondence
   first: the array is a literal in this file's frontmatter, holding no spread

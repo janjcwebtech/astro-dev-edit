@@ -21,5 +21,7 @@ export function readRenderOccurrences(root: Document | Element) {
       elements.push(element);
     }
   }
-  return { elements, result: renderOccurrences(events) };
+  // `events` travels with the result: the ordinal walk needs the parent
+  // pointers, which an occurrence list has deliberately flattened away.
+  return { elements, events, result: renderOccurrences(events) };
 }

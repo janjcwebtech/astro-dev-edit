@@ -96,11 +96,32 @@ export interface UsageTrace {
 
 /** The verdict half of a prop or a slot, as a union so the three states cannot
  *  be mixed up: only `elsewhere` names a module, only `editable` may omit a
- *  reason, and only `editable` carries a trace. */
+ *  reason, and only `editable` carries the words.
+ *
+ *  `unproven-entry` is split out because it is the one refusal that can be
+ *  *earned back*: it carries the trace the render ordinal needs, so
+ *  `usage-parse.ts::proveEntry` can name the entry without re-parsing. Every
+ *  other refusal has nothing to earn back with. */
 export type UsageWrite =
-  | { verdict: 'editable'; reason?: undefined; from?: undefined; trace?: UsageTrace }
-  | { verdict: 'elsewhere'; reason: 'imported'; from: string; trace?: undefined }
-  | { verdict: 'read-only'; reason: UsageRefusal; from?: undefined; trace?: undefined };
+  | {
+      verdict: 'editable';
+      reason?: undefined;
+      from?: undefined;
+      trace?: UsageTrace;
+      /**
+       * The words, decoded out of whatever source syntax carries them: a
+       * quoted attribute without its quotes or entities, the frontmatter
+       * literal a traced prop reads, the text of a slot run.
+       *
+       * It is what a field edits and what a write verifies against, and it is
+       * deliberately not `source`: editing `"Protected"` — quotes and all —
+       * would be editing the syntax rather than the content.
+       */
+      value: string;
+    }
+  | { verdict: 'elsewhere'; reason: 'imported'; from: string; trace?: undefined; value?: undefined }
+  | { verdict: 'read-only'; reason: 'unproven-entry'; from?: undefined; trace: UsageTrace; value?: undefined }
+  | { verdict: 'read-only'; reason: Exclude<UsageRefusal, 'unproven-entry'>; from?: undefined; trace?: undefined; value?: undefined };
 
 /** One attribute at a component usage site.
  *
@@ -113,6 +134,9 @@ export type UsageWrite =
 export type UsageProp = {
   name: string;
   kind: string;
+  /** The bytes, exactly as `start`/`end` bound them — a quoted attribute's own
+   *  quotes included, an expression's braces excluded. It is what the source
+   *  *says*; the `value` an `editable` verdict carries is what it *means*. */
   source: string;
   start?: number;
   end?: number;
@@ -147,6 +171,19 @@ export interface CompositionRequest {
   chain?: string;
   traceVersion?: 2;
 }
+
+/**
+ * Which render of each usage site in the chain produced the selected element,
+ * keyed by usage id — the live half of a `.map()` proof.
+ *
+ * The client reads it off the rendered annotations ({@link RenderTrace.ordinal}
+ * as `data-atx-ordinal`) and walks the instance's parents; the static index
+ * supplies the array. Neither half is a write target on its own, which is the
+ * whole point of `unproven-entry`. A missing or `0` entry leaves that usage
+ * site's mapped values refused, and the server applies these only to a
+ * `proven` chain — an inferred path names no instance, so it names no render.
+ */
+export type RenderOrdinals = Record<string, number>;
 
 /** IDs last for one server render; source usage ids remain stable across renders. */
 export interface RenderTrace {
@@ -193,6 +230,7 @@ export interface CompositionLookupRequest {
   file: string;
   chain?: string;
   traceVersion?: 2;
+  ordinals?: RenderOrdinals;
 }
 export interface CompositionLinksRequest {
   pathname: string;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseUsages } from '../src/server/usage-parse.ts';
+import { parseUsages, proveEntry, proveLink } from '../src/server/usage-parse.ts';
 import { arrayEntries, locateEntryValue, type ExpressionTrace } from '../src/patcher/expression-trace.ts';
+import type { UsageLink, UsageWrite } from '../src/shared/protocol.ts';
 
 /**
  * The three write-layer prerequisites, each pinned at the property that makes
@@ -210,10 +211,13 @@ describe('a prop carries its write verdict', () => {
       "const services = [{ title: 'Design' }, { title: 'Build' }];",
       "const greeting = 'Hello';",
     ].join('\n'));
-    expect(props.title).toMatchObject({ verdict: 'read-only', reason: 'unproven-entry' });
+    // The refusal carries the trace, because it is the one refusal that can be
+    // earned back — nothing else would let the ordinal name the entry later.
+    expect(props.title).toMatchObject({ verdict: 'read-only', reason: 'unproven-entry',
+      trace: { property: 'title', array: 'services', label: 'services[].title' } });
     // A value that does not read from an array is unambiguous and stays editable,
     // in the same loop — the refusal is about the array, not about the `.map()`.
-    expect(props.greeting).toMatchObject({ verdict: 'editable', trace: { property: 'greeting', label: 'greeting' } });
+    expect(props.greeting).toMatchObject({ verdict: 'editable', trace: { property: 'greeting', label: 'greeting' }, value: 'Hello' });
   });
 
   it('refuses a hop it cannot land on a literal, rather than offering the edit', async () => {
@@ -283,6 +287,122 @@ describe('a slot run carries its write verdict', () => {
     expect(slots.filter(s => !s.source.trim())).not.toHaveLength(0);
     for (const slot of slots.filter(s => !s.source.trim())) {
       expect(slot).toMatchObject({ verdict: 'read-only', reason: 'empty' });
+    }
+  });
+});
+
+/**
+ * Earning the refusal back.
+ *
+ * `unproven-entry` is not a permanent verdict — it is the one that waits for a
+ * fact the static index cannot have. `proveEntry` is where the render ordinal
+ * arrives, and it may only ever turn that single refusal into `editable`: a
+ * wrong entry is a silently wrong write, so every check `locateEntryValue`
+ * makes has to still be reachable from here.
+ */
+describe('a render ordinal earns back the unproven-entry refusal', () => {
+  const mapped = (frontmatter: string, body = '{services.map((s) => <Card title={s.title} />)}') =>
+    parseUsages(`---\nimport Card from './Card.astro';\n${frontmatter}\n---\n${body}`);
+  const LITERAL = "const services = [{ title: 'Design' }, { title: 'Build' }];";
+  const fm = (source: string) => source.split('---')[1] ?? '';
+  const write = async (frontmatter: string, ordinal: number): Promise<UsageWrite> => {
+    const source = `---\nimport Card from './Card.astro';\n${frontmatter}\n---\n{services.map((s) => <Card title={s.title} />)}`;
+    const [usage] = await parseUsages(source);
+    return proveEntry(fm(source), usage.props[0], ordinal);
+  };
+
+  it('names the entry the ordinal points at, and carries its words', async () => {
+    expect(await write(LITERAL, 1)).toMatchObject({ verdict: 'editable', value: 'Design' });
+    expect(await write(LITERAL, 2)).toMatchObject({ verdict: 'editable', value: 'Build' });
+  });
+
+  it('keeps refusing the 0 a broken chain reports, and an ordinal past the end', async () => {
+    for (const ordinal of [0, 3, -1, 1.5]) {
+      expect(await write(LITERAL, ordinal), String(ordinal))
+        .toMatchObject({ verdict: 'read-only', reason: 'unproven-entry' });
+    }
+  });
+
+  it('keeps refusing a spread array and a duplicated property, which the ordinal cannot settle', async () => {
+    for (const frontmatter of [
+      "const services = [{ title: 'Design' }, ...more];",
+      "const services = [{ title: 'Design', title: 'Again' }];",
+    ]) {
+      expect(await write(frontmatter, 1), frontmatter)
+        .toMatchObject({ verdict: 'read-only', reason: 'unproven-entry' });
+    }
+  });
+
+  it('leaves an array it never proved at all refused earlier, and by its own name', async () => {
+    // Neither of these reaches `unproven-entry`: a built array has no literals
+    // to find, and an imported name is a value in another module. The ordinal
+    // has nothing to earn back, which is the point of naming refusals apart.
+    const [built] = await mapped('const services = buildServices();');
+    expect(built.props[0]).toMatchObject({ verdict: 'read-only', reason: 'untraced' });
+    // An imported array is `untraced` rather than `elsewhere`: the prop reads
+    // `s.title`, and `s` is the loop's own parameter — no import binds it, so
+    // there is no module to name. `elsewhere` belongs to a prop that reads the
+    // imported name itself.
+    const [imported] = await mapped("import { services } from '../data/services.ts';");
+    expect(imported.props[0]).toMatchObject({ verdict: 'read-only', reason: 'untraced' });
+    const [direct] = await mapped("import { services } from '../data/services.ts';",
+      '<Card title={services} />');
+    expect(direct.props[0]).toMatchObject({ verdict: 'elsewhere', from: '../data/services.ts' });
+  });
+
+  it('touches nothing but that one refusal', async () => {
+    const [usage] = await mapped(LITERAL,
+      '{services.map((s) => <Card title={s.title} label="Static" featured={s === 0} />)}');
+    const proven = proveLink({ id: 'aaaaaaaa', file: '/Page.astro', loc: '5:20', offset: 0,
+      name: 'Card', hasSpread: false, props: usage.props, slots: usage.slots } satisfies UsageLink,
+      "\nconst services = [{ title: 'Design' }, { title: 'Build' }];\n", 2);
+    expect(proven.props.map(p => [p.name, p.verdict, p.value])).toEqual([
+      ['title', 'editable', 'Build'], ['label', 'editable', 'Static'], ['featured', 'read-only', undefined],
+    ]);
+    // The byte range survives the upgrade: it is what a quoted write targets.
+    expect(proven.props[1].start).toBe(usage.props[1].start);
+  });
+});
+
+/**
+ * Every `editable` verdict knows its words.
+ *
+ * The bytes are not the words: `"Protected"` carries its own quotes, `{title}`
+ * carries none of them, and a field that edited either as written would be
+ * editing syntax. `value` is what the field shows and what the write verifies.
+ */
+describe('an editable value carries the words, not the bytes', () => {
+  it('separates a quoted attribute from its quotes and its entities', async () => {
+    const source = `---\nimport Card from './Card.astro';\n---\n<Card a="x &amp; y &lt; z" b="Plain" />`;
+    const [usage] = await parseUsages(source);
+    // The compiler truncates `raw` around an entity; the span is proved against
+    // the decoded value instead, so it still reaches the closing quote.
+    expect(usage.props[0]).toMatchObject({ verdict: 'editable', source: '"x &amp; y &lt; z"', value: 'x & y < z' });
+    expect(source.slice(usage.props[0].start, usage.props[0].end)).toBe('"x &amp; y &lt; z"');
+    expect(usage.props[1]).toMatchObject({ source: '"Plain"', value: 'Plain' });
+  });
+
+  it('gives a slot run its text, entities decoded', async () => {
+    const [usage] = await parseUsages(`---\nimport Card from './Card.astro';\n---\n<Card>Start &amp; finish</Card>`);
+    expect(usage.slots[0]).toMatchObject({ verdict: 'editable', source: 'Start &amp; finish', value: 'Start & finish' });
+  });
+
+  it('gives a traced prop the literal it reads, never the expression that reads it', async () => {
+    const [usage] = await parseUsages(
+      `---\nimport Card from './Card.astro';\nconst greeting = 'Hello there';\n---\n<Card title={greeting} />`);
+    expect(usage.props[0]).toMatchObject({ source: 'greeting', value: 'Hello there' });
+  });
+
+  it('never leaves an editable verdict without one', async () => {
+    const source = `---
+import Card from './Card.astro';
+const greeting = 'Hello';
+---
+<Card a="x" b={greeting} c={site.x} d={1 + 1} e f={\`t\`} class="g" {...rest}>words</Card>`;
+    const [usage] = await parseUsages(source);
+    for (const value of [...usage.props, ...usage.slots]) {
+      if (value.verdict === 'editable') expect(value.value, value.name).toBeTypeOf('string');
+      else expect(value.value, value.name).toBeUndefined();
     }
   });
 });

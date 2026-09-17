@@ -1,6 +1,7 @@
 import type { SourceLoc, UsageLink, CompositionCoverage } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { readRenderOccurrences } from './composition-dom.ts';
+import { chainOrdinals } from './render-occurrences.ts';
 import { rulesForElement } from './css-inspect.ts';
 import { has } from './features.ts';
 import { card, item, itemGroup } from './group.ts';
@@ -430,6 +431,10 @@ export function initInspector(deps: InspectorDeps) {
     // broken chain says nothing about the words written in this file.
     let render: ReturnType<typeof readRenderOccurrences> | null = null;
     let group: ReturnType<typeof occurrenceSummary> = null;
+    /** Which render of each usage site above this element produced it. Read
+     *  from the page, sent to the server, and meaningful only against a proven
+     *  chain — see `chainOrdinals`. */
+    let ordinals: Record<string, number> = {};
     if (opaque || !source) {
       note(chain.body, opaque ? 'No chain · untracked-html. Generated HTML has no proven inner-element source relationship.'
         : 'No chain · this element has no source annotation.');
@@ -441,6 +446,7 @@ export function initInspector(deps: InspectorDeps) {
         note(slots.body, 'Slot placement graph refused.');
       } else {
         const key = render.elements.indexOf(el);
+        ordinals = chainOrdinals(render.events, key);
         const occurrence = render.result.occurrences.find(p => p.key === key);
         const peers = render.result.occurrences.filter(p => {
           const peer = render!.elements[p.key];
@@ -470,7 +476,7 @@ export function initInspector(deps: InspectorDeps) {
     try {
       answer = await loader.load(
         chainable ? {
-          pathname, file: source!.file,
+          pathname, file: source!.file, ordinals,
           chain: el.getAttribute('data-atx-chain') ?? undefined,
           ...(el.getAttribute('data-atx-version') === '2' ? { traceVersion: 2 as const } : {}),
         } : null,

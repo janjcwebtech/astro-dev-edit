@@ -98,7 +98,7 @@ const NAMED_ENTITIES: Record<string, string> = {
 
 /** Decode the entities a source region may contain so it compares equal to the
  *  rendered DOM text the client sends. Unknown entities pass through. */
-function decodeEntities(s: string): string {
+export function decodeEntities(s: string): string {
   return s.replace(/&(#[xX]?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (m, body: string) => {
     if (body[0] === '#') {
       const cp =
@@ -164,7 +164,7 @@ function escapeMarkup(s: string): string {
 }
 
 /** Escape an attribute value for insertion inside `quote`-delimited quotes. */
-function escapeAttrValue(s: string, quote: string): string {
+export function escapeAttrValue(s: string, quote: string): string {
   let out = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\{/g, '&#123;');
   out = quote === '"' ? out.replace(/"/g, '&quot;') : out.replace(/'/g, '&#39;');
   return out;

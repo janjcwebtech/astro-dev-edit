@@ -1,8 +1,11 @@
 import { parse } from '@astrojs/compiler';
 import { init, parse as parseImports } from 'es-module-lexer';
 import { attrSpan, tagEnd, type TagAttribute } from './astro-tag-end.ts';
-import { expressionRoot, hasCandidates, traceExpressionSource } from '../patcher/expression-trace.ts';
-import type { CompositionRefusal, UsageProp, UsageSlot, UsageWrite } from '../shared/protocol.ts';
+import {
+  constLiteral, expressionRoot, hasCandidates, locateEntryValue, traceExpressionSource,
+} from '../patcher/expression-trace.ts';
+import { decodeEntities } from '../patcher/astro.ts';
+import type { CompositionRefusal, UsageLink, UsageProp, UsageSlot, UsageWrite } from '../shared/protocol.ts';
 
 interface Node {
   type: string;
@@ -13,6 +16,15 @@ interface Node {
   position?: { start: { offset: number; line: number; column: number }; end?: { offset: number; line: number; column: number } };
   attributes?: Node[];
   children?: Node[];
+}
+/** One file's usages plus the frontmatter a trace is resolved against, and
+ *  where that frontmatter starts in the file — everything a write needs from
+ *  one parse, so nothing re-parses to find the same bytes again. */
+export interface ParsedFile {
+  usages: ParsedUsage[];
+  frontmatter: string;
+  /** Index of the frontmatter text within the file, past the opening fence. */
+  frontmatterAt: number;
 }
 export interface ParsedUsage {
   name: string;
@@ -65,7 +77,7 @@ function located(source: string, span: { start?: number; end?: number; source: s
  * and deliberately does not resolve it — no transitive chase (#61's own rule).
  */
 function propWrite(
-  prop: { name: string; kind: string; source: string; start?: number; end?: number },
+  prop: { name: string; kind: string; source: string; text: string; start?: number; end?: number },
   context: { source: string; frontmatter: string; enclosingHead: string | null; values: Map<string, string> },
 ): UsageWrite {
   const { name, kind, source } = prop;
@@ -73,7 +85,9 @@ function propWrite(
   if (name === 'slot' || name.includes(':')) return { verdict: 'read-only', reason: 'directive' };
   if (kind === 'spread') return { verdict: 'read-only', reason: 'spread' };
   if (kind === 'empty') return { verdict: 'read-only', reason: 'boolean' };
-  if (kind === 'quoted') return located(context.source, prop, { verdict: 'editable' });
+  // The compiler decodes a quoted value while parsing, so `text` is already
+  // the words; `attrSpan` has proved those words are what the bytes spell.
+  if (kind === 'quoted') return located(context.source, prop, { verdict: 'editable', value: prop.text });
   if (kind === 'template-literal') return { verdict: 'read-only', reason: 'template' };
   if (kind !== 'expression' && kind !== 'shorthand') return { verdict: 'read-only', reason: 'unsupported' };
   if (source.trimStart().startsWith('`')) return { verdict: 'read-only', reason: 'template' };
@@ -87,8 +101,40 @@ function propWrite(
   // entry this render read — so a mapped value is refused by name until the
   // render ordinal reaches it. Ten identical cards would otherwise each get a
   // field pointing at entry 1.
-  if (trace.array) return { verdict: 'read-only', reason: 'unproven-entry' };
-  return located(context.source, prop, { verdict: 'editable', trace });
+  if (trace.array) return { verdict: 'read-only', reason: 'unproven-entry', trace };
+  const literal = constLiteral(context.frontmatter, trace.property);
+  if (!literal) return { verdict: 'read-only', reason: 'untraced' };
+  return located(context.source, prop, { verdict: 'editable', trace, value: literal.value });
+}
+
+/**
+ * Earn back an `unproven-entry` refusal with the render ordinal that names the
+ * entry — the one place the live render meets the static array.
+ *
+ * Pure, and deliberately one-way: it can only turn that single refusal into
+ * `editable`, never the reverse and never any other verdict. Everything the
+ * correspondence rests on is re-checked by `locateEntryValue` — a literal
+ * array in this file's frontmatter with no spread and no elision, an ordinal
+ * inside it, and exactly one plain string for the property — so an array that
+ * is imported, built or spread, an ordinal past the end, a duplicated property
+ * and the `0` a broken chain reports all stay refused, by name.
+ */
+export function proveEntry(frontmatter: string, write: UsageWrite, ordinal: number): UsageWrite {
+  if (write.verdict !== 'read-only' || write.reason !== 'unproven-entry') return write;
+  const found = locateEntryValue(frontmatter, write.trace, ordinal);
+  return found.ok ? { verdict: 'editable', trace: write.trace, value: found.span.value } : write;
+}
+
+/** Every prop of one usage site re-judged against that site's render ordinal.
+ *  Slots are untouched: a slot run is literal text at a fixed byte range, so
+ *  which render read it never arises. */
+export function proveLink(link: UsageLink, frontmatter: string, ordinal: number): UsageLink {
+  if (!link.props.some(prop => prop.reason === 'unproven-entry')) return link;
+  return { ...link, props: link.props.map(prop => {
+    const { name, kind, source, start, end } = prop;
+    return { name, kind, source, ...(start === undefined ? {} : { start }),
+      ...(end === undefined ? {} : { end }), ...proveEntry(frontmatter, prop, ordinal) };
+  }) };
 }
 
 /**
@@ -106,14 +152,24 @@ function slotWrite(type: string, slot: { start: number; end: number; source: str
   // A bracket inside a range the AST called text means the bytes carry
   // structure, and a whole-value write would change it rather than the words.
   if (/[<>{}]/.test(slot.source)) return { verdict: 'read-only', reason: 'markup' };
-  return { verdict: 'editable' };
+  // Entities are how a literal `&` is spelled in a template; the words are
+  // what a field edits, and the writer re-spells them on the way back.
+  return { verdict: 'editable', value: decodeEntities(slot.source.trim()) };
 }
 
 /** AST locations and import lexer ranges come from the untouched source. */
 export async function parseUsages(source: string): Promise<ParsedUsage[]> {
+  return (await parseFile(source)).usages;
+}
+
+/** One parse, everything it saw. `parseUsages` is the reading half; a write
+ *  needs the frontmatter and where it sits as well, and re-parsing to find
+ *  them again would be a second chance to disagree. */
+export async function parseFile(source: string): Promise<ParsedFile> {
   const { ast } = await parse(source, { position: true });
   const root = ast as unknown as Node;
-  const frontmatter = root.children?.find(n => n.type === 'frontmatter')?.value ?? '';
+  const frontmatterNode = root.children?.find(n => n.type === 'frontmatter');
+  const frontmatter = frontmatterNode?.value ?? '';
   const imports = new Map<string, string>();
   /** Every imported *value* name, which is a wider set than the component map:
    *  a prop reads `site.tagline` however `site` arrived, and the verdict only
@@ -171,10 +227,15 @@ export async function parseUsages(source: string): Promise<ParsedUsage[]> {
           const span = attrSpan(source, a as TagAttribute);
           const prop = {
             name: a.name ?? '', kind: a.kind ?? '',
-            source: a.raw || a.value || a.name || '',
+            // The bytes when they are proven, and only then: `raw` is the
+            // compiler's own spelling and it truncates around an entity, so it
+            // is a display fallback for a value with no write target at all.
+            source: span ? source.slice(span.start, span.end) : (a.raw || a.value || a.name || ''),
+            text: a.value ?? '',
             ...(span ? { start: span.start, end: span.end } : {}),
           };
-          return { ...prop, ...propWrite(prop, {
+          const { text: _text, ...wire } = prop;
+          return { ...wire, ...propWrite(prop, {
             source, frontmatter, values,
             enclosingHead: context.at(-1)?.head ?? null,
           }) };
@@ -197,5 +258,6 @@ export async function parseUsages(source: string): Promise<ParsedUsage[]> {
     for (const child of node.children ?? []) walk(child, context);
   };
   walk(root, []);
-  return usages;
+  const at = frontmatterNode?.position ? indexAt(frontmatterNode.position.start) + 3 : 0;
+  return { usages, frontmatter, frontmatterAt: at };
 }
