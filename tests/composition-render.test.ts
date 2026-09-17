@@ -31,7 +31,8 @@ function occurrenceModel(html: string) {
       const key = elements.length;
       elements.push(match[0]);
       events.push({ type: 'element', key, instance: attr(match[0], 'data-atx-instance'),
-        parent: attr(match[0], 'data-atx-parent'), file: attr(match[0], 'data-atx-file'), chain: attr(match[0], 'data-atx-chain') });
+        parent: attr(match[0], 'data-atx-parent'), file: attr(match[0], 'data-atx-file'),
+        chain: attr(match[0], 'data-atx-chain'), ordinal: attr(match[0], 'data-atx-ordinal') });
     }
   }
   return { result: renderOccurrences(events), events, elements };

@@ -130,9 +130,9 @@ const answer = await getComposition({
 ```
 
 Only use this for a tracked element. Read `readRenderOccurrences(document)` from
-`src/client/composition-dom.ts` for repeated instance groups and slot placements.
-An occurrence marked `untracked-html` has no proven inner-element relationship;
-a malformed placement graph is refused. The source-location reader also ignores
+`src/client/composition-dom.ts` for repeated instance groups, render ordinals
+and slot placements. An occurrence marked `untracked-html` has no proven
+inner-element relationship; a malformed placement graph is refused. The source-location reader also ignores
 copied annotations beneath `data-atx-boundary="html"`, while retaining the
 container's own source target. Editing a known whole HTML string is separate
 from tracing its generated descendants.
@@ -141,6 +141,30 @@ from tracing its generated descendants.
 coordinates over legacy compiler annotations. Keep API results and render IDs
 scoped to the current page/render; do not treat usage IDs as stable data-record
 identities or the watcher revision as a write precondition.
+
+## Render ordinals and write targets
+
+Three things exist for the value-writing layer, and none of them writes
+anything yet.
+
+- **`RenderTrace.ordinal`**, on every version-2 element as `data-atx-ordinal`.
+  It is counted by `composition-runtime.ts::child()` as the render happens —
+  which render of that usage site, under that parent instance, produced this
+  element. A second parent counts from 1 again, and `0` means the chain broke
+  so nothing counted it. It is a **render count, not an array index**: nothing
+  may read it as a source position without the static proof below.
+- **`UsageProp.start` / `.end`**, bounding the prop's `source` in the file the
+  `UsageLink` names, exactly as `UsageSlot`'s do. Two props on one tag can hold
+  the same string, so a write target is a byte range and never a search of the
+  tag text. Both are absent when the source does not read back the way the AST
+  describes it, and a caller must then refuse rather than fall back to a scan.
+- **`expression-trace.ts::locateEntryValue`**, the one-hop trace from
+  `{s.title}` to the entry an ordinal names. It proves the correspondence
+  first: the array is a literal in this file's frontmatter, holding no spread
+  and no elision, so entry *k* is render *k*, and the entry at that ordinal
+  carries the property as a plain string literal. A `.filter()`, `.slice()` or
+  `.sort()` in the chain, an imported or computed array, or an out-of-range
+  ordinal each refuse **by name**.
 
 The inspector combines these read APIs with the existing CSS inspector
 and source links. Markdown-backed values open their known backing file in the

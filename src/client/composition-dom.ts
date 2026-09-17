@@ -17,7 +17,7 @@ export function readRenderOccurrences(root: Document | Element) {
       if (element.getAttribute('data-atx-version') !== '2') continue;
       const get = (name: string) => element.getAttribute(`data-atx-${name}`) ?? '';
       events.push({ type: 'element', key: elements.length, instance: get('instance'), parent: get('parent'),
-        file: get('file'), chain: get('chain'), opaque });
+        file: get('file'), chain: get('chain'), ordinal: get('ordinal'), opaque });
       elements.push(element);
     }
   }

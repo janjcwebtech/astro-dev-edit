@@ -18,6 +18,7 @@ Writing an entry — one line, past tense, no essay:
 
 - Added a read-only inspector for `composition: true`: Alt/Option selection, a persistent element-tree selection, component chains and usage details, native-slot relationships, source previews, and CSS inspection. Staged editing remains a separate layer.
 - Added opt-in `composition: true` tracing through the normal integration, with read-only chain, batch-link and route-scoped usage APIs, bounded source discovery, and file-change invalidation. The existing source reader prefers original `data-atx-*` locations and ignores copied annotations inside generated HTML.
+- Added the three write-layer prerequisites, all read-only: every version-2 element carries `data-atx-ordinal`, the render count of its usage site under its parent; `UsageProp` carries the byte range of its own value; and `expression-trace.ts::locateEntryValue` resolves a `.map()` render to its array entry, refusing by name anything it cannot prove.
 - Added an isolated component-tracing fixture (`npm run dev:composition`) with source usage chains, protected per-render identities, and native-slot insertion boundaries. Spread recursion and repeated multi-root components are traced; replayed `set:html` output is explicitly untracked.
 
 ### Removed

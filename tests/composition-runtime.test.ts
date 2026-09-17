@@ -19,6 +19,28 @@ it('captures an immutable context and removes the transport before application c
   expect(begin({}, '/Page.astro', {}).chain).toBe('!');
 });
 
+it('counts a render ordinal per usage site and per parent, never globally', () => {
+  const request = {};
+  const page = begin({}, '/Page.astro', request);
+  expect(page.ordinal).toBe(1); // the entry render happens exactly once
+
+  // One usage site rendered three times — a .map() — counts 1, 2, 3.
+  const mapped = [1, 2, 3].map(() =>
+    begin(child(page, 'aaaaaaaa', '/Card.astro'), '/Card.astro', request).ordinal);
+  expect(mapped).toEqual([1, 2, 3]);
+
+  // A second usage site in the same parent has its own count.
+  expect(begin(child(page, 'bbbbbbbb', '/Card.astro'), '/Card.astro', request).ordinal).toBe(1);
+
+  // A second parent instance counts from 1 again, so an ordinal is only ever
+  // read against the parent that produced it.
+  const other = begin(child(page, 'cccccccc', '/Page.astro'), '/Page.astro', request);
+  expect(begin(child(other, 'aaaaaaaa', '/Card.astro'), '/Card.astro', request).ordinal).toBe(1);
+
+  // A break carries no ordinal: nothing counted that render.
+  expect(begin({}, '/Page.astro', request).ordinal).toBe(0);
+});
+
 it('preserves a broken relationship through subsequent known usages', () => {
   const request = {};
   begin({}, '/Page.astro', request);
@@ -60,8 +82,8 @@ describe('safe insertion after the final attribute', () => {
 });
 
 it('keeps serialized HTML annotations explicitly ungrouped', () => {
-  const result = renderOccurrences([{ type: 'element', key: 0, instance: 'replayed', parent: '', file: '', chain: '', opaque: true }]);
-  expect(result).toEqual({ ok: true, placements: [], occurrences: [{ key: 0, instance: 'replayed', group: null, slots: [], reason: 'untracked-html' }] });
+  const result = renderOccurrences([{ type: 'element', key: 0, instance: 'replayed', parent: '', file: '', chain: '', ordinal: '', opaque: true }]);
+  expect(result).toEqual({ ok: true, placements: [], occurrences: [{ key: 0, instance: 'replayed', group: null, slots: [], ordinal: 0, reason: 'untracked-html' }] });
 });
 
 it('instruments empty frontmatter and a leading slot without shifting source annotations', async () => {

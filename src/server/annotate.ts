@@ -143,7 +143,7 @@ export async function annotateAstroSource(
             (opts.composition ?
               ` data-atx-file="${fileAttr}" data-atx-loc="${loc.line}:${loc.column}"` +
               (enhanced ? ` data-atx-chain={${enhanced.trace}.chain} data-atx-instance={${enhanced.trace}.id}` +
-                ` data-atx-parent={${enhanced.trace}.parent??""} data-atx-version="2"`
+                ` data-atx-parent={${enhanced.trace}.parent??""} data-atx-ordinal={String(${enhanced.trace}.ordinal)} data-atx-version="2"`
                 + (node.attributes?.some(a => a.name === 'set:html') ? ' data-atx-boundary="html"' : '')
                 : ` data-atx-chain={Astro.props["data-atx-chain"]??"!"}`) : ''),
         });

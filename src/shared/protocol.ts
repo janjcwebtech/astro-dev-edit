@@ -29,10 +29,20 @@ export type CompositionRefusal =
   | 'chain-break' | 'unresolved' | 'spread' | 'reserved-attribute'
   | 'invalid-chain' | 'incomplete-index' | 'too-many-paths' | 'no-path' | 'recursive'
   | 'disabled' | 'no-route' | 'stale-index' | 'index-limit' | 'path-refused' | 'untracked-html';
+/** One attribute at a component usage site.
+ *
+ *  `start`/`end` bound `source` in the file named by the owning
+ *  {@link UsageLink}, exactly as {@link UsageSlot}'s do — so a write targets a
+ *  proven byte range rather than re-finding the value by searching the tag
+ *  text, which two props holding the same string would break. Absent when the
+ *  source does not read back the way the AST describes it; a caller must then
+ *  refuse rather than fall back to a search. */
 export interface UsageProp {
   name: string;
   kind: string;
   source: string;
+  start?: number;
+  end?: number;
 }
 export interface UsageSlot {
   name: string;
@@ -67,6 +77,21 @@ export interface RenderTrace {
   file: string;
   parent: string | null;
   chain: string;
+  /**
+   * Which render of this usage site, under this parent, produced this
+   * instance — 1-based, counted by `composition-runtime.ts::child()` as it
+   * hands the transport out.
+   *
+   * **It is a render count, never a source index.** A `.map()` over an array
+   * literal renders its usage site once per entry in order, so the ordinal
+   * meets static proof to name an entry; on its own it says only "the Nth
+   * time this tag rendered here", which is why nothing may read it as an
+   * array position without that proof.
+   *
+   * `0` means *unknown*: the chain broke, so no parent counted this render.
+   * A route's own entry render is `1` — it happens exactly once.
+   */
+  ordinal: number;
 }
 export interface SlotPlacement {
   id: string;

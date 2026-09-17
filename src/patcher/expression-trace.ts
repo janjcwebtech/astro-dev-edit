@@ -324,3 +324,144 @@ export function encodeLiteral(value: string, quote: string): string {
   else out = out.replace(/\$\{/g, '\\${');
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Locating an entry by render ordinal
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolving a value by **where it rendered** rather than by what it says.
+ *
+ * `locateValue` above matches on the rendered text, which is the only thing a
+ * page click supplies and which refuses two items that read alike. A component
+ * usage site has something stronger available: `composition-runtime.ts::child()`
+ * counted which render of that tag produced the instance, so the Nth render can
+ * name the Nth array entry — but only where the correspondence is *proved*, not
+ * assumed.
+ *
+ * **What has to hold, and every one of them is checked here.** The expression
+ * is exactly `param.property` with `param` bound by the enclosing `.map()`; the
+ * array is a literal declared in this file's frontmatter; it holds no spread,
+ * no hole and no conditional, so entry *k* is render *k*; and the entry at that
+ * ordinal carries the property as a plain string literal. A `.filter()`,
+ * `.slice()` or `.sort()` anywhere in the chain fails at the first check,
+ * because {@link MAP_HEAD} is anchored to a bare identifier.
+ *
+ * Anything short of that is refused **by name** rather than falling back to a
+ * text match: an ordinal aimed at the wrong array is a silently wrong write,
+ * which is the one failure this project must not have.
+ */
+
+/** Whether a segment between two commas holds nothing but whitespace and
+ *  comments — a trailing comma when it is last, an elision when it is not. */
+function codeless(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    if (/\s/.test(text[i])) continue;
+    const past = text[i] === '/' ? skipOpaque(text, i) : -1;
+    if (past < 0) return false;
+    i = past - 1;
+  }
+  return true;
+}
+
+/** The top-level entries of an array literal, or null when the literal is not
+ *  one this can count — a spread, a hole, or an unbalanced bracket all mean
+ *  entry *k* is not render *k*. */
+export function arrayEntries(frontmatter: string, name: string): { from: number; to: number }[] | null {
+  const span = arraySpan(frontmatter, name);
+  if (!span) return null;
+  const entries: { from: number; to: number }[] = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = span.from; i < span.to; i++) {
+    const past = skipOpaque(frontmatter, i);
+    if (past >= 0) {
+      if (past > span.to) return null;
+      i = past - 1;
+      continue;
+    }
+    const ch = frontmatter[i];
+    if (ch === '[' || ch === '{' || ch === '(') {
+      depth++;
+      if (depth === 1) start = i + 1;
+      continue;
+    }
+    if (ch === ']' || ch === '}' || ch === ')') {
+      depth--;
+      if (depth === 0) {
+        // The final entry, unless the literal ended on a trailing comma — a
+        // comment after that comma is not an entry either.
+        if (start >= 0 && !codeless(frontmatter.slice(start, i))) entries.push({ from: start, to: i });
+        break;
+      }
+      continue;
+    }
+    if (ch === ',' && depth === 1) {
+      // An elision (`[a, , b]`) shifts every later index, so it is not
+      // countable — and a comment in that position is still an elision.
+      if (codeless(frontmatter.slice(start, i))) return null;
+      entries.push({ from: start, to: i });
+      start = i + 1;
+    }
+  }
+  if (depth !== 0) return null;
+  // A spread contributes an unknown number of entries, so nothing after it —
+  // and in truth nothing at all — keeps a provable index.
+  for (const entry of entries) if (/^\s*\.\.\./.test(frontmatter.slice(entry.from, entry.to))) return null;
+  return entries;
+}
+
+/**
+ * The string literal that a `.map()`'s Nth render read, proven rather than
+ * matched. `ordinal` is 1-based, as {@link RenderTrace.ordinal} is.
+ */
+export function locateEntryValue(
+  frontmatter: string,
+  trace: ExpressionTrace,
+  ordinal: number,
+): Located {
+  if (!trace.array) {
+    return {
+      ok: false,
+      code: 'untraceable',
+      error: `“${trace.property}” isn’t read from an array, so a render position cannot name an entry.`,
+    };
+  }
+  if (!Number.isInteger(ordinal) || ordinal < 1) {
+    return {
+      ok: false,
+      code: 'untraceable',
+      error: 'The render position for this element is unknown, so the array entry it came from cannot be proved.',
+    };
+  }
+  const entries = arrayEntries(frontmatter, trace.array);
+  if (!entries) {
+    return {
+      ok: false,
+      code: 'untraceable',
+      error: `“${trace.array}” isn’t a plain array literal in this file’s frontmatter (it may be imported, built, or hold a spread), so its entries can’t be counted. Edit it in the source instead.`,
+    };
+  }
+  const entry = entries[ordinal - 1];
+  if (!entry) {
+    return {
+      ok: false,
+      code: 'mismatch',
+      error: `${trace.array} no longer has ${ordinal} entries — the file may have been edited elsewhere. Reload and try again.`,
+    };
+  }
+  const hits = propertyLiterals(frontmatter, trace.property, entry.from, entry.to);
+  if (hits.length === 1) return { ok: true, span: hits[0] };
+  if (hits.length === 0) {
+    return {
+      ok: false,
+      code: 'untraceable',
+      error: `That entry of ${trace.array} has no “${trace.property}” string to edit. Edit it in the source instead.`,
+    };
+  }
+  return {
+    ok: false,
+    code: 'ambiguous',
+    error: `That entry of ${trace.array} declares “${trace.property}” more than once, so the right one can’t be identified. Edit it in the source instead.`,
+  };
+}

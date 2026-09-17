@@ -7,7 +7,7 @@ plan:
   priority: high
   created: "2026-09-13"
   updated: "2026-09-17"
-  progress: 31
+  progress: 41
   visual: narrow-to-editor-inspector.plan.html
   mockup: narrow-to-editor-inspector.mockup.html
   tags: [scope-reduction, astro, composition, annotations]
@@ -244,7 +244,9 @@ Rules it must obey:
 | `src/client/ui.ts` | `buildDrawer` stays for Settings; `PAPER` and `switchControl`'s CMS-only uses go. |
 | `tests/helpers.ts` | Drop `stubSchemaProvider` and the `content-config.ts` import. |
 
-**Removed** — ~34 files. Schema designer (`collections-panel.ts`, `schema-routes.ts`, `schema-introspect.ts`, `zod-adapt.ts`, `patcher/content-config.ts`); entry management (`editors/entry.ts`, `entry-routes.ts`, `entry-resolve-routes.ts`, `server/content-config.ts`, `collection-entries.ts`, `entry-detect.ts`, `client/page-source.ts`); rich text (`body-editor.ts`, `markdown.ts`, `shadow.ts::mountLight`); Unsplash (`unsplash-routes.ts`, `unsplash-pane.ts`, `unsplash-search.ts`, `shared/unsplash.ts`, `patcher/dotenv.ts`); `editors/asset-picker.ts`; their tests (~4,900 lines); `documentation/ENTRY-EDITOR.md` wholly.
+**Removed** — 34 source files, 13 test files, ~17,000 lines. Schema designer (`collections-panel.ts`, `schema-routes.ts`, `schema-introspect.ts`, `zod-adapt.ts`, `patcher/content-config.ts`); entry management (`editors/entry.ts`, `entry-routes.ts`, `entry-resolve-routes.ts`, `server/content-config.ts`, `collection-entries.ts`, `entry-detect.ts`, `entry-pattern.ts`, `patcher/frontmatter.ts`); rich text (`body-editor.ts`, `markdown.ts`, `shadow.ts::mountLight`, `ui.ts::PAPER`); Unsplash (`unsplash-routes.ts`, `unsplash-pane.ts`, `unsplash-search.ts`, `shared/unsplash.ts`, `patcher/dotenv.ts`, `shared/slug.ts`); `editors/asset-picker.ts`; `documentation/ENTRY-EDITOR.md` wholly.
+
+`client/page-source.ts` **survives**, against the original plan: the inspector's route anchor reads the page's own `astro-dev-edit:page-source` declaration, so only the `/entry/resolve` half of the module went.
 
 **Kept deliberately:** `editors/markup.ts` + `markup-insert.ts` (they serve the on-page `markup` classification, zero CMS coupling); `media-grid.ts` / `server/assets.ts` (grid and upload route); `route-manifest.ts` + `page-source-routes.ts` (load-bearing for composition's route anchor).
 
@@ -265,9 +267,9 @@ Rules it must obey:
 - [ ] **E3** — tool-owned namespace survives hydration on Astro 5.18
 - [ ] **E4** — page-weight budget on the largest real fixture page
 - [x] **E5** — static usage index coverage, every failure named
-- [ ] **P1** — delete the CMS, Unsplash, asset picker, `client/page-source.ts`; fix the ~12 composition points
-- [ ] **P1** — rewrite `notice.ts`; revise README + the four owning docs; delete `ENTRY-EDITOR.md`
-- [ ] **P1** — dead CSS out of `styles.ts`, its own commit, after green
+- [x] **P1** — delete the CMS, Unsplash and the asset picker; fix the ~12 composition points. `client/page-source.ts` **stays**: the inspector's route anchor reads the page's own meta declaration, and only the `/entry/resolve` half went
+- [x] **P1** — rewrite `notice.ts`; revise README + the owning docs; delete `ENTRY-EDITOR.md`
+- [x] **P1** — dead CSS out of `styles.ts`, its own commit, after green — 831 lines
 - [ ] **P2** — compact/pinned hover pill; refusal folded into the inspector; Settings slimmed
 - [ ] **P3** — emit `data-atx-*` on all versions + dev-only parity counter; fix `<slot>` and `custom-element` gaps; correct `ASTRO-COMPAT.md`
 - [x] **P4** — `protocol.ts` shapes, then `usage-parse.ts`, `usage-index.ts`, `composition.ts`, `composition-routes.ts`
@@ -278,7 +280,7 @@ Rules it must obey:
 - [ ] **P6a** — menu and settings in that header
 - [x] **P6b** — one read-only inspector for every click: Values, Component chain, Slot relationships, CSS, one *View code* verb
 - [ ] **P6b** — staged values and one Save per row; replaces the refusal modal and the image modal
-- [ ] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
+- [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
 - [ ] **P6c** — prop and slot-text editing at proven source targets, including whole HTML string values and destination-aware encoding (closes #61)
 - [ ] **P6d** — Markdown-backed routes: source-file navigation for frontmatter and body content; no browser writes
 - [ ] **P6e** — image picker: filter across the project's assets, paged browsing, and upload into the configured `uploadDir`
@@ -296,7 +298,7 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [x] Clicking a component-rendered element shows a chain whose last link resolves to that element's own file; a `{...Astro.props}` forwarder shows `inferred` or `candidates`, never a wrong chain
 - [x] Slotted content is marked as slotted, and its chain is a strict prefix of its DOM parent's
 - [ ] `data-atx-file` count in the live DOM equals the served count on Astro 5.18 and 7.1.1, with the dev toolbar both on and off
-- [ ] No route under `/__dev-edit` answers a CMS path; `/health` reports no `entryEditor` or `unsplash`
+- [x] No route under `/__dev-edit` answers a CMS path; `/health` reports no `entryEditor` or `unsplash`
 - [ ] A quoted prop edited from the inspector lands as a byte-level patch at the usage site, and a stale one refuses rather than writes
 - [ ] A `{s.title}` prop inside a `.map()` edits **only** the clicked instance, and names which array entry it wrote
 - [ ] String values containing braces, angle brackets and quotes save and read back unchanged; text remains text and HTML-valued destinations retain HTML behavior

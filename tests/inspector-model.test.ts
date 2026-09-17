@@ -10,16 +10,16 @@ const request = { pathname: '/', file: '/Card.astro', chain: '.abcdefgh', traceV
 describe('inspector render identity', () => {
   it('counts multi-root components once and repeated slot placements separately', () => {
     const occurrences = [
-      { key: 0, instance: 'a', group: 'a/slot1', slots: [] },
-      { key: 1, instance: 'a', group: 'a/slot1', slots: [] },
-      { key: 2, instance: 'a', group: 'a/slot2', slots: [] },
-      { key: 3, instance: 'b', group: 'b/slot3', slots: [] },
+      { key: 0, instance: 'a', group: 'a/slot1', slots: [], ordinal: 1 },
+      { key: 1, instance: 'a', group: 'a/slot1', slots: [], ordinal: 1 },
+      { key: 2, instance: 'a', group: 'a/slot2', slots: [], ordinal: 2 },
+      { key: 3, instance: 'b', group: 'b/slot3', slots: [], ordinal: 1 },
     ];
     expect(occurrenceSummary(occurrences[2], occurrences)).toEqual({ index: 2, total: 3, slots: [] });
   });
   it('never groups replayed HTML or a missing occurrence', () => {
-    expect(occurrenceSummary({ key: 0, instance: 'a', group: null, slots: [], reason: 'untracked-html' }, [])).toBeNull();
-    expect(occurrenceSummary({ key: 0, instance: 'a', group: 'a', slots: [] }, [])).toBeNull();
+    expect(occurrenceSummary({ key: 0, instance: 'a', group: null, slots: [], ordinal: 0, reason: 'untracked-html' }, [])).toBeNull();
+    expect(occurrenceSummary({ key: 0, instance: 'a', group: 'a', slots: [], ordinal: 1 }, [])).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 import { parse } from '@astrojs/compiler';
 import { init, parse as parseImports } from 'es-module-lexer';
-import { tagEnd, type TagAttribute } from './astro-tag-end.ts';
+import { attrSpan, tagEnd, type TagAttribute } from './astro-tag-end.ts';
 import type { CompositionRefusal, UsageProp, UsageSlot } from '../shared/protocol.ts';
 
 interface Node {
@@ -72,7 +72,16 @@ export async function parseUsages(source: string): Promise<ParsedUsage[]> {
         injectionOffset: tagEnd(source, offset, node.name, attrs as TagAttribute[])?.insert,
         specifier: self ? undefined : imports.get(node.name), refusal,
         hasSpread: attrs.some(a => a.kind === 'spread'),
-        props: attrs.map(a => ({ name: a.name ?? '', kind: a.kind ?? '', source: a.raw || a.value || a.name || '' })),
+        props: attrs.map(a => {
+          // The byte range is proven, not searched: two props on one tag can
+          // hold the same string, so a value is identified by where it is.
+          const span = attrSpan(source, a as TagAttribute);
+          return {
+            name: a.name ?? '', kind: a.kind ?? '',
+            source: a.raw || a.value || a.name || '',
+            ...(span ? { start: span.start, end: span.end } : {}),
+          };
+        }),
         slots: (node.children ?? []).flatMap((n, i, children) => {
           if (!n.position) return [];
           const start = indexAt(n.position.start);
