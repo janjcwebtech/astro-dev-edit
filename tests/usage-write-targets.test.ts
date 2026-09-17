@@ -188,14 +188,31 @@ describe('a prop carries its write verdict', () => {
     expect(props.title).toMatchObject({ verdict: 'read-only', reason: 'untraced' });
   });
 
-  it('traces one hop to a literal in this file, including through a map', async () => {
+  it('traces one hop to a literal in this file', async () => {
+    const props = await parse('<Card title={greeting} />', [
+      "import Card from './Card.astro';",
+      "const greeting = 'Hello';",
+    ].join('\n'));
+    expect(props.title).toMatchObject({ verdict: 'editable', trace: { property: 'greeting', label: 'greeting' } });
+  });
+
+  /**
+   * The trace resolves and the array holds matching literals — and that is
+   * still not a write target. `hasCandidates` proves *some* entry matches, and
+   * every card in the loop shares one usage site, so an `editable` verdict here
+   * would give ten identical cards ten fields all aimed at entry 1.
+   * `locateEntryValue` proves the entry from the render ordinal; until that
+   * ordinal reaches the verdict the refusal is named rather than assumed.
+   */
+  it('refuses a mapped value by name until the render ordinal proves its entry', async () => {
     const props = await parse('{services.map((s) => <Card title={s.title} {greeting} />)}', [
       "import Card from './Card.astro';",
       "const services = [{ title: 'Design' }, { title: 'Build' }];",
       "const greeting = 'Hello';",
     ].join('\n'));
-    expect(props.title).toMatchObject({ verdict: 'editable',
-      trace: { property: 'title', array: 'services', label: 'services[].title' } });
+    expect(props.title).toMatchObject({ verdict: 'read-only', reason: 'unproven-entry' });
+    // A value that does not read from an array is unambiguous and stays editable,
+    // in the same loop — the refusal is about the array, not about the `.map()`.
     expect(props.greeting).toMatchObject({ verdict: 'editable', trace: { property: 'greeting', label: 'greeting' } });
   });
 

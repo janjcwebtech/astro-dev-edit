@@ -101,6 +101,7 @@ const CAPTIONS: Record<UsageRefusal | 'imported', string> = {
   computed: 'Computed as the page renders.',
   template: 'A template literal — interpolation, not a fixed string.',
   untraced: 'This name has no proven path to a literal in this file.',
+  'unproven-entry': 'One of several renders of this usage site — which array entry it reads is not yet proven.',
   markup: 'Markup that wraps values. The values inside it are rows of their own.',
   empty: 'Whitespace only — nothing to edit.',
   unlocated: 'The source does not read back the way the page described it.',

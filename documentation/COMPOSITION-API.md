@@ -197,9 +197,15 @@ anything yet.
   writable in the module the same object names in `from`, and `read-only` is
   one with no string to write. Every verdict but `editable` carries a named
   `reason` — `styling`, `directive`, `spread`, `boolean`, `computed`,
-  `template`, `untraced`, `markup`, `empty`, `unlocated`, `unsupported`,
-  `imported` — decided in `usage-parse.ts` beside the byte range it needs.
-  `elsewhere` names a module; it never resolves or follows one.
+  `template`, `untraced`, `unproven-entry`, `markup`, `empty`, `unlocated`,
+  `unsupported`, `imported` — decided in `usage-parse.ts` beside the byte range
+  it needs. `elsewhere` names a module; it never resolves or follows one.
+- **`unproven-entry`**, the refusal a value read from a `.map()` carries. The
+  trace resolves and the array holds matching literals, which proves only that
+  *some* entry matches — every card in the loop shares one usage site, so an
+  `editable` verdict would aim every field at entry 1. The entry is named only
+  once the render ordinal reaches `locateEntryValue`. A value in the same loop
+  that does not read from the array is unambiguous and stays `editable`.
 - **`expression-trace.ts::locateEntryValue`**, the one-hop trace from
   `{s.title}` to the entry an ordinal names. It proves the correspondence
   first: the array is a literal in this file's frontmatter, holding no spread

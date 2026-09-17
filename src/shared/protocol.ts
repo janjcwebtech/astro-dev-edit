@@ -59,6 +59,18 @@ export type UsageRefusal =
   | 'template'
   /** A name we could not prove reaches a string literal in this file. */
   | 'untraced'
+  /**
+   * The value is one of several renders of this usage site — it reads an entry
+   * of an array a `.map()` loops over — and *which* entry has not been proven.
+   *
+   * A trace naming an array proves only that the array holds matching
+   * literals; it does not name the one this instance rendered. Until the
+   * render ordinal reaches the verdict and
+   * `expression-trace.ts::locateEntryValue` proves the 1:1 map, offering
+   * `editable` would give ten identical cards ten fields all pointing at
+   * entry 1. So the refusal is named rather than assumed.
+   */
+  | 'unproven-entry'
   /** Slot children that are markup or a component tag, not literal text. */
   | 'markup'
   /** Slot children that are only whitespace: nothing to edit. */

@@ -83,6 +83,11 @@ function propWrite(
   if (from) return { verdict: 'elsewhere', reason: 'imported', from };
   const trace = traceExpressionSource(source, context.enclosingHead);
   if (!trace || !hasCandidates(context.frontmatter, trace)) return { verdict: 'read-only', reason: 'untraced' };
+  // `hasCandidates` proves the array holds *a* matching literal, never which
+  // entry this render read — so a mapped value is refused by name until the
+  // render ordinal reaches it. Ten identical cards would otherwise each get a
+  // field pointing at entry 1.
+  if (trace.array) return { verdict: 'read-only', reason: 'unproven-entry' };
   return located(context.source, prop, { verdict: 'editable', trace });
 }
 
