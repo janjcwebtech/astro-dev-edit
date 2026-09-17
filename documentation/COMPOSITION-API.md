@@ -85,16 +85,18 @@ and supported source relationships.
 
 ## Contract
 
-All three endpoints are read-only `POST`s under `/__dev-edit`. They share the
-existing localhost/origin gate and return JSON. Request bodies are capped at
-32 KiB. Invalid request shapes return `400`; named refusals return `200`.
-Disabled endpoints return `reason: "disabled"`. `/health` reports `composition`.
+All four endpoints are `POST`s under `/__dev-edit` sharing the existing
+localhost/origin gate, and only `/composition/apply` writes. The three read
+endpoints cap request bodies at 32 KiB; invalid shapes return `400`, named
+refusals return `200`, and a disabled endpoint returns `reason: "disabled"`.
+`/health` reports `composition`.
 
 | Endpoint | Request | Answer |
 | --- | --- | --- |
 | `/composition` | `{ pathname, file, chain?, traceVersion?: 2, ordinals? }` | `tier`, ordered `links`, optional `candidates` / `reason`, `route`, `coverage` |
 | `/composition/links` | `{ pathname, ids }` | `links`, `missing`, `route`, `coverage`, optional `reason` |
 | `/composition/uses` | `{ pathname, file }` | matching usage `links`, `route`, `coverage`, optional `reason` |
+| `/composition/apply` | `{ pathname, usageId, target, ordinal?, original, newText }` | `{ ok: true }`, or `422` with `error` and a `code` |
 
 `pathname` is the browser's route, including any configured base. Astro's route
 manifest selects the source entrypoint; a client-supplied `route` field cannot
@@ -112,6 +114,15 @@ report unknown IDs in `missing`.
 `ordinals` maps usage IDs to render counts, at most 128 of them, each a
 non-negative integer — see [Render ordinals](#render-ordinals-and-write-targets).
 They are applied only to a `proven` chain.
+
+`/composition/apply` caps its body at 256 KiB and names a **usage ID, never a
+path**. `target` is `{ kind: "prop" | "slot", name, start }`, where `start` is
+the byte offset the panel was shown — a *selector* among the values the server
+parses for itself, not an offset to write into. The file the ID resolves to
+passes the same source-path gate as every other write, the bytes go through
+the one injected write seam, and the path joins `textMutationPaths` so writes
+queue with every other file mutation. It refuses unless the value's verdict is
+`editable` and `original` still equals the words the source holds.
 
 `UsageLink` includes its usage ID, caller file, original source location and
 source offsets (JavaScript string indices), component name, resolved target or
@@ -234,14 +245,24 @@ identities or the watcher revision as a write precondition.
   `.sort()` in the chain, an imported or computed array, or an out-of-range
   ordinal each refuse **by name**.
 
+- **`usage-write.ts::applyUsageWrite`**, the pure writer. It is a *sibling* of
+  `patcher/astro.ts::resolveElement`, not a loosening of it: that function
+  matches a plain element by the loc Astro would have annotated, and a
+  component tag carries no annotation, so the usage site's own loc is the
+  address instead. Content is accepted and source syntax preserved — a quoted
+  attribute is encoded with `escapeAttrValue`, a frontmatter literal with
+  `encodeLiteral` in the quote style already there, slot text as template text
+  — and the patched source is parsed again so the value has to **read back** as
+  exactly what was typed. A line break is refused, because it would move every
+  usage site below it and a usage site is addressed by its loc.
+
 The inspector combines these read APIs with the existing CSS inspector
 and source links. Markdown-backed values open their known backing file in the
-IDE; they do not require a Markdown write API. Writing goes through the
-existing `/apply` endpoint and no other: the literal-text targets `/classify`
-proves are staged and saved from the panel
-([Staged values and Save](EDITING.md#staged-values-and-save)); prop and slot
-values at a usage site are still read-only here, and whole-string content
-editing belongs with them.
+IDE; they do not require a Markdown write API. Element values are staged and
+saved through `/apply`; a prop or slot value at a usage site goes through
+`/composition/apply` ([Staged values and Save](EDITING.md#staged-values-and-save)).
+Whole HTML string values and `set:html` destinations are not written from
+either.
 
 ## Verification
 

@@ -23,6 +23,7 @@ import type {
   SettingsUpdateRequest,
   UploadRequest,
   UploadResponse,
+  UsageApplyRequest,
 } from '../shared/protocol.ts';
 
 /**
@@ -145,6 +146,14 @@ export async function classify(req: ClassifyRequest): Promise<ClassifyResult> {
  *  source still matches `original`, and writes atomically. (spec §5, §7.5) */
 export async function apply(req: ApplyRequestWire): Promise<void> {
   const res = await post('/apply', req);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `save failed (${res.status})`);
+}
+
+/** The same save for a value passed at a component usage site. It names a
+ *  usage id rather than a path; the server resolves the file, gates it and
+ *  verifies `original` before writing. */
+export async function applyUsage(req: UsageApplyRequest): Promise<void> {
+  const res = await post('/composition/apply', req);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `save failed (${res.status})`);
 }
 

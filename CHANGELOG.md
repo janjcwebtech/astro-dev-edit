@@ -16,6 +16,7 @@ Writing an entry — one line, past tense, no essay:
 
 ### Added
 
+- Added `POST /__dev-edit/composition/apply`, the write path for a value passed at a component usage site. It names a usage id rather than a path, resolves the file through the server's own route-scoped index, gates it with `validateEditablePath`, writes through the one injected seam, and joins `textMutationPaths`. A quoted prop, the frontmatter literal a traced prop reads, and a run of literal slot text each encode for their own destination, and the patched source is re-parsed so the value has to read back as exactly what was typed.
 - A `/composition` request now accepts `ordinals`, the render count of each usage id in the chain, and a prop read from a proven 1:1 `.map()` over a literal array reads `editable` again instead of `unproven-entry` — naming the array entry that render actually read. An imported, built or spread array, an ordinal past the end, a duplicated property and a broken chain each still refuse by name.
 - Every `editable` prop or slot verdict now carries `value`, the words it edits with the source syntax removed — a quoted attribute without its quotes or entities, the frontmatter literal a traced prop reads, the text of a slot run.
 - Fixed the byte range of a quoted prop whose value contains an entity: `@astrojs/compiler` truncates its own `raw` to the decoded length, so the range stopped short of the closing quote.

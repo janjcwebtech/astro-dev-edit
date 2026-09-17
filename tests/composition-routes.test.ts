@@ -84,6 +84,63 @@ describe('composition HTTP contract through real middleware', () => {
     await writeFile(join(root, '.astro-dev-edit.json'), JSON.stringify({ options: { contentRoots: ['public'] } }));
     expect((await request('/composition', query())).body.reason).toBe('path-refused');
   });
+  /**
+   * The one write in this group. It names a **usage id**, never a path — the
+   * file is the server's own to resolve, and it still passes the same gate and
+   * goes through the same write seam every other write does.
+   */
+  describe('writing a value at a usage site', () => {
+    const mapped = `---\nimport Card from '../Card.astro';\nconst cards = [{ title: 'One' }, { title: 'Two' }];\n---\n{cards.map((c) => <Card title={c.title} />)}\n<Card label="Plain">Slot words</Card>`;
+    const read = () => readFile(join(root, 'src/pages/index.astro'), 'utf8');
+    const propAt = async (start: number, original: string, newText: string, ordinal?: number) =>
+      request('/composition/apply', { pathname: '/docs/', usageId: usageId('src/pages/index.astro', locOf(mapped, '<Card')),
+        target: { kind: 'prop', name: 'title', start }, ordinal, original, newText });
+
+    beforeEach(async () => { await writeFile(join(root, 'src/pages/index.astro'), mapped); });
+
+    it('writes the array entry the render ordinal names, and refuses without one', async () => {
+      const start = mapped.indexOf('c.title');
+      expect(await propAt(start, 'Two', 'Second card')).toMatchObject({ status: 422, body: { code: 'dynamic' } });
+      expect(await read()).toBe(mapped);
+      expect(await propAt(start, 'Two', 'Second card', 2)).toMatchObject({ status: 200, body: { ok: true } });
+      expect(await read()).toBe(mapped.replace("{ title: 'Two' }", "{ title: 'Second card' }"));
+    });
+
+    it('writes a quoted prop and a run of slot text at their own ranges', async () => {
+      const second = usageId('src/pages/index.astro', locOf(mapped, '<Card label'));
+      const at = (target: unknown, original: string, newText: string) =>
+        request('/composition/apply', { pathname: '/docs/', usageId: second, target, original, newText });
+      expect(await at({ kind: 'prop', name: 'label', start: mapped.indexOf('"Plain"') }, 'Plain', 'Named'))
+        .toMatchObject({ status: 200 });
+      const afterProp = await read();
+      expect(afterProp).toContain('label="Named"');
+      expect(await at({ kind: 'slot', name: 'default', start: afterProp.indexOf('Slot words') }, 'Slot words', 'Other words'))
+        .toMatchObject({ status: 200 });
+      expect(await read()).toContain('>Other words<');
+    });
+
+    it('refuses a stale original, an unknown id and a malformed target, writing nothing', async () => {
+      const start = mapped.indexOf('c.title');
+      expect(await propAt(start, 'Moved on', 'x', 2)).toMatchObject({ status: 422, body: { code: 'mismatch' } });
+      expect(await request('/composition/apply', { pathname: '/docs/', usageId: 'aaaaaaaa',
+        target: { kind: 'prop', name: 'title', start }, original: 'Two', newText: 'x' }))
+        .toMatchObject({ status: 422, body: { code: 'unresolved' } });
+      for (const target of [undefined, { kind: 'attr', name: 'title', start }, { kind: 'prop', name: 'title', start: -1 }]) {
+        expect((await request('/composition/apply', { pathname: '/docs/', usageId: 'aaaaaaaa', target, original: '', newText: '' })).status).toBe(400);
+      }
+      expect(await read()).toBe(mapped);
+    });
+
+    it('refuses when composition is off, and never answers a remote caller', async () => {
+      expect((await request('/composition/apply', { pathname: '/docs/' }, '192.0.2.1')).status).toBe(403);
+      mount(false);
+      expect(await request('/composition/apply', { pathname: '/docs/', usageId: 'aaaaaaaa',
+        target: { kind: 'prop', name: 'title', start: 0 }, original: '', newText: '' }))
+        .toMatchObject({ status: 422, body: { code: 'unsupported' } });
+      expect(await read()).toBe(mapped);
+    });
+  });
+
   it('answers disabled at every endpoint, and rejects remote requests through the existing gate', async () => {
     mount(false);
     expect((await request('/health')).body.composition).toBe(false);

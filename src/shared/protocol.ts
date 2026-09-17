@@ -504,6 +504,50 @@ export interface ApplyRequestWire extends SourceLoc {
   ops: ApplyOp[];
 }
 
+// --- POST /composition/apply -------------------------------------------------
+/**
+ * A write at a component usage site.
+ *
+ * It is not an {@link ApplyOp}: every `TargetType` there names a *plain
+ * element*, addressed by the `file:loc` its annotation carries, and a
+ * component tag carries no annotation at all. This names a **usage id**, and
+ * never a path — the file is the server's own to resolve from its index, and
+ * it still passes the same source-path gate every other write does.
+ */
+export interface UsageApplyRequest {
+  /** The browser's route. The usage index is route-scoped, so this is what
+   *  turns a usage id back into a file — exactly as `/composition` does. */
+  pathname: string;
+  usageId: string;
+  target: UsageApplyTarget;
+  /**
+   * Which render of this usage site the page showed, for a value read from a
+   * `.map()`. Absent or `0` is *unknown*, and a mapped value then refuses —
+   * see `RenderOrdinals`.
+   */
+  ordinal?: number;
+  /** The words the panel showed — an `editable` verdict's `value`, verified
+   *  against the source before anything is written (rule 5). */
+  original: string;
+  newText: string;
+}
+
+/** Which value at the usage site, named the way the panel saw it. */
+export interface UsageApplyTarget {
+  kind: 'prop' | 'slot';
+  /** The prop's name, or the slot's. */
+  name: string;
+  /**
+   * The byte offset the panel was shown.
+   *
+   * A **selector** among the values the server parses for itself, never a
+   * write offset: the server re-reads the file, re-parses it, and requires
+   * that one of its own values starts here. A client cannot name bytes to
+   * write into.
+   */
+  start: number;
+}
+
 /** Error body shape shared by all endpoints (4xx/5xx). */
 export interface ErrorResponse {
   error: string;

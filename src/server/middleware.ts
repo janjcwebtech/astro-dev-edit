@@ -415,11 +415,12 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
     ...coreRoutes,
     ...createInspectRoutes({ logger, root, optionsResolver }),
     ...createPageSourceRoutes({ logger, optionsResolver, routeManifest }),
-    ...createCompositionRoutes({ root, optionsResolver, routeManifest, composition: deps.composition ?? null }),
+    ...createCompositionRoutes({ root, optionsResolver, routeManifest, writeText, logger,
+      composition: deps.composition ?? null }),
     ...createSettingsRoutes({ writeText, logger, root, optionsResolver }),
   ];
 
-  const textMutationPaths = new Set(['/apply', '/settings']);
+  const textMutationPaths = new Set(['/apply', '/composition/apply', '/settings']);
   for (const route of routes) {
     if (route.method !== 'POST' || !textMutationPaths.has(route.path)) continue;
     const handler = route.handler;
