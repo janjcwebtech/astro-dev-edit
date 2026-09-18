@@ -8,8 +8,8 @@ devEdit({ composition: true })
 ```
 
 `composition` defaults to `false` and is config-only: changing it requires a dev
-server restart. It installs the version-2 annotation transform, even when
-`sourceAnnotations` is `off`. Builds and previews install neither the transform
+server restart. It installs the version-2 annotation transform in place of the
+plain one, even when `sourceAnnotations` is `off`. Builds and previews install neither the transform
 nor the API. This option selects the read-only inspector described below.
 Staged edits, prop writes and HTML-string writes are not part of this layer.
 
@@ -195,10 +195,15 @@ callers wanting the same ids share one request. Call `invalidate()` on
 navigation and on every HMR update — ids survive a server restart but not an
 edit to the file that mints them.
 
-`src/client/source-map.ts` prefers original `data-atx-file` / `data-atx-loc`
-coordinates over legacy compiler annotations. Keep API results and render IDs
-scoped to the current page/render; do not treat usage IDs as stable data-record
-identities or the watcher revision as a write precondition.
+`src/client/source-map.ts` reads `data-atx-file` / `data-atx-loc`, which the
+integration stamps on every supported Astro version and which the dev toolbar
+does not strip. Astro's own `data-astro-source-*` is a fallback read path only,
+and on Astro 5/6 its loc is shifted by the injection, so it is never original
+coordinates;
+`annotationGaps()` counts every element that needed it, and *Copy page context*
+reports the count. Keep API results and render IDs scoped to the current
+page/render; do not treat usage IDs as stable data-record identities or the
+watcher revision as a write precondition.
 
 ## Render ordinals and write targets
 

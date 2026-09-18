@@ -4,9 +4,9 @@ import { applyAstro, classifyAstro } from '../src/patcher/astro.ts';
 import { locOf } from './helpers.ts';
 
 /**
- * The self-annotation transform for Astro ≥7 (src/server/annotate.ts) must
- * stamp exactly the locs the patcher expects — the same rules locOf() mirrors.
- * Two invariants pinned here:
+ * The self-annotation transform (src/server/annotate.ts) runs on every
+ * supported Astro version and must stamp exactly the locs the patcher expects
+ * — the same rules locOf() mirrors. Two invariants pinned here:
  *
  * 1. Parity: the injected loc for an element equals the locOf()-derived loc
  *    the whole patcher test-suite is built on.
@@ -16,6 +16,13 @@ import { locOf } from './helpers.ts';
  */
 
 const FILE = '/proj/src/pages/index.astro';
+
+/** The full attribute run one annotated element carries, tool-owned pair
+ *  included — both namespaces come from one walk, on every Astro version. */
+function stamp(file: string, loc: string): string {
+  return ` data-astro-source-file="${file}" data-astro-source-loc="${loc}"` +
+    ` data-atx-file="${file}" data-atx-loc="${loc}"`;
+}
 
 /** Extract the injected loc for the first annotated occurrence of `tag`. */
 function injectedLoc(annotated: string, tag: string): string {
@@ -28,7 +35,7 @@ function injectedLoc(annotated: string, tag: string): string {
 }
 
 describe('annotateAstroSource', () => {
-  it('never stamps slots, and includes custom elements in force mode', async () => {
+  it('never stamps slots, and does stamp custom elements', async () => {
     const out = await annotateAstroSource('<slot><my-card>Fallback</my-card></slot>', FILE);
     expect(out).toContain('<slot>');
     expect(out).toContain('<my-card data-astro-source-file=');
@@ -38,9 +45,7 @@ describe('annotateAstroSource', () => {
   it('annotates a text-bearing element with its text start', async () => {
     const src = `<p>Hello world</p>\n`;
     const out = await annotateAstroSource(src, FILE);
-    expect(out).toBe(
-      `<p data-astro-source-file="${FILE}" data-astro-source-loc="${locOf(src, 'Hello')}">Hello world</p>\n`,
-    );
+    expect(out).toBe(`<p${stamp(FILE, locOf(src, 'Hello'))}>Hello world</p>\n`);
   });
 
   it('annotates every element in a nested template, matching locOf', async () => {
@@ -67,9 +72,7 @@ describe('annotateAstroSource', () => {
   it('annotates a self-closing img before its attributes', async () => {
     const src = `<img src="/a.jpg" alt="A photo" />\n`;
     const out = await annotateAstroSource(src, FILE);
-    expect(out).toMatch(
-      /^<img data-astro-source-file="[^"]*" data-astro-source-loc="1:2" src="\/a\.jpg" alt="A photo" \/>\n$/,
-    );
+    expect(out).toBe(`<img${stamp(FILE, '1:2')} src="/a.jpg" alt="A photo" />\n`);
   });
 
   it('skips components and fragments', async () => {
@@ -105,10 +108,39 @@ describe('annotateAstroSource', () => {
     expect(out.split('\n').length).toBe(src.split('\n').length);
   });
 
-  it('escapes quotes in the file path', async () => {
+  it('escapes quotes in the file path, in both namespaces', async () => {
     const src = `<p>x</p>\n`;
     const out = await annotateAstroSource(src, `/odd"path.astro`);
     expect(out).toContain('data-astro-source-file="/odd&quot;path.astro"');
+    expect(out).toContain('data-atx-file="/odd&quot;path.astro"');
+  });
+
+  /**
+   * The tool-owned namespace is not conditional on the Astro version, on the
+   * dev toolbar, or on composition: one transform stamps it everywhere, which
+   * is what lets the client read one channel and what the parity counter in
+   * `client/source-map.ts` measures against.
+   */
+  it('stamps the tool-owned pair beside the legacy one, with the same loc', async () => {
+    const src = `<main>\n  <h1>Title</h1>\n</main>\n`;
+    const out = await annotateAstroSource(src, FILE);
+    expect(out).toContain(`<h1${stamp(FILE, locOf(src, 'Title'))}>`);
+    // No composition attributes leak into a plain annotation run.
+    expect(out).not.toContain('data-atx-chain');
+    expect(out).not.toContain('data-atx-version');
+  });
+
+  /**
+   * `legacy: false` is what runs on Astro 5/6 with the dev toolbar on, where
+   * the Go compiler emits its own pair. A second one is not a harmless
+   * duplicate there: the printer splices its own (injection-shifted) loc in
+   * ahead of ours and the HTML parser keeps the first, so ours would lose.
+   */
+  it('omits Astro’s pair under legacy:false, keeping the tool-owned one', async () => {
+    const src = `<p>Hello world</p>\n`;
+    const loc = locOf(src, 'Hello');
+    const out = await annotateAstroSource(src, FILE, { legacy: false });
+    expect(out).toBe(`<p data-atx-file="${FILE}" data-atx-loc="${loc}">Hello world</p>\n`);
   });
 
   it('round-trips: injected locs classify against the ORIGINAL source', async () => {

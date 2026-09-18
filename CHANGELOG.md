@@ -14,6 +14,12 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Changed
+
+- The integration now injects its own `data-atx-file` / `data-atx-loc` source annotations on **every** supported Astro version, not just where Astro stopped emitting its own; `sourceAnnotations: 'auto'` means "inject" everywhere and `'force'` is a synonym. Astro's `data-astro-source-*` is injected only where Astro itself emits none, so no element ever carries the attribute twice.
+- On Astro 5 and 6 the dev toolbar's own *open in editor* now lands on the right file and line but a shifted column: an element's source loc points past its opening tag, so any injected attribute moves the column the compiler computes. The editor reads its own `data-atx-loc`, which is unaffected.
+- *Copy page context* reports annotation parity — the elements, if any, reachable only through Astro's own annotation — and the console warns once when the first is seen.
+
 ### Added
 
 - A route rendering a Markdown entry gets a Values row per value instead of one generic *Page backing file* row for the page. A frontmatter value and each body paragraph from `<Content />` read `elsewhere`, name the entry file and carry *View code* onto it — **no field and no Save**, because this pass edits no Markdown in the browser. The component chain ends at *Content — markdown, chain ends*, marked inferred with its reason; a literal written in the route template stays editable as usual. Where the page declares no backing file nothing is invented: the value keeps the template's own refusal and the jump lands on the route template.

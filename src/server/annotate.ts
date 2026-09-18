@@ -4,15 +4,33 @@ import type { UsageLink } from '../shared/protocol.ts';
 import { prepareComposition } from './composition-instrument.ts';
 
 /**
- * Self-annotation for Astro ≥7 — inject `data-astro-source-file` / `-loc`
- * ourselves when Astro's compiler no longer does.
+ * Self-annotation — the tool stamps its own `data-atx-file` / `-loc` on every
+ * supported Astro version, and Astro's `data-astro-source-*` only where Astro
+ * itself does not.
  *
  * Astro 5/6 (WASM Go compiler) annotate every element in dev when the toolbar
- * is on; the whole feature rides on those attributes. Astro 7's Rust compiler
- * (@astrojs/compiler-rs) accepts the `annotateSourceFile` flag but emits
- * nothing (withastro/compiler-rs#96). So on 7 we run a
- * Vite `enforce: 'pre'` transform that annotates the raw `.astro` source
- * BEFORE Astro's compiler sees it.
+ * is on; Astro 7's Rust compiler (@astrojs/compiler-rs) accepts the
+ * `annotateSourceFile` flag and emits nothing (withastro/compiler-rs#96). A
+ * channel owned by somebody else is therefore present on some versions, under
+ * some settings — and the feature rides on it everywhere. So this Vite
+ * `enforce: 'pre'` transform runs on all of 5/6/7, annotating the raw `.astro`
+ * source BEFORE Astro's compiler sees it, and `data-atx-*` is the one channel
+ * the client reads.
+ *
+ * **Never emit the legacy pair where the compiler will emit its own** (the
+ * `legacy` option) — measured against `@astrojs/compiler` 2.x, that is not a
+ * harmless duplicate. Given an element we already annotated, the Go printer
+ * splices its own `data-astro-source-loc` in directly after our
+ * `data-astro-source-file` and *also* appends its usual pair at the end. Its
+ * loc is computed from the source we have already lengthened, so it is shifted
+ * right by the width of our injection — and being first, it is the one the
+ * HTML parser keeps. The duplicate does not lose; ours does.
+ *
+ * What no injection can avoid is that shift itself: an element's loc points at
+ * its first child, which sits after the whole opening tag, so any attribute we
+ * add moves the compiler's own idea of it. On 5/6 Astro's `data-astro-source-loc`
+ * is therefore shifted whether or not we emit a pair of our own, which is the
+ * standing reason the tool reads its own namespace and not that one.
  *
  * The critical invariant: injected locs are computed from the ORIGINAL source,
  * so they reference on-disk coordinates — the patcher resolves them against
@@ -105,14 +123,15 @@ interface Insertion {
 }
 
 /**
- * Annotate every plain element in an `.astro` source with the
- * `data-astro-source-*` attributes Astro 5/6 would have emitted.
- * `file` is the absolute path stamped into the attribute (what the Vite
- * transform receives as its module id).
+ * Annotate every plain element in an `.astro` source with the tool-owned
+ * `data-atx-file` / `-loc` pair, and — unless `legacy` is false — the
+ * `data-astro-source-*` pair Astro 5/6 would have emitted. `file` is the
+ * absolute path stamped into the attribute (what the Vite transform receives
+ * as its module id).
  */
 export async function annotateAstroSource(
   source: string, file: string,
-  opts: { composition?: readonly UsageLink[]; runtime?: string } = {},
+  opts: { composition?: readonly UsageLink[]; runtime?: string; legacy?: boolean } = {},
 ): Promise<string> {
   const { ast } = await parse(source, { position: true });
   const starts = lineStartIndices(source);
@@ -138,10 +157,11 @@ export async function annotateAstroSource(
         insertions.push({
           index: tagStart + 1 + node.name!.length,
           text:
-            ` data-astro-source-file="${fileAttr}"` +
-            ` data-astro-source-loc="${loc.line}:${loc.column}"` +
+            (opts.legacy === false ? '' :
+              ` data-astro-source-file="${fileAttr}"` +
+              ` data-astro-source-loc="${loc.line}:${loc.column}"`) +
+            ` data-atx-file="${fileAttr}" data-atx-loc="${loc.line}:${loc.column}"` +
             (opts.composition ?
-              ` data-atx-file="${fileAttr}" data-atx-loc="${loc.line}:${loc.column}"` +
               (enhanced ? ` data-atx-chain={${enhanced.trace}.chain} data-atx-instance={${enhanced.trace}.id}` +
                 ` data-atx-parent={${enhanced.trace}.parent??""} data-atx-ordinal={String(${enhanced.trace}.ordinal)} data-atx-version="2"`
                 + (node.attributes?.some(a => a.name === 'set:html') ? ' data-atx-boundary="html"' : '')
@@ -181,7 +201,7 @@ export async function annotateAstroSource(
  * main module is transformed — style/script sub-requests carry a
  * `?astro&type=…` query and no longer end in `.astro`.
  */
-export function createAnnotatePlugin(): VitePlugin {
+export function createAnnotatePlugin(opts: { legacy: boolean }): VitePlugin {
   return {
     name: 'astro-dev-edit:annotate',
     enforce: 'pre',
@@ -189,7 +209,7 @@ export function createAnnotatePlugin(): VitePlugin {
       order: 'pre',
       async handler(code, id) {
         if (!id.endsWith('.astro')) return null;
-        return { code: await annotateAstroSource(code, id), map: null };
+        return { code: await annotateAstroSource(code, id, { legacy: opts.legacy }), map: null };
       },
     },
   };

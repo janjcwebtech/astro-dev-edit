@@ -104,43 +104,45 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         // would be noise.
         warnAboutUploadDirs(projectRoot, publicDir, userOptions, logger);
 
-        // The whole feature rides on `data-astro-source-file` / `-loc`
-        // attributes. On Astro 5/6 the compiler emits them (dev toolbar on);
-        // on Astro ≥7 the Rust compiler doesn't
-        // (withastro/compiler-rs#96), so we inject them ourselves with a
-        // pre-compiler Vite transform. Unresolvable version → inject too:
-        // missing annotation kills the feature. Duplicate legacy annotations
-        // are not a loc-parity guarantee on Go: the compiler can put a shifted
-        // loc first. The composition proof uses its own data-atx-loc instead.
+        // The whole feature rides on source annotations, so the tool owns them
+        // on every supported version rather than borrowing a channel that is
+        // present on 5/6 only while the dev toolbar is on and absent from 7
+        // altogether (withastro/compiler-rs#96). One transform, one namespace,
+        // one set of loc rules to hold — and `data-atx-*` is nobody else's to
+        // strip, shift or switch off. `'off'` is the one opt-out, and leaves
+        // the overlay dependent on whatever the compiler provides.
+        //
+        // Astro's own `data-astro-source-*` is emitted alongside ONLY where
+        // Astro will not emit it itself. Where it would, a second pair is not a
+        // harmless duplicate: the Go printer splices its own (shifted) loc in
+        // ahead of ours and the parser keeps that one — see `annotate.ts`'s
+        // header for the measurement.
         const astroMajor = detectAstroMajor(projectRoot);
+        const toolbarEnabled = config.devToolbar?.enabled ?? true;
+        const astroAnnotates = astroMajor !== null && astroMajor < 7 && toolbarEnabled;
         const trace = userOptions.composition ?? DEFAULTS.composition;
-        const selfAnnotate = trace ||
-          sourceAnnotations === 'force' ||
-          (sourceAnnotations === 'auto' && (astroMajor === null || astroMajor >= 7));
+        const selfAnnotate = trace || sourceAnnotations !== 'off';
         if (selfAnnotate) {
           updateConfig({ vite: { plugins: [trace
-            ? createCompositionPlugin(projectRoot, () => composition?.invalidate())
-            : createAnnotatePlugin()] } });
+            ? createCompositionPlugin(projectRoot, () => composition?.invalidate(), { legacy: !astroAnnotates })
+            : createAnnotatePlugin({ legacy: !astroAnnotates })] } });
           logger.info(
-            trace ? 'component tracing and data-atx-* source annotations enabled' :
-            `injecting data-astro-source-* annotations (` +
-              (sourceAnnotations === 'force'
-                ? 'sourceAnnotations: "force"'
-                : `Astro ${astroMajor ?? 'unknown'} — its compiler does not emit them`) +
-              ')',
+            (trace ? 'component tracing and ' : '') +
+            `injecting data-atx-* source annotations (Astro ${astroMajor ?? 'unknown'}` +
+            (astroAnnotates ? ', which emits its own data-astro-source-*)' : ', and data-astro-source-* with them)'),
           );
         }
 
-        // Without self-annotation, only the dev toolbar makes Astro emit the
-        // attributes. If it's off, hover highlight and click-to-edit silently
-        // find nothing. Fail loud rather than mysteriously do nothing.
-        const toolbarEnabled = config.devToolbar?.enabled ?? true;
-        if (!toolbarEnabled && !selfAnnotate) {
+        // `sourceAnnotations: 'off'` hands the channel back to Astro, and on
+        // 5/6 only the dev toolbar makes Astro emit anything (on 7 nothing
+        // does). With both off, hover highlight and click-to-edit silently find
+        // nothing. Fail loud rather than mysteriously do nothing.
+        if (!selfAnnotate && !astroAnnotates) {
           logger.warn(
-            'the Astro dev toolbar is DISABLED, so no data-astro-source-* ' +
-              'attributes are emitted. astro-dev-edit needs them to locate ' +
-              'editable elements and will find nothing. Re-enable the dev ' +
-              'toolbar (devToolbar.enabled) or set sourceAnnotations: "force".',
+            'sourceAnnotations is "off" and Astro is emitting no source ' +
+              'annotations of its own, so astro-dev-edit has nothing to locate ' +
+              'editable elements with and will find nothing. Set ' +
+              'sourceAnnotations: "auto" to inject them.',
           );
         }
 

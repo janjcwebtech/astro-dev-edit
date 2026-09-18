@@ -50,6 +50,43 @@ interface Stamped extends HTMLElement {
   [PROP]?: SourceLoc;
 }
 
+/**
+ * Annotation parity — every element the legacy namespace reached that the
+ * tool-owned one did not.
+ *
+ * Both namespaces are emitted by one transform over one walk, so the honest
+ * expectation is nothing here. It is counted anyway because the two are read
+ * by two code paths, and removing the legacy read path is gated on this being
+ * empty on a real site rather than on the transform looking symmetrical.
+ *
+ * Counted at stamp time, not by querying: the dev toolbar strips
+ * `data-astro-source-*` out of the DOM within a frame of hydration, so by the
+ * time anyone asks, the population being measured is gone. Deduped by
+ * `<tag> file:loc`, so an HMR re-render — which replaces the element object
+ * and re-stamps it — reports the same gap once.
+ */
+const GAP_MAX = 50;
+const gaps = new Set<string>();
+
+/** Elements carrying Astro's own annotation but not the tool's, capped at
+ *  {@link GAP_MAX}. Empty is the evidence that the legacy read path can go. */
+export function annotationGaps(): readonly string[] {
+  return [...gaps];
+}
+
+function recordGap(el: HTMLElement, src: SourceLoc): void {
+  if (gaps.size >= GAP_MAX) return;
+  gaps.add(`<${el.tagName.toLowerCase()}> ${src.file}:${src.loc}`);
+  if (gaps.size === 1) {
+    console.warn(
+      '[astro-dev-edit] annotation parity gap — an element carries Astro’s own ' +
+        'data-astro-source-* but no tool-owned data-atx-*, so it is only reachable ' +
+        'through the legacy read path. Copy page context lists them. ' +
+        '(Expected when sourceAnnotations is "off".)',
+    );
+  }
+}
+
 const sourceByPath = new Map<string, SourceLoc>();
 
 /** Structural path: `tag:nth-of-type` chain to the document root. Computed from
@@ -83,6 +120,7 @@ function stamp(el: Stamped): void {
   const src: SourceLoc = { file, loc };
   el[PROP] = src;
   sourceByPath.set(elementPath(el), src);
+  recordGap(el, src);
 }
 
 /** Snapshot everything currently annotated in the DOM. Called at capture start

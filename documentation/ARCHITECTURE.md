@@ -6,7 +6,7 @@ It ships TypeScript source with **no build step** — `exports` points at `./src
 
 **Dev-only by construction.** `astro:config:setup` bails unless `command === 'dev'`, so nothing registers for `astro build` / `astro preview` and the code cannot reach a production bundle. Any new hook work preserves that guard.
 
-**Two annotation regimes.** The whole feature rides on the `data-astro-source-file` / `-loc` attributes present in dev. Astro 5 and 6 emit them from the compiler (dev toolbar required); Astro 7 does not, so the integration injects them itself — `src/server/annotate.ts`, a pre-compiler Vite transform gated by the `sourceAnnotations` option. Two invariants hold it: its locs stay loc-rule-identical to the patcher's (`tests/helpers.ts::locOf`), and it keeps **hook-level** `transform: { order: 'pre' }`, because plugin-level `enforce` alone is not enough.
+**One annotation regime.** The whole feature rides on source annotations present in dev, and the tool emits its own — `data-atx-file` / `-loc` — on every supported version rather than depending on Astro's, which needs the dev toolbar on 5/6 and is gone on 7. `src/server/annotate.ts` is that pre-compiler Vite transform; `sourceAnnotations: 'off'` is the opt-out. It stamps Astro's `data-astro-source-*` pair beside its own only where Astro would not — on 7, and on 5/6 with the dev toolbar off — because where Astro does emit it, the compiler's own (injection-shifted) loc wins the duplicate rather than losing it. Two invariants hold it: its locs stay loc-rule-identical to the patcher's (`tests/helpers.ts::locOf`), and it keeps **hook-level** `transform: { order: 'pre' }`, because plugin-level `enforce` alone is not enough.
 
 Three layers meet at one type-only contract.
 

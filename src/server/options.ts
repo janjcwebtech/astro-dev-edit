@@ -159,7 +159,7 @@ const OPTION_SPECS: readonly OptionSpec[] = [
   {
     key: 'sourceAnnotations',
     label: 'Source annotations',
-    help: 'Who emits the data-astro-source-* attributes everything rides on. "auto" uses Astro\'s compiler on 5/6 and injects them on 7+. Registers a Vite plugin, so it is config-only.',
+    help: 'Who emits the source annotations everything rides on. "auto" (and "force") inject the tool\'s own data-atx-* on every Astro version; "off" leaves only whatever the compiler provides. Registers a Vite plugin, so it is config-only.',
     type: 'select',
     choices: ['auto', 'force', 'off'],
     group: 'general',

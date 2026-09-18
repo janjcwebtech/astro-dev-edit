@@ -40,7 +40,7 @@ export default defineConfig({
 | `revealWrites` | `false` | Open each text file in your editor as it is written. See [Watching writes in your editor](#watching-writes-in-your-editor). |
 | `revealWriteDelayMs` | `1000` | How long to wait after asking the editor to open an existing file. A whole number of milliseconds, `0` to `10000`. |
 | `cssInspector` | `true` | The hover pill's class and ID CSS inspector. |
-| `sourceAnnotations` | `'auto'` | Who emits `data-astro-source-*`: `'auto'`, `'force'` or `'off'`. Config only, because it registers a Vite plugin. |
+| `sourceAnnotations` | `'auto'` | Whether the integration injects its own source annotations: `'auto'` (yes, on every Astro version), `'force'` (a synonym) or `'off'`. Config only, because it registers a Vite plugin. |
 | `composition` | `false` | Read-only inspector, tracing API and version-2 source annotations. Config only; when true, replaces the editing UI and supersedes `sourceAnnotations`. See [Component tracing and inspector](COMPOSITION-API.md). |
 
 ## Where a value can come from
@@ -55,20 +55,21 @@ file cannot reach them. They render read-only in the drawer.
 
 ## Astro versions and source annotations
 
-Astro 5, 6 and 7 are supported. What differs between them is who emits the
-`data-astro-source-*` attributes the overlay reads.
+Astro 5, 6 and 7 are supported, and the overlay reads the same annotations on
+all three: `data-atx-file` / `data-atx-loc`, injected by the integration itself
+before Astro's compiler sees the file.
 
-On **Astro 5 and 6** they come from the compiler, but only while the dev
-toolbar is enabled. Keep `devToolbar.enabled` on, or set
-`sourceAnnotations: 'force'` to have the integration emit them regardless.
+It does not depend on Astro's own `data-astro-source-*`, which is emitted on
+**Astro 5 and 6** only while the dev toolbar is enabled, and on **Astro 7** not
+at all ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)).
+Where Astro emits nothing — on 7, and on 5/6 with the dev toolbar off — those
+attributes are injected alongside, so the dev toolbar's own source-backed
+features keep working on 7. Where Astro does emit them they are left alone.
 
-From **Astro 7** the Rust compiler stopped emitting them
-([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)),
-so the integration always injects them itself.
-
-`'auto'`, the default, picks the right regime for the running version. `'off'`
-disables injection entirely, which leaves the overlay dependent on whatever the
-compiler provides.
+`'auto'` is the default and injects on every version; `'force'` is a synonym
+kept for configs that set it. `'off'` disables injection entirely, which leaves
+the overlay dependent on whatever the compiler provides — nothing at all on
+Astro 7, and nothing on 5/6 with the dev toolbar disabled.
 
 ## The Settings drawer
 

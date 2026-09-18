@@ -15,7 +15,9 @@ describe('Unicode page content source positions', () => {
         expect(loc).toBe(locOf(source, 'Later heading'));
         // Removing annotations must recover the complete original, catching
         // insertion drift even when annotate and patch share the same mistake.
-        expect(annotated.replace(/ data-astro-source-file="[^"]*" data-astro-source-loc="[^"]*"/g, '')).toBe(source);
+        expect(annotated.replace(
+          / data-astro-source-file="[^"]*" data-astro-source-loc="[^"]*" data-atx-file="[^"]*" data-atx-loc="[^"]*"/g,
+          '')).toBe(source);
         expect(await classifyAstro(source, loc!, 'h2')).toMatchObject({ kind: 'text' });
         expect(await applyAstro(source, {
           loc: loc!, tag: 'h2', targetType: 'text', original: 'Later heading', newText: 'Updated café 東京 😊',

@@ -9,7 +9,7 @@ import { initInspector } from './inspector.ts';
 import { createMenu } from './menu.ts';
 import { markdownSource, pageSource, resolvePageSource } from './page-source.ts';
 import { isOwnUi, mount } from './shadow.ts';
-import { annotatedElements, cacheSourceMappings, sourceFor } from './source-map.ts';
+import { annotatedElements, annotationGaps, cacheSourceMappings, sourceFor } from './source-map.ts';
 import { createStagedValues } from './staged-values.ts';
 import * as state from './state.ts';
 import { initTree } from './tree.ts';
@@ -162,6 +162,14 @@ export function initInspectorApp() {
     if (backing) lines.push(`- **Backing content file** ${backing}`);
     lines.push(`- **Annotated elements** ${elements.length}`);
     if (unannotated) lines.push(`- **Without a composition chain** ${unannotated}`);
+    // The parity counter, reported where someone is already asking the page
+    // what it knows about itself. Removing the legacy annotation read path is
+    // gated on this being empty on a real site, so it is stated either way
+    // rather than only when it has something to complain about.
+    const gaps = annotationGaps();
+    lines.push(gaps.length
+      ? `- **Annotation parity** ${gaps.length} element${gaps.length === 1 ? '' : 's'} reachable only through Astro’s own annotation`
+      : '- **Annotation parity** complete — every annotated element carries data-atx-*');
     try {
       const links = await chainLinks.resolve(pathname, [...ids]);
       const files = [...new Set([...links.values()].flatMap(link => link.target ? [link.target] : []))].sort();
@@ -172,6 +180,7 @@ export function initInspectorApp() {
     } catch (error) {
       lines.push('', `## Components on this route`, `_Unavailable — ${error instanceof Error ? error.message : 'request failed'}._`);
     }
+    if (gaps.length) lines.push('', `## Elements with no data-atx-* annotation (${gaps.length})`, ...gaps.map(gap => `- ${gap}`));
     try {
       await navigator.clipboard.writeText(`${lines.join('\n')}\n`);
       toast('Page context copied', 'ok');

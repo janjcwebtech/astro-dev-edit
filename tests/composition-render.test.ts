@@ -71,7 +71,10 @@ async function fixture(compiler: 'go' | 'rust', enhanced = false, entry = 'Page'
     const annotated = await annotateAstroSource(source, file, { composition: index.links().filter(l => l.file === file), runtime: enhanced ? pathToFileURL(runtimePath).href : undefined });
     const plain = await annotateAstroSource(source, file);
     if (!enhanced) expect(annotated.split('\n')).toHaveLength(source.split('\n').length);
-    const annotations = (text: string) => text.match(/data-astro-source-file="[^"]*" data-astro-source-loc="[^"]*"/g);
+    // Both namespaces, in one match: composition adds chain attributes, and
+    // must not move a single byte of the file/loc run either namespace carries.
+    const annotations = (text: string) => text.match(
+      /data-astro-source-file="[^"]*" data-astro-source-loc="[^"]*" data-atx-file="[^"]*" data-atx-loc="[^"]*"/g);
     expect(annotations(annotated)).toEqual(annotations(plain));
     const compiled = await transform(annotated, {
       filename: file, internalURL: pathToFileURL(runtime.resolve('astro/runtime/server/index.js')).href,
