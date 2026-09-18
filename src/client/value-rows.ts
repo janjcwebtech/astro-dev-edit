@@ -121,6 +121,17 @@ export interface ValueSelection {
   /** Lowercased tag name — the apply request carries it, so the row's target
    *  has to. */
   tag: string;
+  /**
+   * For an unannotated element that wraps a slot boundary: the component that
+   * rendered it from a tag it did not spell statically, and where the words
+   * inside were written (issue #71).
+   *
+   * It names a refusal, never a row. Which element a dynamic tag resolves to
+   * is a render-time fact, so nothing here is a write target — but "no source
+   * annotation" is not the whole of what the page knows, and every other
+   * refusal in this tool names its cause and points somewhere.
+   */
+  dynamicTag?: { component: SourceLoc; content: SourceLoc | null } | null;
 }
 
 export interface ValueRowsInput {
@@ -391,6 +402,30 @@ function usageRows(links: readonly UsageLink[], pathname: string,
   return rows;
 }
 
+/** Last path segment — enough to name a file in a sentence. */
+function base(file: string): string {
+  return file.split(/[\\/]/).pop() || file;
+}
+
+/**
+ * Why an unannotated element is unannotated, when the page can say.
+ *
+ * A polymorphic `<Tag>` is the case worth naming: the tool holds the slot
+ * boundary, so it knows which component rendered the element and where the
+ * words inside it came from — the same words that answer fully when the
+ * `<span>` inside is clicked instead. Saying "no source annotation" to one and
+ * a full chain to the other, for one string of text, is the defect.
+ */
+function dynamicTagRefusal(selection: ValueSelection): string {
+  const dynamic = selection.dynamicTag;
+  if (!dynamic) return 'This element has no source annotation.';
+  const where = `Rendered from a dynamic tag in ${base(dynamic.component.file)} — ` +
+    'a tag name that is a value, so no annotation could be written on it.';
+  return dynamic.content
+    ? `${where} The words inside come from ${base(dynamic.content.file)}:${dynamic.content.loc}.`
+    : `${where} Nothing inside it carries a source annotation either.`;
+}
+
 /** Build the Values card's rows for one selection. */
 export function buildValueRows(input: ValueRowsInput): ValueRows {
   const { selection, classification, classifyError, links } = input;
@@ -404,7 +439,7 @@ export function buildValueRows(input: ValueRowsInput): ValueRows {
   if (selection.opaque) {
     return { rows, refusal: 'Generated HTML — its inner elements have no proven source relationship.' };
   }
-  if (!selection.source) return { rows, refusal: 'This element has no source annotation.' };
+  if (!selection.source) return { rows, refusal: dynamicTagRefusal(selection) };
   if (classifyError) return { rows, refusal: classifyError };
   if (classification) return { rows, refusal: classification.reason };
   return { rows, refusal: 'No value was resolved for this selection.' };

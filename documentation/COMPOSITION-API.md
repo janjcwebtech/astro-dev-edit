@@ -55,7 +55,20 @@ The panel shows:
   each prop and slot with its verdict; the values themselves are Values rows.
 - **Slot relationships:** all enclosing native-slot insertion boundaries,
   including forwarded slots and fallback content, with links to the receiving
-  `<slot>` locations. The selected element's own source remains separate.
+  `<slot>` locations. The selected element's own source remains separate. An
+  unannotated element that *wraps* a boundary gets a row for it too — see
+  below.
+
+**An element rendered from a dynamic tag** — `<Tag {...attributes}><slot /></Tag>`,
+where `Tag` is a variable — carries no annotation from anyone: a tag name that
+is a value cannot be stamped, and injecting into the attribute position is
+refused because `Tag` may resolve to a component, where the attributes would
+become props. The panel names it instead of stopping at *no source annotation*:
+the slot boundary such an element wraps identifies the component that rendered
+it and the first annotated element inside identifies where the words were
+written, so Values refuses with both named, *View code* is offered on each, and
+the slot row says which `<slot />` is wrapped. Selecting an element inside gives
+the full chain, unchanged.
 - **CSS:** inline declarations, computed values and readable matched selectors
   in stylesheet order. Conditional matches may be inactive, and inaccessible
   cross-origin sheets are omitted. Available stylesheet sources offer an

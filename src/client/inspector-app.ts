@@ -1,7 +1,7 @@
 import type { UsageLink } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { chainIds, createChainLinks } from './composition.ts';
-import { readRenderOccurrences } from './composition-dom.ts';
+import { readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
 import { openPeekPanel } from './editors/peek.ts';
 import { openSettingsPanel } from './editors/settings-panel.ts';
 import { icon } from './icons.ts';
@@ -322,8 +322,13 @@ export function initInspectorApp() {
     hoverOutline.setAttribute('data-on', '');
     const src = sourceFor(el);
     const opaque = !!el.parentElement?.closest('[data-atx-boundary="html"]');
+    // The same naming the panel does, at the point the reader first meets the
+    // element: a dynamic tag is unannotated for a reason the page can state.
+    const dynamic = !src && !opaque ? wrappedSlot(el) : null;
     pillRow.textContent = src && !opaque ? `${basename(src.file)}:${src.loc} · inspect`
-      : opaque ? 'Generated HTML · untracked' : `<${el.tagName.toLowerCase()}> · no source annotation`;
+      : opaque ? 'Generated HTML · untracked'
+        : dynamic ? `<${el.tagName.toLowerCase()}> · dynamic tag in ${basename(dynamic.placement.file)}`
+          : `<${el.tagName.toLowerCase()}> · no source annotation`;
     pillCrumbs.replaceChildren();
     pillCrumbs.removeAttribute('data-on');
     pill.setAttribute('data-on', '');

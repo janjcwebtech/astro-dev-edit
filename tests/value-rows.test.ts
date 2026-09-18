@@ -201,6 +201,35 @@ describe('a refusal collapses the card instead of drawing an empty list', () => 
       .refusal).toContain('no source annotation');
   });
 
+  /**
+   * Issue #71. A polymorphic `<Tag>` renders an element nobody annotates, and
+   * the tool still holds the slot boundary it wraps — which names the
+   * component that chose the tag, and the file the words inside were written
+   * in. Clicking the `<span>` inside answered fully all along; clicking the
+   * `<h2>` around it must not answer with a mechanical fact and stop.
+   */
+  it('names the dynamic tag that rendered an unannotated element, and both files', () => {
+    const refusal = buildValueRows(input({
+      selection: { ...input().selection, source: null, dynamicTag: {
+        component: { file: '/repo/src/components/ui/Heading.astro', loc: '6:22' },
+        content: { file: '/repo/src/components/sections/Intro.astro', loc: '21:272' } } },
+      classification: null,
+    })).refusal;
+    expect(refusal).toContain('dynamic tag in Heading.astro');
+    expect(refusal).toContain('Intro.astro:21:272');
+    expect(refusal).not.toContain('no source annotation');
+  });
+
+  it('says so when nothing inside the dynamic tag is annotated either', () => {
+    const refusal = buildValueRows(input({
+      selection: { ...input().selection, source: null, dynamicTag: {
+        component: { file: '/repo/src/components/ui/Heading.astro', loc: '6:22' }, content: null } },
+      classification: null,
+    })).refusal;
+    expect(refusal).toContain('dynamic tag in Heading.astro');
+    expect(refusal).toContain('Nothing inside it carries a source annotation');
+  });
+
   it('carries a failed classification through as the reason', () => {
     expect(buildValueRows(input({ classification: null, classifyError: 'Could not classify — offline' }))
       .refusal).toBe('Could not classify — offline');

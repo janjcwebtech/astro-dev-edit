@@ -21,6 +21,27 @@ const chain = (value: unknown) => typeof value === 'string' && /^(?:!|\?|(?:\.[\
  *  a damaged trace, not a value to coerce. */
 const ordinalOf = (value: string): number | null => (/^\d+$/.test(value) ? Number(value) : null);
 
+/**
+ * One `<!--atx-slot:…-->` marker, validated field by field, or null.
+ *
+ * Every field is checked because a marker is text in the served HTML: the
+ * boundary graph is only trustworthy if nothing half-parsed can enter it.
+ * Shared with `composition-dom.ts`, which reads a single marker off an element
+ * rather than the whole stream, so the two can never disagree about what a
+ * well-formed placement is.
+ */
+export function parseSlotMarker(text: string): SlotPlacement | null {
+  if (!text.startsWith('atx-slot:')) return null;
+  try {
+    const slot = JSON.parse(decodeURIComponent(text.slice('atx-slot:'.length))) as SlotPlacement;
+    if (!slot || !id(slot.id) || !id(slot.receiver) ||
+      typeof slot.name !== 'string' || typeof slot.file !== 'string' || !slot.file || !chain(slot.chain) ||
+      (slot.parent !== null && !id(slot.parent)) || typeof slot.fallback !== 'boolean' ||
+      typeof slot.loc !== 'string' || !/^[1-9]\d*:[1-9]\d*$/.test(slot.loc)) return null;
+    return slot;
+  } catch { return null; }
+}
+
 /** Feed DOM-order comments and annotated elements. Fail closed on damaged
  * boundaries; never attach content to an invented or partially parsed slot. */
 export function renderOccurrences(events: readonly TraceEvent[]): { ok: true; occurrences: RenderOccurrence[]; placements: SlotPlacement[] } | { ok: false; reason: string } {
@@ -42,14 +63,11 @@ export function renderOccurrences(events: readonly TraceEvent[]): { ok: true; oc
       occurrences.push({ key: event.key, instance: event.instance, ordinal,
         group: [event.instance, ...stack.map(slot => slot.id)].join('/'), slots: [...stack] });
     } else if (event.text.startsWith('atx-slot:')) {
-      try {
-        const slot = JSON.parse(decodeURIComponent(event.text.slice('atx-slot:'.length))) as SlotPlacement;
-        if (!slot || !id(slot.id) || !id(slot.receiver) || seen.has(slot.id) ||
-          typeof slot.name !== 'string' || typeof slot.file !== 'string' || !slot.file || !chain(slot.chain) ||
-          (slot.parent !== null && !id(slot.parent)) || typeof slot.fallback !== 'boolean' ||
-          typeof slot.loc !== 'string' || !/^[1-9]\d*:[1-9]\d*$/.test(slot.loc)) throw new Error('Invalid slot');
-        seen.add(slot.id); stack.push(slot); placements.push(slot);
-      } catch { return { ok: false, reason: 'invalid-slot-marker' }; }
+      const slot = parseSlotMarker(event.text);
+      // A repeated id is a damaged stream, not a second placement: two
+      // boundaries claiming one identity make every containment answer a guess.
+      if (!slot || seen.has(slot.id)) return { ok: false, reason: 'invalid-slot-marker' };
+      seen.add(slot.id); stack.push(slot); placements.push(slot);
     } else if (event.text.startsWith('/atx-slot:')) {
       if (stack.pop()?.id !== event.text.slice('/atx-slot:'.length)) return { ok: false, reason: 'unbalanced-slot-markers' };
     }

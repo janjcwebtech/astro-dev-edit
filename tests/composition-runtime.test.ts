@@ -3,7 +3,7 @@ import { begin, child, slot } from '../src/server/composition-runtime.ts';
 import { parseUsages } from '../src/server/usage-parse.ts';
 import { annotateAstroSource } from '../src/server/annotate.ts';
 import { createUsageIndex } from '../src/server/usage-index.ts';
-import { renderOccurrences } from '../src/client/render-occurrences.ts';
+import { parseSlotMarker, renderOccurrences } from '../src/client/render-occurrences.ts';
 
 it('captures an immutable context and removes the transport before application code', () => {
   const request = {};
@@ -64,6 +64,16 @@ it('allocates slot placement IDs per insertion, including rendering the same obj
 it('rejects malformed, duplicate and incomplete slot boundaries', () => {
   expect(renderOccurrences([{ type: 'comment', text: 'atx-slot:%broken' }])).toEqual({ ok: false, reason: 'invalid-slot-marker' });
   expect(renderOccurrences([{ type: 'comment', text: '/atx-slot:missing' }])).toEqual({ ok: false, reason: 'unbalanced-slot-markers' });
+  const marker = (over: Record<string, unknown> = {}) => 'atx-slot:' + encodeURIComponent(JSON.stringify({
+    id: 'a'.repeat(24), receiver: 'b'.repeat(24), name: 'default', loc: '6:22',
+    fallback: false, file: '/Heading.astro', chain: '.E4himsYp', parent: null, ...over }));
+  // One parser, two readers: the stream and `composition-dom.ts::wrappedSlot`,
+  // which reads a single marker off an element for the dynamic-tag refusal.
+  expect(parseSlotMarker(marker())).toMatchObject({ name: 'default', loc: '6:22', file: '/Heading.astro' });
+  expect(parseSlotMarker(marker({ loc: '0:1' }))).toBeNull();
+  expect(parseSlotMarker(marker({ chain: 'nope' }))).toBeNull();
+  expect(parseSlotMarker(marker({ file: '' }))).toBeNull();
+  expect(parseSlotMarker('/atx-slot:' + 'a'.repeat(24))).toBeNull();
 });
 
 describe('safe insertion after the final attribute', () => {

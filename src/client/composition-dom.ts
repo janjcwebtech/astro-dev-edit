@@ -1,4 +1,5 @@
-import { renderOccurrences, type TraceEvent } from './render-occurrences.ts';
+import type { SlotPlacement, SourceLoc } from '../shared/protocol.ts';
+import { parseSlotMarker, renderOccurrences, type TraceEvent } from './render-occurrences.ts';
 
 /** Read-only adapter. Comments inside set:html are serialized content, not
  * trusted live insertion boundaries; replayed annotations there stay opaque. */
@@ -24,4 +25,39 @@ export function readRenderOccurrences(root: Document | Element) {
   // `events` travels with the result: the ordinal walk needs the parent
   // pointers, which an occurrence list has deliberately flattened away.
   return { elements, events, result: renderOccurrences(events) };
+}
+
+/**
+ * The slot boundary an **unannotated** element wraps directly, if any — the
+ * evidence behind a polymorphic `<Tag>` (issue #71).
+ *
+ * `<Tag {...attributes}><slot /></Tag>` renders an element nobody annotates:
+ * a capitalised tag parses as a component, so the transform skips it, and
+ * Astro's compiler never stamped it either. The element is still identifiable,
+ * because the `<slot />` inside it emitted its boundary markers *as its own
+ * children*: the placement names the file and loc the `<slot />` is written
+ * at, and only that component's template can have written the element around
+ * it — an element it spelled statically would have been annotated.
+ *
+ * `content` is the first annotated element inside the boundary, which is where
+ * the words on screen were actually written. Null when nothing inside carries
+ * an annotation, which is said rather than guessed around.
+ *
+ * Direct children only. A marker further down belongs to some element between,
+ * and attributing it to this one would name the wrong component.
+ */
+export function wrappedSlot(el: Element): { placement: SlotPlacement; content: SourceLoc | null } | null {
+  for (const node of el.childNodes) {
+    if (node.nodeType !== 8) continue;
+    const placement = parseSlotMarker(node.nodeValue ?? '');
+    if (!placement) continue;
+    const inner = el.querySelector('[data-atx-file][data-atx-loc]');
+    return {
+      placement,
+      content: inner
+        ? { file: inner.getAttribute('data-atx-file')!, loc: inner.getAttribute('data-atx-loc')! }
+        : null,
+    };
+  }
+  return null;
 }

@@ -1,6 +1,6 @@
 import type { SourceLoc, UsageLink, CompositionCoverage } from '../shared/protocol.ts';
 import * as api from './api.ts';
-import { readRenderOccurrences } from './composition-dom.ts';
+import { readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
 import { chainOrdinals } from './render-occurrences.ts';
 import { rulesForElement } from './css-inspect.ts';
 import { buildImagePicker } from './editors/image.ts';
@@ -395,7 +395,7 @@ export function initInspector(deps: InspectorDeps) {
   function renderValues(
     section: ReturnType<typeof card>,
     model: ValueRows,
-    jump: { label: string; src: SourceLoc; description: string } | null,
+    jump: readonly { label: string; src: SourceLoc; description: string }[],
   ) {
     // Every field on screen is about to be discarded, so every subscription
     // reading the store on its behalf has to go with it.
@@ -403,7 +403,7 @@ export function initInspector(deps: InspectorDeps) {
     section.body.replaceChildren();
     if (!model.rows.length) {
       note(section.body, `Nothing writable on this selection. ${model.refusal ?? ''}`.trim());
-      if (jump) sourceRow(section.body, jump.label, jump.src, jump.description);
+      for (const to of jump) sourceRow(section.body, to.label, to.src, to.description);
       return;
     }
     const list = itemGroup({ bleed: true });
@@ -463,9 +463,16 @@ export function initInspector(deps: InspectorDeps) {
     const opaque = !!el.parentElement?.closest('[data-atx-boundary="html"]');
     const ancestor = !source && el.parentElement ? nearestOwnSource(el.parentElement) : null;
     const ancestorSource = ancestor ? sourceFor(ancestor) ?? null : null;
+    // Only asked of an element with nothing of its own to say: a slot boundary
+    // inside an annotated element is an ordinary containment fact, and the
+    // Slot relationships card already covers it.
+    const wrapped = !source && !opaque ? wrappedSlot(el) : null;
+    const dynamicTag = wrapped
+      ? { component: { file: wrapped.placement.file, loc: wrapped.placement.loc }, content: wrapped.content }
+      : null;
     const selection: ValueSelection = {
       source: source ?? null, opaque, viaSlot: false, tag: el.tagName.toLowerCase(),
-      ancestorSource,
+      ancestorSource, dynamicTag,
       text: (el.textContent ?? '').trim().slice(0, 4000),
       // The attribute, not `currentSrc`: the row describes what the file holds.
       ...(el instanceof HTMLImageElement
@@ -478,13 +485,20 @@ export function initInspector(deps: InspectorDeps) {
     // route's own template, which is known rather than guessed. Never an entry
     // file — a value belonging to one earns a row of its own, and a page that
     // has not declared one has told us nothing to name.
-    const jump = ancestorSource
-      ? { label: 'Enclosing source', src: ancestorSource,
-        description: 'Container source; this element’s source is not proven.' }
-      : routeFile
-        ? { label: 'Route template', src: { file: routeFile, loc: '1:1' },
-          description: 'The file this route is written in; this element’s own source is not proven.' }
-        : null;
+    const jump: { label: string; src: SourceLoc; description: string }[] = dynamicTag
+      // Both files, because the answer is in two places: the component that
+      // chose the tag, and the file the words are written in.
+      ? [{ label: 'Dynamic tag', src: dynamicTag.component,
+        description: `The <slot /> this element wraps, in ${basename(dynamicTag.component.file)}.` },
+        ...(dynamicTag.content ? [{ label: 'Content source', src: dynamicTag.content,
+          description: `Where the words inside were written, ${basename(dynamicTag.content.file)}:${dynamicTag.content.loc}.` }] : [])]
+      : ancestorSource
+        ? [{ label: 'Enclosing source', src: ancestorSource,
+          description: 'Container source; this element’s source is not proven.' }]
+        : routeFile
+          ? [{ label: 'Route template', src: { file: routeFile, loc: '1:1' },
+            description: 'The file this route is written in; this element’s own source is not proven.' }]
+          : [];
 
     // Never climb from an untracked descendant to manufacture its ownership.
     // Values is still answered: /classify needs only a source loc, and a
@@ -497,12 +511,21 @@ export function initInspector(deps: InspectorDeps) {
     let ordinals: Record<string, number> = {};
     if (opaque || !source) {
       note(chain.body, opaque ? 'No chain · untracked-html. Generated HTML has no proven inner-element source relationship.'
-        : 'No chain · this element has no source annotation.');
+        : dynamicTag ? `No chain · rendered from a dynamic tag in ${basename(dynamicTag.component.file)}. ` +
+          'Select an element inside it for the chain its content does have.'
+          : 'No chain · this element has no source annotation.');
       // A Markdown body is the one unannotated element whose owner is known,
       // because the route declared it. The chain still ends — it just ends
       // somewhere nameable.
       if (!opaque && markdownEntry && ancestorSource) markdownChainEnd(chain.body, markdownEntry);
-      note(slots.body, 'No proven slot relationship.');
+      // The boundary this element wraps is a proven slot relationship — it is
+      // the one thing about this element that *is* proven, so it is shown as a
+      // row like any other rather than left inside the refusal sentence.
+      if (wrapped) {
+        sourceRow(slots.body, `${wrapped.placement.name || 'default'} slot · wrapped by this element`,
+          dynamicTag!.component,
+          `This element surrounds the <slot /> at ${basename(wrapped.placement.file)}:${wrapped.placement.loc}`);
+      } else note(slots.body, 'No proven slot relationship.');
     } else {
       render = readRenderOccurrences(document);
       if (!render.result.ok) {

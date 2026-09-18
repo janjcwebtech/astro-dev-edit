@@ -100,9 +100,24 @@ function locForElement(node: AstNode): Pos | null {
  */
 const NEVER_ANNOTATE = new Set(['script', 'style', 'slot']);
 
-/** Plain lowercase HTML elements only — components/fragments are never
- *  annotated (matches compiler behavior; the client walks up via
- *  nearestSource anyway), nor is anything in NEVER_ANNOTATE. */
+/**
+ * Plain lowercase HTML elements only — components/fragments are never
+ * annotated (matches compiler behavior; the client walks up via
+ * nearestSource anyway), nor is anything in NEVER_ANNOTATE.
+ *
+ * **A polymorphic `<Tag>` stays out, deliberately** (issue #71). Its attribute
+ * position is static even though its tag name is not, so injecting there looks
+ * possible — but `as` is a prop, and any usage site may pass a *component*, at
+ * which point the injected attributes become props and land in `Astro.props`.
+ * That is exactly the leak the `.astro`→`.astro` injection gate exists to
+ * prevent, and a literal default proves nothing about what a caller passes. The
+ * only honest proof is at render time (`typeof Tag === 'string'`), which means
+ * a conditional spread on a component tag and a loc on a node the patcher's loc
+ * rules do not cover (rule 9). Until both are answered, the client names the
+ * refusal instead: `composition-dom.ts::wrappedSlot` reads the slot boundary
+ * such an element wraps, and the inspector says which component rendered it and
+ * where the words inside were written.
+ */
 function isAnnotatable(node: AstNode): boolean {
   return (
     (node.type === 'element' || node.type === 'custom-element') &&
