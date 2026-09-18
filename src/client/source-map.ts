@@ -4,43 +4,49 @@ import type { SourceLoc } from '../shared/protocol.ts';
 /**
  * Source-location capture cache.
  *
- * Astro emits `data-astro-source-file` / `-loc` in the served HTML, but its
- * dev-toolbar runtime STRIPS those attributes out of the DOM shortly after
- * hydration. By hover time they are gone — querying them live finds nothing.
- * (Verified against Astro 5.18: 254 attrs in served HTML, 0 in the live DOM.)
+ * The client reads `data-atx-file` / `data-atx-loc` and nothing else. Those are
+ * the integration's own, injected by `server/annotate.ts` on every supported
+ * Astro version, and no other tool strips, shifts or switches them off.
  *
- * So we snapshot every annotated element the instant it appears, before the
- * toolbar clears them, and read hover/edit locations from the cache instead of
- * from live attributes. This is the same approach the astro-click-to-source
- * integration uses. It supersedes spec §4.2's "re-read attributes lazily on
- * next hover", which is not viable here.
+ * Astro's `data-astro-source-*` used to be a second read path here. It is gone,
+ * on evidence rather than on taste:
+ *
+ * - It is not dependable. The dev toolbar strips `data-astro-source-*` out of
+ *   the live DOM within a frame of hydration — on **both** majors, including
+ *   the copy we inject on 7 for other tooling's benefit. By hover time it has
+ *   nothing to offer.
+ * - It is not needed. Across five Astro 5.18.2 routes, all **1,721** of Astro's
+ *   own `(file, loc)` pairs reproduce byte-identically from our own
+ *   annotations, with zero disagreements, and we annotate 75 elements more
+ *   (`<html>`, `<head>` and its children, which the compiler skips). The legacy
+ *   population was a strict subset of the tool-owned one.
+ * - It was not safe. On 5/6 the Go printer splices its own injection-shifted
+ *   loc in ahead of ours, so a legacy loc points into *transformed* source and
+ *   could outrank a correct one.
+ *
+ * `sourceAnnotations: 'off'` therefore leaves the client with nothing to read,
+ * on every version — `src/index.ts` warns about exactly that.
  *
  * Two-layer cache. The primary key is the element itself: when we see an
- * annotated element we copy its {file, loc} onto a private JS property. A JS
- * property survives the attribute-strip (Astro removes the HTML attribute, not
- * our property) AND survives across hover with no path matching. The secondary
- * path-keyed map is the fallback for the case where Astro REPLACES a node
- * wholesale (new object, our property gone): we re-resolve by structural path.
- *
- * The critical timing fix: we don't snapshot once and hope. A MutationObserver
- * watches for the attributes being added (initial render / HMR) and stamps them
- * onto the element the moment they appear — so we always capture the value
- * before the toolbar's own observer strips it, regardless of ordering.
+ * annotated element we copy its {file, loc} onto a private JS property. The
+ * secondary path-keyed map is the fallback for the case where a node is
+ * REPLACED wholesale — a framework island re-rendering, or an HMR swap — so a
+ * fresh element object carrying no annotation still resolves by structural
+ * path. A MutationObserver keeps both fed as the DOM changes.
  *
  * TIMING CONTRACT: this module has no top-level side effects. The entry module
- * (overlay.ts) must call startCapture() synchronously at module evaluation to
- * win the race against the toolbar's stripping.
+ * (overlay.ts) must call startCapture() synchronously at module evaluation, so
+ * the cache is populated before anything asks it a question.
  */
 
 const PROP = '__astroDevEditSrc' as const;
-const SOURCE_ELEMENTS = '[data-atx-file], [data-astro-source-file]';
+const SOURCE_ELEMENTS = '[data-atx-file]';
 
 function opaque(el: HTMLElement): boolean {
   return Boolean(el.parentElement?.closest('[data-atx-boundary="html"]'));
 }
 
-/** Version-2 coordinates refer to untouched source. Legacy Go annotations can
- * point into the transformed source and must never outrank these. */
+/** The one annotation the client reads. Coordinates refer to untouched source. */
 function ownSource(el: HTMLElement): SourceLoc | undefined {
   const file = el.getAttribute('data-atx-file'), loc = el.getAttribute('data-atx-loc');
   return file && loc ? { file, loc } : undefined;
@@ -48,43 +54,6 @@ function ownSource(el: HTMLElement): SourceLoc | undefined {
 
 interface Stamped extends HTMLElement {
   [PROP]?: SourceLoc;
-}
-
-/**
- * Annotation parity — every element the legacy namespace reached that the
- * tool-owned one did not.
- *
- * Both namespaces are emitted by one transform over one walk, so the honest
- * expectation is nothing here. It is counted anyway because the two are read
- * by two code paths, and removing the legacy read path is gated on this being
- * empty on a real site rather than on the transform looking symmetrical.
- *
- * Counted at stamp time, not by querying: the dev toolbar strips
- * `data-astro-source-*` out of the DOM within a frame of hydration, so by the
- * time anyone asks, the population being measured is gone. Deduped by
- * `<tag> file:loc`, so an HMR re-render — which replaces the element object
- * and re-stamps it — reports the same gap once.
- */
-const GAP_MAX = 50;
-const gaps = new Set<string>();
-
-/** Elements carrying Astro's own annotation but not the tool's, capped at
- *  {@link GAP_MAX}. Empty is the evidence that the legacy read path can go. */
-export function annotationGaps(): readonly string[] {
-  return [...gaps];
-}
-
-function recordGap(el: HTMLElement, src: SourceLoc): void {
-  if (gaps.size >= GAP_MAX) return;
-  gaps.add(`<${el.tagName.toLowerCase()}> ${src.file}:${src.loc}`);
-  if (gaps.size === 1) {
-    console.warn(
-      '[astro-dev-edit] annotation parity gap — an element carries Astro’s own ' +
-        'data-astro-source-* but no tool-owned data-atx-*, so it is only reachable ' +
-        'through the legacy read path. Copy page context lists them. ' +
-        '(Expected when sourceAnnotations is "off".)',
-    );
-  }
 }
 
 const sourceByPath = new Map<string, SourceLoc>();
@@ -112,15 +81,9 @@ function elementPath(el: HTMLElement): string {
 function stamp(el: Stamped): void {
   if (opaque(el)) return;
   const own = ownSource(el);
-  if (own) { el[PROP] = own; sourceByPath.set(elementPath(el), own); return; }
-  if (el[PROP]) return;
-  const file = el.getAttribute('data-astro-source-file');
-  if (!file) return;
-  const loc = el.getAttribute('data-astro-source-loc') ?? '';
-  const src: SourceLoc = { file, loc };
-  el[PROP] = src;
-  sourceByPath.set(elementPath(el), src);
-  recordGap(el, src);
+  if (!own) return;
+  el[PROP] = own;
+  sourceByPath.set(elementPath(el), own);
 }
 
 /** Snapshot everything currently annotated in the DOM. Called at capture start
@@ -134,12 +97,11 @@ export function cacheSourceMappings(): void {
 /**
  * Every live element that carries a captured source loc, in document order.
  *
- * The `data-astro-source-*` attributes are gone by now (the toolbar stripped
- * them), so we can't query them — we read the stamped JS property instead,
- * which persists. This is the only way to enumerate annotated elements after
- * boot; the element-tree panel derives its structure from it. Assumes the DOM
- * has already been stamped (startCapture / cacheSourceMappings), which the boot
- * and HMR paths guarantee before this is called.
+ * Walks every element rather than querying `SOURCE_ELEMENTS`, because a node
+ * replaced after stamping resolves through the cache and no longer carries the
+ * attribute. The element-tree panel derives its structure from this. Assumes
+ * the DOM has already been stamped (startCapture / cacheSourceMappings), which
+ * the boot and HMR paths guarantee before this is called.
  */
 export function annotatedElements(root: HTMLElement = document.body): HTMLElement[] {
   const out: HTMLElement[] = [];
@@ -156,16 +118,13 @@ export function pathFor(el: HTMLElement): string {
   return elementPath(el);
 }
 
-/** Original tool-owned coordinates first, then the legacy capture cache. */
+/** Live attribute first, then the capture cache for a replaced node. */
 export function sourceFor(el: HTMLElement): SourceLoc | undefined {
   if (opaque(el)) return undefined;
   return ownSource(el) ?? (el as Stamped)[PROP] ?? sourceByPath.get(elementPath(el));
 }
 
-/**
- * Nearest ancestor (or self) with a cached source location. Reads the
- * snapshot cache, not live attributes — the attributes are gone by now.
- */
+/** Nearest ancestor (or self) with a source location, live or cached. */
 export function nearestSource(node: EventTarget | null): HTMLElement | null {
   let el = node as HTMLElement | null;
   while (el && el !== document.body) {
@@ -197,7 +156,7 @@ export function isPackageSource(src: SourceLoc): boolean {
  * own component. The element is then a dead end: nothing in it can be edited,
  * and the file cannot even be opened. But the element *was* written somewhere
  * — as `<Image …>` or as a wrapper around it — and that somewhere is the
- * nearest enclosing element Astro annotated to a project file.
+ * nearest enclosing element annotated to a project file.
  *
  * Two levels of indirection do not break it: a `<SiteImage>` wrapping an
  * `<Image>` still renders inside whatever markup the page wrote around it, so
@@ -216,8 +175,8 @@ export function nearestOwnSource(from: HTMLElement): HTMLElement | null {
   return null;
 }
 
-// Stamp attributes the instant they appear, before the dev toolbar strips them.
-// This wins the race regardless of script ordering. (verified fix)
+// Stamp annotations the instant they appear, so a node replaced later still
+// resolves from the cache.
 const stampObserver = new MutationObserver((records) => {
   for (const rec of records) {
     if (rec.type === 'attributes' && rec.target instanceof HTMLElement) {
@@ -241,6 +200,6 @@ export function startCapture(): void {
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ['data-atx-file', 'data-atx-loc', 'data-astro-source-file', 'data-astro-source-loc'],
+    attributeFilter: ['data-atx-file', 'data-atx-loc'],
   });
 }

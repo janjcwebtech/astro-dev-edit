@@ -109,8 +109,9 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         // present on 5/6 only while the dev toolbar is on and absent from 7
         // altogether (withastro/compiler-rs#96). One transform, one namespace,
         // one set of loc rules to hold — and `data-atx-*` is nobody else's to
-        // strip, shift or switch off. `'off'` is the one opt-out, and leaves
-        // the overlay dependent on whatever the compiler provides.
+        // strip, shift or switch off. `'off'` is the one opt-out, and now
+        // leaves the overlay with nothing at all: the client reads no other
+        // namespace.
         //
         // Astro's own `data-astro-source-*` is emitted alongside ONLY where
         // Astro will not emit it itself. Where it would, a second pair is not a
@@ -133,16 +134,20 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
           );
         }
 
-        // `sourceAnnotations: 'off'` hands the channel back to Astro, and on
-        // 5/6 only the dev toolbar makes Astro emit anything (on 7 nothing
-        // does). With both off, hover highlight and click-to-edit silently find
-        // nothing. Fail loud rather than mysteriously do nothing.
-        if (!selfAnnotate && !astroAnnotates) {
+        // `sourceAnnotations: 'off'` is now total, not a handover: the client
+        // reads `data-atx-*` and nothing else, so Astro's own annotations —
+        // where a 5/6 dev toolbar still emits them — are no longer a second
+        // read path. Fail loud rather than mysteriously do nothing.
+        if (!selfAnnotate) {
           logger.warn(
-            'sourceAnnotations is "off" and Astro is emitting no source ' +
-              'annotations of its own, so astro-dev-edit has nothing to locate ' +
-              'editable elements with and will find nothing. Set ' +
-              'sourceAnnotations: "auto" to inject them.',
+            'sourceAnnotations is "off", so no data-atx-* annotations are ' +
+              'injected and astro-dev-edit has nothing to locate elements ' +
+              'with. It will find nothing' +
+              (astroAnnotates
+                ? ' — Astro\u2019s own data-astro-source-* is not a substitute; ' +
+                  'the client stopped reading it.'
+                : '.') +
+              ' Set sourceAnnotations: "auto" to inject them.',
           );
         }
 

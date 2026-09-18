@@ -208,15 +208,13 @@ callers wanting the same ids share one request. Call `invalidate()` on
 navigation and on every HMR update — ids survive a server restart but not an
 edit to the file that mints them.
 
-`src/client/source-map.ts` reads `data-atx-file` / `data-atx-loc`, which the
-integration stamps on every supported Astro version and which the dev toolbar
-does not strip. Astro's own `data-astro-source-*` is a fallback read path only,
-and on Astro 5/6 its loc is shifted by the injection, so it is never original
-coordinates;
-`annotationGaps()` counts every element that needed it, and *Copy page context*
-reports the count. Keep API results and render IDs scoped to the current
-page/render; do not treat usage IDs as stable data-record identities or the
-watcher revision as a write precondition.
+`src/client/source-map.ts` reads `data-atx-file` / `data-atx-loc` and nothing
+else — the integration stamps them on every supported Astro version and the dev
+toolbar does not strip them. Astro's own `data-astro-source-*` is not read at
+all: the toolbar strips it on both majors, and on 5/6 its loc is shifted by the
+injection, so it is never original coordinates. Keep API results and render IDs
+scoped to the current page/render; do not treat usage IDs as stable data-record
+identities or the watcher revision as a write precondition.
 
 ## Render ordinals and write targets
 

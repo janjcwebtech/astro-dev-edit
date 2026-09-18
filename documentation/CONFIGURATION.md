@@ -59,17 +59,19 @@ Astro 5, 6 and 7 are supported, and the overlay reads the same annotations on
 all three: `data-atx-file` / `data-atx-loc`, injected by the integration itself
 before Astro's compiler sees the file.
 
-It does not depend on Astro's own `data-astro-source-*`, which is emitted on
-**Astro 5 and 6** only while the dev toolbar is enabled, and on **Astro 7** not
-at all ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)).
-Where Astro emits nothing — on 7, and on 5/6 with the dev toolbar off — those
-attributes are injected alongside, so the dev toolbar's own source-backed
-features keep working on 7. Where Astro does emit them they are left alone.
+Astro's own `data-astro-source-*` is **not read**. It is emitted on **Astro 5
+and 6** only while the dev toolbar is enabled, and on **Astro 7** not at all
+([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)),
+and the toolbar strips it from the live DOM within a frame of hydration on both
+majors. Where Astro emits nothing — on 7, and on 5/6 with the dev toolbar off —
+the integration still injects those attributes alongside its own, so the dev
+toolbar and other tooling that looks for them keep working. That is an emit, not
+a dependency.
 
 `'auto'` is the default and injects on every version; `'force'` is a synonym
-kept for configs that set it. `'off'` disables injection entirely, which leaves
-the overlay dependent on whatever the compiler provides — nothing at all on
-Astro 7, and nothing on 5/6 with the dev toolbar disabled.
+kept for configs that set it. `'off'` disables injection entirely, and because
+nothing else is read, it **disables the overlay** — on every Astro version,
+whatever the dev toolbar is doing. The integration logs a warning saying so.
 
 ## The Settings drawer
 

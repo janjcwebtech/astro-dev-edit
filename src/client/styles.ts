@@ -23,6 +23,12 @@
  * `overlayCss()` is a **function**, not a constant, because ui.ts → shadow.ts →
  * styles.ts → ui.ts is an import cycle: reading `COLOR` at module-evaluation
  * time would hit the temporal dead zone. Reading it at first mount does not.
+ *
+ * ⚠️ **Never type a backtick into the CSS**, not even inside a comment. The
+ * rules below are one template literal, so a stray backtick ends the string
+ * mid-stylesheet. `tsc --noEmit` stays clean — the result is still valid
+ * TypeScript — and the failure surfaces only as a Vite 500 in the browser,
+ * with nothing in the terminal to point at this file.
  */
 
 import { BAR_CHIP, BAR_CHIP_HOVER, CHECKER, COLOR, FONT, RADIUS, Z, hexToRgba, lift } from './ui.ts';

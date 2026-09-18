@@ -118,8 +118,8 @@ describe('annotateAstroSource', () => {
   /**
    * The tool-owned namespace is not conditional on the Astro version, on the
    * dev toolbar, or on composition: one transform stamps it everywhere, which
-   * is what lets the client read one channel and what the parity counter in
-   * `client/source-map.ts` measures against.
+   * is what lets `client/source-map.ts` read that one channel and nothing
+   * else.
    */
   it('stamps the tool-owned pair beside the legacy one, with the same loc', async () => {
     const src = `<main>\n  <h1>Title</h1>\n</main>\n`;

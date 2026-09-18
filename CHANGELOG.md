@@ -18,7 +18,7 @@ Writing an entry — one line, past tense, no essay:
 
 - The integration now injects its own `data-atx-file` / `data-atx-loc` source annotations on **every** supported Astro version, not just where Astro stopped emitting its own; `sourceAnnotations: 'auto'` means "inject" everywhere and `'force'` is a synonym. Astro's `data-astro-source-*` is injected only where Astro itself emits none, so no element ever carries the attribute twice.
 - On Astro 5 and 6 the dev toolbar's own *open in editor* now lands on the right file and line but a shifted column: an element's source loc points past its opening tag, so any injected attribute moves the column the compiler computes. The editor reads its own `data-atx-loc`, which is unaffected.
-- *Copy page context* reports annotation parity — the elements, if any, reachable only through Astro's own annotation — and the console warns once when the first is seen.
+- The overlay reads `data-atx-file` / `data-atx-loc` and nothing else; Astro's own `data-astro-source-*` is no longer a fallback read path. It is still injected where Astro emits none, for the dev toolbar and other tooling. **`sourceAnnotations: 'off'` therefore disables the overlay on every Astro version**, where before it could still ride Astro's attributes on 5/6 with the dev toolbar on.
 
 ### Added
 
