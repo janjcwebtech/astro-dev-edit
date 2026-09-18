@@ -30,6 +30,15 @@ import type { ValueTarget } from './value-model.ts';
 
 export type ValueBadge = 'selected element' | 'via slot';
 
+/**
+ * Why a row is not editable *here*, beyond the reasons the server sends.
+ *
+ * `imported` and `markdown` are the client's own: neither is a verdict
+ * `usage-parse.ts` reaches, and both say the same shape of thing — the words
+ * are real and writable, in a file this panel names and does not write.
+ */
+export type RowReason = UsageRefusal | 'imported' | 'markdown';
+
 /** Which question a chain row answers about its file: who owns the look, and
  *  who holds the words. Both can be true of one link. */
 export type ChainBadge = 'presentation' | 'content';
@@ -52,7 +61,7 @@ export interface ValueRow {
   label: string;
   verdict: UsageVerdict;
   /** Present on every verdict but `editable`. */
-  reason?: UsageRefusal | 'imported';
+  reason?: RowReason;
   /** One line naming what this value *is*, in no mechanism vocabulary. */
   caption: string;
   /**
@@ -98,6 +107,13 @@ export interface ValueSelection {
   opaque: boolean;
   /** True when slot markup passed at a usage site wraps this element. */
   viaSlot: boolean;
+  /**
+   * The nearest annotated **ancestor**'s source, for an element that has none
+   * of its own. It is what separates content the route template rendered
+   * without annotating — a Markdown body — from an element whose owner is some
+   * component further down that simply did not annotate.
+   */
+  ancestorSource?: SourceLoc | null;
   /** The rendered text the page showed. */
   text: string;
   /** For an `img`, what it currently renders. */
@@ -121,10 +137,24 @@ export interface ValueRowsInput {
   classifyError?: string;
   /** The resolved chain, route first — so the nearest usage site is last. */
   links: readonly UsageLink[];
+  /**
+   * The Markdown entry this route renders, when the **page itself** declares
+   * one (`page-source.ts::markdownSource`). Null otherwise, and null is not a
+   * cue to go looking: an unresolved backing file opens the route template and
+   * says so, rather than inventing an entry file.
+   */
+  markdownEntry?: string | null;
+  /**
+   * The file this route is written in, root-relative as `/page-source` spells
+   * it. Two jobs, both of them refusals: it is where an unresolved value jumps
+   * to, and it is the test that a `dynamic` value belongs to the template
+   * rendering the entry rather than to some component further down.
+   */
+  routeFile?: string | null;
 }
 
 /** One sentence per refusal, in the vocabulary a reader already has. */
-const CAPTIONS: Record<UsageRefusal | 'imported', string> = {
+const CAPTIONS: Record<RowReason, string> = {
   styling: 'Styling, not content.',
   directive: 'A directive — it shapes structure, not words.',
   spread: 'Spread from the caller’s caller, so the words are not written here.',
@@ -139,7 +169,88 @@ const CAPTIONS: Record<UsageRefusal | 'imported', string> = {
   unsupported: 'A value shape this inspector does not model.',
   absent: 'No alt attribute — add it in the IDE. Nothing is inserted for you.',
   imported: 'Written in another module.',
+  markdown: 'Written in the Markdown entry this route renders.',
 };
+
+/**
+ * Whether the element's annotated file is the route's own template.
+ *
+ * Annotations carry an absolute fsPath and `/page-source` answers
+ * root-relative, so one is a suffix of the other. It is the same suffix test
+ * `inspector-app.ts` makes of an HMR payload, and it errs the same way: a
+ * near-miss reads as "not the template", which costs a jump rather than making
+ * a claim.
+ */
+function isRouteTemplate(file: string, routeFile: string | null | undefined): boolean {
+  if (!routeFile) return false;
+  return file === routeFile || file.endsWith(`/${routeFile}`);
+}
+
+/**
+ * The rows a Markdown-backed route contributes, or null when this selection is
+ * not one of them.
+ *
+ * **Navigation, never a field.** The words are in an entry file, this pass
+ * does not edit Markdown in the browser, and a row offering a field it could
+ * not save would be worse than the sentence. So the verdict is `elsewhere` —
+ * writable, in the file it names — and *View code* lands on the entry, at its
+ * top: `<Content />` leaves no annotation at all, so no line is ever invented
+ * for a body paragraph.
+ *
+ * Two shapes, and the difference is what the page can prove:
+ *
+ * - **Body content** has no source annotation of its own, because the Markdown
+ *   renderer is not an `.astro` component and nothing threads through it. Its
+ *   nearest annotated ancestor being the route's template is what separates it
+ *   from an island or a component's output that merely failed to annotate.
+ * - **A frontmatter value** is a `dynamic` expression written *in* the route
+ *   template. That it reads the entry is derived, not proven — the trace stops
+ *   at a member access this tool does not model — so the row says so in as many
+ *   words and the detail line marks it `inferred`.
+ */
+function markdownRows(input: ValueRowsInput): ValueRow[] | null {
+  const { selection, classification, markdownEntry, routeFile } = input;
+  if (!markdownEntry || selection.opaque) return null;
+  const destination: SourceLoc = { file: markdownEntry, loc: '1:1' };
+  // `target` is the row's address, never a write: `elsewhere` is what keeps a
+  // field off it, and this pass writes no Markdown at all. Body content has no
+  // address of its own — <Content /> annotates nothing — so the entry's top is
+  // the closest true thing to say, and no line is invented for it.
+  const base = {
+    verdict: 'elsewhere' as const, reason: 'markdown' as const, from: markdownEntry,
+    value: selection.text, destination, badges: ['selected element' as const],
+    pinned: true, depth: -1,
+  };
+  if (!selection.source) {
+    // An unannotated element anywhere else on the page is not this: only the
+    // template that renders <Content /> can have put it here.
+    const ancestor = selection.ancestorSource;
+    if (!ancestor || !isRouteTemplate(ancestor.file, routeFile)) return null;
+    return [{
+      ...base, key: `${markdownEntry}|body`,
+      target: { kind: 'element', file: markdownEntry, loc: '1:1', tag: selection.tag,
+        targetType: 'text' },
+      label: 'content',
+      caption: 'Body content from the Markdown entry — edit it there.',
+      details: ['inferred · rendered by <Content />, which carries no annotation',
+        'no line · a rendered paragraph names no source line',
+        `entry · ${markdownEntry}`],
+    }];
+  }
+  if (classification?.kind !== 'dynamic' || !isRouteTemplate(selection.source.file, routeFile)) {
+    return null;
+  }
+  return [{
+    ...base, key: `${selection.source.file}|${selection.source.loc}|frontmatter`,
+    target: { kind: 'element', file: selection.source.file, loc: selection.source.loc,
+      tag: selection.tag, targetType: 'text' },
+    label: 'frontmatter value',
+    caption: 'An expression in the route template, on a route backed by a Markdown entry — edit it there.',
+    details: ['inferred · derived from the route’s template and the entry it renders',
+      `template · ${selection.source.file}:${selection.source.loc}`,
+      `entry · ${markdownEntry}`],
+  }];
+}
 
 /** `read-only` and `elsewhere` both carry a reason; `editable` carries none. */
 function verdictOf(write: UsageWrite): Pick<ValueRow, 'verdict' | 'reason' | 'from' | 'caption'> {
@@ -283,7 +394,12 @@ function usageRows(links: readonly UsageLink[], pathname: string,
 /** Build the Values card's rows for one selection. */
 export function buildValueRows(input: ValueRowsInput): ValueRows {
   const { selection, classification, classifyError, links } = input;
-  const rows = [...pinnedRows(input), ...usageRows(links, input.pathname, input.ordinals ?? {})];
+  // A Markdown-backed value replaces the pinned row rather than joining it:
+  // what the template says about the value is `dynamic`, which is true and is
+  // not the answer the reader came for. Values further up the chain are still
+  // the caller's own and stay.
+  const pinned = markdownRows(input) ?? pinnedRows(input);
+  const rows = [...pinned, ...usageRows(links, input.pathname, input.ordinals ?? {})];
   if (rows.length) return { rows, refusal: null };
   if (selection.opaque) {
     return { rows, refusal: 'Generated HTML — its inner elements have no proven source relationship.' };

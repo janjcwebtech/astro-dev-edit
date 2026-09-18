@@ -16,7 +16,12 @@ import { buildValueRows, chainBadges, type ValueRow, type ValueRows, type ValueS
 export interface InspectorDeps {
   viewCode(source: SourceLoc): void;
   openRule(file: string, selector: string): void;
-  backingFile(): string | null;
+  /** The Markdown entry this route renders, when the page declares one. Null
+   *  is not a cue to go looking — an unresolved entry opens the template. */
+  markdownEntry(): string | null;
+  /** The file this route is written in, root-relative, or null while it is
+   *  unresolved. The jump of last resort, and never a guessed one. */
+  routeFile(): string | null;
   onClose(): void;
   /** The one staged-value store the panel and the page share. */
   staging: StagedValues;
@@ -157,6 +162,21 @@ export function initInspector(deps: InspectorDeps) {
     row.root.dataset.usage = link.id;
     parent.append(row.root);
     return row.root;
+  }
+
+  /**
+   * Where a Markdown-backed chain stops, and why it is honest to stop there.
+   *
+   * `<Content />` is the Markdown renderer, not an `.astro` component, so no
+   * chain threads through it and nothing it emits carries an annotation. The
+   * link to the entry is therefore **inferred** — derived from the route's own
+   * declaration of what it renders — and it says so rather than sitting in a
+   * list of proven links looking like one of them.
+   */
+  function markdownChainEnd(parent: HTMLElement, entry: string) {
+    sourceRow(parent, 'Content — markdown, chain ends', { file: entry, loc: '1:1' },
+      `Renders ${basename(entry)}`);
+    note(parent, 'Inferred · derived from the route’s template and the entry it renders, not proven like the links above it.');
   }
 
   function css(el: HTMLElement) {
@@ -441,22 +461,29 @@ export function initInspector(deps: InspectorDeps) {
 
     const source = sourceFor(el);
     const opaque = !!el.parentElement?.closest('[data-atx-boundary="html"]');
+    const ancestor = !source && el.parentElement ? nearestOwnSource(el.parentElement) : null;
+    const ancestorSource = ancestor ? sourceFor(ancestor) ?? null : null;
     const selection: ValueSelection = {
       source: source ?? null, opaque, viaSlot: false, tag: el.tagName.toLowerCase(),
+      ancestorSource,
       text: (el.textContent ?? '').trim().slice(0, 4000),
       // The attribute, not `currentSrc`: the row describes what the file holds.
       ...(el instanceof HTMLImageElement
         ? { image: { src: el.getAttribute('src') ?? '', alt: el.getAttribute('alt') ?? '' } } : {}),
     };
-    const ancestor = !source && el.parentElement ? nearestOwnSource(el.parentElement) : null;
-    const ancestorSource = ancestor && sourceFor(ancestor);
-    const backing = deps.backingFile();
+    const markdownEntry = deps.markdownEntry();
+    const routeFile = deps.routeFile();
+    // The jump of last resort, for a selection with no rows at all. The
+    // enclosing element first, because it is the one thing proven; then the
+    // route's own template, which is known rather than guessed. Never an entry
+    // file — a value belonging to one earns a row of its own, and a page that
+    // has not declared one has told us nothing to name.
     const jump = ancestorSource
       ? { label: 'Enclosing source', src: ancestorSource,
         description: 'Container source; this element’s source is not proven.' }
-      : backing
-        ? { label: 'Page backing file', src: { file: backing, loc: '1:1' },
-          description: 'Route content file; individual value mapping is not proven.' }
+      : routeFile
+        ? { label: 'Route template', src: { file: routeFile, loc: '1:1' },
+          description: 'The file this route is written in; this element’s own source is not proven.' }
         : null;
 
     // Never climb from an untracked descendant to manufacture its ownership.
@@ -471,6 +498,10 @@ export function initInspector(deps: InspectorDeps) {
     if (opaque || !source) {
       note(chain.body, opaque ? 'No chain · untracked-html. Generated HTML has no proven inner-element source relationship.'
         : 'No chain · this element has no source annotation.');
+      // A Markdown body is the one unannotated element whose owner is known,
+      // because the route declared it. The chain still ends — it just ends
+      // somewhere nameable.
+      if (!opaque && markdownEntry && ancestorSource) markdownChainEnd(chain.body, markdownEntry);
       note(slots.body, 'No proven slot relationship.');
     } else {
       render = readRenderOccurrences(document);
@@ -523,7 +554,7 @@ export function initInspector(deps: InspectorDeps) {
     }
     if (!answer || !alive()) return;
     const model = buildValueRows({
-      selection, pathname, ordinals,
+      selection, pathname, ordinals, markdownEntry, routeFile,
       classification: answer.classification, classifyError: answer.classifyError,
       links: answer.chain?.links ?? [],
     });
@@ -552,6 +583,12 @@ export function initInspector(deps: InspectorDeps) {
       sourceRow(chain.body, 'Route', { file: answer.chain.route, loc: '1:1' }).dataset.usage = 'route';
     }
     for (const link of answer.chain.links) usage(chain.body, link, source?.file ?? null);
+    // Only for a value the entry actually supplies: an ordinary literal in the
+    // same template ends at the template, and saying "chain ends at the entry"
+    // under it would claim a relationship it does not have.
+    if (markdownEntry && model.rows.some(row => row.pinned && row.reason === 'markdown')) {
+      markdownChainEnd(chain.body, markdownEntry);
+    }
     for (const [index, candidate] of (answer.chain.candidates ?? []).entries()) {
       const details = styled('details', 'atx-inspector-details');
       const summary = styled('summary', '');

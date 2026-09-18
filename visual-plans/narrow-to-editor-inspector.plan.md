@@ -7,7 +7,7 @@ plan:
   priority: high
   created: "2026-09-13"
   updated: "2026-09-18"
-  progress: 75
+  progress: 85
   visual: narrow-to-editor-inspector.plan.html
   mockup: narrow-to-editor-inspector.mockup.html
   tags: [scope-reduction, astro, composition, annotations]
@@ -285,7 +285,7 @@ Rules it must obey:
 - [x] **P6b** — the same field, Save and Revert for props and slot text, through the one staged-value store; `elsewhere` and `read-only` rows keep their sentence and their *View code*. The image grid in place of the modal is P6e
 - [x] **P6c-0** — `UsageProp` byte range in `protocol.ts`; render ordinal in `composition-runtime.ts::child()`; one-hop trace from `{s.title}` to a literal array entry
 - [x] **P6c** — prop and slot-text editing at proven source targets, with destination-aware encoding, lands via `/composition/apply` and `usage-write.ts`; the render ordinal earns back `unproven-entry` for a proven 1:1 `.map()`; and a known whole HTML string is editable at both destinations — `set:html` at a usage site, and a `set:html` container through `/apply`'s `html` target
-- [ ] **P6d** — Markdown-backed routes: source-file navigation for frontmatter and body content; no browser writes
+- [x] **P6d** — Markdown-backed routes: a row per value carrying *View code* onto the entry and no field, the chain ending at `Content — markdown, chain ends` marked inferred, and an undeclared backing file opening the route template instead of inventing one. `page-source.ts::markdownSource` is the one declaration read; the composition fixture gains `/services/[slug]` and `/undeclared`
 - [x] **P6e** — the image picker as a block above Values: filter across the project's assets, eight at a time through the grid's own footer (`/assets` pages nothing), upload into the configured `uploadDir` with that directory named on screen, and `src`/`alt` as ordinary rows. Picking and uploading both **stage**; the modal and its `image.ts` swap panel are gone
 - [ ] **P7** — committed fixture site with a genuine 3-deep chain; real-site pass on both fixtures
 - [ ] **P7** — remove the legacy annotation read path, parity counter as evidence
@@ -315,7 +315,7 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 - [x] A literal rendered on two routes edits as one value and writes one line, and both elements mark unsaved together
 - [x] A value writable in another file reads `elsewhere` with that file named — never `read-only`
 - [x] A value wrapped in slot markup is an editable row badged `via slot`, not a read-only slot preview
-- [ ] Markdown frontmatter, plain paragraphs and formatted paragraphs all offer source navigation without editable fields or Save
-- [ ] An unresolved Markdown backing file opens the known route template, without inventing an entry file or body-line location
+- [x] Markdown frontmatter, plain paragraphs and formatted paragraphs all offer source navigation without editable fields or Save
+- [x] An unresolved Markdown backing file opens the known route template, without inventing an entry file or body-line location
 - [x] The overlay is inert until ⌥ is held: links navigate, forms submit, nothing is intercepted
 - [x] A composition section exists in `VERIFICATION.md`'s manual checklist — today it has none, and every component/slot case there is a refusal to verify

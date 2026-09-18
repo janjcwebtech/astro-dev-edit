@@ -20,7 +20,7 @@ The [README](../README.md) has the short version; this is the whole of it.
 | Text rendered through an `{expression}` | a **value popup** | the string in the frontmatter |
 | A prop or slot value at a component usage site | a **Values** row with a field | the attribute, the frontmatter string, or the slot text — in the caller's file |
 | A static `<img>` | the inspector's **image picker**, above its `src` and `alt` rows | `src` and `alt` |
-| A page declaring a backing `.md`/`.mdx` | a notice naming that file, to open in your IDE | nothing |
+| A route rendering a `.md`/`.mdx` entry | a Values row naming that file, with **View code** and no field | nothing |
 | Anything else | a notice with the reason and a *View code* jump | nothing |
 
 ### Inline markup
@@ -46,11 +46,22 @@ A frontmatter const (`<h1>{title}</h1>`), or one item of an array a `.map()` loo
 
 ### Markdown-backed content
 
-Content that lives in a `.md` or `.mdx` entry is **not** edited in the browser. Where the page declares its backing file, the notice names it so you can open it in your IDE; nothing writes a frontmatter key or a body line for you. Literal content written in the Astro route template stays editable as usual.
+Content that lives in a `.md` or `.mdx` entry is **not** edited in the browser. It gets a Values row like everything else, carrying **View code** onto the entry file and no field at all — so a frontmatter key and a body line are navigated to, never written for you.
+
+**One row per value, not one per page.** Two shapes reach it, and they are proven to different depths:
+
+- **Body content** — a paragraph, heading or list item from `<Content />`. The Markdown renderer is not an `.astro` component, so nothing it emits carries a source annotation; what identifies it is that the route's own template is the nearest annotated thing above it. *View code* opens the entry **at its top**: no line is invented for a rendered paragraph.
+- **A frontmatter value** — `{entry.data.title}` written in the route template. That it reads the entry is **inferred**, not proven, and the row says so: the expression is a member access the tracer does not model, so what is known is the route, its template, and the entry the page declared.
+
+**The page declares its backing file**, with `<meta name="astro-dev-edit:page-source" content="src/content/…/x.md">`. Nothing is derived from the URL.
+
+**When no backing file is declared**, nothing is invented: the value keeps the template's own refusal, and the jump lands on the **route template** — the enclosing element that does have a source, or the file the route is written in. An entry path is never guessed from a slug.
+
+Literal content written in the Astro route template stays editable as usual, so one page shows both behaviours. The component chain of a Markdown-backed value ends at **Content — markdown, chain ends**, marked *inferred* with its reason.
 
 ### What refuses, and why
 
-Every refusal names its reason and offers one *View code* jump — a read-only source popup carrying its own **Open in editor**. On a page that declares a backing content file it also names that file as the place the words live.
+Every refusal names its reason and offers one *View code* jump — a read-only source popup carrying its own **Open in editor**. On a route that declares a Markdown backing file, a value coming from that entry is not a refusal at all: it is an `elsewhere` row naming the file (above).
 
 - **Not traceable to a string** — an expression the AST cannot resolve, a component, a `set:html` whose value is not a quoted string or a frontmatter `const`, or block-level nested markup.
 - **Rendered by a component or a slot** — it has no source location of its own, because Astro annotates only what is written in the file, so the click is answered about the nearest element that *has* one. The notice names the tag you clicked, since the reason belongs to that ancestor: a one-word button can be refused for "containing nested markup" that lives in the wrapper around it.

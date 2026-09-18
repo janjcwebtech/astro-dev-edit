@@ -1,0 +1,9 @@
+---
+interface Props {
+  /** The backing content file, declared so the inspector can name where these
+   *  words live. Omitted on purpose by one route, to exercise the refusal. */
+  pageSource?: string;
+}
+const { pageSource } = Astro.props;
+---
+<html><head>{pageSource && <meta name="astro-dev-edit:page-source" content={pageSource} />}</head><body><main id="entry"><slot /></main></body></html>

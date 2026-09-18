@@ -1,0 +1,14 @@
+---
+import { getEntry, render } from 'astro:content';
+import EntryLayout from '../../EntryLayout.astro';
+
+// Deliberately declares no backing file: the inspector must open this template
+// rather than invent an entry path from the URL.
+const entry = await getEntry('services', 'product-design');
+const { Content } = await render(entry!);
+---
+<EntryLayout>
+  <p class="eyebrow">Undeclared</p>
+  <h1>{entry!.data.title}</h1>
+  <article><Content /></article>
+</EntryLayout>

@@ -18,6 +18,16 @@
  */
 const META = 'astro-dev-edit:page-source';
 
+/**
+ * The extensions that make a declared backing file **Markdown-backed**.
+ *
+ * The declaration is deliberately wider than Markdown — it covers data sources
+ * the tool cannot walk — so the inspector asks this before deciding a value's
+ * words live in an entry rather than in the template. A `.json` backing file is
+ * a real declaration and is not this.
+ */
+const MARKDOWN = /\.(md|mdx|markdown)$/i;
+
 /** The name this meta carried before the project was renamed in 0.7.0. */
 const LEGACY_META = 'astro-text-edit:page-source';
 
@@ -69,6 +79,20 @@ export function onPageSourceChange(fn: () => void): void {
  *  inside code that cannot await. */
 export function pageSource(): string | null {
   return metaSource();
+}
+
+/**
+ * The declared backing file when it is a Markdown entry, or null.
+ *
+ * The one question the inspector asks before it says a value is written in a
+ * `.md` file, and the only thing that makes that claim honest: the page — its
+ * own template, rendering its own entry — is what declared it. Nothing here
+ * derives a file from the URL, and nothing guesses which line of it a rendered
+ * paragraph came from.
+ */
+export function markdownSource(): string | null {
+  const file = metaSource();
+  return file && MARKDOWN.test(file) ? file : null;
 }
 
 /**

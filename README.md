@@ -50,7 +50,7 @@ Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6
 - **Text carrying inline markup.** A heading broken by a `<br>`, or a sentence with a `<strong>` in it, opens over the raw source with a row of insertable tags: `br`, `strong`, `em`, `b`, `i`, `u`, `a`, `span`, `code`, `small`, `sup`, `sub`.
 - **Images.** Click one and you get a preview, the file name and size, the alt text, and the six images most recently added to the project. The full picker lists everything in your asset directories, with a filter and an upload button.
 
-Content that lives in a Markdown or MDX entry is not edited in the browser. A page that declares its backing file is told which file holds its words, so you open that file in your IDE instead of typing over rendered text.
+Content that lives in a Markdown or MDX entry is not edited in the browser. Each such value gets a row naming the entry file, with **View code** and no field, so you open that file in your IDE instead of typing over rendered text. Literal content in the route template stays editable as usual.
 
 ## Other features
 
@@ -85,7 +85,7 @@ Every option, with its default and what it does: [Configuration reference](https
 
 - No undo and no edit history. Every save writes the file immediately, so your git tree is the safety net: start from a clean tree, review with `git diff`, discard with `git checkout <file>`. Writes are atomic and verified against what the page showed, so a stale click fails rather than corrupting the file.
 - Content, never structure. Inline edited text is escaped so it cannot introduce a tag, an expression or an entity. The markup popup lets tags through, but only the inline safelist, only with presentational attributes, and only well nested.
-- Markdown and MDX content is not browser-editable. The overlay names the backing file and points you at it; nothing writes a `.md` frontmatter key or body line for you.
+- Markdown and MDX content is not browser-editable. The overlay names the backing file and points you at it; nothing writes a `.md` frontmatter key or body line for you, and a route that declares no backing file opens its own template rather than guessing an entry.
 
 ## Documentation
 

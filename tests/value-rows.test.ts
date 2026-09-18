@@ -263,3 +263,81 @@ describe('an HTML value is one whole row, and says so', () => {
     expect(refused.details).toContain('renders as · HTML');
   });
 });
+
+/**
+ * A Markdown-backed route, which is the one case that pulls the other way:
+ * every other row exists so a value can be written, and these exist so one
+ * cannot be. The words are real and the file holding them is named; this pass
+ * edits no Markdown in the browser, so a field would be an offer it could not
+ * keep.
+ */
+describe('a route rendering a Markdown entry', () => {
+  const ROUTE = 'src/pages/services/[slug].astro';
+  const TEMPLATE = `/repo/${ROUTE}`;
+  const ENTRY = 'src/content/services/product-design.md';
+  const md = (over: Partial<ValueRowsInput> = {}) => input({
+    markdownEntry: ENTRY, routeFile: ROUTE, ...over,
+  });
+
+  it('answers a frontmatter expression with the entry, and no field', () => {
+    const { rows } = buildValueRows(md({
+      selection: { ...input().selection, source: { file: TEMPLATE, loc: '15:7' }, text: 'Product design' },
+      classification: { kind: 'dynamic', reason: 'A template expression.' },
+    }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ label: 'frontmatter value', verdict: 'elsewhere',
+      reason: 'markdown', from: ENTRY, pinned: true });
+    // The top of the entry, never a line: nothing proves which one.
+    expect(rows[0].destination).toEqual({ file: ENTRY, loc: '1:1' });
+    expect(rows[0].details.some(line => line.startsWith('inferred ·'))).toBe(true);
+  });
+
+  it('answers a body paragraph — which carries no annotation at all — the same way', () => {
+    const { rows } = buildValueRows(md({
+      selection: { ...input().selection, source: null, text: 'We start every engagement…',
+        ancestorSource: { file: TEMPLATE, loc: '17:12' } },
+      classification: null,
+    }));
+    expect(rows[0]).toMatchObject({ label: 'content', verdict: 'elsewhere', reason: 'markdown' });
+    expect(rows[0].destination).toEqual({ file: ENTRY, loc: '1:1' });
+    expect(rows[0].details).toContain('no line · a rendered paragraph names no source line');
+  });
+
+  it('leaves a literal written in the template editable — one page, both behaviours', () => {
+    const { rows } = buildValueRows(md({
+      selection: { ...input().selection, source: { file: TEMPLATE, loc: '14:22' }, text: 'Service' },
+      classification: text,
+    }));
+    expect(rows[0]).toMatchObject({ label: 'text', verdict: 'editable', pinned: true });
+  });
+
+  it('claims nothing for an unannotated element the route template does not enclose', () => {
+    const { rows, refusal } = buildValueRows(md({
+      selection: { ...input().selection, source: null, text: 'Somewhere else',
+        ancestorSource: { file: '/repo/src/components/Widget.astro', loc: '3:1' } },
+      classification: null,
+    }));
+    expect(rows).toHaveLength(0);
+    expect(refusal).toBe('This element has no source annotation.');
+  });
+
+  it('refuses the whole shape when the page declares no backing file', () => {
+    const { rows } = buildValueRows(input({
+      routeFile: ROUTE,
+      selection: { ...input().selection, source: { file: TEMPLATE, loc: '15:7' } },
+      classification: { kind: 'dynamic', reason: 'A template expression.' },
+    }));
+    // The template's own refusal, pointing at the template — never an entry
+    // path invented from the URL.
+    expect(rows[0]).toMatchObject({ verdict: 'read-only', reason: 'computed' });
+    expect(rows[0].destination).toEqual({ file: TEMPLATE, loc: '15:7' });
+  });
+
+  it('does not claim a dynamic value written somewhere other than the route template', () => {
+    const { rows } = buildValueRows(md({
+      selection: { ...input().selection, source: { file: '/repo/src/components/Nav.astro', loc: '4:3' } },
+      classification: { kind: 'dynamic', reason: 'A template expression.' },
+    }));
+    expect(rows[0]).toMatchObject({ verdict: 'read-only', reason: 'computed' });
+  });
+});

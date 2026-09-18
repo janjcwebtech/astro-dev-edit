@@ -7,7 +7,7 @@ import { openSettingsPanel } from './editors/settings-panel.ts';
 import { icon } from './icons.ts';
 import { initInspector } from './inspector.ts';
 import { createMenu } from './menu.ts';
-import { pageSource, resolvePageSource } from './page-source.ts';
+import { markdownSource, pageSource, resolvePageSource } from './page-source.ts';
 import { isOwnUi, mount } from './shadow.ts';
 import { annotatedElements, cacheSourceMappings, sourceFor } from './source-map.ts';
 import { createStagedValues } from './staged-values.ts';
@@ -184,7 +184,10 @@ export function initInspectorApp() {
 
   const inspector = initInspector({
     viewCode,
-    backingFile: pageSource,
+    // Read per selection, not captured: a navigation changes both, and the
+    // route's own resolve lands after the first paint.
+    markdownEntry: markdownSource,
+    routeFile: () => routeFile,
     staging,
     openRule: (file, selector) => {
       void api.inspectOpen({ file, selector }).then(result => {
