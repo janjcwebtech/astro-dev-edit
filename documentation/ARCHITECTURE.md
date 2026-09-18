@@ -106,6 +106,10 @@ Every piece of chrome the overlay draws lives in one shadow root. `shadow.ts` ow
 - `document.querySelector` cannot find our own elements — query the root.
 - The host never gains `transform`, `filter` or `contain`, which would re-anchor every `position: fixed` panel to it.
 
+One further client invariant, unrelated to the boundary but broken the same way — by asking the DOM a question it cannot answer:
+
+- **Never read an inline style back as state.** A style the overlay wrote is not a record of what the overlay decided: the page's own CSS, a transition mid-flight, or a second writer can all change what comes back. Keep the state in a `data-*` attribute and read that. Four functions read a style back; all four were bugs.
+
 ### Modules
 
 `overlay.ts` is the composition root — toggle button, boot, HMR wiring — and wires the leaves together. With `composition: true` it hands boot to `inspector-app.ts` instead, and none of the editing routes below are entered.
