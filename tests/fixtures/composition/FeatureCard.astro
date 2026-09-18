@@ -1,0 +1,10 @@
+---
+/** Link 3: where the words finally reach the page. Nothing here is written
+ *  here — every value on this element came from Marketing.astro. */
+const { title, blurb, footnote } = Astro.props;
+---
+<article class="feature">
+  <h3 class="feature-title">{title}</h3>
+  <p class="feature-blurb">{blurb}</p>
+  <p class="feature-footnote">{footnote}</p>
+</article>

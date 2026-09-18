@@ -252,5 +252,74 @@ for (const compiler of [...(canRenderGo ? ['go'] : []), ...(hasRust && peerMajor
       expect(result.ok).toBe(true);
       if (result.ok) expect(result.newSource).toContain('<small>Updated label</small>');
     }, 30000);
+
+    /**
+     * The site-shaped fixture, as opposed to the mechanism-shaped one above.
+     *
+     * `Marketing.astro` holds every word and renders none of them: they travel
+     * SiteLayout → FeatureSection → FeatureCard and reach the page three files
+     * below the one that wrote them. Nothing here is constructed to hit a
+     * branch — it is the shape a layout, a section and a card produce on any
+     * real site, which is exactly why it is worth committing. Without it the
+     * three-deep guarantee is a memory of a browser session.
+     */
+    it('threads a three-deep chain on a site-shaped fixture, back to the file that holds the words', async () => {
+      const { html, links } = await fixture(compiler, true, 'Marketing');
+      const route = join(root, 'Marketing.astro');
+      const verdict = (tag: string | undefined) => resolveComposition({ route,
+        file: attr(tag, 'data-atx-file'), chain: attr(tag, 'data-atx-chain'), traceVersion: 2 }, links, true);
+      const footnotes = tags(html, 'p').filter(t => attr(t, 'class') === 'feature-footnote');
+      expect(footnotes).toHaveLength(2);
+      for (const footnote of footnotes) {
+        const resolved = verdict(footnote);
+        expect(resolved.tier).toBe('proven');
+        // Three links, in order, each one a file further from the words.
+        expect(resolved.links.map(link => link.target?.split('/').at(-1)))
+          .toEqual(['SiteLayout.astro', 'FeatureSection.astro', 'FeatureCard.astro']);
+        expect(attr(footnote, 'data-atx-file').split('/').at(-1)).toBe('FeatureCard.astro');
+        // The chain starts in the file that holds the words, not in the file
+        // that renders them: a three-deep chain is only useful if its first
+        // link is where someone would go to change the sentence.
+        expect(resolved.links[0]?.file).toBe(route);
+      }
+      // Two cards, distinguished by their own instance rather than by their
+      // identical footnote text.
+      expect(new Set(footnotes.map(t => attr(t, 'data-atx-instance'))).size).toBe(2);
+
+      // The value itself: `footnote` is a quoted literal at Marketing.astro's
+      // one usage site, and that is where a write would land — three files up
+      // from the element carrying it.
+      const passed = links.find(link => link.file === route && link.name === 'SiteLayout')!;
+      const prop = passed.props.find(p => p.name === 'footnote')!;
+      expect(prop).toMatchObject({ verdict: 'editable',
+        value: 'Written in Marketing.astro, rendered three files below it.' });
+
+      // The words the cards differ by come from a literal array one hop below,
+      // so each card's title is proven to its own entry rather than to entry 1.
+      const titles = tags(html, 'h3').filter(t => attr(t, 'class') === 'feature-title');
+      expect(titles).toHaveLength(2);
+      expect(titles.map(t => verdict(t).tier)).toEqual(['proven', 'proven']);
+      expect(new Set(titles.map(t => attr(t, 'data-atx-ordinal'))).size).toBe(2);
+
+      // The other half of the guarantee, and the one a real site meets first: a
+      // value FORWARDED through an intermediate component is `read-only` at
+      // every hop that merely passes it on. `{footnote}` in SiteLayout,
+      // `{section.heading}` and `{card.title}` in the map bodies are all names
+      // whose literal lives in another file, and the trace does not cross a
+      // component boundary — so it refuses by name instead of guessing which
+      // caller wrote the string. Editable exactly once, where the words are.
+      const sectionLink = links.find(l => l.file.endsWith('FeatureSection.astro') && l.name === 'FeatureCard')!;
+      const layoutLink = links.find(l => l.file.endsWith('SiteLayout.astro') && l.name === 'FeatureSection')!;
+      for (const forwarded of [sectionLink.props.find(p => p.name === 'title')!,
+                               layoutLink.props.find(p => p.name === 'heading')!,
+                               layoutLink.props.find(p => p.name === 'footnote')!]) {
+        expect(forwarded).toMatchObject({ verdict: 'read-only', reason: 'untraced' });
+      }
+
+      // Page-owned slot content keeps the route's own empty chain, so a
+      // three-deep page does not make everything on it three deep.
+      const lede = tags(html, 'p').find(t => attr(t, 'id') === 'lede')!;
+      expect(attr(lede, 'data-atx-chain')).toBe('!');
+    }, 30000);
   });
 }

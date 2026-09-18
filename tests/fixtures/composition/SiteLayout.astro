@@ -1,0 +1,20 @@
+---
+/** Link 1 of the chain: the page shell. It renders none of the words it is
+ *  handed — `footnote` goes straight past it, `sections` one hop further. */
+import FeatureSection from './FeatureSection.astro';
+
+const { title, footnote, sections } = Astro.props;
+---
+<html>
+  <head><title>{title}</title></head>
+  <body>
+    <header id="site-header"><h1>{title}</h1></header>
+    <main id="site-main">
+      <slot />
+      {sections.map(section => (
+        <FeatureSection heading={section.heading} cards={section.cards} footnote={footnote} />
+      ))}
+    </main>
+    <footer id="site-footer"><small id="site-credit">Ridgeline Studio</small></footer>
+  </body>
+</html>

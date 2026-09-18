@@ -1,0 +1,10 @@
+---
+/** Link 2: a section of cards. `footnote` is still just passing through. */
+import FeatureCard from './FeatureCard.astro';
+
+const { heading, cards, footnote } = Astro.props;
+---
+<section class="features">
+  <h2 id="section-heading">{heading}</h2>
+  {cards.map(card => <FeatureCard title={card.title} blurb={card.blurb} footnote={footnote} />)}
+</section>

@@ -1,0 +1,29 @@
+---
+/**
+ * A fixture that looks like a site rather than a mechanism.
+ *
+ * Everything a visitor reads is written HERE, and nothing renders here: the
+ * words travel Marketing → SiteLayout → FeatureSection → FeatureCard and reach
+ * the page three files below the one that holds them. That is the guarantee
+ * this fixture exists to pin — a chain a real site produces by accident, not
+ * one built to exercise a branch.
+ */
+import SiteLayout from './SiteLayout.astro';
+
+const sections = [
+  {
+    heading: 'What we do',
+    cards: [
+      { title: 'Strategy', blurb: 'We find the shape of the problem before anyone writes code.' },
+      { title: 'Interface', blurb: 'Screens that say what they mean, in the words customers already use.' },
+    ],
+  },
+];
+---
+<SiteLayout
+  title="Ridgeline Studio"
+  footnote="Written in Marketing.astro, rendered three files below it."
+  sections={sections}
+>
+  <p id="lede">A small studio that ships the thing it described.</p>
+</SiteLayout>
