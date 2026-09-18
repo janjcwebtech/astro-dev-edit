@@ -256,23 +256,23 @@ Rules it must obey:
 ## Open questions
 
 - **E1 is the gate.** If chain threading cannot be shown truthful on a real component tree, the feature degrades to static tiers only (`inferred` / `candidates` / `none`) — still useful, but unable to distinguish repeated instances.
-- **Page weight at real-site scale is unmeasured.** If E4 fails, chains stamp on component-root elements only and the client resolves by ancestor walk.
+- ~~**Page weight at real-site scale is unmeasured.**~~ Measured — see E4. Chains are 4% of a real page; the fallback is not needed.
 - **⌥ is an assumption.** It is what the current build uses for hold-to-navigate, so the inversion is obvious, but it is unverified against real sites that bind it.
-- **Whether the legacy annotation read path can go** depends on the dev-only parity counter in P3 showing zero gaps across both fixtures. Until then both namespaces are emitted.
+- **Whether the legacy annotation read path can go** depends on the parity counter showing zero gaps across both fixtures. It shows zero on every page driven so far, and the loc comparison below says why: across five Astro 5.18.2 routes, **all 1,721** of Astro's own annotations are reproduced byte-identically by the transform, and we annotate 75 *more* (`<html>`, `<head>` and head `<meta>`/`<link>`/`<title>`, which Astro's compiler skips and we deliberately do not). The read path is a strict subset. Removal is still P7's, because it cannot honestly land in the pass that produced the evidence.
 
 ## Implementation progress
 
-- [ ] **E6** — removal blast radius: scratch branch, delete CMS + Unsplash, count edits outside deleted files
+- ~~**E6** — removal blast radius: scratch branch, delete CMS + Unsplash, count edits outside deleted files~~ — **superseded**, not run. It was a pre-flight *estimate* for P1, and P1 was then done for real on this branch with the actual count recorded: 34 source + 13 test files, ~17,000 lines (`5be3932`'s series; see **Removed** above). Predicting something already measured is waste.
 - [x] **E2** — loc parity untouched with composition on
 - [x] **E1** — chain threading truthful on a purpose-built component tree
-- [ ] **E3** — tool-owned namespace survives hydration on Astro 5.18
-- [ ] **E4** — page-weight budget on the largest real fixture page
+- [x] **E3** — tool-owned namespace survives hydration on Astro 5.18 **and 7.1.1, dev toolbar on and off** — four runs, measured at DOMContentLoaded, `load` and `load+3s`. On Astro 7.1.1 (`tests/fixtures/composition`, a page that does not mutate itself) the live `data-atx-file` count equals the served count exactly, 54/54, in all three snapshots and with the toolbar both ways. On Astro 5.18.2 (`examples/sf-sf` homepage) 309 of the 424 served annotated elements survive to DOMContentLoaded in **both** toolbar configurations — the site's own `Preloader.astro` removes 115 before then — and those 309 keep `data-atx-*` in every snapshot. The legacy namespace is the one that dies: 294 → **0** by `load` with the toolbar on (Astro 5), 54 → **0** by `load+3s` with it on (Astro 7, stripping the annotations we injected for it), and untouched with it off. Numbers in `internal-documentation/VERIFICATION.md`.
+- [x] **E4** — page-weight budget on the largest real fixture page — `01-example-site-2` homepage, composition on: **894,652 bytes served, 1,231 annotated elements**. `data-atx-chain` is **36,414 bytes / 4.07%**, which is the number the plan's fallback (stamp component roots only, resolve by ancestor walk) exists to avoid — it is not needed. The **whole** tool-owned load is larger and worth knowing: 389,962 bytes / **43.6%**, dominated by `data-atx-file` (147,126 — one absolute path per element) and the instance/parent/ordinal/version run (160,030 — 24-hex-char ids), with `data-astro-source-*` a further 195,797. If page weight ever does bite, the cheap wins are root-relative paths and shorter ids, not dropping the chain.
 - [x] **E5** — static usage index coverage, every failure named
 - [x] **P1** — delete the CMS, Unsplash and the asset picker; fix the ~12 composition points. `client/page-source.ts` **stays**: the inspector's route anchor reads the page's own meta declaration, and only the `/entry/resolve` half went
 - [x] **P1** — rewrite `notice.ts`; revise README + the owning docs; delete `ENTRY-EDITOR.md`
 - [x] **P1** — dead CSS out of `styles.ts`, its own commit, after green — 831 lines
 - [x] **P2** — compact hover pill with a breadcrumb row (the inspector's; `hover.ts`'s editing pill is untouched and still carries the chips row); refusal folded into the inspector — `showDynamicNotice` has one caller, `router.ts`; Settings slimmed to three tabs and twelve options
-- [ ] **P3** — emit `data-atx-*` on all versions + dev-only parity counter; fix `<slot>` and `custom-element` gaps; correct `ASTRO-COMPAT.md`
+- [x] **P3** — `data-atx-*` on all versions, and `data-astro-source-*` only where Astro emits none: where it does, the second pair is **not** a harmless duplicate — the Go printer splices its own injection-shifted loc in ahead of ours and the parser keeps that one. The dev-only parity counter is `source-map.ts::annotationGaps()`, warning once on the console and listed under *Copy page context*; zero gaps on every page driven. The two named gaps were **already closed** — `<slot>` has been in `NEVER_ANNOTATE` and `custom-element` in the annotatable set since the transform was written — so nothing was manufactured for them. `ASTRO-COMPAT.md` corrected with the measurement.
 - [x] **P4** — `protocol.ts` shapes, then `usage-parse.ts`, `usage-index.ts`, `composition.ts`, `composition-routes.ts`
 - [x] **P5** — component-usage injection in `annotate.ts` behind the `composition` option
 - [x] **P6** — `composition-model.ts`, `composition-dom.ts`, component-aware tree
@@ -296,11 +296,11 @@ Every phase ends green on both gates, with a `CHANGELOG.md` entry under `[Unrele
 
 - [x] `npm run typecheck` clean and `npm test` green after every phase — 33 files / 523 tests (`ATX_ASTRO5_ROOT=examples/sf-sf` is required, or `composition-render.test.ts` drops its Astro-5 leg silently)
 - [x] Element annotations are **byte-identical** with composition on and off — the single most important regression guard in the feature
-- [ ] 205/205 playground loc parity retained; no newlines added by the transform; classify/apply round-trip green
+- [x] Loc parity retained; no newlines added by the transform; classify/apply round-trip green. **The playground's 205/205 is no longer reproducible** — it is on Astro 7.1.1, which emits no annotations to compare against — so the equivalent was run at larger scale on Astro 5.18.2 (`examples/sf-sf`, five routes, injection off vs on): **1,721 of 1,721** of Astro's own `(file, loc)` pairs reproduced exactly, zero disagreements, plus the 75 head elements above. No newlines and the round-trip are pinned by `tests/annotate.test.ts` and `composition-render.test.ts`.
 - [x] `usage-parse.ts`, `composition.ts` (server), `client/composition.ts`, `composition-model.ts`, `usage-id.ts` unit-tested with fixtures covering spreads, shorthand props, `class:list`, `Fragment slot=`, dotted names and `.map()`
 - [x] Clicking a component-rendered element shows a chain whose last link resolves to that element's own file; a `{...Astro.props}` forwarder shows `inferred` or `candidates`, never a wrong chain
 - [x] Slotted content is marked as slotted, and its chain is a strict prefix of its DOM parent's
-- [ ] `data-atx-file` count in the live DOM equals the served count on Astro 5.18 and 7.1.1, with the dev toolbar both on and off
+- [x] `data-atx-file` count in the live DOM equals the served count on Astro 5.18 and 7.1.1, with the dev toolbar both on and off — exactly, 54/54, on the fixture page; on the sf-sf homepage the comparison is against the 309 elements the site itself leaves in the DOM, identical in both toolbar configurations. See E3.
 - [x] No route under `/__dev-edit` answers a CMS path; `/health` reports no `entryEditor` or `unsplash`
 - [x] A quoted prop edited from the inspector lands as a byte-level patch at the usage site, and a stale one refuses rather than writes
 - [x] A `{s.title}` prop inside a `.map()` edits **only** the clicked instance, and names which array entry it wrote
