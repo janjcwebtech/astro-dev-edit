@@ -7,9 +7,20 @@
  * (enforced by verbatimModuleSyntax), so this file can never reach the client
  * bundle. If a future feature changes what one side sends, the other side
  * fails `npm run typecheck` instead of failing at runtime.
+ *
+ * **Every `file` on this wire is root-relative, forward-slashed** — in both
+ * directions, and in the annotations the client reads them from. A served page
+ * is not a private one (a LAN dev server, a tunnel, a screen share, a
+ * screenshot in a bug report), and an absolute path names the developer's home
+ * directory; it is also one long string repeated once per element. The server
+ * converts on the way out (`server/wire-path.ts`) and resolves against the
+ * project root on the way in (`server/paths.ts::checkEditablePath`), so the
+ * relative form is a wire format and never a filesystem input. The one
+ * exception is `data-astro-source-file`, which is Astro's attribute in Astro's
+ * format and stays absolute for the tooling that reads it.
  */
 
-/** A source location as captured from data-astro-source-file / -loc. */
+/** A source location as captured from `data-atx-file` / `-loc`. */
 export interface SourceLoc {
   /** Path to the source file, relative to the project root. */
   file: string;
@@ -173,12 +184,15 @@ export type UsageSlot = {
 } & UsageWrite;
 export interface UsageLink {
   id: string;
+  /** The usage site's own file, root-relative. */
   file: string;
   loc: string;
   offset: number;
   /** Safe insertion point immediately before the opening tag's / or >. */
   injectionOffset?: number;
   name: string;
+  /** The component this usage resolves to, root-relative — so it compares
+   *  directly against a selected element's annotated file. */
   target?: string;
   refusal?: CompositionRefusal;
   hasSpread: boolean;
@@ -208,6 +222,8 @@ export type RenderOrdinals = Record<string, number>;
 /** IDs last for one server render; source usage ids remain stable across renders. */
 export interface RenderTrace {
   id: string;
+  /** The rendering module, root-relative — the instrumenter generates it in
+   *  that spelling because this reaches the page inside a slot comment. */
   file: string;
   parent: string | null;
   chain: string;
@@ -316,12 +332,6 @@ export interface HealthResponse {
   /** Whether the "Open source" buttons and jump-to-file links should render.
    *  Absent from a server that predates the option editor. */
   openInEditor?: boolean;
-  /** Absolute project root. Astro's source annotations are absolute fsPaths,
-   *  which the overlay only ever showed a basename of; the copied element
-   *  context needs them repo-relative to be worth pasting anywhere, and this
-   *  is the only way the client can strip the prefix exactly. Dev-only, and
-   *  the annotations already carry the same information. */
-  root: string;
 }
 
 // --- GET /assets -------------------------------------------------------------
@@ -450,7 +460,8 @@ export interface PageSourceResponse {
  *  from the stylesheet URL; the server best-effort locates `selector` inside it
  *  (for .astro, only within <style> blocks) and launches the editor there. */
 export interface InspectOpenRequest {
-  /** Source file the rule came from — root-relative or absolute. */
+  /** Source file the rule came from, root-relative — the client derives it
+   *  from the stylesheet URL, which is already in that spelling. */
   file: string;
   /** The class/id selector fragment to locate, e.g. ".hero-title" or "#masthead". */
   selector: string;

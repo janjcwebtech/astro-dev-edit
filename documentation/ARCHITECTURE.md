@@ -27,7 +27,7 @@ separate from this layer.
 
 ## The contract — `src/shared/`
 
-`protocol.ts` is the single source of truth for every request and response shape on the `/__dev-edit` endpoints. Both client and server import it with `import type` (enforced by `verbatimModuleSyntax`), so it never reaches the client bundle, and a shape change breaks `typecheck` on the other side instead of at runtime. Changing what one side sends starts there.
+`protocol.ts` is the single source of truth for every request and response shape on the `/__dev-edit` endpoints. Both client and server import it with `import type` (enforced by `verbatimModuleSyntax`), so it never reaches the client bundle, and a shape change breaks `typecheck` on the other side instead of at runtime. Changing what one side sends starts there. Every `file` on it is root-relative in both directions — see *Paths leave relative and arrive absolute* below.
 
 `protocol.ts` is types-only. The runtime shared modules are `package-path.ts` (is this path inside an installed package?), `asset-path.ts` and `usage-id.ts`. `package-path.ts` is a plain predicate both sides must answer identically about the same source annotation, since the client decides on hover whether to look past an element and the server decides whether to refuse it; `usage-id.ts` is the one hash the transform and the usage index both mint, so they agree by construction. A runtime list that a type needs goes in a module shaped like those, or server-side.
 
@@ -44,6 +44,7 @@ Dev middleware, mounted under `/__dev-edit`.
 | `annotate.ts`, `private-files.ts` | The two injected Vite plugins, both ordering-critical: one annotates `.astro` source before the compiler, the other refuses to serve the files this integration writes |
 | `options.ts` | The option vocabulary, `OPTION_SPECS`, `DevEditOptions`, `DEFAULTS`, `createOptionsResolver` |
 | `paths.ts` | `validateEditablePath`, the one path gate |
+| `wire-path.ts` | `toWirePath` — absolute fs path → the root-relative spelling every response and annotation carries |
 | `text-writes.ts` | The single write seam |
 | `route-manifest.ts` | Which file a route is written in, from `astro:routes:resolved`; and which routes are dynamic |
 | `usage-parse.ts`, `usage-index.ts`, `composition.ts` | The static usage graph: a pure parser, an mtime-cached index, and the pure tiering |
@@ -62,6 +63,15 @@ Each feature group is a `create<Feature>Routes(deps): Route[]` factory.
 - `isLocalRequest` rejects non-localhost and bad Origin at the middleware door, covering every route automatically.
 - `paths.ts::validateEditablePath` is the one gate every edit path passes: realpath (symlinks resolved) ∈ project root ∈ configured `contentRoots`, with an allowed extension. `/classify`, `/apply` and `/open` alike go through it.
 - Writes go through `atomicWrite` (temp file + rename). Its `mode` rides the **temp** file, so a secret is never briefly readable at the umask before the rename.
+
+### Paths leave relative and arrive absolute
+
+Nothing the tool serves carries an absolute filesystem path. A dev server is not private — a LAN bind, a tunnel, a screen share or a screenshot in a bug report all publish the page — and an absolute path names the developer, their directory layout and often their client's project. It is also the single heaviest thing on an annotated page, repeated once per element.
+
+- **Out:** `wire-path.ts::toWirePath` is the only conversion. It runs at the two places a path is emitted — the annotating transform (`data-atx-file`, and the paths the composition instrumenter *generates*) and the outbound seam in `composition-routes.ts` (`route`, `UsageLink.file`, `UsageLink.target`, coverage issues).
+- **In:** `checkEditablePath` already resolves against the root before it confines, so the relative form is a **wire format only** — never a filesystem input, and never compared against a real path without being resolved first.
+- **The exception** is `data-astro-source-file`: Astro's attribute in Astro's own format, read by the dev toolbar and other tooling that expects the absolute path Astro itself emits. Relativizing it would break those readers, so it stays as Astro spells it.
+- A path already relative (`route-manifest.ts` answers in that spelling) is left alone at the seam — resolving one against the root a second time would resolve it against the cwd.
 
 ### Two classes of write, and only the first uses that gate
 

@@ -177,9 +177,14 @@ describe('routing & guards', () => {
     expect(r.body).toMatchObject({ ok: true, name: 'astro-dev-edit' });
   });
 
-  it('GET /health reports the project root, so the overlay can relativize the absolute source annotations', async () => {
+  // Issue #72: the root named the developer's home directory, and /health is
+  // served to anything that can reach the dev server. The client no longer has
+  // any use for it either — every path on the wire is already root-relative.
+  it('GET /health reports feature flags and never the project root', async () => {
     const r = await request({ method: 'GET', url: '/__dev-edit/health' });
-    expect(r.body).toMatchObject({ root, cssInspector: true });
+    expect(r.body).toMatchObject({ cssInspector: true });
+    expect(r.body).not.toHaveProperty('root');
+    expect(JSON.stringify(r.body)).not.toContain(root);
   });
 
   it('GET /healthX no longer matches /health — routes are exact-path (intentional tightening)', async () => {

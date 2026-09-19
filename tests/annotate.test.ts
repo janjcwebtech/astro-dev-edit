@@ -131,6 +131,64 @@ describe('annotateAstroSource', () => {
   });
 
   /**
+   * Issue #72 — the leak and the weight, pinned together.
+   *
+   * `data-atx-file` was one absolute path repeated once per element: 16% of a
+   * real page, and it named the developer's home directory into HTML that a
+   * LAN dev server, a tunnel, a screen share or a screenshot all publish.
+   * `root` is what the plugins pass; the attribute is root-relative from then
+   * on, and the loc is untouched — locs are computed from the ORIGINAL source,
+   * so shortening an attribute cannot move one (rule 9).
+   *
+   * `data-astro-source-file` is deliberately NOT relativized: it is Astro's
+   * attribute in Astro's own format, and the tooling that reads it expects the
+   * absolute path Astro itself emits.
+   */
+  it('emits data-atx-file root-relative, naming nothing above the root', async () => {
+    const root = '/proj';
+    const src = `<main>\n  <h1>Title</h1>\n</main>\n`;
+    const loc = locOf(src, 'Title');
+    const out = await annotateAstroSource(src, FILE, { root });
+    expect(out).toContain(`data-atx-file="src/pages/index.astro" data-atx-loc="${loc}"`);
+    expect(out).not.toContain('data-atx-file="/proj');
+    // Astro's own namespace keeps Astro's own shape.
+    expect(out).toContain(`data-astro-source-file="${FILE}"`);
+  });
+
+  it('shortening the attribute moves no loc — the pair is identical either way', async () => {
+    const src = `---\nconst t = 'x';\n---\n<article>\n  <h2>A heading</h2>\n  <p>Copy.</p>\n  <h3>{t}</h3>\n</article>\n`;
+    const absolute = await annotateAstroSource(src, FILE, { legacy: false });
+    const relative = await annotateAstroSource(src, FILE, { legacy: false, root: '/proj' });
+    expect(relative).toBe(absolute.replaceAll(`data-atx-file="${FILE}"`,
+      'data-atx-file="src/pages/index.astro"'));
+  });
+
+  /**
+   * The composition runtime is generated code, and generated code is served:
+   * the module reaches the browser, and `RenderTrace.file` reaches it a second
+   * time inside an `atx-slot` comment. `begin` compares the target `child`
+   * threaded against the file it was handed, so both have to be in the same
+   * spelling — and that spelling is the root-relative one.
+   */
+  it('generates the trace runtime with root-relative paths on both sides', async () => {
+    const src = `---\nimport Card from '../Card.astro';\n---\n<Card title="Hi" />\n`;
+    const links = [{ id: 'aaaaaaaa', file: FILE, loc: locOf(src, '<Card'), offset: src.indexOf('<Card'),
+      injectionOffset: src.indexOf('<Card') + '<Card'.length, name: 'Card',
+      target: '/proj/src/Card.astro', hasSpread: false, props: [], slots: [] }];
+    const out = await annotateAstroSource(src, FILE,
+      { composition: links, runtime: '/runtime.mjs', legacy: false, root: '/proj' });
+    expect(out).toContain('begin(Astro.props,"src/pages/index.astro",Astro.request)');
+    expect(out).toContain('"aaaaaaaa","src/Card.astro"');
+    expect(out).not.toContain('"/proj/src');
+  });
+
+  it('keeps the node_modules segment, so package ownership still reads off the annotation', async () => {
+    const out = await annotateAstroSource('<img src="/x.jpg" alt="x">\n',
+      '/proj/node_modules/astro/components/Image.astro', { legacy: false, root: '/proj' });
+    expect(out).toContain('data-atx-file="node_modules/astro/components/Image.astro"');
+  });
+
+  /**
    * `legacy: false` is what runs on Astro 5/6 with the dev toolbar on, where
    * the Go compiler emits its own pair. A second one is not a harmless
    * duplicate there: the printer splices its own (injection-shifted) loc in

@@ -186,9 +186,9 @@ const CAPTIONS: Record<RowReason, string> = {
 /**
  * Whether the element's annotated file is the route's own template.
  *
- * Annotations carry an absolute fsPath and `/page-source` answers
- * root-relative, so one is a suffix of the other. It is the same suffix test
- * `inspector-app.ts` makes of an HMR payload, and it errs the same way: a
+ * Both sides are root-relative — the annotation and `/page-source` — so this
+ * is normally a plain equality. The suffix arm stays for the case where they
+ * are anchored differently, and it errs the way `inspector-app.ts` does: a
  * near-miss reads as "not the template", which costs a jump rather than making
  * a claim.
  */

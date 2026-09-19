@@ -23,7 +23,7 @@ export function createCompositionPlugin(
         // Keep resolution local to the awaited transform, including aliases.
         const links = await index.update(source, file,
           async (specifier, importer) => (await this.resolve(specifier, importer))?.id ?? null);
-        return { code: await annotateAstroSource(source, file, { composition: links, legacy: opts.legacy,
+        return { code: await annotateAstroSource(source, file, { composition: links, legacy: opts.legacy, root,
           runtime: fileURLToPath(new URL('./composition-runtime.ts', import.meta.url)) }), map: null };
       },
     },

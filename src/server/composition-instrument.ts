@@ -1,6 +1,7 @@
 import { parse } from '@astrojs/compiler';
 import type { UsageLink } from '../shared/protocol.ts';
 import { tagEnd, type TagAttribute } from './astro-tag-end.ts';
+import { toWirePath } from './wire-path.ts';
 
 interface Node {
   type: string;
@@ -11,8 +12,20 @@ interface Node {
 }
 
 /** All edits refer to the untouched source. New frontmatter can add lines;
- * the original annotation coordinates remain authoritative for editing. */
-export async function prepareComposition(source: string, file: string, links: readonly UsageLink[], runtime: string) {
+ * the original annotation coordinates remain authoritative for editing.
+ *
+ * `file` and `link.target` stay absolute here — they are the index's identity
+ * for a module — but every path this **generates** is root-relative (`root`;
+ * issue #72), because the generated code is served: the module reaches the
+ * browser, and `RenderTrace.file` reaches it again inside an `atx-slot`
+ * comment. `begin` compares the target `child` threaded against the file it
+ * was called with, so the two only have to agree with each other, and both
+ * come from here. */
+export async function prepareComposition(
+  source: string, file: string, links: readonly UsageLink[], runtime: string, root?: string,
+) {
+  const wire = (path: string) => (root === undefined ? path : toWirePath(root, path));
+  const where = wire(file);
   const { ast } = await parse(source, { position: true });
   const starts = [0];
   for (let i = 0; i < source.length; i++) if (source[i] === '\n') starts.push(i + 1);
@@ -22,7 +35,7 @@ export async function prepareComposition(source: string, file: string, links: re
   let trace = '__atxRender';
   while (source.includes(trace)) trace += '_';
   const insertions: { index: number; text: string; deleteCount?: number }[] = [];
-  const setup = `import * as ${alias} from ${JSON.stringify(runtime)};const ${trace}=${alias}.begin(Astro.props,${JSON.stringify(file)},Astro.request);`;
+  const setup = `import * as ${alias} from ${JSON.stringify(runtime)};const ${trace}=${alias}.begin(Astro.props,${JSON.stringify(where)},Astro.request);`;
   const frontmatter = (ast as unknown as Node).children?.find(n => n.type === 'frontmatter');
   if (frontmatter?.position) {
     const start = source.indexOf('\n', at(frontmatter.position.start)) + 1;
@@ -31,9 +44,9 @@ export async function prepareComposition(source: string, file: string, links: re
 
   for (const link of links) {
     if (link.file !== file || !link.target || link.refusal) continue;
-    if (link.injectionOffset === undefined) throw new Error(`Cannot safely instrument ${file}:${link.loc}`);
+    if (link.injectionOffset === undefined) throw new Error(`Cannot safely instrument ${where}:${link.loc}`);
     insertions.push({ index: link.injectionOffset,
-      text: ` {...${alias}.child(${trace},${JSON.stringify(link.id)},${JSON.stringify(link.target)})}` });
+      text: ` {...${alias}.child(${trace},${JSON.stringify(link.id)},${JSON.stringify(wire(link.target))})}` });
   }
   const walk = (node: Node, inExpression = false) => {
     if (node.name === 'slot' && node.position) {
@@ -45,7 +58,7 @@ export async function prepareComposition(source: string, file: string, links: re
       const opening = tagEnd(source, start, 'slot', attrs);
       const end = opening && source[opening.end - 2] === '/' ? opening.end
         : node.position.end ? at(node.position.end) : undefined;
-      if (!opening || end === undefined) throw new Error(`Cannot safely trace a slot in ${file}`);
+      if (!opening || end === undefined) throw new Error(`Cannot safely trace a slot in ${where}`);
       const slotName = JSON.stringify(name?.value ?? 'default');
       const forwarded = attrs.find(a => a.name === 'slot');
       if (forwarded && forwarded.kind !== 'quoted') throw new Error('Dynamic forwarded slot names cannot be traced');

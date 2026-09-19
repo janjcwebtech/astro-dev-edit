@@ -20,10 +20,15 @@
  * `my_node_modules_notes` is the user's own source and must stay editable.
  *
  * Both separators are split on regardless of platform. The client receives
- * whatever Astro stamped into the annotation and has no `path.sep` to consult,
- * and on POSIX — where a backslash is a legal filename character rather than a
- * separator — the extra split can only ever classify *more* paths as
- * package-owned, never fewer. That direction is a refusal, so it fails safe.
+ * whatever the annotation spells — a root-relative path — and has no
+ * `path.sep` to consult, and on POSIX, where a backslash is a legal filename
+ * character rather than a separator, the extra split can only ever classify
+ * *more* paths as package-owned, never fewer. That direction is a refusal, so
+ * it fails safe.
+ *
+ * A relative path answers this as well as an absolute one did: an installed
+ * package under the project root keeps its `node_modules` segment, and one
+ * resolved from outside the root never had the segment to lose.
  */
 export function isPackagePath(path: string): boolean {
   return path.split(/[\\/]/).includes('node_modules');

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { PeekResponse } from '../src/shared/protocol.ts';
 import {
   formatContext,
-  relativize,
   windowAround,
   type ElementContext,
 } from '../src/client/element-context.ts';
@@ -191,36 +190,6 @@ describe('formatContext', () => {
     ]) {
       expect(out).toContain(section);
     }
-  });
-});
-
-describe('relativize', () => {
-  const ROOT = '/Users/dev/projects/site';
-
-  it('strips the project root from an absolute annotation path', () => {
-    expect(relativize(`${ROOT}/src/pages/index.astro`, ROOT)).toBe('src/pages/index.astro');
-  });
-
-  it('tolerates a trailing slash on the root', () => {
-    expect(relativize(`${ROOT}/src/x.astro`, `${ROOT}/`)).toBe('src/x.astro');
-  });
-
-  it('leaves a path that is not under the root alone', () => {
-    expect(relativize('/elsewhere/x.astro', ROOT)).toBe('/elsewhere/x.astro');
-  });
-
-  it('leaves an already-relative path alone', () => {
-    expect(relativize('src/pages/index.astro', ROOT)).toBe('src/pages/index.astro');
-  });
-
-  it('passes the path through unchanged when the root is unknown', () => {
-    expect(relativize(`${ROOT}/src/x.astro`, null)).toBe(`${ROOT}/src/x.astro`);
-  });
-
-  it('normalizes Windows separators on both sides before comparing', () => {
-    expect(relativize('C:\\dev\\site\\src\\pages\\index.astro', 'C:\\dev\\site')).toBe(
-      'src/pages/index.astro',
-    );
   });
 });
 

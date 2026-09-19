@@ -167,22 +167,6 @@ export function formatContext(ctx: ElementContext): string {
   return `${out.join('\n').trimEnd()}\n`;
 }
 
-/**
- * Source paths repo-relative, the shape a person (or an assistant) can act on.
- *
- * Astro's `data-astro-source-file` annotations are absolute fsPaths — the pill
- * only ever showed their basename, so it never mattered before, but
- * "/Users/you/projects/site/src/pages/index.astro:12:3" is noise in a paste.
- * `root` comes from /health; without it the path is left as-is rather than
- * guessed at.
- */
-export function relativize(file: string, root: string | null): string {
-  const path = file.replace(/\\/g, '/');
-  if (!root) return path;
-  const base = root.replace(/\\/g, '/').replace(/\/+$/, '') + '/';
-  return path.startsWith(base) ? path.slice(base.length) : path;
-}
-
 /** Cut the paste-sized window out of a /peek response (which is normally the
  *  whole file). Exported for its own test — the arithmetic is 1-based and easy
  *  to get wrong by one. */
@@ -255,15 +239,13 @@ function verdictOf(result: ClassifyResult): string {
 
 async function sourceFor(
   src: SourceLoc,
-  root: string | null,
 ): Promise<Pick<ElementContext, 'source' | 'sourceUnavailable'>> {
   try {
     const peeked = await api.peek({ file: src.file, loc: src.loc });
     // Not an error: the file is real but package-owned (an astro:assets
     // <Image>, say), so the server explains instead of returning source.
     if (peeked.refused) return { source: null, sourceUnavailable: peeked.refused };
-    const window = windowAround(peeked);
-    return { source: { ...window, file: relativize(window.file, root) }, sourceUnavailable: null };
+    return { source: windowAround(peeked), sourceUnavailable: null };
   } catch (err) {
     return {
       source: null,
@@ -273,12 +255,12 @@ async function sourceFor(
 }
 
 /** Gather everything for one element. Only the /peek read can be slow; the
- *  classification is served from the hover cache in the normal case. `root` is
- *  the project root from /health, used to render source paths repo-relative. */
+ *  classification is served from the hover cache in the normal case. Every
+ *  path in the result is already root-relative — that is what the annotation
+ *  carries and what `/peek` echoes back — so nothing here rewrites one. */
 export async function collectContext(
   el: HTMLElement,
   src: SourceLoc,
-  root: string | null,
 ): Promise<ElementContext> {
   const { html, dropped } = renderedHtml(el);
   const matched = rulesForElement(el);
@@ -292,7 +274,7 @@ export async function collectContext(
   }
 
   return {
-    loc: { file: relativize(src.file, root), loc: src.loc },
+    loc: { file: src.file, loc: src.loc },
     openTag: openTagOf(el),
     label: describe(el),
     verdict,
@@ -303,6 +285,6 @@ export async function collectContext(
     htmlDropped: dropped,
     rules: kept,
     rulesDropped: matched.length - kept.length,
-    ...(await sourceFor(src, root)),
+    ...(await sourceFor(src)),
   };
 }

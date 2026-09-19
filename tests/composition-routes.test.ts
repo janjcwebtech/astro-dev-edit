@@ -52,9 +52,13 @@ describe('composition HTTP contract through real middleware', () => {
     const before = await readFile(join(root, 'src/pages/index.astro'), 'utf8');
     expect((await request('/health')).body.composition).toBe(true);
     const answer = await request('/composition', query());
-    expect(answer).toMatchObject({ status: 200, body: { tier: 'proven', route: join(root, 'src/pages/index.astro'), coverage: { complete: true, files: 2 } } });
+    expect(answer).toMatchObject({ status: 200, body: { tier: 'proven', route: 'src/pages/index.astro', coverage: { complete: true, files: 2 } } });
+    // Issue #72: the index keys modules by absolute path, but nothing absolute
+    // may leave the server — the client compares these against `data-atx-file`.
+    expect(JSON.stringify(answer.body)).not.toContain(root);
     const batch = await request('/composition/links', { pathname: '/docs/', ids: [id(), id(), 'unknown1'] });
     expect(batch.body.links).toHaveLength(1);
+    expect(batch.body.links[0]).toMatchObject({ file: 'src/pages/index.astro', target: 'src/Card.astro' });
     expect(batch.body.links[0].props[0]).toMatchObject({ name: 'title', source: '"Hello"' });
     expect(batch.body.missing).toEqual(['unknown1']);
     expect((await request('/composition/uses', { pathname: '/docs/', file: 'src/Card.astro' })).body.links).toHaveLength(1);

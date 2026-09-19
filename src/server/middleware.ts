@@ -158,7 +158,6 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
             cssInspector: o.cssInspector,
             composition: o.composition && Boolean(deps.composition),
             openInEditor: o.openInEditor,
-            root,
           },
         };
       },

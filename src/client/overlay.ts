@@ -57,9 +57,6 @@ let editMode = false;
 // you came to edit. The choice does survive the full-page reload that follows
 // every save, like edit mode itself.
 let treeWanted = false;
-// From /health: the absolute project root, so copied source paths come out
-// repo-relative (Astro's annotations are absolute). Null until boot completes.
-let projectRoot: string | null = null;
 let inspectorMode = false;
 
 // ---------------------------------------------------------------------------
@@ -294,7 +291,7 @@ async function copyContext(el: HTMLElement, src: SourceLoc): Promise<boolean> {
   let text: string;
   let label: string;
   try {
-    const ctx = await collectContext(el, src, projectRoot);
+    const ctx = await collectContext(el, src);
     text = formatContext(ctx);
     label = ctx.label;
   } catch (err) {
@@ -408,7 +405,6 @@ async function boot(): Promise<void> {
   // check fails the overlay stays out of the way entirely.
   const info = await api.health();
   if (!info) return;
-  projectRoot = info.root ?? null; // older servers don't send it — paths stay absolute
   // Every option-derived flag is read through features.ts rather than a local,
   // so the media modal can see them without importing the composition root and
   // so a Settings save updates them in place. (see features.ts)

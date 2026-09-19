@@ -2,6 +2,7 @@ import { parse } from '@astrojs/compiler';
 import type { Plugin as VitePlugin } from 'vite';
 import type { UsageLink } from '../shared/protocol.ts';
 import { prepareComposition } from './composition-instrument.ts';
+import { toWirePath } from './wire-path.ts';
 
 /**
  * Self-annotation — the tool stamps its own `data-atx-file` / `-loc` on every
@@ -141,18 +142,32 @@ interface Insertion {
  * Annotate every plain element in an `.astro` source with the tool-owned
  * `data-atx-file` / `-loc` pair, and — unless `legacy` is false — the
  * `data-astro-source-*` pair Astro 5/6 would have emitted. `file` is the
- * absolute path stamped into the attribute (what the Vite transform receives
- * as its module id).
+ * absolute path the Vite transform receives as its module id, and stays the
+ * index's identity for a module throughout.
+ *
+ * **`data-atx-file` carries the root-relative spelling** ({@link toWirePath}),
+ * never `file` itself: it is repeated once per element into HTML anyone on the
+ * network can read, and an absolute path there names the developer's home
+ * directory (issue #72). `opts.root` is what makes that possible; without it
+ * the absolute path is stamped, which is only ever a unit test with no project
+ * root to speak of.
+ *
+ * `data-astro-source-file` is the exception, and deliberately so: it is
+ * Astro's own attribute in Astro's own format, read by the dev toolbar and by
+ * other tooling that expects the absolute path Astro itself emits. Changing
+ * its shape would break those readers to no benefit — the tool's own channel
+ * is the one the client reads.
  */
 export async function annotateAstroSource(
   source: string, file: string,
-  opts: { composition?: readonly UsageLink[]; runtime?: string; legacy?: boolean } = {},
+  opts: { composition?: readonly UsageLink[]; runtime?: string; legacy?: boolean; root?: string } = {},
 ): Promise<string> {
   const { ast } = await parse(source, { position: true });
   const starts = lineStartIndices(source);
   const insertions: Insertion[] = [];
   const fileAttr = escapeAttr(file);
-  const enhanced = opts.runtime ? await prepareComposition(source, file, opts.composition ?? [], opts.runtime) : undefined;
+  const atxAttr = escapeAttr(opts.root === undefined ? file : toWirePath(opts.root, file));
+  const enhanced = opts.runtime ? await prepareComposition(source, file, opts.composition ?? [], opts.runtime, opts.root) : undefined;
   if (enhanced) insertions.push(...enhanced.insertions);
   for (const link of enhanced ? [] : opts.composition ?? []) {
     if (link.file !== file || !link.target || link.refusal || !source.startsWith(`<${link.name}`, link.offset)) continue;
@@ -175,7 +190,7 @@ export async function annotateAstroSource(
             (opts.legacy === false ? '' :
               ` data-astro-source-file="${fileAttr}"` +
               ` data-astro-source-loc="${loc.line}:${loc.column}"`) +
-            ` data-atx-file="${fileAttr}" data-atx-loc="${loc.line}:${loc.column}"` +
+            ` data-atx-file="${atxAttr}" data-atx-loc="${loc.line}:${loc.column}"` +
             (opts.composition ?
               (enhanced ? ` data-atx-chain={${enhanced.trace}.chain} data-atx-instance={${enhanced.trace}.id}` +
                 ` data-atx-parent={${enhanced.trace}.parent??""} data-atx-ordinal={String(${enhanced.trace}.ordinal)} data-atx-version="2"`
@@ -216,7 +231,7 @@ export async function annotateAstroSource(
  * main module is transformed — style/script sub-requests carry a
  * `?astro&type=…` query and no longer end in `.astro`.
  */
-export function createAnnotatePlugin(opts: { legacy: boolean }): VitePlugin {
+export function createAnnotatePlugin(root: string, opts: { legacy: boolean }): VitePlugin {
   return {
     name: 'astro-dev-edit:annotate',
     enforce: 'pre',
@@ -224,7 +239,7 @@ export function createAnnotatePlugin(opts: { legacy: boolean }): VitePlugin {
       order: 'pre',
       async handler(code, id) {
         if (!id.endsWith('.astro')) return null;
-        return { code: await annotateAstroSource(code, id, { legacy: opts.legacy }), map: null };
+        return { code: await annotateAstroSource(code, id, { legacy: opts.legacy, root }), map: null };
       },
     },
   };

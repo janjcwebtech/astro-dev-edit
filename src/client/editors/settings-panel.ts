@@ -208,7 +208,6 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
         ok: true,
         name: 'astro-dev-edit',
         milestone: 1,
-        root: '',
         cssInspector: valueOf(next, 'cssInspector') === true,
         openInEditor: valueOf(next, 'openInEditor') === true,
       });

@@ -126,7 +126,7 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         if (selfAnnotate) {
           updateConfig({ vite: { plugins: [trace
             ? createCompositionPlugin(projectRoot, () => composition?.invalidate(), { legacy: !astroAnnotates })
-            : createAnnotatePlugin({ legacy: !astroAnnotates })] } });
+            : createAnnotatePlugin(projectRoot, { legacy: !astroAnnotates })] } });
           logger.info(
             (trace ? 'component tracing and ' : '') +
             `injecting data-atx-* source annotations (Astro ${astroMajor ?? 'unknown'}` +

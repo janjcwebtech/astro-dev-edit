@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { basename, isAbsolute } from 'node:path';
 import type {
   CompositionCoverage, CompositionLinksResponse, CompositionLookupResponse,
   CompositionRefusal, CompositionUsesResponse, RenderOrdinals, UsageApplyRequest, UsageApplyTarget,
+  UsageLink,
 } from '../shared/protocol.ts';
 import { resolveComposition } from './composition.ts';
 import { proveLink } from './usage-parse.ts';
@@ -13,6 +14,7 @@ import { isPackageOwned, validateEditablePath } from './paths.ts';
 import type { RouteManifest } from './route-manifest.ts';
 import type { Route } from './router.ts';
 import type { TextWriter } from './text-writes.ts';
+import { toWirePath } from './wire-path.ts';
 
 export interface CompositionRouteDeps {
   root: string;
@@ -55,6 +57,22 @@ function applyTargetOf(value: unknown): UsageApplyTarget | null {
 }
 
 export function createCompositionRoutes(deps: CompositionRouteDeps): Route[] {
+  /**
+   * The outbound seam: server space becomes client space here and nowhere else.
+   *
+   * The index keys everything by absolute fs path — that is a module's identity
+   * through resolution, realpath and the graph walk — but nothing absolute may
+   * reach the browser (issue #72), and the client compares these against
+   * `data-atx-file`, which is root-relative. A path that is already relative
+   * (`route-manifest.ts` answers in that spelling) is left alone: resolving one
+   * against the root a second time would resolve it against the cwd instead.
+   */
+  const wirePath = (path: string) => (isAbsolute(path) ? toWirePath(deps.root, path) : path);
+  const wireLink = (link: UsageLink): UsageLink =>
+    ({ ...link, file: wirePath(link.file), ...(link.target ? { target: wirePath(link.target) } : {}) });
+  const wireCoverage = (value: CompositionCoverage): CompositionCoverage =>
+    ({ ...value, issues: value.issues.map(issue => ({ ...issue, file: wirePath(issue.file) })) });
+
   const read: Route[] = ['/composition', '/composition/links', '/composition/uses'].map((path): Route => ({
     method: 'POST', path, label: path.slice(1), maxBytes: 32 * 1024,
     async handler(body) {
@@ -95,18 +113,19 @@ export function createCompositionRoutes(deps: CompositionRouteDeps): Route[] {
       try { route = await allow(hit.file); if (!batch) file = await allow(req.file as string); }
       catch { return fail('path-refused'); }
       const graph = await deps.composition.snapshot(route, allow);
-      const common = { route, coverage: graph.coverage };
+      const common = { route: wirePath(route), coverage: wireCoverage(graph.coverage) };
       const stale = graph.coverage.issues.some(i => i.reason === 'stale-index');
       if (batch) {
         const ids = [...new Set(req.ids as string[])];
         const found = new Map(graph.links.map(link => [link.id, link]));
         const response: CompositionLinksResponse = { ...common,
-          links: ids.flatMap(id => found.has(id) ? [found.get(id)!] : []),
+          links: ids.flatMap(id => found.has(id) ? [wireLink(found.get(id)!)] : []),
           missing: ids.filter(id => !found.has(id)), ...(stale ? { reason: 'stale-index' } : {}) };
         return { status: 200, body: response };
       }
       if (path.endsWith('/uses')) {
-        const response: CompositionUsesResponse = { ...common, links: graph.links.filter(link => link.target === file),
+        const response: CompositionUsesResponse = { ...common,
+          links: graph.links.filter(link => link.target === file).map(wireLink),
           ...(stale ? { reason: 'stale-index' } : {}) };
         return { status: 200, body: response };
       }
@@ -119,9 +138,15 @@ export function createCompositionRoutes(deps: CompositionRouteDeps): Route[] {
       // inferred path or a candidate set names a *possible* usage site, and a
       // render count aimed at one of those would be a guess wearing a proof.
       const ordinals = resolved.tier === 'proven' ? ordinalsOf(req.ordinals) : null;
+      // Proof first, wire conversion last: `proveLink` reads the frontmatter
+      // map, which is keyed by the absolute path the link still carries.
+      const proven = ordinals
+        ? resolved.links.map(link =>
+            proveLink(link, graph.frontmatter.get(link.file) ?? '', ordinals[link.id] ?? 0))
+        : resolved.links;
       const response: CompositionLookupResponse = { ...common, ...resolved,
-        ...(ordinals ? { links: resolved.links.map(link =>
-          proveLink(link, graph.frontmatter.get(link.file) ?? '', ordinals[link.id] ?? 0)) } : {}) };
+        links: proven.map(wireLink),
+        ...(resolved.candidates ? { candidates: resolved.candidates.map(set => set.map(wireLink)) } : {}) };
       return { status: 200, body: response };
     },
   }));

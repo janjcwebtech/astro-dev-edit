@@ -1,6 +1,7 @@
 import { chmod, realpath, rename, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { isPackagePath } from '../shared/package-path.ts';
+import { toWirePath } from './wire-path.ts';
 
 /**
  * Path confinement and mapping helpers — the single home for every "may this
@@ -64,10 +65,10 @@ export function resolveAssetTarget(
   return { dir, redirected: Boolean(req.targetDir) && dir !== req.targetDir };
 }
 
-/** Root-relative path of a file, in posix form regardless of platform. */
-function relPosix(root: string, absFile: string): string {
-  return relative(root, absFile).split(sep).join('/');
-}
+/** Root-relative path of a file, in posix form regardless of platform — the
+ *  same spelling {@link toWirePath} gives the client, so a web path and an
+ *  annotation are derived from one rule. */
+const relPosix = toWirePath;
 
 /**
  * The project's public directory as a root-relative posix prefix, with no
