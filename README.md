@@ -41,6 +41,8 @@ export default defineConfig({
 
 Run `npm run dev` and click **Edit page** in the admin bar.
 
+**Import it statically, as above.** The package ships TypeScript with no build step, and Node refuses to strip types for anything under `node_modules` — so a dynamic `await import("astro-dev-edit")` in your config cannot load it, and wrapping one in `try`/`catch` to guard against the package being absent swallows that error along with the one you meant to catch. The overlay then simply never appears. A static import is loaded by Vite, which strips the types, and works on every install.
+
 Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6 need, are in [Astro versions and source annotations](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/CONFIGURATION.md#astro-versions-and-source-annotations).
 
 ## What you can edit

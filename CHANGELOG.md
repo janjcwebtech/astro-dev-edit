@@ -14,6 +14,10 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Changed
+
+- The README states that the integration must be imported **statically**, and why: the package ships TypeScript with no build step, Node refuses to strip types under `node_modules`, and a dynamic `await import("astro-dev-edit")` therefore cannot load it. Wrapping one in `try`/`catch` to tolerate the package being absent swallows that error too, so the overlay silently never appears. `npm run check:pack` pins both halves against a packed tarball ([#75](https://github.com/janjcwebtech/astro-dev-edit/issues/75))
+
 ### Fixed
 
 - A collection whose glob loader declares a `base` that differs from its name — `useCases` over `src/content/use-cases/`, the shape Astro's own docs encourage — is no longer read as empty. The entry directory comes from the loader's `base` where the config writes it as a string literal, then from the `src/content/<name>` convention; an explicit `entryEditor.collections.<name>.dir` still outranks both. A `base` built from a variable or a template is refused rather than guessed at, and falls back to the convention.

@@ -33,6 +33,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "check:pack": "node scripts/pack-check.mjs",
     "test:watch": "vitest"
   },
   "peerDependencies": {
