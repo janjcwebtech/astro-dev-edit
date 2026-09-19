@@ -1,0 +1,23 @@
+---
+import Swap from '../../layouts/Swap.astro';
+---
+<Swap title="Swap B · Copydesk">
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Client-side navigation</p>
+      <h1>Swap page B</h1>
+      <p class="lead" style="max-width:60ch;">
+        You arrived here through a body swap. The admin bar, the hover pill and
+        the element tree should all still be here, edit mode should still be on
+        if it was on when you left, and this heading should be editable without
+        a reload.
+      </p>
+      <p>
+        Going back with the browser's own Back button is the other half of the
+        check — <code>popstate</code> is a swap the router does not announce
+        with <code>astro:page-load</code> on every Astro version.
+      </p>
+      <p><a href="/swap/a">← Back to swap page A</a></p>
+    </div>
+  </section>
+</Swap>

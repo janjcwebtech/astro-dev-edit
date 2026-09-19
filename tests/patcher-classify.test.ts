@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifyAstro } from '../src/patcher/astro.ts';
+import { readFileSync } from 'node:fs';
 import { locOf } from './helpers.ts';
 
 /**
@@ -154,5 +155,100 @@ describe('classifyAstro', () => {
     const src = `<p>Hello</p>\n`;
     const res = await classifyAstro(src, locOf(src, 'Hello'), 'div');
     expect(res.kind).toBe('unresolved');
+  });
+});
+
+/**
+ * Copy that arrives as a prop (issue #61).
+ *
+ * The trace is right and only the lookup scope is wrong: `items` is a
+ * parameter, not a declaration, so there is no literal in this file to find.
+ * The refusal stands — nothing here has proven a literal at the other end —
+ * but it now names the prop instead of calling copy "code".
+ */
+describe('classifyAstro — words that arrive as a prop', () => {
+  /** The FAQ component from the issue, reduced to the shape that matters. */
+  const faq = `---\nconst { title, items } = Astro.props;\n---\n<section>\n  <h2>{title}</h2>\n  {items.map((item) => (\n    <p>{item.answer}</p>\n  ))}\n</section>\n`;
+
+  it('names the prop a bare expression reads, rather than refusing flatly', async () => {
+    const res = await classifyAstro(faq, locOf(faq, '{title'), 'h2');
+    expect(res.kind).toBe('dynamic');
+    expect(res.prop).toEqual({ name: 'title', local: 'title', label: 'title' });
+    expect(res.reason).toContain('title');
+    expect(res.reason).not.toContain('change code, not copy');
+  });
+
+  it('names the array prop a mapped member reads, keeping the whole path', async () => {
+    const res = await classifyAstro(faq, locOf(faq, '{item.answer'), 'p');
+    expect(res.kind).toBe('dynamic');
+    expect(res.prop).toEqual({ name: 'items', local: 'items', label: 'items[].answer' });
+  });
+
+  it('reads through a rename, so the caller is told the name it wrote', async () => {
+    const src = `---\nconst { title: heading } = Astro.props;\n---\n<h1>{heading}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{heading'), 'h1');
+    expect(res.prop).toEqual({ name: 'title', local: 'heading', label: 'heading' });
+  });
+
+  it('reads through a default value and a type annotation', async () => {
+    const src = `---\nconst { title = 'Untitled', items = [] }: Props = Astro.props;\n---\n<h1>{title}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{title'), 'h1');
+    expect(res.prop?.name).toBe('title');
+  });
+
+  it('reads through an `as Props` assertion', async () => {
+    const src = `---\nconst { title } = Astro.props as Props;\n---\n<h1>{title}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{title'), 'h1');
+    expect(res.prop?.name).toBe('title');
+  });
+
+  it('keeps the plain refusal when the name is a local, not a prop', async () => {
+    // A render-time computation: refused correctly, and permanently.
+    const src = `---\nconst initial = name.trim().charAt(0);\n---\n<h1>{initial}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{initial'), 'h1');
+    expect(res.kind).toBe('dynamic');
+    expect(res.prop).toBeUndefined();
+    expect(res.reason).toContain('change code, not copy');
+  });
+
+  it('prefers a literal in this file over the prop of the same name', async () => {
+    // A local declaration shadowing a prop is still editable here — the trace
+    // resolves, so the prop branch is never reached.
+    const src = `---\nconst { title } = Astro.props;\nconst heading = 'Written here';\n---\n<h1>{heading}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{heading'), 'h1');
+    expect(res.kind).toBe('expression');
+  });
+
+  it('says nothing about a prop when the component takes none', async () => {
+    const src = `---\nconst items = getItems();\n---\n<h1>{items}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{items'), 'h1');
+    expect(res.prop).toBeUndefined();
+  });
+
+  it('refuses a nested pattern rather than guessing which prop it named', async () => {
+    const src = `---\nconst { site: { title } } = Astro.props;\n---\n<h1>{title}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{title'), 'h1');
+    expect(res.prop).toBeUndefined();
+    expect(res.kind).toBe('dynamic');
+  });
+
+  it('skips a rest element, which names no prop', async () => {
+    const src = `---\nconst { title, ...rest } = Astro.props;\n---\n<h1>{rest}</h1>\n`;
+    const res = await classifyAstro(src, locOf(src, '{rest'), 'h1');
+    expect(res.prop).toBeUndefined();
+  });
+});
+
+/** The committed three-deep fixture is the shape a real marketing page has:
+ *  every word on `FeatureCard` is written two files above it. All three of its
+ *  values used to read "editing it here would change code, not copy". */
+describe('classifyAstro — the composition fixture', () => {
+  it('names the prop behind every value on FeatureCard', async () => {
+    const src = readFileSync('tests/fixtures/composition/FeatureCard.astro', 'utf8');
+    const named = await Promise.all((['title', 'blurb', 'footnote'] as const).map(async name => {
+      const tag = name === 'title' ? 'h3' : 'p';
+      return (await classifyAstro(src, locOf(src, `{${name}`), tag)).prop?.name;
+    }));
+    expect(named).toEqual(['title', 'blurb', 'footnote']);
   });
 });

@@ -527,6 +527,25 @@ export interface ClassifyResult {
    */
   expression?: { property: string; label: string };
   /**
+   * For a `dynamic` refusal whose words arrive as a **prop**: the trace was
+   * right and only the lookup scope was wrong (issue #61).
+   *
+   * A component receives its copy from the caller, so the strings sit in
+   * *that* file's frontmatter — one hop away, and invisible to a patcher that
+   * is string-in/string-out by contract. Carrying the trace instead of a flat
+   * "this is code, not copy" is what lets the panel say where the words
+   * actually live, and what a resolver holding the component graph needs to
+   * take the hop.
+   *
+   * `name` is the prop as the caller spells it, `local` the name this file
+   * destructured it to (the two differ on a rename), and `label` is the whole
+   * path for a title — `items[].question`.
+   *
+   * It is deliberately **not** an editable verdict. Nothing here has proven a
+   * literal at the other end; it has proven only which prop to go and look at.
+   */
+  prop?: { name: string; local: string; label: string };
+  /**
    * For `html` targets: the whole string `set:html` is given, as the source
    * spells it — a quoted attribute's entities decoded, or the frontmatter
    * literal the attribute's expression names.

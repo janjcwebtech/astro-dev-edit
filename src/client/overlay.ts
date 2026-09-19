@@ -33,7 +33,7 @@ import { initInspectorApp } from './inspector-app.ts';
 import { cacheSourceMappings, sourceFor, startCapture } from './source-map.ts';
 import { initTree } from './tree.ts';
 import * as state from './state.ts';
-import { mount } from './shadow.ts';
+import { mount, reattachOverlay } from './shadow.ts';
 import { tip } from './tip.ts';
 import { basename, toast } from './ui.ts';
 
@@ -377,6 +377,72 @@ const bar = initAdminBar({
   // so the bar re-evaluates its specs once the drawer is gone.
   openSettings: () => openSettingsPanel({ onClose: () => bar.refresh() }),
 });
+
+// ---------------------------------------------------------------------------
+// Client-side navigation
+// ---------------------------------------------------------------------------
+
+/**
+ * A `<ClientRouter />` swap is about to replace the document.
+ *
+ * An inline edit is a `contenteditable` in the **light DOM** (rule 7 — Safari's
+ * `execCommand` is inert inside a shadow root), so the swap destroys the node
+ * being typed into no matter what this does. The deliberate choice is to drop
+ * it and say so: committing here would race a write against a page that is
+ * already leaving, and staying silent would let typing disappear. The toast
+ * lives in the shadow root, which survives the swap, so it is still readable
+ * on arrival.
+ */
+function onBeforeSwap(): void {
+  if (inspectorMode) return;
+  const open = state.get();
+  if (open?.kind === 'text' || open?.kind === 'panel') {
+    state.dismiss();
+    toast('An edit in progress was dropped — the page navigated. Nothing was written.', 'warn');
+  }
+  clearHighlight();
+}
+
+/**
+ * A client-side navigation landed: same document, new page, same module.
+ *
+ * Three one-shot assumptions break on a swap and all three are repaired here,
+ * in one place rather than as a sprinkling of listeners (issue #77): the host
+ * left with the old body, every cached element and verdict describes a page
+ * that is gone, and `boot()` will never run again because the browser has
+ * already evaluated this module.
+ *
+ * Edit mode is re-applied from this module's own `editMode`, **never** from
+ * `sessionStorage`. The module outlived the swap, so it is the truth; reading
+ * storage here would resurrect the value a *previous* page had stored and turn
+ * a deterministic bug into an intermittent one.
+ */
+function onPageChange(): void {
+  // Always first: everything below draws into the root this puts back, and the
+  // inspector's own `astro:page-load` handler rebuilds into it right after.
+  reattachOverlay();
+  if (inspectorMode) return;
+  // Element identity did not survive the swap, and neither did the verdicts
+  // cached against it.
+  clearHighlight();
+  invalidateClassifications();
+  cacheSourceMappings();
+  // The crosshair was set on the body that just left.
+  refreshCursor();
+  if (editMode) tree.rebuild();
+  // The entry meta tag is per-page, so the answer can differ here; the resolve
+  // refreshes the bar again when it lands.
+  bar.refresh();
+  bar.syncVisibility();
+  void resolvePageSource();
+}
+
+document.addEventListener('astro:before-swap', onBeforeSwap);
+// Registered at module evaluation, so this runs before the listener
+// `initInspectorApp()` adds inside the async boot — the root is live again by
+// the time the inspector rebuilds into it.
+document.addEventListener('astro:page-load', onPageChange);
+window.addEventListener('popstate', onPageChange);
 
 // After an HMR update: drop stale hover state, and re-snapshot source
 // mappings from the freshly-rendered (re-annotated) DOM before the toolbar

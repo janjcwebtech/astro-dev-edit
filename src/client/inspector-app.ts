@@ -568,3 +568,7 @@ export function initInspectorApp() {
   announceDrops(taken.dropped);
   return { invalidate, rebuild };
 }
+  // Model only. Putting the overlay's host back in the swapped-in document is
+  // `overlay.ts::onPageChange`, whose listener is registered at module
+  // evaluation and so runs before these — do not add a second copy here, or a
+  // navigation gets two re-attaches and one of them is the wrong order.

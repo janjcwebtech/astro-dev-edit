@@ -139,6 +139,74 @@ export function expressionRoot(expr: string): string | null {
   return member ? member[1] : null;
 }
 
+/**
+ * The object pattern of a `const { … } = Astro.props` declaration.
+ *
+ * `[^{}]*` on purpose: a nested pattern (`const { a: { b } } = Astro.props`)
+ * and a default holding braces (`const { x = {} } = …`) both fail to match,
+ * and failing to match is the refusal this module is built on. The optional
+ * `: Props` type annotation and a trailing `as Props` are both accepted —
+ * they are how the same declaration is ordinarily written.
+ */
+const PROPS_PATTERN = new RegExp(
+  `(?:^|[\\s;])(?:const|let|var)\\s*\\{([^{}]*)\\}\\s*(?::[^=]*)?=\\s*Astro\\s*\\.\\s*props\\b`,
+  'm',
+);
+
+/** Split an object pattern on its top-level commas. A default value may hold
+ *  brackets or a quoted comma, so depth and string state are both tracked. */
+function patternEntries(pattern: string): string[] {
+  const out: string[] = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < pattern.length; i++) {
+    const past = skipOpaque(pattern, i);
+    if (past >= 0) { i = past - 1; continue; }
+    const ch = pattern[i];
+    if (ch === '[' || ch === '{' || ch === '(') depth++;
+    else if (ch === ']' || ch === '}' || ch === ')') depth--;
+    else if (ch === ',' && depth === 0) { out.push(pattern.slice(start, i)); start = i + 1; }
+  }
+  out.push(pattern.slice(start));
+  return out.map(entry => entry.trim()).filter(Boolean);
+}
+
+/**
+ * The **prop** a local name is destructured from, when it comes from
+ * `Astro.props` — else null.
+ *
+ * This is the lookup scope `hasCandidates` does not have, and the reason a
+ * component-driven site refuses copy it plainly owns (issue #61). A trace that
+ * resolves `{item.question}` to `items[].question` is *right*; it is
+ * `declarationEnd` that then fails, and correctly so — `items` is a parameter,
+ * not a declaration, so there is no literal in this file to find. Saying
+ * "this is the `items` prop" is a different and true answer, and it is the one
+ * the caller needs to take the hop.
+ *
+ * Decides nothing and reads no other file: `Patcher` is string-in/string-out
+ * (`patcher/types.ts`), so resolving the caller belongs to the layer that
+ * already holds the component graph.
+ *
+ * Renames and defaults are both read, because both are ordinary:
+ * `const { title: heading, items = [] } = Astro.props` binds `heading` to the
+ * `title` prop. A rest element (`...rest`) names no prop and is skipped.
+ */
+export function propBinding(frontmatter: string, name: string): string | null {
+  const declared = PROPS_PATTERN.exec(frontmatter);
+  if (!declared) return null;
+  for (const entry of patternEntries(declared[1])) {
+    if (entry.startsWith('...')) continue;
+    // `prop: local = default` — the default is dropped first, so a `:` inside
+    // one cannot be mistaken for the rename separator.
+    const withoutDefault = entry.split('=')[0].trim();
+    const colon = withoutDefault.indexOf(':');
+    const prop = (colon < 0 ? withoutDefault : withoutDefault.slice(0, colon)).trim();
+    const local = (colon < 0 ? withoutDefault : withoutDefault.slice(colon + 1)).trim();
+    if (!BARE_IDENT.test(prop) || !BARE_IDENT.test(local)) continue;
+    if (local === name) return prop;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Locating the string in the frontmatter
 // ---------------------------------------------------------------------------

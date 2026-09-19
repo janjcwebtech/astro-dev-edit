@@ -1,5 +1,68 @@
-import type { ClassifyRequest, ClassifyResult, CompositionLookupRequest, CompositionLookupResponse, CompositionUsesResponse, SlotPlacement } from '../shared/protocol.ts';
+import type { ClassifyRequest, ClassifyResult, CompositionLookupRequest, CompositionLookupResponse, CompositionUsesResponse, SlotPlacement, UsageProp, UsageSlot } from '../shared/protocol.ts';
 import type { RenderOccurrence } from './render-occurrences.ts';
+
+/**
+ * One row of a chain link's *What this usage passes* list, after
+ * indistinguishable slot insertions have been folded together.
+ *
+ * A page that drops 29 children into its layout passes 29 default slot runs,
+ * and rendered one per row they say nothing a reader can act on while pushing
+ * the rows that do — a named slot, a prop — off the panel (issue #74). The
+ * fold is a property of the values, not of the markup that draws them, so it
+ * lives here with the other pure model code.
+ */
+export type PassedRow =
+  | { kind: 'prop'; prop: UsageProp }
+  | { kind: 'slot'; slot: UsageSlot }
+  /** A run of slots that render identically: same name, same verdict. */
+  | { kind: 'slots'; name: string; verdict: UsageSlot['verdict']; count: number };
+
+/**
+ * Props first, then slots with identical rows folded.
+ *
+ * Two rules keep the fold honest:
+ *
+ * - **An `editable` slot is never folded.** It is a write target with its own
+ *   byte range, and folding two of them would hide a value the panel exists to
+ *   offer. Only a row that can do nothing but repeat collapses.
+ * - **A fold keeps its run's first position.** The list is in source order, and
+ *   a summary that jumped to the end would misplace it against the props
+ *   around it.
+ *
+ * `name` is kept rather than flattened to `default`, so the caller owns the
+ * wording and a repeated *named* slot folds without losing what it is called.
+ */
+export function passedRows(link: {
+  props: readonly UsageProp[];
+  slots: readonly UsageSlot[];
+}): PassedRow[] {
+  const rows: PassedRow[] = link.props.map(prop => ({ kind: 'prop', prop }));
+  const folded = new Map<string, Extract<PassedRow, { kind: 'slots' }>>();
+  for (const slot of link.slots) {
+    if (slot.verdict === 'editable') { rows.push({ kind: 'slot', slot }); continue; }
+    // A refusal's `reason` is not rendered, so two rows differing only there
+    // are indistinguishable to the reader and fold together.
+    const key = JSON.stringify([slot.name, slot.verdict]);
+    const seen = folded.get(key);
+    if (seen) { seen.count++; continue; }
+    const row: Extract<PassedRow, { kind: 'slots' }> =
+      { kind: 'slots', name: slot.name, verdict: slot.verdict, count: 1 };
+    folded.set(key, row);
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** The sentence a {@link PassedRow} shows. Pure, so the wording is pinned by a
+ *  test rather than read off a rendered panel. */
+export function passedLabel(row: PassedRow): string {
+  if (row.kind === 'prop') return `${row.prop.name} · ${row.prop.kind} · ${row.prop.verdict}`;
+  if (row.kind === 'slot') return `slot ${row.slot.name || 'default'} · ${row.slot.verdict}`;
+  const name = row.name || 'default';
+  return row.count === 1
+    ? `slot ${name} · ${row.verdict}`
+    : `${row.count} ${name} slot insertions · ${row.verdict}`;
+}
 
 /** Render groups are insertion identities, never records or write targets. */
 export function occurrenceSummary(

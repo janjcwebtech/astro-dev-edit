@@ -7,7 +7,7 @@ import { buildImagePicker } from './editors/image.ts';
 import { has } from './features.ts';
 import { icon, type IconName } from './icons.ts';
 import { card, item, itemGroup } from './group.ts';
-import { createInspectorLoader, occurrenceSummary } from './inspector-model.ts';
+import { createInspectorLoader, occurrenceSummary, passedLabel, passedRows } from './inspector-model.ts';
 import { nearestOwnSource, sourceFor } from './source-map.ts';
 import type { StagedValues } from './staged-values.ts';
 import { basename, footButton, inputEl, isolateScroll, setButtonEnabled, styled, toast } from './ui.ts';
@@ -237,18 +237,16 @@ export function initInspector(deps: InspectorDeps) {
    *  the look and which holds the words; the values themselves are Values
    *  rows, so this row names its usage site rather than re-listing them. */
   function usage(parent: HTMLElement, link: UsageLink, selectionFile: string | null, depth = 0) {
-    const values = [...link.props, ...link.slots];
+    const passed = link.props.length + link.slots.length;
     let extra: HTMLElement | undefined;
-    if (values.length) {
+    if (passed) {
       extra = styled('details', 'atx-inspector-details');
       const summary = styled('summary', '');
-      summary.textContent = `What this usage passes · ${values.length}`;
+      // The count is the true number of values passed; the rows below it fold
+      // indistinguishable slot runs, so the two legitimately differ.
+      summary.textContent = `What this usage passes · ${passed}`;
       extra.append(summary);
-      for (const value of values) {
-        note(extra, 'name' in value && 'kind' in value
-          ? `${value.name} · ${value.kind} · ${value.verdict}`
-          : `slot ${value.name || 'default'} · ${value.verdict}`);
-      }
+      for (const row of passedRows(link)) note(extra, passedLabel(row));
     }
     return chainRow(parent, {
       depth, id: link.id, glyph: 'component', name: link.name,

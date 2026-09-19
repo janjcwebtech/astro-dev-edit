@@ -1,0 +1,27 @@
+---
+import Swap from '../../layouts/Swap.astro';
+---
+<Swap title="Swap A · Copydesk">
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Client-side navigation</p>
+      <h1>Swap page A</h1>
+      <p class="lead" style="max-width:60ch;">
+        This page and its partner are rendered under Astro's view-transitions
+        router, so the link below replaces the document body instead of loading
+        a new one. The overlay has to survive that: before issue #77 it left
+        with the outgoing body and never came back.
+      </p>
+      <p>
+        Edit this paragraph, then navigate and come back — the words are a
+        literal in <code>src/pages/swap/a.astro</code>, so they are editable on
+        arrival exactly as they are on a cold load.
+      </p>
+      <p><a href="/swap/b">Go to swap page B →</a></p>
+      <p>
+        <a href="/swap/b" data-astro-reload>Go to B with a full reload</a> —
+        the control: this one boots the overlay the old way.
+      </p>
+    </div>
+  </section>
+</Swap>

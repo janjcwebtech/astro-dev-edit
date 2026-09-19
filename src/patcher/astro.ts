@@ -7,6 +7,7 @@ import {
   hasCandidates,
   type LiteralSpan,
   locateValue,
+  propBinding,
   traceExpression,
 } from './expression-trace.ts';
 
@@ -518,6 +519,22 @@ function classifyResolved(
         kind: 'expression',
         reason: 'traced to a frontmatter string',
         expression: { property: trace.property, label: trace.label },
+      };
+    }
+    // The trace resolved but this file holds no literal for it. When the name
+    // it reads from is a prop, that is not a failure to understand the
+    // expression — the words are simply in the caller's frontmatter, one file
+    // away (issue #61). Say which prop rather than calling copy "code": the
+    // flat refusal reads as a category error over a plain string the tool
+    // would happily edit if it were declared here.
+    const root = trace && (trace.array ?? trace.property);
+    const prop = root && res?.frontmatter ? propBinding(res.frontmatter.text, root) : null;
+    if (trace && root && prop) {
+      return {
+        kind: 'dynamic',
+        reason:
+          `These words arrive as the “${prop}” prop, so they are written where this component is used — not in this file.`,
+        prop: { name: prop, local: root, label: trace.label },
       };
     }
     return {

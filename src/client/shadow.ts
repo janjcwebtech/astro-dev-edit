@@ -29,8 +29,45 @@ const HOST_TAG = 'astro-dev-edit';
 let host: HTMLElement | null = null;
 let root: ShadowRoot | null = null;
 
+/**
+ * Whether a host that already exists has fallen out of the document.
+ *
+ * `<ClientRouter />` replaces `document.body` wholesale on a navigation,
+ * keeping only nodes marked `transition:persist`. The host is created by
+ * client JS *after* render, so it carries no such mark and leaves with the
+ * outgoing body — while `root` stays non-null, so every later `mount()` goes
+ * on appending chrome to a tree that is not in the document. No error, no UI
+ * (issue #77).
+ *
+ * Exported and pure because it is the whole decision, and there is no jsdom in
+ * this suite to pin the DOM half. A host that was never created is not
+ * detached — there is nothing to put back, and `ensure()` builds one instead.
+ */
+export function isDetached(
+  candidate: { isConnected: boolean } | null,
+  attached: object | null,
+): boolean {
+  return attached !== null && candidate !== null && !candidate.isConnected;
+}
+
+/**
+ * Put the host back in the current document if a swap took it away.
+ *
+ * The shadow root and its adopted stylesheet live on the host, not on the
+ * body, so re-appending the *same* host restores every panel, bar, outline and
+ * toast already inside it — nothing is rebuilt and no state is lost. Returns
+ * whether it had to act, so a caller can tell a re-attach from a cold page.
+ */
+export function reattachOverlay(): boolean {
+  if (!isDetached(host, root)) return false;
+  document.body.append(host as HTMLElement);
+  return true;
+}
+
 function ensure(): ShadowRoot {
-  if (root) return root;
+  // A swap may have happened since the last call; anything reaching for the
+  // root now expects it to be live.
+  if (root) { reattachOverlay(); return root; }
   host = document.createElement(HOST_TAG);
   // `display: contents` (set in overlayCss) means the host generates no box at
   // all, so it cannot shift the page's layout by so much as a line box, and

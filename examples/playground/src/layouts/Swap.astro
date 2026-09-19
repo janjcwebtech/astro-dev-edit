@@ -1,0 +1,40 @@
+---
+/**
+ * The `<ClientRouter />` fixture layout — issue #77.
+ *
+ * Deliberately NOT `Base.astro`. A view-transitions router changes how every
+ * page on the site arrives, so switching it on globally would silently rewrite
+ * every other manual check in `internal-documentation/VERIFICATION.md`. The two
+ * pages under `/swap` are the only ones that navigate this way, which is what
+ * makes "the overlay survived a swap" a thing you can prove rather than
+ * something you hope the rest of the playground still shows.
+ *
+ * Dev-only, like the tool itself: a built playground has no use for it.
+ */
+import { ClientRouter } from 'astro:transitions';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles/global.css" />
+    <title>{title}</title>
+    <ClientRouter />
+  </head>
+  <body>
+    <Nav />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

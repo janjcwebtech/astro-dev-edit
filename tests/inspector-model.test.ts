@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ClassifyResult, CompositionLookupResponse, CompositionUsesResponse } from '../src/shared/protocol.ts';
-import { createInspectorLoader, occurrenceSummary } from '../src/client/inspector-model.ts';
+import { createInspectorLoader, occurrenceSummary, passedLabel, passedRows } from '../src/client/inspector-model.ts';
+import type { UsageProp, UsageSlot } from '../src/shared/protocol.ts';
 import { chainOrdinals, type TraceEvent } from '../src/client/render-occurrences.ts';
 
 const coverage = { complete: true, files: 2, revision: 1, issues: [] };
@@ -25,6 +26,67 @@ describe('inspector render identity', () => {
   it('never groups replayed HTML or a missing occurrence', () => {
     expect(occurrenceSummary({ key: 0, instance: 'a', group: null, slots: [], ordinal: 0, reason: 'untracked-html' }, [])).toBeNull();
     expect(occurrenceSummary({ key: 0, instance: 'a', group: 'a', slots: [], ordinal: 1 }, [])).toBeNull();
+  });
+});
+
+/**
+ * A layout link used to render one row per slot insertion, so a page with 29
+ * children buried its props under 29 identical lines (#74).
+ */
+describe('what a usage passes', () => {
+  const slot = (name: string, write: Partial<UsageSlot> = {}): UsageSlot =>
+    ({ name, start: 0, end: 1, source: 'x', verdict: 'read-only', reason: 'markup', ...write } as UsageSlot);
+  const prop = (name: string): UsageProp =>
+    ({ name, kind: 'quoted', source: '"x"', verdict: 'editable', value: 'x' } as UsageProp);
+  const labels = (link: { props: UsageProp[]; slots: UsageSlot[] }) => passedRows(link).map(passedLabel);
+
+  it('folds a run of identical default slots into one counted row', () => {
+    const link = { props: [prop('title')], slots: Array.from({ length: 29 }, () => slot('')) };
+    expect(labels(link)).toEqual([
+      'title · quoted · editable',
+      '29 default slot insertions · read-only',
+    ]);
+  });
+
+  it('keeps a lone slot reading exactly as it did before the fold', () => {
+    expect(labels({ props: [], slots: [slot('')] })).toEqual(['slot default · read-only']);
+    expect(labels({ props: [], slots: [slot('footer')] })).toEqual(['slot footer · read-only']);
+  });
+
+  it('folds by name and verdict, so distinguishable rows survive', () => {
+    const link = { props: [], slots: [
+      slot(''), slot(''), slot('footer'), slot('', { verdict: 'elsewhere', reason: 'imported', from: '/x.astro' }),
+    ] };
+    expect(labels(link)).toEqual([
+      '2 default slot insertions · read-only',
+      'slot footer · read-only',
+      'slot default · elsewhere',
+    ]);
+  });
+
+  it('folds two refusals that differ only in a reason the panel never shows', () => {
+    const link = { props: [], slots: [slot('', { reason: 'markup' }), slot('', { reason: 'empty' })] };
+    expect(labels(link)).toEqual(['2 default slot insertions · read-only']);
+  });
+
+  it('never folds an editable slot — each one is its own write target', () => {
+    const editable = slot('', { verdict: 'editable', reason: undefined, value: 'Hello' });
+    expect(labels({ props: [], slots: [editable, editable, slot('')] })).toEqual([
+      'slot default · editable',
+      'slot default · editable',
+      'slot default · read-only',
+    ]);
+  });
+
+  it('keeps source order, so a fold sits where its run began', () => {
+    const link = { props: [], slots: [
+      slot('header'), slot(''), slot(''), slot('footer'), slot(''),
+    ] };
+    expect(labels(link)).toEqual([
+      'slot header · read-only',
+      '3 default slot insertions · read-only',
+      'slot footer · read-only',
+    ]);
   });
 });
 
