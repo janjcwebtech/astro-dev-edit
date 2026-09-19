@@ -1,9 +1,9 @@
 # Component tracing proof
 
-The `feat/editor-inspector` branch contains opt-in dev-only tracing and a
-[read-only API](COMPOSITION-API.md). The CMS-capable baseline remains at the annotated tag
-`cms-snapshot-2026-09-15` (`7be47b5`). The public integration exposes its existing editing UI; `composition: true`
-enables the stronger tracing and API. The committed fixture uses this option.
+Component tracing is opt-in and dev-only. Without it the integration runs its
+editing UI; `composition: true` enables the stronger tracing, the source
+inspector and a [read-only API](COMPOSITION-API.md). This page is the evidence
+for that mechanism, run against the committed fixture, which sets the option.
 
 ## Run it
 
@@ -15,7 +15,7 @@ npm test
 
 Visit `/advanced` for repeated components, forwarding, recursion and slots;
 `/cached` demonstrates the explicit refusal for replayed HTML. The default route
-contains the original nested component fixture.
+holds the nested component fixture.
 
 The render tests select the compiler matching the installed Astro peer. To also
 exercise an existing Astro 5/6 installation while the repository uses Astro 7:
@@ -150,10 +150,9 @@ map back to the original file. Astro's first legacy loc can be shifted on Go;
   a parity check when client code can remove both halves of a boundary.
 - The tracing API discovers the graph reachable from a requested route, not
   every caller in the repository. Its completeness and freshness rules are in
-  [the API contract](COMPOSITION-API.md). The read-only inspector consumes it;
-  the staged-value store and prop and HTML-string writes are a separate layer
-  and are not implemented.
+  [the API contract](COMPOSITION-API.md). The inspector consumes it; staged
+  edits, prop writes and HTML-string writes are not part of the API.
 
-The stronger mechanism resolves the original spread and multi-root limitations
-within the tested Astro scope. It provides concrete instance and slot-placement
-data to the inspector, with explicit refusals at the remaining boundaries.
+Within the tested Astro scope the mechanism handles spread props and multi-root
+components. It gives the inspector concrete instance and slot-placement data,
+with explicit refusals at the remaining boundaries.

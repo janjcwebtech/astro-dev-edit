@@ -287,7 +287,7 @@ Tab cycles through its own controls and wraps, the page behind it and the bar
 above it are out of reach, Escape closes it, and focus returns to whatever you
 were on when it opened. Each announces itself as a dialog, named by its title.
 
-![The Settings drawer with General, Editing and Media tabs, showing controls for integration enabled, source annotations, content roots and editable extensions](images/settings.png)
+![The Settings drawer with General, Editing and Media tabs, showing the Component tracing and Integration enabled controls, each locked with a note that it is read before the dev server starts](images/settings.png)
 
 ## Element tree
 
