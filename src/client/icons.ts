@@ -42,6 +42,11 @@ export type IconName =
   | "link"
   | "chevronRight"
   | "chevronDown"
+  | "component"
+  | "info"
+  | "doc"
+  | "node"
+  | "slotIn"
   | "copy"
   | "code"
   | "external"
@@ -99,6 +104,26 @@ const PATHS: Record<IconName, string> = {
   link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
   chevronRight: '<path d="m9 18 6-6-6-6"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  // component: the tree's "a new component starts here" mark — Figma's
+  // component glyph, four rhombi meeting at the centre. Not from Lucide, and
+  // filled rather than stroked: it is the mark the wireframe specifies, lifted
+  // from it and scaled off its 12-box onto this file's 24 one. The path
+  // overrides the wrapper's stroke, which would otherwise fatten four small
+  // shapes into a smudge at the 13px a row draws them at.
+  component:
+    '<path fill="currentColor" stroke="none" d="M12 .7 16.6 5.3 12 9.9 7.4 5.3Z M18.7 7.4 23.3 12 18.7 16.6 14.1 12Z M12 14.1 16.6 18.7 12 23.3 7.4 18.7Z M5.3 7.4 9.9 12 5.3 16.6 .7 12Z"/>',
+  // info: the affordance a card's caveat hangs off. Lucide `info`.
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  // doc / node: the chain's other two row kinds, from the same wireframe as
+  // `component` and scaled off its 12-box the same way — a plain document for
+  // the route entry and a rounded square for the element the chain ends at.
+  // Lucide's `file` is file-text, whose three body lines read as noise beside
+  // a component glyph at 13px.
+  doc: '<path d="M5.2 2.2h8.2l6.6 6.6v13H5.2Z"/><path d="M13.2 2.4v6.6h6.6"/>',
+  node: '<rect x="2.8" y="2.8" width="18.4" height="18.4" rx="4.4"/>',
+  // corner-down-right: content that arrived from somewhere else — a slot, or a
+  // markdown body rendered into one.
+  slotIn: '<path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
   copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   // code-xml — the slash is what reads as *source*, not as a pair of brackets.
   code: '<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>',

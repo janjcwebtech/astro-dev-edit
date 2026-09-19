@@ -1,3 +1,5 @@
+import { icon } from './icons.ts';
+import { explains } from './tip.ts';
 import { styled } from './ui.ts';
 
 /**
@@ -26,7 +28,15 @@ import { styled } from './ui.ts';
 export interface CardHeadOptions {
   /** The concern's name. 16px/500 — the only thing at that size in a drawer. */
   title: string;
-  /** One line under it, in muted ink. Where a file path or a caveat goes. */
+  /**
+   * The caveat, the caution, the sentence about what the card can and cannot
+   * prove. It is **not** a second line under the title: it hangs off an info
+   * icon beside it, shown on hover.
+   *
+   * A card's title says what the card is, and that is what a reader scanning a
+   * panel needs. The sentence under it was two lines of prose above every
+   * card, read once and then permanently in the way.
+   */
   description?: string;
   /**
    * The action *this* card offers, pinned to the header's top-right corner —
@@ -48,12 +58,36 @@ export interface Card {
   foot(): HTMLElement;
 }
 
-/** A bounded concern: header, body, and a footer band if one is asked for. */
+/**
+ * A bounded concern: header, body, and a footer band if one is asked for.
+ *
+ * The header is a band with a rule under it and a chevron on it: a panel is a
+ * stack of these, and a reader who has answered one card wants it out of the
+ * way rather than scrolled past. Collapse is view state only — the body keeps
+ * its content and its listeners, so nothing has to be rebuilt to reopen it.
+ */
 export function card(head?: CardHeadOptions): Card {
   const root = styled('div', 'atx-card');
-  if (head) root.append(cardHead(head));
 
   const body = styled('div', 'atx-card-body');
+  if (head) {
+    const bar = cardHead(head);
+    root.dataset.open = 'true';
+    const toggle = styled('button', 'atx-card-toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('aria-label', `Collapse ${head.title}`);
+    toggle.append(icon('chevronDown', 13));
+    toggle.addEventListener('click', () => {
+      const open = root.dataset.open !== 'true';
+      root.dataset.open = String(open);
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} ${head.title}`);
+    });
+    // The chevron leads the row, so the column of them reads down the panel.
+    bar.prepend(toggle);
+    root.append(bar);
+  }
   root.append(body);
 
   let footEl: HTMLElement | null = null;
@@ -84,13 +118,16 @@ export function cardHead(o: CardHeadOptions): HTMLElement {
 
   const title = styled('div', 'atx-card-title');
   title.textContent = o.title;
-  root.append(title);
-
   if (o.description) {
-    const desc = styled('div', 'atx-card-desc');
-    desc.textContent = o.description;
-    root.append(desc);
+    const info = styled('span', 'atx-card-info');
+    info.tabIndex = 0;
+    info.setAttribute('role', 'note');
+    info.setAttribute('aria-label', o.description);
+    info.append(icon('info', 14));
+    explains(info, o.description);
+    title.append(info);
   }
+  root.append(title);
   if (o.action) {
     const slot = styled('div', 'atx-card-action');
     slot.append(o.action);

@@ -3,6 +3,7 @@ import { icon } from './icons.ts';
 import { isOwnUi } from './shadow.ts';
 import { annotatedElements, pathFor, sourceFor } from './source-map.ts';
 import { type TreeNode, buildTreeModel } from './tree-model.ts';
+import { tip } from './tip.ts';
 import { basename, isolateScroll, onChromeInset, outlineRect, styled } from './ui.ts';
 
 /**
@@ -32,6 +33,23 @@ import { basename, isolateScroll, onChromeInset, outlineRect, styled } from './u
 
 // --- View --------------------------------------------------------------------
 
+/**
+ * The leading mark on a row, and the words that go with it.
+ *
+ * The tree itself proves nothing about composition — it nests annotated
+ * elements by DOM ancestry and no more — so the *kind* is decided by whoever
+ * owns that evidence (inspector-app, from the render-occurrence trace) and
+ * arrives here already judged. The two kinds are the two the legend names.
+ */
+export interface TreeMark {
+  kind: 'component' | 'slot';
+  /** Shown after the tag — only what the loc column does not already say.
+   *  Null for a plain component root, whose file the loc names in full. */
+  note: string | null;
+  /** The mark's tooltip, which always spells the whole claim out. */
+  title: string;
+}
+
 export interface TreeDeps {
   /** Inspector mode keeps selection after releasing the interception key. */
   readOnly?: boolean;
@@ -41,8 +59,11 @@ export interface TreeDeps {
    *  of controls rather than a second place to put content. */
   titleActions?: readonly HTMLElement[];
   onSelect?(el: HTMLElement): void;
-  describe?(el: HTMLElement): string | null;
+  describe?(el: HTMLElement): TreeMark | null;
   header?: HTMLElement;
+  /** A strip pinned under the scroll body — the legend for whatever
+   *  {@link describe} marks rows with. Omitted when nothing marks them. */
+  footer?: HTMLElement;
   isEditMode(): boolean;
   /** Drive the hover outline + verdict pill for a row (tree → page). */
   highlight(el: HTMLElement): void;
@@ -111,10 +132,14 @@ export function initTree(deps: TreeDeps): TreeHandle {
 
   const body = styled('div', 'atx-tree-body');
   isolateScroll(body);
+  // Scrolling moves every row out from under the pointer, so whatever the
+  // tooltip was naming is no longer where it is pointing.
+  body.addEventListener('scroll', () => tip.hide(), { passive: true });
 
   root.append(bar);
   if (deps.header) root.append(deps.header);
   root.append(body);
+  if (deps.footer) root.append(deps.footer);
 
   // Keep clear of the admin bar, whichever edge it is docked to. Fires once on
   // subscribe, so the panel is correct however the two modules boot.
@@ -273,13 +298,21 @@ export function initTree(deps: TreeDeps): TreeHandle {
     const tag = styled('span', 'atx-tree-tag');
     tag.textContent = `<${el.tagName.toLowerCase()}>`;
 
-    row.append(chevron, tag);
-    const description = deps.describe?.(el);
-    if (description) {
-      const boundary = styled('span', 'atx-tree-preview');
-      boundary.textContent = description;
-      boundary.title = description;
-      row.append(boundary);
+    row.append(chevron);
+    // The mark sits between the chevron and the tag, so the glyph column reads
+    // straight down the tree the way the indent does.
+    const described = deps.describe?.(el);
+    if (described) {
+      const mark = styled('span', 'atx-tree-mark');
+      mark.dataset.kind = described.kind;
+      mark.append(icon(described.kind === 'component' ? 'component' : 'slotIn', 13));
+      row.append(mark);
+    }
+    row.append(tag);
+    if (described?.note) {
+      const note = styled('span', 'atx-tree-preview');
+      note.textContent = described.note;
+      row.append(note);
     }
 
     // A short text preview for leaf text elements aids scanning.
@@ -292,24 +325,46 @@ export function initTree(deps: TreeDeps): TreeHandle {
       }
     }
 
-    // The loc doubles as an editor jump: clicking it opens the file at this line
-    // in the user's editor (the same /open the hover pill's "open ↗" uses), so it
-    // stops the click from also selecting the row.
-    const loc = styled('span', 'atx-tree-loc');
-    loc.textContent = source.loc || '?';
-    loc.title = `Open ${basename(source.file)}:${source.loc} in your editor`;
+    // The code button doubles as an editor jump: it opens the file at this line
+    // (the same /open the hover pill's "open ↗" uses), so it stops the click
+    // from also selecting the row.
+    // A tree crosses component files every few rows, so a bare `9:28` cannot
+    // say which file it counts in — and the file:line that could is wider than
+    // the tag and the indent together. So the row carries one fixed-width code
+    // button and says where it is in its title, which nothing truncates.
+    const where = `${basename(source.file)}:${source.loc || '?'}`;
+    const loc = styled('button', 'atx-tree-loc');
+    loc.type = 'button';
+    loc.append(icon('code', 14));
+    loc.setAttribute('aria-label', `View code for ${where}`);
     loc.addEventListener('click', (e) => {
       e.stopPropagation();
+      tip.hide();
       deps.openSource(source);
     });
+    // The button says what clicking it does; the row says where the element
+    // is. Both go through the panel's own tooltip, so hovering from one to
+    // the other swaps the words without the tooltip flickering out.
+    loc.addEventListener('mouseenter', () => tip.show(loc, 'View code', where));
+    // Back onto the row proper: the row's own mouseenter never fired, because
+    // the pointer never left it.
+    loc.addEventListener('mouseleave', () => tip.show(row, where, described?.title ?? null));
     row.append(loc);
 
     row.addEventListener('mouseenter', () => {
       if (deps.isEditMode()) deps.highlight(el);
+      tip.show(row, where, described?.title ?? null);
     });
-    row.addEventListener('mouseleave', () => deps.clearHighlight());
+    // Moving onto the code button leaves the row in the eyes of `mouseenter`
+    // but not of `mouseleave`, which does not fire for a descendant — so the
+    // button's own enter is what re-points the tooltip, and this only runs
+    // when the pointer has genuinely left the row.
+    row.addEventListener('mouseleave', () => {
+      deps.clearHighlight();
+      tip.hide();
+    });
     row.tabIndex = 0;
-    const activate = () => { select(el); deps.onSelect?.(el); };
+    const activate = () => { tip.hide(); select(el); deps.onSelect?.(el); };
     row.addEventListener('click', activate);
     row.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
@@ -331,6 +386,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
   }
 
   function renderRows(): void {
+    tip.hide();
     rowFor.clear();
     body.replaceChildren();
     if (model.length === 0) {
@@ -364,6 +420,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
   }
 
   function hide(): void {
+    tip.hide();
     root.toggleAttribute('data-on', false);
     // The tab only makes sense while editing — outside edit mode the tree has
     // nothing live to point at, and the bar's Elements button reopens both.

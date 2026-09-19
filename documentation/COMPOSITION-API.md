@@ -29,18 +29,37 @@ mounts no toolbar:
   route, its template, a declared backing content file, annotated-element
   counts and the components resolved on this route, as markdown — and
   **Re-scan the page**, which re-reads annotations and rebuilds the tree.
-- **Route row:** the current path, the file the route is written in, and a
-  **View code** button opening that file. The route source is resolved once per
-  page; until it resolves the row reads `route source unresolved`.
+- **Route row:** the current path, the project-relative path of the file the
+  route is written in, and a **View code** button opening that file. The route
+  source is resolved once per page; until it resolves the row reads
+  `route source unresolved`.
+- **Tree rows:** each row is its tag, a `</>` opening that file at that line,
+  and a tooltip above the row naming the file, line and column. A row where the tree crosses
+  into another file carries a mark, and only that row does — `❖` where a
+  component's own markup begins, an amber in-arrow where the content was
+  passed in through a `<slot />`, named alongside the slot and its receiving
+  file. A legend under the tree names both.
 
-The panel shows:
+Every card on it collapses from the chevron in its header. Its own two bands
+sit above them: a title bar naming the tool and the selected tag with the
+close, and a status row carrying the chain's tier, a **saved** or **N unsaved**
+chip once there is something to report, and **Copy context** — this element's selector, source
+loc, chain and applied CSS as one paste. A card's caveat is not a line under
+its title: it hangs off the ⓘ beside it, shown on hover.
 
+The panel shows, in this order:
+
+- **Component chain** first — see below. Where a value came from is what tells
+  you whether the values under it are the ones you meant.
 - **Values:** one row per value on the selection. The clicked
-  value is pinned first, marked *selected element*, and badged *via slot* when
-  slot markup wraps it; below it come the values each usage site passes,
-  nearest site first, with the rest folded behind *Further up the chain*. Every
-  row carries its verdict — `editable`, `elsewhere` or `read-only` — a plain
-  caption, the value as the source spells it, and **View code** on the file
+  value is pinned first — marked *selected element*, badged *via slot* when
+  slot markup wraps it, and ruled with a bar down its edge — followed by the
+  values the **nearest** usage site passes. Values handed down from further up
+  the chain are not listed: they belong to that component, and selecting it
+  shows them. Every
+  row carries its verdict — `editable`, `elsewhere` or `read-only` — at its
+  right edge, a plain caption, the value in a box whether or not it can be
+  typed into (a dashed one where it cannot), and **View code** on the file
   holding the words, named once. Mechanism vocabulary sits behind *Details*. A
   selection with no value at all collapses the card to *nothing writable on
   this selection* plus the reason and a jump to whatever source is known.
@@ -48,11 +67,16 @@ The panel shows:
   of a read-only value — see [Staged values and Save](EDITING.md#staged-values-and-save).
   A usage-site prop or slot value says so and offers **View code** only.
 - **Component chain:** a proven runtime chain, an explicitly inferred static
-  path, separate candidate paths, or a named refusal. Component rows offer
-  **View code** for the component and **Open parent** for its usage site, and
-  are badged *presentation* when the usage renders the selected element's own
-  file and *content* when it supplies any writable value. Usage details name
-  each prop and slot with its verdict; the values themselves are Values rows.
+  path, separate candidate paths, or a named refusal — the status row says
+  which in one word (*proven chain*, *one link inferred*, *no chain*) and the
+  reason sits at the top of the card. Drawn as a tree, indented by depth: the
+  route entry, then a level per component, then the element the chain ends at,
+  with a rule where the rows stop. A component row is badged *presentation*
+  when the usage renders the selected element's own file and *content* when it
+  supplies any writable value. **Selecting a row** — clicking it, or arriving
+  from a breadcrumb — reveals **View code** for the component, **Open parent**
+  for its usage site, and the props and slots that usage passes with their
+  verdicts; the values themselves are Values rows.
 - **Slot relationships:** all enclosing native-slot insertion boundaries,
   including forwarded slots and fallback content, with links to the receiving
   `<slot>` locations. The selected element's own source remains separate. An
@@ -69,10 +93,14 @@ it and the first annotated element inside identifies where the words were
 written, so Values refuses with both named, *View code* is offered on each, and
 the slot row says which `<slot />` is wrapped. Selecting an element inside gives
 the full chain, unchanged.
-- **CSS:** inline declarations, computed values and readable matched selectors
-  in stylesheet order. Conditional matches may be inactive, and inaccessible
-  cross-origin sheets are omitted. Available stylesheet sources offer an
-  **Open in editor** jump; selector location is best-effort.
+- **CSS:** inline declarations, readable matched selectors in stylesheet order,
+  and computed values behind a disclosure. Each rule is shown as source — the
+  same syntax-tinted block the hover pill's class chips pop — with the file it
+  came from on a band underneath, offering an **Open in editor** jump where the
+  source is available (selector location is best-effort). Chips above the list
+  filter it to one of the element's classes; they never reorder it, because
+  among equal specificity the cascade *is* document order. Conditional matches
+  may be inactive, and inaccessible cross-origin sheets are omitted.
 
 A component chain row can also be reached from the hover pill's breadcrumb
 (below): the segment marks its chain row and scrolls to it, and never replaces
@@ -86,7 +114,9 @@ branches, rather than runtime instances.
 
 Generated HTML descendants never acquire a chain from copied annotations or
 their container. Malformed render/slot metadata is refused. Incomplete graph
-coverage is displayed separately from a proven chain. Source changes during
+coverage is reported on the wire but no longer shown in the panel: a file the
+walker could not follow is rarely the reason the chain in front of you is
+wrong, and the list read as a defect report for the site. Source changes during
 discovery are retried once; rapid selection changes and closed panels discard
 late responses. Navigation, HMR and removal of the selected DOM node clear the
 selection, so render identities are not carried onto a replacement page.

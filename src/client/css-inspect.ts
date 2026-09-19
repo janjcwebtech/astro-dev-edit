@@ -295,7 +295,16 @@ function renderDeclarations(pre: HTMLElement, declarations: string): void {
   });
 }
 
-function ruleBlock(
+/**
+ * One matched rule as source: the selector, its declarations syntax-tinted by
+ * the tokenizer above, and the file it came from on a foot band.
+ *
+ * Exported because the hover pill's rules card and the inspector's CSS group
+ * are the same thing shown in two places — `selector` is the fragment the
+ * open jump is made with, which for an element-wide list is the rule's own
+ * selector and for a class chip is that chip.
+ */
+export function buildRuleBlock(
   rule: MatchedRule,
   selector: string,
   openRule: (file: string, selector: string) => void,
@@ -340,6 +349,6 @@ export function buildRulesCard(
     card.append(empty);
     return card;
   }
-  for (const rule of rules) card.append(ruleBlock(rule, selector, openRule));
+  for (const rule of rules) card.append(buildRuleBlock(rule, selector, openRule));
   return card;
 }

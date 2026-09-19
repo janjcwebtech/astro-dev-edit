@@ -34,6 +34,7 @@ import { cacheSourceMappings, sourceFor, startCapture } from './source-map.ts';
 import { initTree } from './tree.ts';
 import * as state from './state.ts';
 import { mount } from './shadow.ts';
+import { tip } from './tip.ts';
 import { basename, toast } from './ui.ts';
 
 // Begin capturing source annotations as early as possible. If the body isn't
@@ -417,6 +418,7 @@ async function boot(): Promise<void> {
   mount(
     ...hover.elements,
     tree.selectionOutline,
+    tip.root,
     tree.root,
     tree.tab,
     ...bar.elements,

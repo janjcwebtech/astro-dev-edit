@@ -31,7 +31,7 @@
  * with nothing in the terminal to point at this file.
  */
 
-import { BAR_CHIP, BAR_CHIP_HOVER, CHECKER, COLOR, FONT, RADIUS, Z, hexToRgba, lift } from './ui.ts';
+import { BAR_CHIP, BAR_CHIP_HOVER, CHECKER, COLOR, FONT, RADIUS, Z, Z_MODAL, hexToRgba, lift } from './ui.ts';
 
 const kebab = (k: string): string => k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
@@ -66,22 +66,36 @@ function chevronUrl(color: string): string {
 
 export function overlayCss(): string {
   return `
+/* The same ground as the element tree on the other edge: the page shows
+   faintly through the panel's own surface, while every card on it stays
+   opaque — a translucent card would put the page behind the words. */
 .atx-inspector {
   display: none; position: fixed; right: 8px; top: 8px; bottom: 8px;
   width: min(460px, calc(100vw - 16px)); z-index: ${Z + 4};
-  color: var(--atx-foreground); background: var(--atx-background);
+  color: var(--atx-foreground); background: rgba(0, 0, 0, 0.9);
   border: 1px solid var(--atx-border); border-radius: var(--atx-radius-xl);
   box-shadow: 0 8px 32px #0005; overflow: hidden;
 }
 .atx-inspector[data-on] { display: flex; flex-direction: column; }
-.atx-inspector-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--atx-border); }
-.atx-inspector-title { font: 500 14px var(--atx-font-ui); }
+/* Two bands. The title bar names the tool and the selection; the status row
+   under it carries the selection's own answers and the one action scoped to
+   it. Keeping them apart is what stops "which element" and "can I trust this"
+   reading as the same line. */
+.atx-inspector-header { display: flex; align-items: center; gap: 9px; padding: 11px 10px 11px 16px; border-bottom: 1px solid var(--atx-border); }
+.atx-inspector-title { flex: 0 0 auto; font: 600 12.5px var(--atx-font-ui); }
+.atx-inspector-tag { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--atx-font-mono); color: var(--atx-faint-fg); }
+.atx-inspector-status { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--atx-border); }
+.atx-inspector-status > .atx-btn { margin-left: auto; flex: 0 0 auto; }
+.atx-inspector-status > .atx-tier[hidden] { display: none; }
 .atx-inspector-body { overflow: auto; min-height: 0; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .atx-inspector-body > .atx-card { flex: 0 0 auto; }
 .atx-inspector .atx-item { flex-wrap: wrap; }
 .atx-inspector .atx-item-content { min-width: 0; flex-basis: 180px; }
 .atx-inspector .atx-item-title { overflow-wrap: anywhere; }
-.atx-inspector-code { font: 12px/1.6 var(--atx-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; max-height: 220px; overflow: auto; }
+/* A value the panel can only show, never write, reads as source: chart3 is
+   the same ink the declaration tokenizer gives a number, and the peek gives
+   a literal. */
+.atx-inspector-code { font: 12px/1.6 var(--atx-font-mono); color: var(--atx-chart3); white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; max-height: 220px; overflow: auto; }
 .atx-inspector-note { font: 12px/1.5 var(--atx-font-ui); color: var(--atx-muted-fg); overflow-wrap: anywhere; margin: 8px 0; }
 .atx-inspector-details { font: 12px/1.5 var(--atx-font-ui); margin: 8px 0; }
 .atx-inspector-details > summary { cursor: pointer; color: var(--atx-muted-fg); }
@@ -90,6 +104,9 @@ export function overlayCss(): string {
    three times, and the mechanism vocabulary stays inside the Details
    disclosure the row already owns. */
 .atx-inspector .atx-item-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+/* A value's name is source, not prose — the same chart5 the declaration
+   tokenizer gives a CSS property, for the same reason. */
+.atx-value-name { font: 500 12px var(--atx-font-mono); color: var(--atx-chart5); overflow-wrap: anywhere; }
 .atx-value-chip { flex: 0 0 auto; border: 1px solid var(--atx-input); border-radius: var(--atx-radius-sm); padding: 1px 6px; font: 500 10.5px var(--atx-font-ui); color: var(--atx-muted-fg); text-transform: lowercase; }
 .atx-value-chip[data-chip="editable"] { border-color: var(--atx-success-text); color: var(--atx-success-text); }
 .atx-value-chip[data-chip="elsewhere"] { border-color: var(--atx-warning); color: var(--atx-warning); }
@@ -110,9 +127,48 @@ textarea.atx-value-input { min-height: 64px; resize: vertical; }
 .atx-value-pending { font: 700 10px var(--atx-font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--atx-warning); }
 .atx-value-error { font: 12px/1.5 var(--atx-font-ui); color: var(--atx-destructive); overflow-wrap: anywhere; margin: 7px 0 0; }
 .atx-value-error[hidden] { display: none; }
-.atx-value-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
-.atx-value-where { min-width: 0; font: 11px var(--atx-font-mono); color: var(--atx-faint-fg); overflow-wrap: anywhere; }
-.atx-inspector .atx-item[data-pinned] { border-left: 2px solid var(--atx-primary); }
+/* One line: the button, then the destination named once, right-aligned and
+   yielding first. The path must never push the button away from it. */
+.atx-value-foot { display: flex; align-items: center; flex-wrap: nowrap; gap: 10px; margin: 14px 0 0; }
+.atx-value-foot > .atx-btn { flex: 0 0 auto; }
+.atx-value-where { flex: 1 1 auto; min-width: 0; text-align: right; font: 10.5px var(--atx-font-mono); color: var(--atx-faint-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Values is a list of bands, not a stack of tiles: the hairline between rows
+   is .atx-item-group's, and each row gets the room to be three things — what
+   it is, what you type, where it goes — instead of one dense line. Rows hang
+   off the group, which is bled to the card's edges, so the vertical rhythm is
+   all this has to set. */
+/* Flush with the card's gutter, so the hairline between two rows is exactly
+   as wide as the content it separates. */
+.atx-inspector-values .atx-item {
+  align-items: flex-start;
+  padding: 15px 0 17px;
+}
+
+/* The row you clicked, marked without shouting: a bar, and nothing else. A
+   tinted ground behind a field made the one row you are most likely to type
+   into the one with the least contrast under the caret. */
+.atx-inspector .atx-item[data-pinned] {
+  border-left: 2px solid var(--atx-brand-text);
+  padding-left: 14px;
+}
+/* The verdict is the row's answer, so it sits at the right edge in one column
+   down the card rather than trailing whatever badges the row happens to have. */
+.atx-value-verdict { margin-left: auto; }
+/* Every value is a box. Dashed and unfilled where it cannot be typed into —
+   the border is what says which is which, so a read-only value never has to
+   be read twice to find out. */
+.atx-value-readonly {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border: 1px dashed var(--atx-border);
+  border-radius: var(--atx-radius-lg);
+  color: var(--atx-chart3);
+  font: 11.5px/1.6 var(--atx-font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow: auto;
+}
 .atx-inspector .atx-item[data-verdict] > .atx-item-content > .atx-inspector-code { margin-top: 6px; }
 /* The panel header's second row: which page the tool is pointed at, and the one
    door onto its source. The title bar above it carries the tool's own controls
@@ -124,10 +180,133 @@ textarea.atx-value-input { min-height: 64px; resize: vertical; }
 .atx-inspector-route-file { font: 10.5px var(--atx-font-mono); color: var(--atx-faint-fg); overflow-wrap: anywhere; }
 .atx-inspector-route-file[data-unresolved] { font-style: italic; }
 .atx-inspector-route > .atx-btn { flex: 0 0 auto; }
-.atx-inspector-tree-header > .atx-inspector-note { margin: 8px 0 0; }
+/* == Component chain ======================================================
+   The chain is a nesting, so it is drawn as one: depth as indent, an elbow
+   back to the row above, and the file's own glyph. Everything a row can *do*
+   stays folded until it is the selected row — a five-deep chain with two
+   buttons on every row is a wall, and the question the panel is answering is
+   "where did this come from", not "what can I open". */
+
+/* One word on whether the chain can be trusted, in the card's header. The
+   three tiers are three different answers, so they are three colours. */
+.atx-tier {
+  display: inline-flex; align-items: center; border-radius: var(--atx-radius-full);
+  padding: 4px 9px; font: 700 10px var(--atx-font-ui); letter-spacing: 0.06em;
+  text-transform: uppercase; white-space: nowrap;
+}
+.atx-tier[data-tier='proven'] { color: var(--atx-success-text); background: ${hexToRgba(COLOR.successText, 0.15)}; }
+.atx-tier[data-tier='inferred'] { color: var(--atx-warning); background: ${hexToRgba(COLOR.warning, 0.15)}; }
+.atx-tier[data-tier='candidates'],
+.atx-tier[data-tier='none'] { color: var(--atx-chart5); background: ${hexToRgba(COLOR.chart5, 0.15)}; }
+
+/* Full-bleed, because a row's indent is measured from the card's edge. Only
+   the rows are: a note or a disclosure among them keeps the body's gutter. */
+.atx-card-body.atx-chain { padding: 8px 0; }
+.atx-chain > :not(.atx-chain-row) { padding-left: 16px; padding-right: 16px; }
+
+.atx-chain-row {
+  position: relative; display: flex; align-items: flex-start; gap: 9px;
+  padding: 7px 16px 7px calc(16px + var(--atx-d) * 18px);
+}
+.atx-chain-row[data-usage] { cursor: pointer; }
+.atx-chain-row[data-usage]:hover { background: rgba(255, 255, 255, 0.05); }
+.atx-chain-row[data-focus] { background: ${hexToRgba(COLOR.brand, 0.2)}; }
+.atx-chain-row:focus-visible { outline: 1px solid var(--atx-ring); outline-offset: -2px; }
+/* The elbow into the row above. Drawn from the parent's indent, so it lands
+   under that row's glyph however deep the chain runs. */
+.atx-chain-row::before {
+  content: ''; position: absolute; top: 0; height: 17px; width: 9px;
+  left: calc(16px + (var(--atx-d) - 1) * 18px + 6px);
+  border-left: 1px solid var(--atx-accent); border-bottom: 1px solid var(--atx-accent);
+  border-bottom-left-radius: 5px;
+}
+.atx-chain-row[style*='--atx-d: 0']::before { display: none; }
+/* Where the tree stops. Whatever follows the last row — the usages list — is
+   a different kind of thing, and without this it reads as one more row that
+   happens to have no glyph. Inset to the content, never edge to edge: a rule
+   that reaches the card's rim reads as the end of the card. */
+.atx-chain-row + :not(.atx-chain-row) {
+  position: relative;
+  margin-top: 8px;
+  padding-top: 13px;
+}
+
+.atx-chain-row + :not(.atx-chain-row)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  border-top: 1px solid var(--atx-border);
+}
+
+.atx-chain-ic {
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 13px; height: 18px; color: var(--atx-brand-text);
+}
+.atx-chain-main { min-width: 0; flex: 1 1 auto; }
+.atx-chain-name {
+  color: var(--atx-brand-text); font: 700 12px/18px var(--atx-font-mono);
+  overflow-wrap: anywhere;
+}
+/* The element the chain ends at is not a component — it is the thing itself,
+   so it wears the panel's own ink rather than the component colour. */
+.atx-chain-row[data-kind='leaf'] > .atx-chain-ic { color: var(--atx-foreground); }
+.atx-chain-row[data-kind='leaf'] .atx-chain-name { color: var(--atx-foreground); font-weight: 600; }
+.atx-chain-row[data-kind='inferred'] > .atx-chain-ic,
+.atx-chain-row[data-kind='inferred'] .atx-chain-name { color: var(--atx-warning); }
+
+.atx-chain-sub {
+  margin-top: 1px; color: var(--atx-faint-fg); font: 10.5px var(--atx-font-mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Which question this component answers. Two roles, two hues, and a row can
+   carry both — the file that draws the markup is often not the one that wrote
+   the words, and that split is the whole point of the chain. */
+.atx-chain-role {
+  display: inline-flex; margin-left: 8px; border-radius: var(--atx-radius-full);
+  padding: 2px 7px; font: 700 9.5px var(--atx-font-ui); letter-spacing: 0.04em;
+  text-transform: uppercase; vertical-align: 1px;
+}
+.atx-chain-role[data-role='presentation'] { color: var(--atx-chart5); background: ${hexToRgba(COLOR.chart5, 0.16)}; }
+.atx-chain-role[data-role='content'] { color: var(--atx-chart2); background: ${hexToRgba(COLOR.chart2, 0.16)}; }
+
+.atx-chain-acts { display: none; gap: 7px; margin: 9px 0 2px; flex-wrap: wrap; }
+.atx-chain-row[data-focus] .atx-chain-acts { display: flex; }
+.atx-chain-acts > .atx-inspector-details { flex-basis: 100%; margin: 2px 0 0; }
+
+/* == CSS group ============================================================
+   The rule blocks are the hover pill's, shared through
+   css-inspect.ts::buildRuleBlock. Inside the panel they become bounded cards
+   with the source on a band of its own; the chips above them filter which
+   rules are listed. */
+.atx-rule-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.atx-rule-chip {
+  height: 26px; padding: 0 10px; border: 1px solid var(--atx-input);
+  border-radius: var(--atx-radius-sm); background: var(--atx-control-bg);
+  color: var(--atx-chart1); font: 11px var(--atx-font-mono); cursor: pointer;
+}
+.atx-rule-chip:hover { background: var(--atx-accent); }
+.atx-rule-chip[data-open='true'] { background: var(--atx-accent); border-color: var(--atx-brand); }
+
+.atx-rule-list { display: flex; flex-direction: column; gap: 10px; }
+.atx-inspector .atx-tooltip-rule {
+  padding: 0; border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-lg); overflow: hidden;
+}
+.atx-inspector .atx-tooltip-rule + .atx-tooltip-rule { padding: 0; border-top: 1px solid var(--atx-border); }
+.atx-inspector .atx-tooltip-rule-sel { padding: 10px 13px 0; font: 11px var(--atx-font-mono); color: var(--atx-chart1); }
+.atx-inspector .atx-tooltip-rule-decl { margin: 0; padding: 4px 13px 11px; font: 11px/1.7 var(--atx-font-mono); }
+.atx-inspector .atx-tooltip-rule-foot {
+  gap: 10px; padding: 6px 8px 6px 13px; border-top: 1px solid var(--atx-border);
+  background: var(--atx-control-bg);
+}
+.atx-inspector .atx-tooltip-rule-src { flex: 1 1 auto; min-width: 0; }
+
 /* The chain row a breadcrumb segment named. A ring, not a fill: the row keeps
    whatever it was already saying about itself. */
-.atx-inspector [data-usage][data-focus] { border-color: var(--atx-primary); box-shadow: 0 0 0 3px ${hexToRgba(COLOR.primary, 0.25)}; }
+.atx-inspector [data-usage][data-focus] { box-shadow: inset 2px 0 0 var(--atx-brand-text); }
 .atx-inspector-hover { display: none; position: fixed; pointer-events: none; border: 2px solid var(--atx-primary); box-sizing: border-box; z-index: ${Z}; }
 .atx-inspector-hover[data-on] { display: block; }
 /* The pill itself never takes the pointer — it sits over the page and must not
@@ -433,23 +612,104 @@ button {
 
 /* Horizontal padding lives on the header, the body and the footer rather
    than on the card, which is what lets the footer band and a full-bleed
-   list run edge to edge inside it. */
+   list run edge to edge inside it.
+
+   A band, not a floating line: the rule under it is what says where the card's
+   name stops and its content starts, and the chevron beside it is what makes a
+   stack of cards navigable rather than a single long scroll. */
 .atx-card-head {
   display: grid;
-  grid-template-columns: 1fr;
-  align-items: start;
-  gap: 2px 12px;
-  padding: 0 16px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 0 16px 14px;
+  border-bottom: 1px solid var(--atx-border);
 }
 
 .atx-card-head[data-action] {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
+}
+
+.atx-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  grid-row: 1 / span 2;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--atx-radius-sm);
+  background: transparent;
+  color: var(--atx-faint-fg);
+  cursor: pointer;
+}
+
+.atx-card-toggle:hover {
+  color: var(--atx-foreground);
+}
+
+/* Rotated rather than swapped, so the chevron animates and the icon table
+   keeps one glyph for one idea. */
+.atx-card[data-open='false'] > .atx-card-head > .atx-card-toggle > .atx-ico {
+  display: inline-flex;
+  transform: rotate(-90deg);
+}
+
+/* Collapsed: the head is the whole card, so its rule would be a line under
+   nothing. */
+.atx-card[data-open='false'] > .atx-card-head {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.atx-card[data-open='false'] > .atx-card-body,
+.atx-card[data-open='false'] > .atx-card-foot {
+  display: none;
+}
+
+/* The head's own bottom padding plus this gap is the whole of the space under
+   the rule; the card's 16px gap would double it. */
+.atx-card[data-open='true'] {
+  gap: 14px;
+}
+
+/* The body's first child brings its own top margin (a note, a paragraph); the
+   card's gap is already the space under the rule. */
+.atx-card-body > :first-child {
+  margin-top: 0;
+}
+
+/* Collapsed the head is the card, so it needs the bottom padding the card's
+   own shorthand leaves to the body. */
+.atx-card[data-open='false'] {
+  gap: 0;
+  padding-bottom: 16px;
 }
 
 .atx-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   min-width: 0;
   color: var(--atx-foreground);
   font: 500 16px/1.4 var(--atx-font-ui);
+}
+
+/* The card's caveat, folded onto an affordance. Quiet at rest — it is there
+   for the reader who wants it, not prose every reader has to step over. */
+.atx-card-info {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--atx-faint-fg);
+  cursor: help;
+}
+
+.atx-card-info:hover,
+.atx-card-info:focus-visible {
+  color: var(--atx-brand-text);
+  outline: none;
 }
 
 .atx-card-desc {
@@ -461,7 +721,7 @@ button {
 /* Spans both rows and pins to the top-right, so a card with a description and
    one without put their action in the same place. */
 .atx-card-action {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1 / span 2;
   align-self: start;
   justify-self: end;
@@ -1492,44 +1752,189 @@ input[type='checkbox'].atx-switch:disabled {
   cursor: default;
 }
 
+/* The leading mark: ❖ where a component's markup begins, an in-arrow where the
+   content was passed in through a slot. Colour carries the distinction as much
+   as the glyph does at 12px, and the legend under the body names both. */
+.atx-tree-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 12px;
+}
+
+.atx-tree-mark[data-kind='component'] {
+  color: var(--atx-brand-text);
+}
+
+.atx-tree-mark[data-kind='slot'] {
+  color: var(--atx-warning);
+}
+
+/* A selected row paints itself brand-solid, so a brand-coloured mark on it
+   would vanish; both kinds ride the row's own ink there instead. */
+.atx-tree-row[data-state='selected'] .atx-tree-mark {
+  color: inherit;
+}
+
 /* The tag is what the row *is*; the preview and the loc are what it happens to
    contain and where it happens to live. Full-strength ink on the tag against
    the row's muted default is what makes a long tree scannable by shape -- the
    angle brackets included, since they are what say "element" at a glance. */
 .atx-tree-tag {
-  flex: 0 0 auto;
+  /* Shrinkable only as a backstop: the note absorbs a cramped row first (see
+     its rule), and the tag gives way only once the note is down to nothing —
+     a very deep indent with no note to spend. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--atx-foreground);
   font-weight: 600;
 }
 
+/* The row's shock absorber: a cramped row gives up the note long before the
+   tag, and never the code button, which is fixed-width. Its full text is in
+   the row's own title, so an ellipsis here costs nothing.
+
+   The factor is 1e5, not 2, for a sub-pixel reason. Flex splits a shortfall
+   by shrink x basis, so a tag weighted 1 against a note weighted 999 still
+   loses ~0.02px of a 112px shortfall — enough to trip text-overflow and eat a
+   whole character off a row that had 80px of note still to give. 1e5 puts the
+   tag's share below the layout quantum, and once the note freezes at zero the
+   tag's own factor of 1 lets it absorb the rest in full (a sum below 1 would
+   see CSS Flexbox §9.7 distribute only that fraction, leaving the overflow to
+   run off the panel's clipped edge in silence). */
 .atx-tree-preview {
-  flex: 0 1 auto;
+  flex: 0 100000 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--atx-muted-fg);
 }
 
+/* Where the row was written, as one fixed-width button rather than a column of
+   text. A file:line reading Component.astro:15:40 is wider than the tag and
+   the indent together, and in a 320px panel it can only ever be shown
+   truncated — so the row says it in a tooltip and spends the width on the
+   markup instead. */
 .atx-tree-loc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
   margin-left: auto;
-  padding-left: 10px;
+  padding: 0;
+  border: none;
+  border-radius: var(--atx-radius-sm);
+  background: transparent;
   color: var(--atx-faint-fg);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  text-decoration: underline dotted transparent;
-  text-underline-offset: 2px;
   cursor: pointer;
 }
 
-.atx-tree-loc:hover {
+/* Faint at rest so a column of identical glyphs stays quiet, and lifted the
+   moment the row is under the pointer — which is when it is reachable. */
+.atx-tree-row:hover .atx-tree-loc {
+  color: var(--atx-muted-fg);
+}
+
+/* A brand tint, not --atx-accent: the row's own hover already paints accent
+   behind this button, so an accent surface here changed nothing at all. The
+   selector repeats .atx-tree-row for weight — the rule above it is one class
+   heavier and was winning the colour. */
+.atx-tree-row .atx-tree-loc:hover,
+.atx-tree-row .atx-tree-loc:focus-visible {
+  background: ${hexToRgba(COLOR.brand, 0.28)};
   color: var(--atx-brand-text);
-  text-decoration-color: var(--atx-brand-text);
+  outline: none;
+}
+
+/* On the brand-solid selected row the accent hover and the brand ink both
+   disappear; the button rides the row's own ink and lifts on hover instead. */
+.atx-tree-row[data-state='selected'] .atx-tree-loc {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.atx-tree-row[data-state='selected'] .atx-tree-loc:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+  opacity: 1;
 }
 
 .atx-tree-empty {
   padding: 14px;
   color: var(--atx-muted-fg);
   font: 400 13px var(--atx-font-ui);
+}
+
+/* The overlay's tooltip — one element, shared by the tree's rows and by every
+   info icon. The tool's own rather than the browser's title attribute: it
+   opens in ~130ms instead of a second, re-points instantly as the pointer
+   sweeps, and sits above its anchor so it never covers what is being moved
+   towards. See tip.ts. */
+.atx-tip {
+  position: fixed;
+  /* Above everything that can anchor one, modal drawers included — a settings
+     card's info icon lives inside one. At Z+4 it merely tied with the
+     inspector and lost on document order, popping behind the panel it sits
+     on. Nothing in the overlay may sit above this. */
+  z-index: ${Z_MODAL + 11};
+  display: none;
+  max-width: min(340px, calc(100vw - 16px));
+  padding: 6px 9px;
+  border: 1px solid var(--atx-border);
+  border-radius: var(--atx-radius-md);
+  background: var(--atx-card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.atx-tip[data-on] {
+  display: block;
+}
+
+.atx-tip-head {
+  color: var(--atx-foreground);
+  font: 500 11.5px var(--atx-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.atx-tip-note {
+  margin-top: 3px;
+  color: var(--atx-muted-fg);
+  font: 11px var(--atx-font-ui);
+  overflow-wrap: anywhere;
+}
+
+/* The legend for the row marks, pinned under the scroll body. Supplied by the
+   caller (inspector-app) because it is the caller that decides what a mark
+   means; a tree with no marks passes no footer and shows none. */
+.atx-tree-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--atx-border);
+  color: var(--atx-faint-fg);
+  font: 400 10.5px var(--atx-font-ui);
+}
+
+.atx-tree-legend-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.atx-tree-legend-key[data-kind='component'] > .atx-ico {
+  color: var(--atx-brand-text);
+}
+
+.atx-tree-legend-key[data-kind='slot'] > .atx-ico {
+  color: var(--atx-warning);
 }
 
 /* == Admin bar =============================================================

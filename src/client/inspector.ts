@@ -1,10 +1,11 @@
-import type { SourceLoc, UsageLink, CompositionCoverage } from '../shared/protocol.ts';
+import type { SourceLoc, UsageLink } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
 import { chainOrdinals } from './render-occurrences.ts';
-import { rulesForElement } from './css-inspect.ts';
+import { buildRuleBlock, rulesForElement } from './css-inspect.ts';
 import { buildImagePicker } from './editors/image.ts';
 import { has } from './features.ts';
+import { icon, type IconName } from './icons.ts';
 import { card, item, itemGroup } from './group.ts';
 import { createInspectorLoader, occurrenceSummary } from './inspector-model.ts';
 import { nearestOwnSource, sourceFor } from './source-map.ts';
@@ -23,6 +24,9 @@ export interface InspectorDeps {
    *  unresolved. The jump of last resort, and never a guessed one. */
   routeFile(): string | null;
   onClose(): void;
+  /** Element-scoped counterpart to the launcher menu's page context: the
+   *  selector, the source loc, the chain and the applied CSS, as one paste. */
+  copyContext(el: HTMLElement, source: SourceLoc): void;
   /** The one staged-value store the panel and the page share. */
   staging: StagedValues;
 }
@@ -32,17 +36,42 @@ export interface InspectorDeps {
 export function initInspector(deps: InspectorDeps) {
   const root = styled('aside', 'atx-inspector');
   root.setAttribute('aria-label', 'Source inspector');
+  // Two bands, as the wireframe has them. The title bar names the tool and
+  // what is selected, and carries only the one control that leaves the panel.
+  // Everything that is an *answer* about the selection — how far the chain is
+  // proven, whether the page matches disk — belongs to the status row below
+  // it, with the one action scoped to this element beside them.
   const header = styled('div', 'atx-inspector-header');
   const title = styled('strong', 'atx-inspector-title');
+  title.textContent = 'Inspector';
+  const tag = styled('span', 'atx-inspector-tag');
+  const closeButton = styled('button', 'atx-tree-action');
+  closeButton.type = 'button';
+  closeButton.title = 'Close (Esc)';
+  closeButton.setAttribute('aria-label', 'Close the inspector');
+  closeButton.append(icon('x', 16));
+  closeButton.addEventListener('click', close);
+  header.append(title, tag, closeButton);
+
+  const status = styled('div', 'atx-inspector-status');
+  /** One word on whether the chain can be trusted. Hidden until an answer
+   *  arrives, because "no tier yet" and "no chain" are different things. */
+  const tier = styled('span', 'atx-tier');
+  tier.hidden = true;
   /** Whether what is on screen for this selection is what is on disk. It sits
-   *  in the header because it is the selection's answer, not a row's — and it
-   *  is the one place a panel covering the page can still report the amber. */
+   *  here because it is the selection's answer, not a row's — and it is the
+   *  one place a panel covering the page can still report the amber. */
   const saveState = styled('span', 'atx-value-chip');
-  const closeButton = footButton('Close', 'ghost', close);
-  header.append(title, saveState, closeButton);
+  const copyButton = footButton('Copy context', 'outline', () => {
+    if (selected) deps.copyContext(selected, sourceFor(selected) ?? { file: '', loc: '' });
+  });
+  copyButton.classList.add('atx-btn-sm');
+  copyButton.title = 'Copy this element’s selector, source loc, chain and CSS';
+  status.append(tier, saveState, copyButton);
+
   const body = styled('div', 'atx-inspector-body');
   isolateScroll(body);
-  root.append(header, body);
+  root.append(header, status, body);
   const loader = createInspectorLoader(api);
   let selected: HTMLElement | null = null;
   let generation = 0;
@@ -61,8 +90,15 @@ export function initInspector(deps: InspectorDeps) {
     bindings = [];
   }
 
+  /** Whether a write has landed since the panel opened. `saved` reports that
+   *  it did; with nothing pending and nothing written the chip has nothing to
+   *  say, and a permanent "saved" on a panel that has never written anything
+   *  is a claim about the file the panel has not earned. */
+  let wrote = false;
+
   function paintSaveState() {
     const dirty = deps.staging.pending().length;
+    saveState.hidden = !dirty && !wrote;
     saveState.textContent = dirty ? `${dirty} unsaved` : 'saved';
     saveState.dataset.chip = dirty ? 'unsaved' : 'editable';
   }
@@ -77,6 +113,8 @@ export function initInspector(deps: InspectorDeps) {
     selected = null;
     pageEdit = null;
     chainBody = null;
+    wrote = false;
+    paintSaveState();
     root.removeAttribute('data-on');
     // Leaving with work pending is allowed and is the point — but it is never
     // silent, because the only other signal is an outline on a page the panel
@@ -127,41 +165,103 @@ export function initInspector(deps: InspectorDeps) {
     return row;
   }
 
-  function coverage(parent: HTMLElement, value: CompositionCoverage) {
-    if (value.complete) return;
-    const details = styled('details', 'atx-inspector-details');
-    const summary = styled('summary', '');
-    summary.textContent = `Incomplete discovery · ${value.files} files`;
-    details.append(summary);
-    for (const issue of value.issues) note(details, `${issue.reason} · ${issue.file}${issue.loc ? ':' + issue.loc : ''}`);
-    parent.append(details);
+  /**
+   * One row of the indented chain.
+   *
+   * The chain is a nesting, and a flat list of cards was the one thing about
+   * this panel that did not say so — so it is drawn as a tree: depth as
+   * indent, an elbow to the row above, and the file's own glyph. Everything a
+   * row can *do* stays folded until the row is the selected one, because a
+   * five-deep chain with two buttons and a disclosure on every row is a wall.
+   */
+  interface ChainRow {
+    depth: number;
+    glyph: IconName;
+    name: string;
+    /** The mono second line — where it is used, or what it is. */
+    sub: string;
+    /** Marks the row findable by the breadcrumb, and clickable. */
+    id?: string;
+    kind?: 'leaf' | 'inferred';
+    roles?: readonly string[];
+    /** Revealed with the row, never before it. */
+    actions?: readonly HTMLElement[];
+    /** Extra detail revealed with the actions. */
+    extra?: HTMLElement;
   }
 
-  /** A chain row. `selectionFile` lets it say which file owns the look and
-   *  which holds the words; the values themselves are Values rows, so this row
-   *  names its usage site rather than re-listing them. */
-  function usage(parent: HTMLElement, link: UsageLink, selectionFile: string | null) {
-    const row = item({ title: link.name,
-      description: link.target ? basename(link.target) : `Unresolved · ${link.refusal ?? 'unresolved'}`,
+  function chainRow(parent: HTMLElement, o: ChainRow) {
+    const row = styled('div', 'atx-chain-row');
+    row.style.setProperty('--atx-d', String(o.depth));
+    if (o.kind) row.dataset.kind = o.kind;
+
+    const glyph = styled('span', 'atx-chain-ic');
+    glyph.append(icon(o.glyph, 13));
+
+    const main = styled('div', 'atx-chain-main');
+    const name = styled('div', 'atx-chain-name');
+    name.textContent = o.name;
+    for (const role of o.roles ?? []) {
+      const pill = styled('span', 'atx-chain-role');
+      pill.dataset.role = role;
+      pill.textContent = role;
+      name.append(pill);
+    }
+    const sub = styled('div', 'atx-chain-sub');
+    sub.textContent = o.sub;
+    sub.title = o.sub;
+    main.append(name, sub);
+
+    if (o.actions?.length || o.extra) {
+      const acts = styled('div', 'atx-chain-acts');
+      if (o.actions?.length) acts.append(...o.actions);
+      if (o.extra) acts.append(o.extra);
+      main.append(acts);
+    }
+    row.append(glyph, main);
+    if (o.id) {
+      // The breadcrumb names a link by id; the row it opens has to be findable.
+      row.dataset.usage = o.id;
+      row.tabIndex = 0;
+      const open = () => focusUsage(row.hasAttribute('data-focus') ? null : o.id!);
+      row.addEventListener('click', open);
+      row.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); }
+      });
+    }
+    parent.append(row);
+    return row;
+  }
+
+  /** A chain row for a usage link. `selectionFile` lets it say which file owns
+   *  the look and which holds the words; the values themselves are Values
+   *  rows, so this row names its usage site rather than re-listing them. */
+  function usage(parent: HTMLElement, link: UsageLink, selectionFile: string | null, depth = 0) {
+    const values = [...link.props, ...link.slots];
+    let extra: HTMLElement | undefined;
+    if (values.length) {
+      extra = styled('details', 'atx-inspector-details');
+      const summary = styled('summary', '');
+      summary.textContent = `What this usage passes · ${values.length}`;
+      extra.append(summary);
+      for (const value of values) {
+        note(extra, 'name' in value && 'kind' in value
+          ? `${value.name} · ${value.kind} · ${value.verdict}`
+          : `slot ${value.name || 'default'} · ${value.verdict}`);
+      }
+    }
+    return chainRow(parent, {
+      depth, id: link.id, glyph: 'component', name: link.name,
+      sub: link.target
+        ? `used at ${basename(link.file)}:${link.loc}`
+        : `unresolved · ${link.refusal ?? 'unresolved'} · at ${basename(link.file)}:${link.loc}`,
+      roles: chainBadges(link, selectionFile),
       actions: [
         ...(link.target ? [codeButton({ file: link.target, loc: '1:1' })] : []),
         codeButton(link, 'Open parent'),
-      ] });
-    row.title.append(...chainBadges(link, selectionFile).map(badge => chip(badge, 'badge')));
-    const details = styled('details', 'atx-inspector-details');
-    const summary = styled('summary', '');
-    summary.textContent = `Usage at ${basename(link.file)}:${link.loc}`;
-    details.append(summary);
-    for (const value of [...link.props, ...link.slots]) {
-      note(details, 'name' in value && 'kind' in value
-        ? `${value.name} · ${value.kind} · ${value.verdict}`
-        : `slot ${value.name || 'default'} · ${value.verdict}`);
-    }
-    row.content.append(details);
-    // The breadcrumb names a link by id; the row it opens has to be findable.
-    row.root.dataset.usage = link.id;
-    parent.append(row.root);
-    return row.root;
+      ],
+      extra,
+    });
   }
 
   /**
@@ -173,24 +273,83 @@ export function initInspector(deps: InspectorDeps) {
    * declaration of what it renders — and it says so rather than sitting in a
    * list of proven links looking like one of them.
    */
-  function markdownChainEnd(parent: HTMLElement, entry: string) {
-    sourceRow(parent, 'Content — markdown, chain ends', { file: entry, loc: '1:1' },
-      `Renders ${basename(entry)}`);
+  function markdownChainEnd(parent: HTMLElement, entry: string, depth = 0) {
+    chainRow(parent, { depth, glyph: 'doc', kind: 'inferred',
+      name: 'Content — markdown, chain ends', sub: `renders ${basename(entry)}`,
+      actions: [codeButton({ file: entry, loc: '1:1' })] });
     note(parent, 'Inferred · derived from the route’s template and the entry it renders, not proven like the links above it.');
   }
 
+  /** Which of the element's own class tokens a selector names. A rule that
+   *  matches without naming one — `a { … }`, a descendant rule — belongs to
+   *  no chip and lands under *other*. */
+  function ruleClasses(selector: string, classes: readonly string[]): string[] {
+    return classes.filter(name =>
+      new RegExp(`\\.${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`).test(selector));
+  }
+
+  /**
+   * The CSS group: which classes matched, and each matched rule as source.
+   *
+   * The rule blocks are `css-inspect.ts::buildRuleBlock`, the same ones the
+   * hover pill's class chips pop — one renderer, one palette, one open jump.
+   * The chips here filter that list and never reorder it: among equal
+   * specificity the cascade *is* document order, so a ranked list would
+   * misreport which rule wins.
+   */
   function css(el: HTMLElement) {
     const section = card({ title: 'CSS', description: 'Selector matches in stylesheet order; conditional rules may be inactive. Computed values include inheritance.' });
     if (!has('cssInspector')) {
       note(section.body, 'CSS inspection is disabled in settings.');
       return section.root;
     }
+    const openRule = (file: string, selector: string) => deps.openRule(file, selector);
     const inline = el.getAttribute('style');
     if (inline) {
-      const code = styled('pre', 'atx-inspector-code');
-      code.textContent = `element.style {\n${inline}\n}`;
-      section.body.append(code);
+      section.body.append(buildRuleBlock({ selectorText: 'element.style', sourceFile: null,
+        declarations: inline.split(';').map(one => one.trim()).filter(Boolean).map(one => `${one};`).join('\n') },
+      'element.style', openRule));
     }
+
+    const rules = rulesForElement(el);
+    if (!rules.length) note(section.body, 'No readable matched rules. Cross-origin stylesheets may be unavailable.');
+    if (rules.length) {
+      const classes = [...el.classList]
+        .filter(name => rules.some(rule => ruleClasses(rule.selectorText, [name]).length));
+      const unnamed = rules.filter(rule => !ruleClasses(rule.selectorText, classes).length);
+      const buckets = [
+        { label: 'all', rules },
+        ...classes.map(name => ({ label: `.${name}`,
+          rules: rules.filter(rule => ruleClasses(rule.selectorText, [name]).length) })),
+        ...(unnamed.length && classes.length ? [{ label: 'other', rules: unnamed }] : []),
+      ];
+      const chips = styled('div', 'atx-rule-chips');
+      const out = styled('div', 'atx-rule-list');
+      const show = (label: string) => {
+        for (const button of chips.children) {
+          (button as HTMLElement).dataset.open = String((button as HTMLElement).textContent === label);
+        }
+        const bucket = buckets.find(one => one.label === label);
+        out.replaceChildren(...(bucket?.rules ?? []).map(rule =>
+          buildRuleBlock(rule, label.startsWith('.') ? label : rule.selectorText, openRule)));
+      };
+      // One chip is pointless: `all` and the single class would list the same
+      // rules twice.
+      if (buckets.length > 1) {
+        for (const bucket of buckets) {
+          const button = styled('button', 'atx-rule-chip');
+          button.type = 'button';
+          button.textContent = bucket.label;
+          button.title = `${bucket.rules.length} matched ${bucket.rules.length === 1 ? 'rule' : 'rules'}`;
+          button.addEventListener('click', () => show(bucket.label));
+          chips.append(button);
+        }
+        section.body.append(chips);
+      }
+      section.body.append(out);
+      show('all');
+    }
+
     const computed = getComputedStyle(el);
     const details = styled('details', 'atx-inspector-details');
     const summary = styled('summary', '');
@@ -201,17 +360,6 @@ export function initInspector(deps: InspectorDeps) {
       .map(property => `${property}: ${computed.getPropertyValue(property)};`).join('\n');
     details.append(summary, values);
     section.body.append(details);
-    const rules = rulesForElement(el);
-    if (!rules.length) note(section.body, 'No readable matched rules. Cross-origin stylesheets may be unavailable.');
-    for (const rule of rules) {
-      const row = item({ title: rule.selectorText, description: rule.sourceFile ? basename(rule.sourceFile) : 'Inline or unavailable source',
-        actions: rule.sourceFile && has('openInEditor') ? [footButton('Open in editor', 'outline',
-          () => deps.openRule(rule.sourceFile!, rule.selectorText))] : [] });
-      const code = styled('pre', 'atx-inspector-code');
-      code.textContent = rule.declarations;
-      row.content.append(code);
-      section.body.append(row.root);
-    }
     return section.root;
   }
 
@@ -287,6 +435,8 @@ export function initInspector(deps: InspectorDeps) {
         error.textContent = refusal;
         return;
       }
+      wrote = true;
+      paintSaveState();
       toast(`Saved — ${basename(target.file)}:${target.loc}`, 'ok');
     }
     function discard() {
@@ -320,11 +470,22 @@ export function initInspector(deps: InspectorDeps) {
    * can name a destination instead of explaining one.
    */
   function valueRow(row: ValueRow) {
-    const built = item({ title: row.label, description: row.caption,
-      variant: row.pinned ? 'muted' : 'plain' });
+    // Always plain: `muted` is the standalone-tile variant, and a pinned row
+    // in a list wears the brand bar instead — a filled neutral tile under a
+    // brand bar reads as two different marks for one fact.
+    const built = item({ title: row.label, description: row.caption });
     built.root.dataset.verdict = row.verdict;
     if (row.pinned) built.root.dataset.pinned = '';
-    built.title.append(chip(row.verdict, row.verdict), ...row.badges.map(badge => chip(badge, 'badge')));
+    // The label is a value's *name* — `href`, `src`, `slot` — so it is set as
+    // source rather than as prose, in its own span the stylesheet can reach.
+    built.title.textContent = '';
+    const name = styled('span', 'atx-value-name');
+    name.textContent = row.label;
+    // Badges qualify the name and stay beside it; the verdict is the row's
+    // answer and goes to the right edge, in one column down the card.
+    const verdict = chip(row.verdict, row.verdict);
+    verdict.classList.add('atx-value-verdict');
+    built.title.append(name, ...row.badges.map(badge => chip(badge, 'badge')), verdict);
 
     // A field replaces the read-only value rather than sitting under it: two
     // copies of one string, one of them editable, is a question about which
@@ -332,7 +493,10 @@ export function initInspector(deps: InspectorDeps) {
     const target = row.verdict === 'editable' ? writable(row.target) : null;
     if (target) valueField(built.content, row, target);
     else {
-      const value = styled('pre', 'atx-inspector-code');
+      // Boxed like the field it is standing in for, and dashed rather than
+      // filled: every value on this panel is a box, and the border is what
+      // says which of them you can type into.
+      const value = styled('pre', 'atx-value-readonly');
       value.textContent = row.value.slice(0, 4000) || '(empty)';
       built.content.append(value);
       // An `editable` verdict says the source proves a target; it does not say
@@ -406,21 +570,12 @@ export function initInspector(deps: InspectorDeps) {
       for (const to of jump) sourceRow(section.body, to.label, to.src, to.description);
       return;
     }
-    const list = itemGroup({ bleed: true });
+    // The nearest usage site only. A value handed down from three components
+    // above is a value of *that* component, reachable by selecting it — listing
+    // it here made the card a scroll of other elements' business.
+    const list = itemGroup();
     for (const row of model.rows.filter(r => r.depth <= 0)) list.append(valueRow(row));
     section.body.append(list);
-    // Values passed further up the chain are real rows, not a summary — but
-    // the site that handed this element its values is the one worth reading
-    // without scrolling past its grandparents.
-    const far = model.rows.filter(r => r.depth > 0);
-    if (!far.length) return;
-    const details = styled('details', 'atx-inspector-details');
-    const summary = styled('summary', '');
-    summary.textContent = `Further up the chain · ${far.length}`;
-    const rest = itemGroup();
-    for (const row of far) rest.append(valueRow(row));
-    details.append(summary, rest);
-    section.body.append(details);
   }
 
   /** `focus` names a chain row to mark once the chain has resolved — a
@@ -443,20 +598,28 @@ export function initInspector(deps: InspectorDeps) {
     loader.invalidate();
     const pathname = location.pathname;
     const alive = () => current === generation && el.isConnected && pathname === location.pathname;
-    title.textContent = `<${el.tagName.toLowerCase()}>`;
+    tag.textContent = `<${el.tagName.toLowerCase()}>`;
+    tier.hidden = true;
     paintSaveState();
     root.setAttribute('data-on', '');
     body.replaceChildren();
     const values = card({ title: 'Values',
       description: 'Every value on this selection, one row each · Enter saves, Esc reverts' });
+    values.body.classList.add('atx-inspector-values');
     const chain = card({ title: 'Component chain' });
+    // Full-bleed: a chain row's indent is measured from the card's edge, and
+    // the body's own 16px would be a second, invisible indent under it.
+    chain.body.classList.add('atx-chain');
     const slots = card({ title: 'Slot relationships' });
     chainBody = chain.body;
     // The one block that may sit above Values, and it is empty until the
     // selection turns out to be an image with a writable `src` — a list of
     // fields cannot show pictures, and nothing else has earned the place.
     const picker = styled('div', 'atx-inspector-picker');
-    body.append(picker, values.root, chain.root, slots.root, css(el));
+    // The chain first: "where did this come from" is the question the panel is
+    // opened with, and it is what tells you whether the values under it are
+    // the ones you meant. Values second, because that is what you act on.
+    body.append(picker, chain.root, values.root, slots.root, css(el));
     note(values.body, 'Resolving values…');
 
     const source = sourceFor(el);
@@ -598,19 +761,34 @@ export function initInspector(deps: InspectorDeps) {
     }
     if (!answer.chain || !answer.uses) return;
     chain.body.replaceChildren();
-    const labels = { proven: 'Proven chain', inferred: 'Inferred source path · rendered instance is not proven',
-      candidates: 'Multiple possible source paths · no path selected', none: 'No chain' };
-    note(chain.body, `${labels[answer.chain.tier]}${answer.chain.reason ? ' · ' + answer.chain.reason : ''}`);
+    // The tier is a pill in the card's header rather than a sentence at the
+    // top of it: it is the one-word answer to "can I trust this chain", and
+    // the reason under it is the long form.
+    const labels = { proven: 'proven chain', inferred: 'one link inferred',
+      candidates: 'no chain · candidates', none: 'no chain' };
+    tier.hidden = false;
+    tier.dataset.tier = answer.chain.tier;
+    tier.textContent = labels[answer.chain.tier];
+    if (answer.chain.reason) note(chain.body, answer.chain.reason);
     if (group) note(chain.body, `Rendered occurrence ${group.index} of ${group.total} of this source element.`);
+    // Depth is the nesting: the route entry, then a level per link, then the
+    // element the chain ends at.
+    let depth = 0;
     if (answer.chain.route) {
-      sourceRow(chain.body, 'Route', { file: answer.chain.route, loc: '1:1' }).dataset.usage = 'route';
+      chainRow(chain.body, { depth: depth++, id: 'route', glyph: 'doc',
+        name: basename(answer.chain.route), sub: `route entry · ${answer.chain.route}`,
+        actions: [codeButton({ file: answer.chain.route, loc: '1:1' })] });
     }
-    for (const link of answer.chain.links) usage(chain.body, link, source?.file ?? null);
+    for (const link of answer.chain.links) usage(chain.body, link, source?.file ?? null, depth++);
+    if (source) {
+      chainRow(chain.body, { depth, glyph: 'node', kind: 'leaf',
+        name: `<${el.tagName.toLowerCase()}>`, sub: `${source.file}:${source.loc}` });
+    }
     // Only for a value the entry actually supplies: an ordinary literal in the
     // same template ends at the template, and saying "chain ends at the entry"
     // under it would claim a relationship it does not have.
     if (markdownEntry && model.rows.some(row => row.pinned && row.reason === 'markdown')) {
-      markdownChainEnd(chain.body, markdownEntry);
+      markdownChainEnd(chain.body, markdownEntry, depth);
     }
     for (const [index, candidate] of (answer.chain.candidates ?? []).entries()) {
       const details = styled('details', 'atx-inspector-details');
@@ -620,7 +798,6 @@ export function initInspector(deps: InspectorDeps) {
       candidate.forEach(link => usage(details, link, source?.file ?? null));
       chain.body.append(details);
     }
-    coverage(chain.body, answer.chain.coverage);
     const uses = styled('details', 'atx-inspector-details');
     const summary = styled('summary', '');
     summary.textContent = `Usages on this route · ${answer.uses.links.length}`;
@@ -628,7 +805,6 @@ export function initInspector(deps: InspectorDeps) {
     note(uses, 'Source usage sites, including unrendered branches. These are not rendered instance counts.');
     if (answer.uses.reason) note(uses, answer.uses.reason);
     answer.uses.links.forEach(link => usage(uses, link, null));
-    coverage(uses, answer.uses.coverage);
     chain.body.append(uses);
     focusUsage(focus ?? null);
   }

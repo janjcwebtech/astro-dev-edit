@@ -300,7 +300,7 @@ element on the page highlights its row and scrolls the tree to it.
 
 - **Click a row** to select the element — a persistent outline that stays put while you move the mouse onto the element to inspect it. Plain hovering never changes it; the selection clears on **Escape**, a click elsewhere on the page, or another row.
 - **Double-click a row** to open the editor for that element, exactly as a page click would.
-- **Click a row's `line:col`** to open that file at that line in your editor — the same `/open` the hover pill's **open** button uses.
+- **Click a row's `</>`** to open that file at that line in your editor — the same `/open` the hover pill's **open** button uses. Hovering a row names its file, line and column in a tooltip above it.
 - The tree collapses per node, rebuilds after each save, and is overlaid by any drawer while that is open.
 - Leaving edit mode hides it. Closing it with its ✕ while still editing leaves the left-edge tab that brings it back, as does **Elements** on the bar.
 - Whether it was open is remembered for the session, so a save-triggered reload restores it the way you left it.

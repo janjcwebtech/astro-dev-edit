@@ -1,4 +1,4 @@
-import type { UsageLink } from '../shared/protocol.ts';
+import type { SlotPlacement, UsageLink } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { chainIds, createChainLinks } from './composition.ts';
 import { readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
@@ -9,10 +9,12 @@ import { initInspector } from './inspector.ts';
 import { createMenu } from './menu.ts';
 import { markdownSource, pageSource, resolvePageSource } from './page-source.ts';
 import { isOwnUi, mount } from './shadow.ts';
+import { collectContext, formatContext } from './element-context.ts';
 import { annotatedElements, cacheSourceMappings, sourceFor } from './source-map.ts';
 import { createStagedValues } from './staged-values.ts';
 import * as state from './state.ts';
-import { initTree } from './tree.ts';
+import { tip } from './tip.ts';
+import { type TreeMark, initTree } from './tree.ts';
 import { basename, footButton, outlineRect, setChromeInset, styled, toast } from './ui.ts';
 
 /** Opt-in read-only composition surface. Selection and Alt interception have
@@ -42,7 +44,7 @@ export function initInspectorApp() {
    *  — the header names it, the breadcrumb's first segment is it, and *View
    *  code* opens it. */
   let routeFile: string | null = null;
-  const descriptions = new Map<Element, string>();
+  const descriptions = new Map<Element, TreeMark>();
   const chainLinks = createChainLinks(api);
   /** Every pending edit on this page, and the amber it wears. One store, so
    *  the panel's field and the caret on the page are two views of one value. */
@@ -69,9 +71,18 @@ export function initInspectorApp() {
   const routeButton = footButton('View code', 'outline', () => openRouteSource());
   routeButton.classList.add('atx-btn-sm');
   routeRow.append(routeLabels, routeButton);
-  const hint = styled('p', 'atx-inspector-note');
-  hint.textContent = 'Hold Alt / ⌥ and click to inspect. Release to use the page.';
-  header.append(routeRow, hint);
+  header.append(routeRow);
+
+  // The legend for the marks `describe` puts on rows, pinned under the tree's
+  // scroll body. Two entries because there are two kinds of mark; a third
+  // would mean tree.ts::TreeMark grew one.
+  const legend = styled('div', 'atx-tree-legend');
+  for (const [name, label] of [['component', 'component'], ['slotIn', 'slot / markdown']] as const) {
+    const key = styled('span', 'atx-tree-legend-key');
+    key.dataset.kind = name === 'component' ? 'component' : 'slot';
+    key.append(icon(name, 13), label);
+    legend.append(key);
+  }
 
   function titleAction(label: string, name: 'menu' | 'settings', onClick: (button: HTMLElement) => void) {
     const button = styled('button', 'atx-tree-action');
@@ -135,7 +146,10 @@ export function initInspectorApp() {
 
   function paintRoute() {
     routeText.textContent = location.pathname;
-    routeFileText.textContent = routeFile ? basename(routeFile) : 'route source unresolved';
+    // The whole project-relative path, not its basename: `index.astro` is the
+    // name of a dozen files in a routed site, and the path is what a reader
+    // would type to open it.
+    routeFileText.textContent = routeFile ?? 'route source unresolved';
     routeFileText.toggleAttribute('data-unresolved', !routeFile);
     routeButton.title = routeFile ?? 'Resolve and open the file this route is written in';
   }
@@ -182,8 +196,23 @@ export function initInspectorApp() {
 
   // --- Panels ---------------------------------------------------------------
 
+  /** One element's context as one paste — the panel's counterpart to the
+   *  menu's page-wide *Copy page context*, and the same gather the hover
+   *  pill's copy button uses. */
+  async function copyElementContext(el: HTMLElement, source: { file: string; loc: string }) {
+    if (!source.file) return toast('No source annotation on this element', 'warn');
+    try {
+      const context = await collectContext(el, source);
+      await navigator.clipboard.writeText(formatContext(context));
+      toast(`Copied context for ${context.label}`, 'ok');
+    } catch (error) {
+      toast(`Could not copy context — ${error instanceof Error ? error.message : 'unknown'}`, 'err');
+    }
+  }
+
   const inspector = initInspector({
     viewCode,
+    copyContext: (el, source) => void copyElementContext(el, source),
     // Read per selection, not captured: a navigation changes both, and the
     // route's own resolve lands after the first paint.
     markdownEntry: markdownSource,
@@ -197,7 +226,7 @@ export function initInspectorApp() {
     onClose: () => tree.clearSelection(),
   });
   const tree = initTree({
-    readOnly: true, header, titleActions: [menuButton, settingsButton], isEditMode: () => true,
+    readOnly: true, header, footer: legend, titleActions: [menuButton, settingsButton], isEditMode: () => true,
     highlight, clearHighlight, openEditor: () => {},
     openSource: viewCode,
     onSelect: el => { clearHighlight(); void inspector.select(el); },
@@ -396,14 +425,38 @@ export function initInspectorApp() {
     descriptions.clear();
     const render = readRenderOccurrences(document);
     if (render.result.ok) {
+      // Traced by element, so a row is compared with the nearest ancestor the
+      // trace also knows — never with a raw DOM parent, which on a nested
+      // component is some unannotated wrapper in between.
+      const traced = new Map<Element, { file: string; slots: readonly SlotPlacement[] }>();
       for (const occurrence of render.result.occurrences) {
         if (!occurrence.group || occurrence.reason) continue;
-        const el = render.elements[occurrence.key];
-        const parent = el.parentElement;
-        const boundary = parent?.getAttribute('data-atx-instance') !== el.getAttribute('data-atx-instance');
-        const slot = occurrence.slots.at(-1);
-        if (boundary || slot) descriptions.set(el,
-          `${basename(el.getAttribute('data-atx-file') ?? '')}${slot ? ` · slot ${slot.name || 'default'} in ${basename(slot.file)}` : ''}`);
+        traced.set(render.elements[occurrence.key], {
+          file: render.elements[occurrence.key].getAttribute('data-atx-file') ?? '',
+          slots: occurrence.slots,
+        });
+      }
+      // A mark says the tree crossed something AT THIS ROW, so it is set only
+      // where the crossing happens. The slot stack a `<slot/>` opens is
+      // carried by every element rendered inside it, and marking all of them
+      // amber says nothing — 122 of this site's 399 rows. What is worth a
+      // glyph is the row that is one slot deeper than the row above it.
+      for (const [el, here] of traced) {
+        let ancestor = el.parentElement;
+        while (ancestor && !traced.has(ancestor)) ancestor = ancestor.parentElement;
+        const above = ancestor ? traced.get(ancestor) : undefined;
+        const opened = here.slots.length > (above?.slots.length ?? 0) ? here.slots.at(-1) : undefined;
+        if (opened) {
+          const note = `slot ${opened.name || 'default'} in ${basename(opened.file)}`;
+          descriptions.set(el, { kind: 'slot', note,
+            title: `Passed in — ${basename(here.file)} · ${note}` });
+        } else if (here.file !== (above?.file ?? '')) {
+          // Different file from the markup enclosing it: this row is where
+          // that component's own template begins. No note — the loc column
+          // already names the file, and repeating it costs the row's width.
+          descriptions.set(el, { kind: 'component', note: null,
+            title: `Component boundary — ${basename(here.file)} starts here` });
+        }
       }
     }
     paintRoute();
@@ -435,18 +488,18 @@ export function initInspectorApp() {
    * Which project file an HMR update carries, as the annotations spell it.
    *
    * Vite names a module by its root-relative URL (`/src/pages/index.astro`,
-   * with a cache-busting query); `data-atx-file` carries the absolute path the
-   * Vite transform was handed. The URL is a suffix of the path, which is
-   * enough to decide the only question being asked — did *this* file change —
-   * and it errs towards dropping a pending edit rather than keeping one whose
-   * source may have moved.
+   * with a cache-busting query) and `data-atx-file` carries the same path
+   * without the leading slash, so the two match exactly once it is stripped.
+   * The suffix test below is what covers the rest — a module Vite names from
+   * somewhere else — and it errs towards dropping a pending edit rather than
+   * keeping one whose source may have moved.
    */
   function changedFiles(payload: unknown): string[] {
     const updates = (payload as { updates?: { path?: string; acceptedPath?: string }[] })?.updates ?? [];
     const out: string[] = [];
     for (const update of updates) {
       for (const named of [update.acceptedPath, update.path]) {
-        const path = named?.split('?')[0];
+        const path = named?.split('?')[0].replace(/^\//, '');
         if (path) out.push(path);
       }
     }
@@ -467,7 +520,7 @@ export function initInspectorApp() {
     const changed = changedFiles(payload);
     if (!changed.length) return;
     const dropped = staging.pending().filter(entry =>
-      changed.some(path => entry.target.file === path || entry.target.file.endsWith(path)));
+      changed.some(path => entry.target.file === path || entry.target.file.endsWith(`/${path}`)));
     // Not announced here. Astro answers an `.astro` change with a full reload,
     // and a toast shown in the moment before one is destroyed unread — so the
     // notice is queued, and drained by `vite:afterUpdate` or by the next boot,
@@ -500,7 +553,7 @@ export function initInspectorApp() {
       announceDrops(staging.drainNotices());
     });
   }
-  mount(hoverOutline, pill, tree.root, tree.tab, tree.selectionOutline, menu.root, inspector.root);
+  mount(hoverOutline, pill, tree.root, tree.tab, tree.selectionOutline, tip.root, menu.root, inspector.root);
   tree.tab.title = 'Open source inspector · hold Alt / ⌥ to select on the page';
   tree.tab.setAttribute('aria-label', 'Open source inspector');
   tree.hide();
