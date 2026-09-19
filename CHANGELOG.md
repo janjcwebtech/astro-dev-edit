@@ -16,6 +16,7 @@ Writing an entry — one line, past tense, no essay:
 
 ### Changed
 
+- An unannotated element with no `<slot />` inside it, such as a dynamic `<Wrapper>` holding literal markup, now shows the annotated element directly inside it in its *No chain* note, and points you there.
 - With `composition: true`, an open element tree arms selection without Alt/⌥ — the page's links and buttons select rather than navigate — and its edge tab stays up as a chevron that collapses both panels and disarms it. Escape steps back one level: it clears a selection first, then collapses the panels.
 - The inspector's layout switch shows *docked* as a brand-tinted fill with a ring, and **Copy context** sits on an opaque fill instead of the see-through outline.
 - The inspector's route row names the whole project-relative path (`src/pages/index.astro`), not the file's basename, and the *Hold Alt / ⌥…* hint no longer sits under it.

@@ -61,3 +61,20 @@ export function wrappedSlot(el: Element): { placement: SlotPlacement; content: S
   }
   return null;
 }
+
+/**
+ * The first annotated element directly inside an unannotated one — evidence
+ * that the page *is* annotated here and the reader can select further in.
+ *
+ * Deliberately not an owner. Without a slot boundary there is no proof of who
+ * wrote the outer element: in `<Wrapper><Inner /></Wrapper>` the child is
+ * stamped by `Inner.astro`, not by the file that wrote `<Wrapper>`.
+ */
+export function annotatedChild(el: Element): SourceLoc | null {
+  for (const child of el.children) {
+    const file = child.getAttribute('data-atx-file');
+    const loc = child.getAttribute('data-atx-loc');
+    if (file && loc) return { file, loc };
+  }
+  return null;
+}

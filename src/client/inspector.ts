@@ -1,6 +1,6 @@
 import type { SourceLoc, UsageLink } from '../shared/protocol.ts';
 import * as api from './api.ts';
-import { readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
+import { annotatedChild, readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
 import { chainOrdinals } from './render-occurrences.ts';
 import { buildRuleBlock, rulesForElement } from './css-inspect.ts';
 import { buildImagePicker } from './editors/image.ts';
@@ -711,7 +711,7 @@ export function initInspector(deps: InspectorDeps) {
       note(chain.body, opaque ? 'No chain · untracked-html. Generated HTML has no proven inner-element source relationship.'
         : dynamicTag ? `No chain · rendered from a dynamic tag in ${basename(dynamicTag.component.file)}. ` +
           'Select an element inside it for the chain its content does have.'
-          : 'No chain · this element has no source annotation.');
+          : unannotatedWrapper(el));
       // A Markdown body is the one unannotated element whose owner is known,
       // because the route declared it. The chain still ends — it just ends
       // somewhere nameable.
@@ -859,4 +859,15 @@ export function initInspector(deps: InspectorDeps) {
      *  before deciding between moving its mark and opening the panel. */
     shows: (el: HTMLElement) => selected === el,
     invalidate() { close(); } };
+}
+
+/** The refusal for an unannotated element no slot boundary explains. When an
+ *  element directly inside is annotated, that is said and the reader is sent
+ *  there — without naming a file for this element, which nothing proves. */
+function unannotatedWrapper(el: Element): string {
+  const inner = annotatedChild(el);
+  if (!inner) return 'No chain · this element has no source annotation.';
+  return 'No chain · this element has no source annotation, but the element directly inside it does ' +
+    `(${basename(inner.file)}:${inner.loc}). A tag whose name is a variable, like <Wrapper>, is never ` +
+    'annotated. Select an element inside it for its chain.';
 }

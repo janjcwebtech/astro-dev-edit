@@ -148,7 +148,9 @@ become props. The panel names it instead of stopping at *no source annotation*:
 the slot boundary such an element wraps identifies the component that rendered
 it and the first annotated element inside identifies where the words were
 written, so Values refuses with both named, *View code* is offered on each, and
-the slot row says which `<slot />` is wrapped. Selecting an element inside gives
+the slot row says which `<slot />` is wrapped. A dynamic tag that wraps no
+`<slot />` names no file, since nothing proves who wrote it, and the panel shows the
+annotated element directly inside it instead. Selecting an element inside gives
 the full chain, unchanged.
 - **CSS:** inline declarations, readable matched selectors in stylesheet order,
   and computed values behind a disclosure. Each rule is shown as source — the
