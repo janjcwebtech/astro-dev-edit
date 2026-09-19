@@ -55,6 +55,7 @@ Writing an entry — one line, past tense, no essay:
 ### Fixed
 
 - Self-annotation now skips `<slot>` and includes hyphenated custom elements.
+- `composition: true` no longer breaks a component whose `<slot>` is reached through an expression, such as a ternary fallback. The trace wrapper's braces are an Astro expression container, so inside one they opened a JS object literal and the module failed to compile with `Expected "}" but found "."`.
 
 ## [0.12.0] - 2026-09-13
 

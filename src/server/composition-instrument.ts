@@ -35,7 +35,7 @@ export async function prepareComposition(source: string, file: string, links: re
     insertions.push({ index: link.injectionOffset,
       text: ` {...${alias}.child(${trace},${JSON.stringify(link.id)},${JSON.stringify(link.target)})}` });
   }
-  const walk = (node: Node) => {
+  const walk = (node: Node, inExpression = false) => {
     if (node.name === 'slot' && node.position) {
       const attrs = node.attributes ?? [];
       const name = attrs.find(a => a.name === 'name');
@@ -58,11 +58,16 @@ export async function prepareComposition(source: string, file: string, links: re
           text: source.slice(attrStart, attrStart + width).replace(/[^\r\n]/g, ' ') });
       }
       const loc = `${node.position.start.line}:${node.position.start.column + start - at(node.position.start)}`;
+      // The wrapper is an Astro expression container, so it needs braces in
+      // markup position — but inside an expression that already opened one, `{`
+      // would start an object literal and the JS never parses. A forwarded-slot
+      // Fragment re-enters markup, so it puts the braces back.
+      const braced = !inExpression || Boolean(forwarded);
       insertions.push({ index: start, text: (forwarded ? `<Fragment slot=${forwarded.raw}>` : '') +
-        `{${alias}.slot(${trace},${slotName},${JSON.stringify(loc)},!Astro.slots.has(${slotName}),<>` });
-      insertions.push({ index: end, text: '</>)}' + (forwarded ? '</Fragment>' : '') });
+        `${braced ? '{' : ''}${alias}.slot(${trace},${slotName},${JSON.stringify(loc)},!Astro.slots.has(${slotName}),<>` });
+      insertions.push({ index: end, text: `</>)${braced ? '}' : ''}` + (forwarded ? '</Fragment>' : '') });
     }
-    for (const child of node.children ?? []) walk(child);
+    for (const child of node.children ?? []) walk(child, inExpression || node.type === 'expression');
   };
   walk(ast as unknown as Node);
   return { insertions, trace };

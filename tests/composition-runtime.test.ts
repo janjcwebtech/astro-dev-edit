@@ -1,3 +1,5 @@
+import ts from 'typescript';
+import { transform as goTransform } from '@astrojs/compiler';
 import { describe, expect, it } from 'vitest';
 import { begin, child, slot } from '../src/server/composition-runtime.ts';
 import { parseUsages } from '../src/server/usage-parse.ts';
@@ -94,6 +96,39 @@ describe('safe insertion after the final attribute', () => {
 it('keeps serialized HTML annotations explicitly ungrouped', () => {
   const result = renderOccurrences([{ type: 'element', key: 0, instance: 'replayed', parent: '', file: '', chain: '', ordinal: '', opaque: true }]);
   expect(result).toEqual({ ok: true, placements: [], occurrences: [{ key: 0, instance: 'replayed', group: null, slots: [], ordinal: 0, reason: 'untracked-html' }] });
+});
+
+/** The instrument's `{…}` wrapper is an Astro expression container, valid only
+ *  in markup position. A slot reached through an expression is already inside
+ *  one, so the braces would open a JS object literal and the compiled module
+ *  would not parse — `Expected "}" but found "."`. */
+describe('a slot reached through an expression container', () => {
+  const compiles = async (annotated: string) => {
+    const { code } = await goTransform(annotated, { filename: '/project/Page.astro' });
+    return ts.transpileModule(code, { reportDiagnostics: true, compilerOptions: { target: ts.ScriptTarget.ESNext } })
+      .diagnostics?.map(d => ts.flattenDiagnosticMessageText(d.messageText, ' ')) ?? [];
+  };
+  const annotate = (source: string) =>
+    annotateAstroSource(source, '/project/Page.astro', { composition: [], runtime: '/trace.ts' });
+
+  it('drops the braces inside a ternary, and the module still parses', async () => {
+    const out = await annotate('---\n---\n<div>{flag ? <b>y</b> : <slot name="x" />}</div>');
+    expect(out).toContain(': __atxRuntime.slot(');
+    expect(out).not.toContain(': {__atxRuntime.slot(');
+    expect(await compiles(out)).toEqual([]);
+  });
+
+  it('keeps the braces in markup position', async () => {
+    const out = await annotate('---\n---\n<div><slot name="x" /></div>');
+    expect(out).toContain('{__atxRuntime.slot(');
+    expect(await compiles(out)).toEqual([]);
+  });
+
+  it('puts the braces back inside a forwarded-slot Fragment, which re-enters markup', async () => {
+    const out = await annotate('---\n---\n<Card>{flag && <slot slot="head" name="x" />}</Card>');
+    expect(out).toContain('<Fragment slot="head">{__atxRuntime.slot(');
+    expect(await compiles(out)).toEqual([]);
+  });
 });
 
 it('instruments empty frontmatter and a leading slot without shifting source annotations', async () => {
