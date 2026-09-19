@@ -54,6 +54,10 @@ export interface TreeMark {
 export interface TreeDeps {
   /** Inspector mode keeps selection after releasing the interception key. */
   readOnly?: boolean;
+  /** The edge tab stays up while the panel is open, riding its right edge as a
+   *  collapse handle (chevron) instead of disappearing. Clicking it then hides
+   *  the panel and reports `onToggle(false)`. */
+  persistentTab?: boolean;
   /** Icon buttons for the title bar, placed before the close button — the
    *  inspector's menu and settings. Without an admin bar there is nowhere else
    *  for a tool-wide action to live, and the title bar is the panel's own row
@@ -77,7 +81,7 @@ export interface TreeDeps {
   /** The panel showed or hid itself (its ✕, or the restore tab), so the admin
    *  bar's Elements button can follow. Not called for show()/hide() driven from
    *  outside — the caller already knows. */
-  onToggle?(open: boolean): void;
+  onToggle?(open: boolean, via: 'tab' | 'close'): void;
 }
 
 export interface TreeHandle {
@@ -115,7 +119,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
   closeBtn.title = 'Hide the element tree';
   closeBtn.addEventListener('click', () => {
     hide();
-    deps.onToggle?.(false);
+    deps.onToggle?.(false, 'close');
   });
   bar.append(barText, ...(deps.titleActions ?? []), closeBtn);
 
@@ -127,9 +131,17 @@ export function initTree(deps: TreeDeps): TreeHandle {
   tab.title = 'Show the element tree';
   tab.append(icon('sidebar', 16));
   tab.addEventListener('click', () => {
-    show();
-    deps.onToggle?.(true);
+    const open = !(deps.persistentTab && isOpen());
+    if (open) show();
+    else hide();
+    deps.onToggle?.(open, 'tab');
   });
+  function paintTab(open: boolean): void {
+    if (!deps.persistentTab) return;
+    tab.replaceChildren(icon(open ? 'chevronLeft' : 'sidebar', 16));
+    tab.toggleAttribute('data-panel-open', open);
+    tab.setAttribute('aria-expanded', String(open));
+  }
 
   const body = styled('div', 'atx-tree-body');
   isolateScroll(body);
@@ -416,7 +428,8 @@ export function initTree(deps: TreeDeps): TreeHandle {
 
   function show(): void {
     root.toggleAttribute('data-on', true);
-    tab.toggleAttribute('data-on', false);
+    tab.toggleAttribute('data-on', !!deps.persistentTab);
+    paintTab(true);
   }
 
   function hide(): void {
@@ -425,6 +438,7 @@ export function initTree(deps: TreeDeps): TreeHandle {
     // The tab only makes sense while editing — outside edit mode the tree has
     // nothing live to point at, and the bar's Elements button reopens both.
     tab.toggleAttribute('data-on', deps.isEditMode());
+    paintTab(false);
     syncActive(null);
     if (!deps.readOnly) clearSelection();
   }

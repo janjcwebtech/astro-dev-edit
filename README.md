@@ -54,7 +54,7 @@ Content that lives in a Markdown or MDX entry is not edited in the browser. Each
 
 ## Other features
 
-- **Component inspector** — opt in with `devEdit({ composition: true })` for a read-only inspector with component chains, native slots, source links and CSS. Hold Alt/Option and click, or select from the left-edge element tree. See [Component tracing and inspector](documentation/COMPOSITION-API.md).
+- **Component inspector** — opt in with `devEdit({ composition: true })` for a read-only inspector with component chains, native slots, source links and CSS. Hold Alt/Option and click, or open the left-edge element tree — selection needs no key while it is open. See [Component tracing and inspector](documentation/COMPOSITION-API.md).
 - **CSS peek**
 - **Code peek**
 - **Structure tree view**

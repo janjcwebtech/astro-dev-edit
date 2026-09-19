@@ -15,11 +15,18 @@ Staged edits, prop writes and HTML-string writes are not part of this layer.
 
 ## Read-only inspector
 
-The left-edge launcher opens the element tree. Click a tree row, or hold
-Alt/Option and click an element on the page, to inspect it. Releasing the key
-returns clicks to the page while keeping the selection and inspector open.
-Close or Escape clears the selection. With `composition: false`, the existing
-editing UI remains available.
+The left-edge tab opens the element tree. While the tree is open, selection
+is armed: hovering highlights and clicking inspects, with no key held — a
+link or button selects rather than navigates. The tab stays on the tree's
+edge as a chevron that collapses both panels and disarms selection; the
+tree's own ✕ closes the tree alone. With no panel up, hold Alt/Option and
+click to inspect; releasing the key returns clicks to the page while keeping
+the selection and inspector open.
+
+Escape steps back one level: it clears the selection and closes the
+inspector, and with nothing selected it collapses the panels and disarms
+selection. With `composition: false`, the existing editing UI remains
+available.
 
 ### Overlay and docked
 

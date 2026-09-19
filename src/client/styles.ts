@@ -95,6 +95,10 @@ export function overlayCss(): string {
 .atx-inspector-tag { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--atx-font-mono); color: var(--atx-faint-fg); }
 .atx-inspector-status { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--atx-border); }
 .atx-inspector-status > .atx-btn { margin-left: auto; flex: 0 0 auto; }
+/* Opaque, unlike a plain outline button: the panel ground is translucent, so a
+   see-through fill here would show the page through the control. */
+.atx-inspector-status > .atx-btn-outline { background: var(--atx-elevated); }
+.atx-inspector-status > .atx-btn-outline:hover:not(:disabled) { background: var(--atx-accent); }
 .atx-inspector-status > .atx-tier[hidden] { display: none; }
 .atx-inspector-body { overflow: auto; min-height: 0; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .atx-inspector-body > .atx-card { flex: 0 0 auto; }
@@ -1682,6 +1686,18 @@ input[type='checkbox'].atx-switch:disabled {
   color: var(--atx-foreground);
 }
 
+/* A title-bar action that is a switch (the inspector's layout toggle) wears
+   its on state as a brand fill and ring, so docked reads at a glance. */
+.atx-tree-action[aria-pressed='true'] {
+  background: ${hexToRgba(COLOR.brand, 0.3)};
+  box-shadow: inset 0 0 0 1px ${hexToRgba(COLOR.brandText, 0.55)};
+  color: var(--atx-brand-text);
+}
+.atx-tree-action[aria-pressed='true']:hover {
+  background: ${hexToRgba(COLOR.brand, 0.45)};
+  color: var(--atx-foreground);
+}
+
 /* The edge tab that reopens the tree. Only meaningful while editing — outside
    edit mode the tree has nothing live to point at. */
 .atx-tree-tab {
@@ -1712,6 +1728,15 @@ input[type='checkbox'].atx-switch:disabled {
 
 .atx-tree-tab:hover {
   color: var(--atx-foreground);
+}
+
+/* Open, the tab rides the panel's right edge as its collapse handle. The
+   offsets are .atx-tree's own width plus its margin (none when docked). */
+.atx-tree[data-on] ~ .atx-tree-tab[data-panel-open] {
+  left: calc(min(320px, 90vw) + 5px);
+}
+.atx-tree[data-on][data-layout="docked"] ~ .atx-tree-tab[data-panel-open] {
+  left: min(320px, 90vw);
 }
 
 .atx-tree-body {

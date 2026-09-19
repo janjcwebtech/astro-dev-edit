@@ -16,6 +16,8 @@ Writing an entry — one line, past tense, no essay:
 
 ### Changed
 
+- With `composition: true`, an open element tree arms selection without Alt/⌥ — the page's links and buttons select rather than navigate — and its edge tab stays up as a chevron that collapses both panels and disarms it. Escape steps back one level: it clears a selection first, then collapses the panels.
+- The inspector's layout switch shows *docked* as a brand-tinted fill with a ring, and **Copy context** sits on an opaque fill instead of the see-through outline.
 - The inspector's route row names the whole project-relative path (`src/pages/index.astro`), not the file's basename, and the *Hold Alt / ⌥…* hint no longer sits under it.
 - The **Component chain** is drawn as an indented tree rather than a flat list of cards: the route entry, a level per component, then the element the chain ends at, each with its own glyph. The tier is one word in the card's header (*proven chain* · *one link inferred* · *no chain*), *presentation* and *content* are coloured role pills, and a row's **View code** / **Open parent** and the props and slots it passes appear when the row is selected instead of on every row at once.
 - The **CSS** group shows each matched rule as syntax-tinted source with its file on a band underneath — the same rule block the hover pill's class chips pop, now shared rather than rendered twice — with chips above it that filter the list to one of the element's classes.

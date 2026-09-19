@@ -254,11 +254,17 @@ export function initInspectorApp() {
     layout: { mode: () => layout.mode(), toggle: () => layout.toggleMode() },
   });
   const tree = initTree({
-    readOnly: true, header, footer: legend, titleActions: [menuButton, settingsButton], isEditMode: () => true,
+    readOnly: true, persistentTab: true, header, footer: legend, titleActions: [menuButton, settingsButton], isEditMode: () => true,
     highlight, clearHighlight, openEditor: () => {},
     openSource: viewCode,
     onSelect: el => { clearHighlight(); select(el); },
     describe: el => descriptions.get(el) ?? null,
+    // The tab's chevron is the one "put it all away" control: it takes the
+    // inspector down with the tree. The tree's ✕ closes the tree alone.
+    onToggle: (open, via) => {
+      if (!open && via === 'tab') inspector.close();
+      syncArmed();
+    },
   });
   // The page is squeezed between these two when the layout is docked, so this
   // is the one place that knows which panel is on which edge.
@@ -425,6 +431,33 @@ export function initInspectorApp() {
     }
   }
 
+  /** Selection is armed while the tree is open: the page answers the pointer
+   *  as if Alt were held, until the tree is collapsed or closed. With no panel
+   *  up, Alt is the only way in. */
+  const armed = () => tree.isOpen();
+  const selecting = (event: MouseEvent | KeyboardEvent) => (event.altKey || armed()) && !state.get();
+
+  function syncArmed() {
+    paintTab();
+    setHeld(armed() && !state.get());
+  }
+
+  function paintTab() {
+    const open = tree.isOpen();
+    tree.tab.title = open ? 'Collapse the panels · selection needs Alt / ⌥ again'
+      : 'Open source inspector · selects without Alt / ⌥ while open';
+    tree.tab.setAttribute('aria-label', open ? 'Collapse source inspector' : 'Open source inspector');
+  }
+
+  /** Escape's last step, and the chevron's whole job: nothing left on screen,
+   *  and the page is back to needing Alt. */
+  function collapseAll() {
+    inspector.close();
+    tree.hide();
+    syncArmed();
+    clearHighlight();
+  }
+
   function target(event: MouseEvent): HTMLElement | null {
     if (isOwnUi(event) || state.get()) return null;
     const el = event.target;
@@ -439,26 +472,32 @@ export function initInspectorApp() {
     if (event.key === 'Alt' && !isOwnUi(event) && !state.get()) {
       event.preventDefault(); setHeld(true);
     }
-    // Escape belongs to whatever is innermost. This listener is on `document`
-    // in the capture phase, so it reaches the key before the element being
-    // typed into does — and a caret in the page means Escape is that edit's
-    // Revert, never the panel's Close.
-    if (event.key === 'Escape' && !state.get() && !staging.isEditing()) { inspector.close(); clearHighlight(); }
+    // Escape belongs to whatever is innermost, one step back per press. This
+    // listener is on `document` in the capture phase, so it reaches the key
+    // before the element being typed into does — and a caret in the page means
+    // Escape is that edit's Revert, never the panel's Close. Past that: a
+    // selection is dropped first, and only an empty panel collapses the UI.
+    if (event.key === 'Escape' && !state.get() && !staging.isEditing()) {
+      if (inspector.isOpen()) { inspector.close(); clearHighlight(); }
+      else collapseAll();
+    }
   }, true);
-  document.addEventListener('keyup', event => { if (event.key === 'Alt') setHeld(false); }, true);
+  document.addEventListener('keyup', event => { if (event.key === 'Alt') setHeld(armed() && !state.get()); }, true);
   window.addEventListener('blur', () => setHeld(false));
   document.addEventListener('mousemove', event => {
     if (onPill(event)) return;
-    setHeld(event.altKey && !state.get());
+    setHeld(selecting(event));
     const el = held ? target(event) : null;
     if (el && el !== hovered) highlight(el);
     else if (!el) clearHighlight();
   }, true);
   document.addEventListener('mousedown', event => {
-    if (event.altKey && target(event)) { event.preventDefault(); event.stopImmediatePropagation(); }
+    if (selecting(event) && target(event)) { event.preventDefault(); event.stopImmediatePropagation(); }
   }, true);
   document.addEventListener('click', event => {
-    const el = event.altKey ? target(event) : null;
+    // Armed, a link or button selects like anything else — navigating the
+    // site means collapsing the panels first.
+    const el = selecting(event) ? target(event) : null;
     if (!el) return;
     event.preventDefault(); event.stopImmediatePropagation();
     // The click is swallowed, so the browser never places a caret for it.
@@ -613,9 +652,8 @@ export function initInspectorApp() {
     });
   }
   mount(hoverOutline, pill, tree.root, tree.tab, tree.selectionOutline, tip.root, menu.root, inspector.root, layout.dock);
-  tree.tab.title = 'Open source inspector · hold Alt / ⌥ to select on the page';
-  tree.tab.setAttribute('aria-label', 'Open source inspector');
   tree.hide();
+  paintTab();
   rebuild();
   // A full reload is how Astro answers an `.astro` change, so an edit staged
   // before one has to be taken back rather than mourned. Anything whose source
