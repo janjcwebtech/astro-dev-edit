@@ -113,13 +113,13 @@ it('serializes entire operations, including reads, and recovers after failure', 
 });
 
 it('carries the file mode through the seam to disk', async () => {
-  // `/settings` is in textMutationPaths, so a key save goes through the
-  // injected writer rather than atomicWrite directly — the mode has to survive
-  // the trip or `.env.local` lands at the umask.
+  // A secret is written through the injected writer rather than atomicWrite
+  // directly, so the mode has to survive the trip or `.env.local` lands at
+  // the umask.
   const c = coordinator(false);
   const secret = join(root, '.env.local');
-  await c.run(() => c.write(secret, 'UNSPLASH_ACCESS_KEY=abc\n', null, 0o600));
-  expect(await readFile(secret, 'utf8')).toBe('UNSPLASH_ACCESS_KEY=abc\n');
+  await c.run(() => c.write(secret, 'API_TOKEN=abc\n', null, 0o600));
+  expect(await readFile(secret, 'utf8')).toBe('API_TOKEN=abc\n');
   if (process.platform !== 'win32') {
     const { stat } = await import('node:fs/promises');
     expect((await stat(secret)).mode & 0o777).toBe(0o600);

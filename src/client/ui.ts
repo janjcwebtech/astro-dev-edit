@@ -36,13 +36,12 @@ export type { ChromeInset };
 // this chrome claims the screen, so the toolbar stays reachable beside it.
 export const Z = 1999999000;
 
-// Base layer for every *modal* surface — backdrop, toast, panel, drawer, at
-// Z_MODAL+5..Z_MODAL+10 (the deepest is the Unsplash settings panel). Above
+// Base layer for every *modal* surface — backdrop and toast at Z_MODAL+5,
+// panel and drawer at +6, the tip above all of them at +11. Above
 // Astro's toolbar, because a surface that has drawn a backdrop over the page
 // has claimed the whole screen: leaving it underneath let Astro's invisible
 // `#dev-bar-hitbox-above` swallow clicks on whatever overlay control happened
-// to land in the bottom-centre band, most visibly the entry drawer's Delete.
-// The relative offsets are unchanged, so the modal stack keeps its own order.
+// to land in the bottom-centre band, most visibly a drawer's footer buttons.
 export const Z_MODAL = 2000000020;
 
 /**
@@ -335,7 +334,7 @@ export function styled<K extends keyof HTMLElementTagNameMap>(
  * control baseline from styles.ts.
  *
  * The marker is `[data-input]`, not a class, because every caller already
- * names its own (`atx-field-input`, `atx-collections-input`, `atx-settings-key`
+ * names its own (`atx-field-input`, `atx-value-input`, `atx-popup-input`
  * …) and there is no shared class to key a rule off. `style` is for the
  * per-caller trim a control genuinely needs — a monospace face on a path
  * field, `flex` inside a row — not for the baseline, which is not repeatable
@@ -540,9 +539,9 @@ function stopScrollPropagation(e: Event): void {
  * described because icons.ts imports this module, and reaching back for
  * `icon()` here would close a cycle.
  *
- * `opts` covers the panels that need a different size or stacking layer (the
- * media modal, the widened image panel). Sizing stays here rather than being
- * poked into `panel.style` by callers, so one module owns panel chrome.
+ * `opts` covers the panels that need a different size (the code peek, the
+ * element-context panel). Sizing stays here rather than being poked into
+ * `panel.style` by callers, so one module owns panel chrome.
  */
 export interface PanelOptions {
   /** CSS width; defaults to `min(420px, 92vw)`. */
@@ -550,9 +549,6 @@ export interface PanelOptions {
   /** CSS height. Omitted means auto — the panel is as tall as its content.
    *  Setting it makes the body the scrolling region. */
   height?: string;
-  /** Offset added to the base `Z_MODAL`. Defaults to 6 (the standard panel
-   *  layer); the media modal uses 8 so it can stack above the CMS drawer. */
-  layer?: number;
 }
 export function buildPanel(
   title: string,
@@ -560,7 +556,7 @@ export function buildPanel(
   opts: PanelOptions = {},
 ): HTMLElement {
   const panel = styled('div', 'atx-panel', {
-    zIndex: String(Z_MODAL + (opts.layer ?? 6)),
+    zIndex: String(Z_MODAL + 6),
     ...(opts.width ? { width: opts.width } : {}),
     ...(opts.height ? { height: opts.height } : {}),
   });
@@ -598,10 +594,6 @@ export interface DrawerOptions {
    * which one, which is the half that used to be crammed after a `·`.
    */
   description?: string;
-  /** Offset added to the base `Z_MODAL`. Defaults to 6, the standard panel
-   *  layer. The settings drawer can open *above* the media modal (which sits at
-   *  8), so it needs to ask for a higher one. */
-  layer?: number;
   /**
    * A chip beside the name, qualifying the drawer as a whole — "experimental".
    * It belongs on the title rather than in the body because it is true of every
@@ -612,7 +604,7 @@ export interface DrawerOptions {
 }
 export function buildDrawer(title: string, opts: DrawerOptions = {}): HTMLElement {
   const drawer = styled('div', 'atx-drawer', {
-    zIndex: String(Z_MODAL + (opts.layer ?? 6)),
+    zIndex: String(Z_MODAL + 6),
     ...(opts.width ? { width: opts.width } : {}),
   });
 
@@ -730,9 +722,8 @@ export function badge(label: string, tone: BadgeTone): HTMLElement {
 /**
  * A tab strip and the single host its active pane is mounted into.
  *
- * Lifted out of the media modal, which grew the first one for its
- * Project/Unsplash sources, when the Settings drawer needed a second. The
- * behaviours worth keeping are both non-obvious:
+ * The Settings drawer's tabs. The behaviours worth keeping are both
+ * non-obvious:
  *
  * - **The strip is not rendered when there is only one tab.** A lone tab is not
  *   a choice, and drawing it implies there are others.
@@ -869,11 +860,9 @@ export function setFreshSrc(img: HTMLImageElement, path: string): void {
   img.src = bust();
 }
 
-/** Dim backdrop that closes the panel when clicked. `layer` matches the panel
- *  it sits under — the media modal's backdrop must land above the CMS drawer it
- *  can open over, not at the standard panel layer. */
-export function buildBackdrop(onClose: () => void, layer = 5): HTMLElement {
-  const b = styled('div', 'atx-backdrop', { zIndex: String(Z_MODAL + layer) });
+/** Dim backdrop that closes the panel when clicked, one layer under it. */
+export function buildBackdrop(onClose: () => void): HTMLElement {
+  const b = styled('div', 'atx-backdrop', { zIndex: String(Z_MODAL + 5) });
   b.addEventListener('click', onClose);
   return b;
 }

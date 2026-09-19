@@ -102,7 +102,7 @@ export interface TreeHandle {
 
 export function initTree(deps: TreeDeps): TreeHandle {
   // Panel shell: fixed to the left edge, full height. Below modal panels and
-  // drawers (Z_MODAL+5/6) so an open CMS drawer overlays it, above the hover
+  // drawers (Z_MODAL+5/6) so an open drawer overlays it, above the hover
   // pill so rows read clearly. Non-modal — no backdrop, never touches state.ts.
   const root = styled('div', 'atx-tree', undefined, 'atx-tree');
 

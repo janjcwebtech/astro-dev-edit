@@ -38,20 +38,9 @@ export interface DrawerOpenOptions {
   description?: string;
   /** Chip beside the title; see `ui.ts::DrawerOptions`. */
   badge?: HTMLElement;
-  /** Stacking layer. Needed when a drawer opens above something already
-   *  raised — the Settings drawer reached from the media modal's "no key
-   *  configured" card. */
-  layer?: number;
-  /** Run after the drawer is gone, however it closed. Lets the caller that
-   *  raised it resume — the Unsplash pane re-runs its search once a key
-   *  exists. */
+  /** Run after the drawer is gone, however it closed — the admin bar
+   *  refreshes, since a Settings save can change what it shows. */
   onClose?(): void;
-  /**
-   * Hand the interaction slot back to whatever held it, instead of clearing it.
-   * Required when this drawer opened above another modal surface, which would
-   * otherwise stop owning the page's clicks once this one closes.
-   */
-  restoreState?: boolean;
 }
 
 export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell {
@@ -59,16 +48,13 @@ export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell 
     ...(opts.width ? { width: opts.width } : {}),
     ...(opts.description ? { description: opts.description } : {}),
     ...(opts.badge ? { badge: opts.badge } : {}),
-    ...(opts.layer !== undefined ? { layer: opts.layer } : {}),
   });
   const body = drawer.querySelector('[data-body]') as HTMLElement;
   const foot = drawer.querySelector('[data-foot]') as HTMLElement;
   const actions = drawer.querySelector('[data-actions]') as HTMLElement;
 
-  const heldBefore = opts.restoreState ? state.get() : null;
   const teardown = (): void => {
-    if (heldBefore) state.releaseTo(token, heldBefore);
-    else state.releaseIf(token);
+    state.releaseIf(token);
     releaseFocus();
     drawer.remove();
     backdrop.remove();
@@ -84,7 +70,7 @@ export function openDrawer(title: string, opts: DrawerOpenOptions): DrawerShell 
     teardown();
     return true;
   };
-  const backdrop = buildBackdrop(close, opts.layer !== undefined ? opts.layer - 1 : undefined);
+  const backdrop = buildBackdrop(close);
   let token = state.begin({ kind: 'panel', close });
 
   mount(backdrop, drawer);

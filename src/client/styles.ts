@@ -384,8 +384,8 @@ button {
 
 /* ── Shells ────────────────────────────────────────────────────────────────
    The panel, drawer, backdrop and tab strip built by ui.ts. What stays inline
-   at those call sites is only what cannot be known here: the computed stacking
-   layer (Z_MODAL + n), a caller's width or height override, and the sized-panel
+   at those call sites is only what cannot be known here: the stacking layer
+   (Z_MODAL + n, computed from ui.ts), a caller's width or height override, and the sized-panel
    branch, which is a [data-sized] flag rather than an inline display so the
    layout lives in one place. */
 
@@ -2371,11 +2371,9 @@ input[type='checkbox'].atx-switch:disabled {
 
 /* == Settings drawer =======================================================
    editors/settings-panel.ts. The option controls themselves come from
-   fields.ts; what is here is the drawer's own prose, the Unsplash key section
-   and the three status lines. Four states are attributes: [data-off] on the
-   key section while the photo source is switched off, [data-on] on the error
-   and gitignore-warning lines, [data-hidden] on the clear-key button, and
-   [data-tone] / [data-mono] on a status word. */
+   fields.ts; what is here is the drawer's own prose and its three status
+   lines. Two states are attributes: [data-on] on the error and
+   gitignore-warning lines, and [data-tone] on a status word. */
 
 /* A stack of cards under the tab strip. */
 .atx-settings-pane {
@@ -2384,8 +2382,6 @@ input[type='checkbox'].atx-switch:disabled {
   gap: 16px;
   padding-top: 16px;
 }
-
-.atx-settings-status,
 
 .atx-settings-status {
   margin: 0;
@@ -2410,10 +2406,6 @@ input[type='checkbox'].atx-switch:disabled {
   display: block;
 }
 
-/* The access key is a secret with its own endpoint, not an option, so it is a
-   card of its own rather than a heading inside the options card. It dims
-   whole while the photo source it belongs to is off. */
-
 .atx-settings-text {
   font: 13px var(--atx-font-ui);
 }
@@ -2422,23 +2414,12 @@ input[type='checkbox'].atx-switch:disabled {
   color: var(--atx-muted-fg);
 }
 
-/* successText, not success: the plain token is a *background* — a dark green
-   that reaches 2.7:1 as ink on a panel, which is the mistake the two-token
-   split exists to prevent. */
-.atx-settings-text[data-tone='ok'] {
-  color: var(--atx-success-text);
-}
-
 .atx-settings-text[data-tone='warn'] {
   color: var(--atx-warning);
 }
 
-.atx-settings-text[data-mono] {
-  font: 12px var(--atx-font-mono);
-}
-
 /* Muted, not amber: an option the project set in its own config is a normal
-   state, and the one warning colour is spent on the uncommitted-secret line. */
+   state, and the one warning colour is spent on the uncommitted-settings line. */
 .atx-settings-lock {
   display: flex;
   align-items: center;

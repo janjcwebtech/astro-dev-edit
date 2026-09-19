@@ -21,7 +21,7 @@ Patcher and middleware changes land with a pinning test. Server-side logic is co
 
 ## Gate 3 — runtime in the playground
 
-Needed for client/overlay changes, or server code the tests stub (`content-config.ts`'s real `ssrLoadModule` path).
+Needed for client/overlay changes, and for what exists only inside a running dev server — the `annotate.ts` transform, HMR.
 
 ### Launch
 
@@ -30,13 +30,13 @@ Needed for client/overlay changes, or server code the tests stub (`content-confi
 ```bash
 cd examples/playground
 npx astro dev status                        # already up? on what port?
-curl -s localhost:<port>/__dev-edit/health  # `root` says WHICH project it serves
+lsof -a -p "$(lsof -tiTCP:<port> -sTCP:LISTEN)" -d cwd   # WHICH project it serves
 ```
 
-- **`health.root` is the only trustworthy identity check** — never the port. The daemonized playground routinely takes :4321, the port the real consuming site would use. `…/astro-text-edit/examples/playground/` is safe to drive.
-- ⚠️ A server you did not start may belong to a **concurrent session**. Confirm `health.root` and leave it running rather than `stop`ping it.
+- **The server's `cwd` is the only trustworthy identity check** — never the port, and not `/health`, which carries no path. The daemonized playground routinely takes :4321, the port the real consuming site would use. `…/astro-text-edit/examples/playground` is safe to drive.
+- ⚠️ A server you did not start may belong to a **concurrent session**. Confirm its `cwd` and leave it running rather than `stop`ping it.
 - An already-running playground is fine for `src/client/` work — Vite compiles the working tree per request.
-- ⚠️ **`src/server/` changes need a restart.** The middleware is built once in `astro:config:setup` / `server:setup` and captured, so a route, patcher or `schema-introspect.ts` edit keeps answering with the old code and looks like the fix did nothing. Option *values* are the deliberate exception — they resolve per request.
+- ⚠️ **`src/server/` changes need a restart.** The middleware is built once in `astro:config:setup` / `server:setup` and captured, so a route or patcher edit keeps answering with the old code and looks like the fix did nothing. Option *values* are the deliberate exception — they resolve per request.
 
 Your own instance (also for a second isolated one — concurrent session, different options):
 
@@ -57,12 +57,12 @@ Daemon controls: `astro dev status`, `astro dev stop`, `astro dev logs [--follow
 
 ```js
 const root = document.querySelector('astro-dev-edit').shadowRoot;
-root.getElementById('atx-entry').click();
+root.getElementById('atx-toggle').click();
 ```
 
-Exception: `.atx-rte-content` is slotted **light DOM**, so `document.querySelector` finds it.
+Exception: an inline edit is the page's **own element** made `contenteditable="plaintext-only"` — light DOM, so `document.querySelector('[contenteditable]')` finds it.
 
-- Singletons in that root: `#atx-bar` holding `#atx-toggle`, `#atx-entry` (detail pages only), `#atx-bar-elements`, `#atx-bar-pin`, `#atx-bar-exit`, `#atx-bar-edge`; `#atx-hairline` when retracted; menu items `#atx-menu-page-source`, `#atx-menu-collections`, `#atx-menu-settings`; `#atx-tree-tab`; drawer `.atx-drawer`.
+- Singletons in that root: `#atx-bar` holding `#atx-toggle`, `#atx-bar-elements`, `#atx-bar-pin`, `#atx-bar-exit`, `#atx-bar-edge`; `#atx-hairline` when retracted; menu items `#atx-menu-page-source`, `#atx-menu-settings`; `#atx-tree-tab`; drawer `.atx-drawer`.
 - Inspector mode (`composition: true`, `npm run dev:composition`) adds `#atx-dock` and its drag handle `#atx-dock-grip`; the layout switch is the first button in `.atx-inspector-header`.
 - State: `sessionStorage.astroDevEditMode` (`'1'`/`'0'`), `localStorage.astroDevEditBar` (pin/dock), `localStorage.astroDevEditLayout` (`{mode, dockHeight, dockOpen}`).
 - Hover is JS-driven on `#atx-bar` — `browser_hover` plus `getComputedStyle` through `browser_evaluate`.
@@ -71,30 +71,19 @@ Fixtures:
 
 | Page | Exercises |
 | --- | --- |
-| `/` | Edit toggle only |
-| `/articles/` | listing, literal text |
-| `/articles/editing-astro-sites` | declares the page-source meta → Edit entry pill + CMS drawer |
-| `/articles/text-editors-vs-visual-editors` | markdown table → body opens raw-only |
-| `/articles/drafts-live-here-too` | `draft: true` → boolean widget, off the listing |
+| `/`, `/about` | literal text, edit toggle |
+| `/articles/<slug>`, `/works/<slug>` | a route rendering a Markdown entry — its values are not editable in the browser |
+| `/swap/a` ↔ `/swap/b` | `<ClientRouter />` navigation: the overlay must survive the body swap |
+| `npm run dev:composition` → `/marketing` | inspector mode on a three-deep component chain |
 
-### Drive the CMS routes without a browser
+### Live server checks without a browser
 
-Fastest way to exercise the `ssrLoadModule` path the tests stub. Every route needs a localhost `Origin`:
-
-```bash
-curl -s -H 'Content-Type: application/json' -H 'Origin: http://localhost:4321' \
-  -X POST http://localhost:4321/__dev-edit/collections -d '{}'
-```
-
-`/collections` is the highest-signal single call: `fieldSource: "schema"` (not `"inferred"`) means schema introspection is alive for this project's zod major. Read the wire shape in `src/shared/protocol.ts` before hand-rolling a body — an unknown key is ignored, not refused (`dir` vs `directory` on `/collection/create` silently uses the default directory).
+Routes are pinned by the middleware tests. For a live look, `GET /__dev-edit/health` and `GET /__dev-edit/settings`. An `Origin` header is optional, but when present it must be localhost.
 
 ### Restore the fixtures
 
-Overlay edits write into the playground's own source. Four things get dirtied and only the first shows in `git status`:
+Overlay edits write into the playground's own source:
 
-- entry files and `src/content.config.ts` → `git checkout --`
-- **empty directories** the collection designer created (`src/content/<name>`) → `rmdir` by name
-- `.astro-dev-edit.json` (gitignored) → reset by hand after testing overrides or settings
-- `.env.local` (gitignored) → **delete it** after testing the access key. This is the one holding a real credential, so it is the one worth not forgetting
-
-`/collections`' `etag` returns to its original value once the config is byte-identical again.
+- edited `.astro` files → `git checkout --`
+- uploads land in the upload dir as new untracked files → delete by name
+- `.astro-dev-edit.json` (gitignored, invisible to `git status`) → reset by hand after testing Settings

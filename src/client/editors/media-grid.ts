@@ -38,8 +38,7 @@ export interface GridTile {
    *
    * Disabled rather than hidden on purpose: an asset dir listing that quietly
    * drops half its files reads as "you have no images" when the real answer is
-   * "not this one, and here is why" — the stance the collection designer takes
-   * with a disabled field type. (issue #9)
+   * "not this one, and here is why". (issue #9)
    */
   disabledReason?: string;
   /** The long form of that reason, for the tile's title. The band on the tile

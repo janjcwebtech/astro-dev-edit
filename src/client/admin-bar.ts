@@ -8,8 +8,7 @@ import { overlayActiveElement } from './shadow.ts';
  * The admin bar — the overlay's one piece of persistent chrome.
  *
  * A full-width strip docked to the top (or bottom) of the viewport holding every
- * global action: the element tree, edit mode, the CMS entry drawer, the bar's own
- * pin/dock controls, and the exit button that doubles as the save indicator.
+ * global action: the element tree, edit mode, the bar's own pin/dock controls, and the exit button that doubles as the save indicator.
  * Modelled on the WordPress admin bar with three deliberate differences:
  *
  *  - it **overlays** the page rather than pushing it down. The top edge belongs
@@ -27,8 +26,8 @@ import { overlayActiveElement } from './shadow.ts';
  * label/icon/visibility/lit-state from the live app state, so specs stay
  * declarative.
  *
- * What the bar does NOT own: edit mode, the tree, and the entry drawer all live
- * elsewhere and are reached through `AdminBarDeps`. The bar is a view.
+ * What the bar does NOT own: edit mode and the tree both live elsewhere and
+ * are reached through `AdminBarDeps`. The bar is a view.
  */
 
 /** Which viewport edge the bar is docked to. */

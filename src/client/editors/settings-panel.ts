@@ -52,11 +52,6 @@ const GROUPS: ReadonlyArray<{ id: string; label: string; blurb: string }> = [
 ];
 
 export interface SettingsPanelOptions {
-  /** Open on a particular tab. */
-  tab?: string;
-  /** Stacking layer, when opened above something already raised — that same
-   *  card opens this from the media modal's own layer. */
-  layer?: number;
   /** Run after the drawer closes, whatever the outcome. */
   onClose?(): void;
 }
@@ -75,7 +70,6 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     isDirty,
     discardMessage: 'Discard unsaved settings changes?',
     width: 'min(max(520px, 44vw), 94vw)',
-    ...(opts.layer !== undefined ? { layer: opts.layer, restoreState: true } : {}),
     ...(opts.onClose ? { onClose: opts.onClose } : {}),
   });
   const { body, foot } = shell;
@@ -150,10 +144,9 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     }
   };
 
-  const text = (value: string, tone: 'muted' | 'ok' | 'warn', mono = false): HTMLElement => {
+  const text = (value: string, tone: 'muted' | 'warn'): HTMLElement => {
     const el = styled('span', 'atx-settings-text');
     el.dataset.tone = tone;
-    if (mono) el.dataset.mono = '';
     el.textContent = value;
     return el;
   };
@@ -163,7 +156,7 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
     // Muted, not amber: an option the project set in its own config is a
     // normal state, and painting a third of the panel in warning colour would
     // spend the one colour that should mean "something is wrong" — which here
-    // is the uncommitted-secret warning at the bottom.
+    // is the uncommitted-settings warning at the bottom.
     const note = styled('p', 'atx-settings-lock');
     note.append(
       icon('lock', 12),
@@ -237,7 +230,6 @@ export function openSettingsPanel(opts: SettingsPanelOptions = {}): void {
   void api.getSettings().then(
     (data) => {
       paint(data);
-      if (opts.tab) tabs.show(opts.tab);
     },
     (err: unknown) => {
       status.textContent = '';

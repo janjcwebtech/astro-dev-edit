@@ -4,7 +4,7 @@ import { parseUsages } from '../src/server/usage-parse.ts';
 import { createUsageIndex } from '../src/server/usage-index.ts';
 import { usageId } from '../src/shared/usage-id.ts';
 import { resolveComposition } from '../src/server/composition.ts';
-import { compositionRelation } from '../src/client/composition-model.ts';
+import { compositionRelation } from './helpers.ts';
 import type { UsageLink } from '../src/shared/protocol.ts';
 
 const link = (file: string, target: string, loc = '1:1', extra = {}): UsageLink => ({

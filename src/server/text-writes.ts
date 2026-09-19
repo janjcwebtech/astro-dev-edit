@@ -9,8 +9,8 @@ import { atomicWrite, insideRoot } from './paths.ts';
  *
  * `original`: null means a new file; undefined snapshots the current contents.
  * `mode`: file mode for the write, applied to the temp file so a secret is
- * never briefly world-readable — pass `SECRET_MODE` for anything holding the
- * access key, and omit it otherwise.
+ * never briefly world-readable — pass `SECRET_MODE` for anything holding a
+ * secret, and omit it otherwise.
  */
 export type TextWriter = (
   target: string,
@@ -38,8 +38,8 @@ async function contents(target: string): Promise<string | null> {
   }
 }
 
-/** One instance per middleware. Entire requests queue, including a settings save
- *  that writes both `.env.local` and the settings file. */
+/** One instance per middleware. Entire requests queue, a settings save
+ *  included. */
 export function createTextWrites(deps: {
   root: string;
   optionsResolver: OptionsResolver;
@@ -66,7 +66,7 @@ export function createTextWrites(deps: {
     const before = original === undefined ? await contents(target) : original;
     if (before === content) return;
     // Callers retain their content / config / fixed-path gates (the settings
-    // file and `.env.local` are both fixed targets). Pin the
+    // file is a fixed target). Pin the
     // resolved target and parent as well, so a symlink swap during the pause fails.
     const root = await realpath(deps.root);
     const parent = await realpath(dirname(target));

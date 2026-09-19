@@ -87,19 +87,6 @@ function ensure(): ShadowRoot {
   return root;
 }
 
-/** The shadow root. Query it instead of `document` — `document.querySelector`
- *  does not cross the boundary. */
-export function overlayRoot(): ShadowRoot {
-  return ensure();
-}
-
-/** The host element. Needed for `composedPath().includes(host)` and as the
- *  parent for the shadow root. */
-export function overlayHost(): HTMLElement {
-  ensure();
-  return host as HTMLElement;
-}
-
 /** Mount overlay chrome. The shadow-root replacement for `document.body.append`
  *  — every panel, drawer, bar and toast goes through here. */
 export function mount(...nodes: Node[]): void {

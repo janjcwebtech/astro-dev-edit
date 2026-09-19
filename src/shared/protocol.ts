@@ -632,16 +632,6 @@ export interface ErrorResponse {
   code?: RefusalCode;
 }
 
-// --- The media modal ---------------------------------------------------------
-/** What the media picker resolves with. `origin` is a server-side distinction:
- *  an existing asset and a fresh upload produce the same kind of path by
- *  different routes, and a caller may want to know which. */
-export interface MediaPick {
-  /** The value to write — already relative-converted if the field needs it. */
-  webPath: string;
-  origin: 'existing' | 'upload';
-}
-
 // --- GET/POST /settings ------------------------------------------------------
 /** The control an option renders as. Declared by the server's `OPTION_SPECS`
  *  table; the panel builds a control per member and knows no option names. */

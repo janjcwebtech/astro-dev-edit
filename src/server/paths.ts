@@ -41,8 +41,7 @@ export function resolveUploadDir(
 }
 
 /**
- * Where an asset write should land — the shared rule behind `/upload` and
- * `/unsplash/import`.
+ * Where an asset write should land — the rule behind `/upload`.
  *
  * Two decisions in one place. An `assetRef: 'relative'` field's asset is
  * imported by Astro rather than served verbatim, so it falls back to the
@@ -197,15 +196,15 @@ export async function validateEditablePath(
   return check.abs;
 }
 
-/** Owner-only. The mode for any file holding the Unsplash access key. */
+/** Owner-only. The mode for any file holding a secret. */
 export const SECRET_MODE = 0o600;
 
 /**
  * Write atomically: temp file in the same directory, then rename. (spec §10)
  *
  * `mode` rides the **temp file**, not the finished one. Chmod-ing after the
- * rename leaves a window in which the content — for a secret-bearing file, the
- * access key — sits on disk at the process umask, typically world-readable.
+ * rename leaves a window in which a secret-bearing file's content sits on disk
+ * at the process umask, typically world-readable.
  * `rename` then carries the temp inode's mode onto the target, so a
  * pre-existing loose file is tightened rather than left as it was. The chmod is
  * belt-and-braces over `writeFile`'s `mode`, which is honoured only on create:

@@ -31,12 +31,6 @@ export function setFeatures(info: HealthResponse): void {
   features.openInEditor = info.openInEditor === true;
 }
 
-/** Re-read a single flag — used after a Settings save, so an affordance appears
- *  without a page reload. */
-export function updateFeature<K extends keyof Features>(key: K, value: Features[K]): void {
-  features[key] = value;
-}
-
 export function has(key: keyof Features): boolean {
   return features[key];
 }

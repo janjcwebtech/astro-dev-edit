@@ -473,8 +473,9 @@ async function boot(): Promise<void> {
   const info = await api.health();
   if (!info) return;
   // Every option-derived flag is read through features.ts rather than a local,
-  // so the media modal can see them without importing the composition root and
-  // so a Settings save updates them in place. (see features.ts)
+  // so a panel deep in the import graph can see them without importing the
+  // composition root, and so a Settings save updates them in place. (see
+  // features.ts)
   setFeatures(info);
   if (info.composition) {
     inspectorMode = true;

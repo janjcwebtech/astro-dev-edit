@@ -10,7 +10,7 @@ import { annotateAstroSource } from '../src/server/annotate.ts';
 import { createUsageIndex } from '../src/server/usage-index.ts';
 import { resolveComposition } from '../src/server/composition.ts';
 import { renderOccurrences, type TraceEvent } from '../src/client/render-occurrences.ts';
-import { compositionRelation } from '../src/client/composition-model.ts';
+import { compositionRelation } from './helpers.ts';
 import { applyAstro, classifyAstro } from '../src/patcher/astro.ts';
 
 const root = fileURLToPath(new URL('./fixtures/composition/', import.meta.url));

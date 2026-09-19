@@ -113,11 +113,6 @@ export function safeFileName(name: string, fallbackExt: string): string {
  * suffix is added rather than overwriting. Returns the web-servable path and
  * the name actually written. (safe: writes a NEW asset file, never patches
  * source)
- *
- * Bytes-in rather than data-URL-in because not every caller has a data URL:
- * `/unsplash/import` downloads a response body, and synthesising a data URL
- * from it would mean a ~33% larger base64 string and a decode straight back to
- * the Buffer we started with.
  */
 export async function saveBuffer(
   root: string,

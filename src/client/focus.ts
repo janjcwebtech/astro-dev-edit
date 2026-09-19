@@ -19,9 +19,9 @@ import { overlayActiveElement } from './shadow.ts';
  * - **The composed tree, not the shadow tree.** Slots are followed, in slot
  *   order, so Tab order matches what the eye sees rather than what
  *   `shell.querySelectorAll` happens to find.
- * - **Traps stack.** The media modal opens over a drawer, and the Settings
- *   drawer over the media modal. Only the innermost trap acts; the one
- *   underneath resumes when it is released, exactly like `state.releaseTo`.
+ * - **Traps stack.** A surface opened over another traps focus in turn; only
+ *   the innermost trap acts, and the one underneath resumes when it is
+ *   released.
  */
 
 const FOCUSABLE =

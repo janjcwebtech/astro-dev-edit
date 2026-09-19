@@ -59,7 +59,7 @@ describe('isServableAsset', () => {
 /**
  * `atomicWrite`'s mode. The parameter exists because chmod-ing after the rename
  * leaves the content on disk at the process umask first — for `.env.local`,
- * that is the access key world-readable for the length of a write.
+ * that is a secret world-readable for the length of a write.
  */
 describe('atomicWrite', () => {
   let dir: string;
