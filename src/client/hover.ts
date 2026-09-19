@@ -20,7 +20,7 @@ import {
  * and the interactive tooltip pill (file:loc · verdict, plus "open ↗" and
  * "copy ⧉" buttons). Clicking the file:loc label opens the in-browser source
  * peek; "open ↗" jumps to the editor; "copy ⧉" puts the element's context
- * (HTML, CSS, source) on the clipboard. Hover state is self-contained
+ * (tag, source location, rendering chain) on the clipboard. Hover state is self-contained
  * here — it never interacts with the editing slot in state.ts.
  *
  * The pill never guesses. It appears instantly in a neutral "checking" state
@@ -86,7 +86,7 @@ const tooltipOpen = pillButton(
   icon("external", 12),
 );
 
-// The context copy: everything we know about this element as one markdown
+// The context copy: which element and where it lives, as one markdown
 // block, for pasting into an AI assistant. Its label swaps through
 // copying…/copied, so it holds a fixed width — the pill must not resize
 // mid-interaction (the verdict slot next to it exists for the same reason).
@@ -99,7 +99,7 @@ const copyIcon = icon("copy", 12);
 const tooltipCopy = pillButton(
   "atx-tooltip-copy",
   COPY_IDLE,
-  "Copy this element's source, HTML and CSS as context for an AI assistant",
+  "Copy this element's tag, source location and the files that render it, for an AI assistant",
   { minWidth: "108px" },
   copyIcon,
 );

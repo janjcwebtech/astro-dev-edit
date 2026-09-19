@@ -1,39 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import type { PeekResponse } from '../src/shared/protocol.ts';
+import type { PeekResponse, UsageLink } from '../src/shared/protocol.ts';
 import {
+  chainSteps,
   formatContext,
+  textOf,
   windowAround,
   type ElementContext,
 } from '../src/client/element-context.ts';
 
 /**
- * The clipboard payload behind the hover pill's "copy ⧉". `formatContext` is
- * the pure half of element-context.ts — an ElementContext in, markdown out —
- * so what an assistant actually receives is pinned here without a browser.
- * The DOM/fetch half (collectContext) is manual-verified in the playground;
- * see docs/VERIFICATION.md.
+ * The clipboard payload behind **Copy context**. `formatContext` is the pure
+ * half of element-context.ts — an ElementContext in, markdown out — so what an
+ * assistant actually receives is pinned here without a browser. The DOM/fetch
+ * half (collectContext) is manual-verified in the playground.
  */
 
 const FULL: ElementContext = {
-  loc: { file: 'src/pages/index.astro', loc: '12:3' },
+  loc: { file: 'src/components/Hero.astro', loc: '12:3' },
   openTag: '<h1 class="hero-title">',
   label: 'h1.hero-title',
-  verdict: 'editable text — literal text',
+  text: 'Something Familiar',
   pageUrl: 'http://localhost:4321/',
+  routeFile: 'src/pages/index.astro',
   entryFile: null,
+  chain: [{ name: 'Hero', usedAt: 'src/pages/index.astro:8:5', target: 'src/components/Hero.astro' }],
   domPath: 'body > main > section.hero > h1.hero-title',
-  html: '<h1 class="hero-title">Something Familiar</h1>',
-  htmlDropped: 0,
-  rules: [
-    {
-      selectorText: '.hero-title',
-      declarations: 'font-size: 3rem;\nline-height: 1.05;',
-      sourceFile: 'src/styles/global.css',
-    },
-  ],
-  rulesDropped: 0,
   source: {
-    file: 'src/pages/index.astro',
+    file: 'src/components/Hero.astro',
     startLine: 11,
     focusLine: 12,
     totalLines: 24,
@@ -54,17 +47,33 @@ function peek(overrides: Partial<PeekResponse> = {}): PeekResponse {
 }
 
 describe('formatContext', () => {
-  it('lays out every section, in order, for a fully-populated element', () => {
+  it('names the element, where it is written, and the files that render it', () => {
     const out = formatContext(FULL);
-    expect(out).toContain('# Element context — src/pages/index.astro:12:3');
+    expect(out).toContain('# Element context — src/components/Hero.astro:12:3');
     expect(out).toContain('- **Element** `<h1 class="hero-title">`');
+    expect(out).toContain('- **Text** "Something Familiar"');
+    expect(out).toContain('- **Written in** src/components/Hero.astro:12:3');
     expect(out).toContain('- **Page** http://localhost:4321/');
-    expect(out).toContain('- **DOM path** body > main > section.hero > h1.hero-title');
-    const order = ['## Rendered HTML', '## Source —', '## CSS that applies'];
-    const positions = order.map((heading) => out.indexOf(heading));
-    expect(positions.every((p) => p >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(out).toContain('- **Route file** src/pages/index.astro');
+    expect(out).toContain('- **Rendered via** (outermost first)\n  - `<Hero>` at src/pages/index.astro:8:5 → src/components/Hero.astro');
+    expect(out).toContain('## Source — src/components/Hero.astro');
     expect(out.endsWith('\n')).toBe(true);
+  });
+
+  // Compiled markup and matched CSS exist in no source file; a model handed
+  // them searches for markup that is not there, or starts restyling.
+  it('carries no rendered HTML, no CSS, and nothing Astro generated', () => {
+    const out = formatContext(FULL);
+    expect(out).not.toContain('Rendered HTML');
+    expect(out).not.toContain('CSS');
+    expect(out).not.toContain('```html');
+    expect(out).not.toContain('```css');
+    expect(out).not.toContain('data-astro-cid');
+    expect(out).not.toContain('**Editability**');
+  });
+
+  it('stays small — it identifies one element, it does not describe a page', () => {
+    expect(formatContext(FULL).length).toBeLessThan(800);
   });
 
   it('gutter-marks the element line with ">" and numbers from startLine', () => {
@@ -76,7 +85,7 @@ describe('formatContext', () => {
 
   it('states the quoted range and picks the fence language from the extension', () => {
     expect(formatContext(FULL)).toContain(
-      '## Source — src/pages/index.astro (lines 11–13 of 24, `>` marks the element)',
+      '## Source — src/components/Hero.astro (lines 11–13 of 24, `>` marks the element)',
     );
     expect(formatContext(FULL)).toContain('```astro');
     const md = formatContext({
@@ -95,21 +104,22 @@ describe('formatContext', () => {
   });
 
   it('omits the optional facts that are absent', () => {
-    const out = formatContext({ ...FULL, entryFile: null });
+    const out = formatContext({ ...FULL, text: '', routeFile: null, entryFile: null, chain: [] });
+    expect(out).not.toContain('**Text**');
+    expect(out).not.toContain('**Route file**');
     expect(out).not.toContain('**Content entry**');
-  });
-
-  // The verdict says what *this overlay* can edit, not what the element is, and
-  // an LLM handed the context reads it as a constraint. It is collected but
-  // never formatted, so a populated verdict must still not appear.
-  it('never renders the editability verdict, even when one was classified', () => {
-    expect(FULL.verdict).not.toBeNull();
-    expect(formatContext(FULL)).not.toContain('**Editability**');
+    expect(out).not.toContain('**Rendered via**');
   });
 
   it('names the backing content entry when the page declares one', () => {
     const out = formatContext({ ...FULL, entryFile: 'src/content/works/lamp.md' });
     expect(out).toContain('- **Content entry** src/content/works/lamp.md');
+  });
+
+  it('prints the DOM path only when there is no source quote to pin the element', () => {
+    expect(formatContext(FULL)).not.toContain('**DOM path**');
+    const out = formatContext({ ...FULL, source: null, sourceUnavailable: 'refused' });
+    expect(out).toContain('- **DOM path** body > main > section.hero > h1.hero-title');
   });
 
   it('replaces the source block with the reason when the server refused it', () => {
@@ -120,76 +130,43 @@ describe('formatContext', () => {
     });
     expect(out).toContain('## Source\n_Not available — That file belongs to a package, not your project._');
     expect(out).not.toContain('```astro');
-    // The rest of the payload still stands.
-    expect(out).toContain('## Rendered HTML');
-    expect(out).toContain('## CSS that applies');
+    expect(out).toContain('- **Written in** src/components/Hero.astro:12:3');
   });
 
   it('drops the source section entirely when there is nothing to say', () => {
     const out = formatContext({ ...FULL, source: null, sourceUnavailable: null });
     expect(out).not.toContain('## Source');
   });
+});
 
-  it('explains an empty CSS scan instead of printing an empty fence', () => {
-    const out = formatContext({ ...FULL, rules: [], rulesDropped: 0 });
-    expect(out).toContain('## CSS that applies\n_No stylesheet rule matches this element directly');
-    expect(out).not.toContain('```css');
+describe('textOf', () => {
+  it('collapses whitespace and caps with an ellipsis', () => {
+    expect(textOf('  Something\n   Familiar  ')).toBe('Something Familiar');
+    const long = textOf('x'.repeat(200), 10);
+    expect(long).toHaveLength(10);
+    expect(long.endsWith('…')).toBe(true);
   });
 
-  it('prints each rule with its source file, indented inside a block', () => {
-    const out = formatContext(FULL);
-    expect(out).toContain('/* src/styles/global.css */\n.hero-title {\n  font-size: 3rem;\n  line-height: 1.05;\n}');
+  it('keeps the quoted text from closing its own quotes', () => {
+    expect(textOf('say "hi"')).toBe("say 'hi'");
+  });
+});
+
+describe('chainSteps', () => {
+  const link = (id: string, name: string, target?: string): UsageLink => ({
+    id, file: 'src/pages/index.astro', loc: '8:5', offset: 0, name, target,
+    hasSpread: false, props: [], slots: [],
   });
 
-  it('omits the source comment for a rule whose stylesheet could not be resolved', () => {
-    const out = formatContext({
-      ...FULL,
-      rules: [{ selectorText: '.hero-title', declarations: 'color: red;', sourceFile: null }],
-    });
-    expect(out).toContain('.hero-title {\n  color: red;\n}');
-    expect(out).not.toContain('/* null */');
-  });
-
-  it('declares both truncations rather than silently shortening', () => {
-    const out = formatContext({ ...FULL, htmlDropped: 812, rulesDropped: 6 });
-    expect(out).toContain('_Truncated — 812 more characters of markup._');
-    expect(out).toContain('## CSS that applies (1 of 7 rules)');
-    expect(out).toContain('_Truncated — 6 further matching rules._');
-  });
-
-  it('counts rules in the heading when nothing was dropped', () => {
-    expect(formatContext(FULL)).toContain('## CSS that applies (1 rule)');
-    expect(
-      formatContext({ ...FULL, rules: [FULL.rules[0], FULL.rules[0]] }),
-    ).toContain('## CSS that applies (2 rules)');
-  });
-
-  it('never emits rendered geometry — it is not something to act on in source', () => {
-    const out = formatContext(FULL);
-    expect(out).not.toContain('Rendered box');
-    expect(out).not.toMatch(/display:|font: \d/);
-  });
-
-  it('announces a trimmed rule set rather than dropping rules silently', () => {
-    const out = formatContext({ ...FULL, rulesDropped: 9 });
-    expect(out).toContain('## CSS that applies (1 of 10 rules)');
-    expect(out).toContain('_Truncated — 9 further matching rules._');
-  });
-
-  it('keeps everything that identifies the element', () => {
-    const out = formatContext({ ...FULL, entryFile: 'src/content/blog/post.mdx' });
-    expect(out).toContain('- **Content entry** src/content/blog/post.mdx');
-    for (const section of [
-      '- **Element**',
-      '- **Source**',
-      '- **Page**',
-      '- **DOM path**',
-      '## Rendered HTML',
-      '## Source —',
-      '## CSS that applies',
-    ]) {
-      expect(out).toContain(section);
-    }
+  it('keeps the chain order and skips ids that did not resolve', () => {
+    const links = new Map([
+      ['aaaaaaaa', link('aaaaaaaa', 'Layout', 'src/layouts/Base.astro')],
+      ['cccccccc', link('cccccccc', 'Hero')],
+    ]);
+    expect(chainSteps(['aaaaaaaa', 'bbbbbbbb', 'cccccccc'], links)).toEqual([
+      { name: 'Layout', usedAt: 'src/pages/index.astro:8:5', target: 'src/layouts/Base.astro' },
+      { name: 'Hero', usedAt: 'src/pages/index.astro:8:5', target: null },
+    ]);
   });
 });
 
@@ -201,9 +178,9 @@ describe('windowAround', () => {
     const w = windowAround({
       file: 'src/pages/index.astro', startLine: 1, focusLine: 30, totalLines: 107, lines,
     });
-    expect(w.startLine).toBe(25);
-    expect(w.lines).toHaveLength(11);
-    expect(w.lines[w.lines.length - 1]).toBe('l35');
+    expect(w.startLine).toBe(27);
+    expect(w.lines).toHaveLength(7);
+    expect(w.lines[w.lines.length - 1]).toBe('l33');
     // …and the heading still says what was left out.
     expect(w.totalLines).toBe(107);
   });

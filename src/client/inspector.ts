@@ -103,7 +103,7 @@ export function initInspector(deps: InspectorDeps) {
     if (selected) deps.copyContext(selected, sourceFor(selected) ?? { file: '', loc: '' });
   });
   copyButton.classList.add('atx-btn-sm');
-  copyButton.title = 'Copy this element’s selector, source loc, chain and CSS';
+  copyButton.title = 'Copy this element’s tag, source location and the files that render it';
   status.append(tier, saveState, copyButton);
 
   const body = styled('div', 'atx-inspector-body');

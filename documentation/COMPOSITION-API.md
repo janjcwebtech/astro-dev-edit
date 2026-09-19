@@ -100,8 +100,8 @@ card stays collapsed — across a new selection and across a page — because th
 choice is kept per card title in `localStorage`. Its own two bands
 sit above them: a title bar naming the tool and the selected tag with the
 layout switch and the close, and a status row carrying the chain's tier, a **saved** or **N unsaved**
-chip once there is something to report, and **Copy context** — this element's selector, source
-loc, chain and applied CSS as one paste. A card's caveat is not a line under
+chip once there is something to report, and **Copy context** — this element's tag, source
+loc and component chain as one paste. A card's caveat is not a line under
 its title: it hangs off the ⓘ beside it, shown on hover.
 
 The panel shows, in this order:

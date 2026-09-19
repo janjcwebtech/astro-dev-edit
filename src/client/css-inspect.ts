@@ -183,45 +183,12 @@ export function rulesForToken(el: Element, token: string, kind: 'class' | 'id'):
 
 /**
  * Every rule `el` matches, whatever the selector — the chips card's scan
- * widened from "through this one class/ID" to "at all", for the copy-context
- * collector. Rules that apply only to an *ancestor* are not included: this is
+ * widened from "through this one class/ID" to "at all", for the inspector's
+ * CSS card. Rules that apply only to an *ancestor* are not included: this is
  * what the browser matched against this element.
  */
 export function rulesForElement(el: Element): MatchedRule[] {
   return scan(el, (sub) => !UNIVERSAL_ONLY.test(sub));
-}
-
-/**
- * Narrow a matched-rule list to `max`, dropping the rules that say least about
- * this element first.
- *
- * A selector naming one of the element's own classes or its id was written for
- * something like this element. `a { color: inherit }` matches an anchor
- * without naming it — a site-wide default, and a page's worth of those crowds
- * out the one rule the reader is actually asking about.
- *
- * Survivors keep their original order. Ranking them would misreport the
- * cascade, which among equal specificity is decided by document order, and a
- * reader of the result has no way to know the list was resorted.
- */
-export function narrowRules(el: Element, rules: MatchedRule[], max: number): MatchedRule[] {
-  if (rules.length <= max) return rules;
-  const tokens: { token: string; kind: 'class' | 'id' }[] = [
-    ...(el.id ? [{ token: el.id, kind: 'id' as const }] : []),
-    ...Array.from(el.classList).map((token) => ({ token, kind: 'class' as const })),
-  ];
-  const names = (rule: MatchedRule): boolean =>
-    splitSelectorList(rule.selectorText).some((sub) =>
-      tokens.some(({ token, kind }) => referencesToken(sub, token, kind)));
-
-  const specific = rules.filter(names);
-  if (specific.length >= max) return specific.slice(0, max);
-  const keep = new Set(specific);
-  for (const rule of rules) {
-    if (keep.size >= max) break;
-    keep.add(rule);
-  }
-  return rules.filter((r) => keep.has(r));
 }
 
 // --- Card DOM ----------------------------------------------------------------
