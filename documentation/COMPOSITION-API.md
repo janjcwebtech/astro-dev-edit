@@ -40,7 +40,9 @@ mounts no toolbar:
   passed in through a `<slot />`, named alongside the slot and its receiving
   file. A legend under the tree names both.
 
-Every card on it collapses from the chevron in its header. Its own two bands
+Every card on it collapses from the chevron in its header, and a collapsed
+card stays collapsed — across a new selection and across a page — because the
+choice is kept per card title in `localStorage`. Its own two bands
 sit above them: a title bar naming the tool and the selected tag with the
 close, and a status row carrying the chain's tier, a **saved** or **N unsaved**
 chip once there is something to report, and **Copy context** — this element's selector, source

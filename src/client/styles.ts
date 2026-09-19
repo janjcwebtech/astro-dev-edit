@@ -97,8 +97,12 @@ export function overlayCss(): string {
    a literal. */
 .atx-inspector-code { font: 12px/1.6 var(--atx-font-mono); color: var(--atx-chart3); white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; max-height: 220px; overflow: auto; }
 .atx-inspector-note { font: 12px/1.5 var(--atx-font-ui); color: var(--atx-muted-fg); overflow-wrap: anywhere; margin: 8px 0; }
-.atx-inspector-details { font: 12px/1.5 var(--atx-font-ui); margin: 8px 0; }
+.atx-inspector-details { font: 12px/1.5 var(--atx-font-ui); margin: 16px 0 8px; }
 .atx-inspector-details > summary { cursor: pointer; color: var(--atx-muted-fg); }
+/* Computed styles is a fixed list of thirteen declarations with nothing after
+   it to scroll past — a scroller inside the disclosure it already sits in
+   would be a second thing to open. */
+.atx-inspector-details > .atx-inspector-code { max-height: none; }
 /* A Values row is three bands — what it is (title, verdict, badges, caption) ·
    the value · where it goes — so the destination is named once instead of
    three times, and the mechanism vocabulary stays inside the Details
@@ -139,9 +143,12 @@ textarea.atx-value-input { min-height: 64px; resize: vertical; }
    all this has to set. */
 /* Flush with the card's gutter, so the hairline between two rows is exactly
    as wide as the content it separates. */
+/* Square, because a band is not a tile: a rounded corner on a row separated
+   only by a hairline reads as a card that failed to paint. */
 .atx-inspector-values .atx-item {
   align-items: flex-start;
   padding: 15px 0 17px;
+  border-radius: 0;
 }
 
 /* The row you clicked, marked without shouting: a bar, and nothing else. A
@@ -690,20 +697,27 @@ button {
 .atx-card-title {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 3px;
   min-width: 0;
   color: var(--atx-foreground);
   font: 500 16px/1.4 var(--atx-font-ui);
 }
 
 /* The card's caveat, folded onto an affordance. Quiet at rest — it is there
-   for the reader who wants it, not prose every reader has to step over. */
+   for the reader who wants it, not prose every reader has to step over.
+
+   Set like a footnote index: small, and raised to the title's cap line rather
+   than centred on it, so it marks the title instead of sitting in the row as a
+   second thing to read. The offset is measured from the 22.4px line box of the
+   16px/1.4 title. No cursor of its own — the pointer says nothing the raised
+   mark has not already said. */
 .atx-card-info {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 3px;
   color: var(--atx-faint-fg);
-  cursor: help;
 }
 
 .atx-card-info:hover,

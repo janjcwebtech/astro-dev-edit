@@ -20,8 +20,9 @@ import { styled } from './ui.ts';
  *   every list in the overlay is built from the same row rather than each
  *   panel inventing its own.
  *
- * All three are pure DOM: no state, no listeners, no imports beyond `styled`.
- * Callers own behaviour. Styling is `.atx-card*`, `.atx-field-group`,
+ * All three are DOM only: a card owns its own collapse and nothing else, and
+ * no primitive here reads the page or the server. Callers own behaviour the
+ * panel cares about. Styling is `.atx-card*`, `.atx-field-group`,
  * `.atx-item*` and `.atx-sep` in `styles.ts` — internal classes, as ever.
  */
 
@@ -58,13 +59,52 @@ export interface Card {
   foot(): HTMLElement;
 }
 
+// --- Persisted collapse ------------------------------------------------------
+
+/**
+ * The titles of the cards the reader has collapsed.
+ *
+ * Collapse is the reader's answer to "I am done with this concern", and that
+ * answer outlives the card it was given on: the inspector rebuilds every card
+ * on each selection, and a dev-server navigation rebuilds the whole overlay.
+ * Keying the set by title rather than by instance is what carries the answer
+ * across both — two cards that say the same thing are the same concern.
+ *
+ * `localStorage` rather than `sessionStorage` for the same reason the admin
+ * bar's edge lives there: it is a preference, not a transient of one page.
+ */
+const CARDS_KEY = 'astroDevEditCards';
+
+function collapsedCards(): Set<string> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(CARDS_KEY) ?? '[]');
+    return new Set(Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === 'string') : []);
+  } catch {
+    // No localStorage (or junk in it) — every card opens, which is the default.
+    return new Set();
+  }
+}
+
+function rememberCard(title: string, open: boolean): void {
+  const collapsed = collapsedCards();
+  if (open) collapsed.delete(title);
+  else collapsed.add(title);
+  try {
+    localStorage.setItem(CARDS_KEY, JSON.stringify([...collapsed]));
+  } catch {
+    // The choice just won't outlive the page.
+  }
+}
+
 /**
  * A bounded concern: header, body, and a footer band if one is asked for.
  *
  * The header is a band with a rule under it and a chevron on it: a panel is a
  * stack of these, and a reader who has answered one card wants it out of the
  * way rather than scrolled past. Collapse is view state only — the body keeps
- * its content and its listeners, so nothing has to be rebuilt to reopen it.
+ * its content and its listeners, so nothing has to be rebuilt to reopen it —
+ * and it is remembered by title, so re-selecting an element or navigating to
+ * another page brings the panel back the shape the reader left it in.
  */
 export function card(head?: CardHeadOptions): Card {
   const root = styled('div', 'atx-card');
@@ -72,17 +112,19 @@ export function card(head?: CardHeadOptions): Card {
   const body = styled('div', 'atx-card-body');
   if (head) {
     const bar = cardHead(head);
-    root.dataset.open = 'true';
+    const start = !collapsedCards().has(head.title);
+    root.dataset.open = String(start);
     const toggle = styled('button', 'atx-card-toggle');
     toggle.type = 'button';
-    toggle.setAttribute('aria-expanded', 'true');
-    toggle.setAttribute('aria-label', `Collapse ${head.title}`);
+    toggle.setAttribute('aria-expanded', String(start));
+    toggle.setAttribute('aria-label', `${start ? 'Collapse' : 'Expand'} ${head.title}`);
     toggle.append(icon('chevronDown', 13));
     toggle.addEventListener('click', () => {
       const open = root.dataset.open !== 'true';
       root.dataset.open = String(open);
       toggle.setAttribute('aria-expanded', String(open));
       toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} ${head.title}`);
+      rememberCard(head.title, open);
     });
     // The chevron leads the row, so the column of them reads down the panel.
     bar.prepend(toggle);
@@ -123,7 +165,7 @@ export function cardHead(o: CardHeadOptions): HTMLElement {
     info.tabIndex = 0;
     info.setAttribute('role', 'note');
     info.setAttribute('aria-label', o.description);
-    info.append(icon('info', 14));
+    info.append(icon('info', 11));
     explains(info, o.description);
     title.append(info);
   }
