@@ -201,19 +201,20 @@ status row has the same as **Copy context**. It puts on your clipboard what an
 assistant needs to find that element in your source, as one markdown block to
 paste along with what you want changed:
 
-- the element's **opening tag** as you wrote it — Astro's generated
-  `data-astro-cid-*` attributes and `astro-*` classes removed — and the first
-  80 characters of its **text**;
-- where it is **written**, repo-relative (`src/components/Hero.astro:12:3`), the
-  **page URL**, the **route file**, and the page's **content entry** when it
-  declares one;
-- the **component chain** that renders it, outermost first: each component's
-  name, where it is used (`file:line:col`) and its own file. Present with
-  `composition: true`;
-- the **source lines** around it — three either side, with `>` marking the
-  element's own line — read through the same `/peek` endpoint the source peek
-  uses. A location the server won't serve (an `astro:assets` `<Image>`, say)
-  says so here instead, and the element's **DOM path** takes its place.
+- a heading naming the element and the first 80 characters of its **text**;
+- its **source location**, repo-relative (`src/components/Hero.astro:12:3`);
+- the files that **render** it, outermost first — each component's usage site
+  (`file:line:col`) and name, with `composition: true`; otherwise the **route
+  file** when it is not the element's own file;
+- the page's **content entry** when it declares one;
+- where its **text** comes from, from the same classification the pill's
+  verdict uses: written literally on the quoted line, traced to a frontmatter
+  string, passed in as a prop by the caller named above, or computed — in which
+  case the words are not in this file;
+- the element's own **source lines**, from its opening line to its closing
+  tag, read through the same `/peek` endpoint the source peek uses. A location
+  the server won't serve (an `astro:assets` `<Image>`, say) says so instead,
+  and the element's **opening tag** and **DOM path** take the quote's place.
 
 Rendered HTML and applied CSS are left out on purpose: compiled markup exists
 in no source file, so an assistant handed it searches for markup that is not

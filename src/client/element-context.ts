@@ -1,5 +1,6 @@
-import type { PeekResponse, SourceLoc, UsageLink } from '../shared/protocol.ts';
+import type { ClassifyResult, PeekResponse, SourceLoc, UsageLink } from '../shared/protocol.ts';
 import * as api from './api.ts';
+import { classifyCached } from './classify-cache.ts';
 import { chainIds, createChainLinks } from './composition.ts';
 import { pageSource } from './page-source.ts';
 
@@ -9,15 +10,17 @@ import { pageSource } from './page-source.ts';
  * inspector's **Copy context** produce.
  *
  * Its one job is to let a model find *this* element in *these* files. So it
- * carries only what is true of the source: the authored tag, the file and line
- * it is written on, the chain of files that render it, and a few source lines.
+ * carries only what is true of the source: the file and line it is written on,
+ * the files that render it, where its words actually live, and the element's
+ * own source lines. Nothing is said twice — the quoted line already shows the
+ * tag, so the tag is printed only when there is no quote.
  * Rendered HTML and matched CSS are deliberately absent — compiled markup
  * (`data-astro-cid-*`, expanded components, resolved props) exists in no file,
  * and a model handed it searches for it, and a list of rules pulls it toward
  * restyling what it was only asked to find.
  *
- * Every part is best-effort: the /peek read, the route lookup and the chain
- * resolve may each come up empty, and a part is then dropped or replaced with
+ * Every part is best-effort: the /peek read, the classification, the route
+ * lookup and the chain resolve may each come up empty, and a part is then dropped or replaced with
  * the reason. Never fail the whole payload because one part degraded.
  *
  * Split in two on purpose: `formatContext` is pure (an ElementContext in, a
@@ -25,26 +28,21 @@ import { pageSource } from './page-source.ts';
  * that only the browser can run.
  */
 
-/** Source lines kept either side of the element's own line. /peek returns the
- *  whole file; this is the paste-sized window cut out of it — enough to pin the
- *  element, not enough to bury it. What it leaves out is named on the heading,
- *  and the whole file is one `/peek` away. */
-const SOURCE_CONTEXT = 3;
+/** Most lines quoted for one element. The quote is the element itself — from
+ *  its opening line to its closing tag — and a longer element is cut here, the
+ *  heading saying which lines were shown. */
+const ELEMENT_LINES_MAX = 8;
 /** Characters of the element's text kept as an identifier. */
 const TEXT_MAX = 80;
 /** Deepest DOM-path segments kept — the fallback identifier when there is no
  *  source to quote. */
 const PATH_MAX = 6;
 
-/** The source window actually quoted in the payload. */
+/** The element's own source lines, as quoted in the payload. */
 export interface SourceWindow {
   file: string;
-  /** 1-based line number of `lines[0]`. */
+  /** 1-based line number of `lines[0]` — the line the element opens on. */
   startLine: number;
-  /** 1-based line the element sits on — marked in the quote. */
-  focusLine: number;
-  /** Lines in the whole file, so the payload can say what it left out. */
-  totalLines: number;
   lines: string[];
 }
 
@@ -58,6 +56,19 @@ export interface ChainStep {
   target: string | null;
 }
 
+/** What the server's classification proved about where the element's words
+ *  come from — the subset of {@link ClassifyResult} the payload phrases. */
+export interface TextOrigin {
+  kind: ClassifyResult['kind'];
+  /** The frontmatter path an `expression` was traced to, e.g. `hero.title`. */
+  expression?: string;
+  /** The prop the words arrive through, as the caller spells it, e.g. `title`. */
+  prop?: string;
+  /** Whether the element holds other elements — a `dynamic` verdict then means
+   *  "mixed content", not "a computed value". */
+  hasChildElements: boolean;
+}
+
 /** Everything the payload says about one element, before formatting. */
 export interface ElementContext {
   loc: SourceLoc;
@@ -67,6 +78,8 @@ export interface ElementContext {
   label: string;
   /** The element's visible text, whitespace-collapsed and capped; empty when it has none. */
   text: string;
+  /** Where the words come from; null when the classification failed. */
+  origin: TextOrigin | null;
   pageUrl: string;
   /** The route's own template, when the server resolved it. */
   routeFile: string | null;
@@ -94,70 +107,105 @@ function fenceLang(file: string): string {
   return '';
 }
 
-/** `>` gutter-marks the element's own line, so the model knows which of the
- *  quoted lines is the subject without a marker polluting the code text. */
+/** Line-numbered, so the quote can be matched against the file. */
 function quoteSource(source: SourceWindow): string {
   const last = source.startLine + source.lines.length - 1;
   const width = String(last).length;
   return source.lines
-    .map((line, i) => {
-      const no = source.startLine + i;
-      const mark = no === source.focusLine ? '>' : ' ';
-      return `${mark} ${String(no).padStart(width)} | ${line}`;
-    })
+    .map((line, i) => `${String(source.startLine + i).padStart(width)} | ${line}`)
     .join('\n');
+}
+
+/** One sentence on where the element's words live — the fact a model most
+ *  needs and cannot read off the quoted line. Null when there is nothing
+ *  worth saying (an image, an empty element, a verdict that proved nothing). */
+export function originSentence(origin: TextOrigin | null, caller: ChainStep | null, entryFile: string | null): string | null {
+  if (!origin) return null;
+  const inEntry = entryFile ? ` The page's content entry is ${entryFile}.` : '';
+  switch (origin.kind) {
+    case 'text':
+      return 'Written literally in the quoted source.';
+    case 'markup':
+      return 'Written literally in the quoted source, with inline markup.';
+    case 'expression':
+      return origin.expression
+        ? `An expression traced to the frontmatter string \`${origin.expression}\` in this file.`
+        : 'An expression traced to a frontmatter string in this file.';
+    case 'html':
+      return 'A `set:html` string in this file.';
+    case 'dynamic':
+      if (origin.prop) {
+        const at = caller ? ` at ${caller.usedAt}` : '';
+        return `The prop \`${origin.prop}\` — the words are set by the caller${at}, not in this file.`;
+      }
+      if (origin.hasChildElements) return 'Mixed content — see the child elements for where each part is written.';
+      return `Computed by an expression — the words are not in this file.${inEntry}`;
+    default:
+      return null;
+  }
 }
 
 /** Render an ElementContext as the markdown that lands on the clipboard. */
 export function formatContext(ctx: ElementContext): string {
   const where = `${ctx.loc.file}:${ctx.loc.loc}`;
-  const out: string[] = [`# Element context — ${where}`, ''];
+  const text = ctx.text ? ` "${ctx.text}"` : '';
+  const out: string[] = [`# ${ctx.label}${text}`, ''];
 
-  out.push(`- **Element** \`${ctx.openTag}\``);
-  if (ctx.text) out.push(`- **Text** "${ctx.text}"`);
-  out.push(`- **Written in** ${where}`);
-  out.push(`- **Page** ${ctx.pageUrl}`);
-  if (ctx.routeFile) out.push(`- **Route file** ${ctx.routeFile}`);
-  if (ctx.entryFile) out.push(`- **Content entry** ${ctx.entryFile}`);
+  // The quoted line shows the tag; without a quote it is the best identifier left.
+  if (!ctx.source) out.push(`- **Element** \`${ctx.openTag}\``);
+  out.push(`- **Source** ${where}`);
   if (ctx.chain.length > 0) {
-    out.push('- **Rendered via** (outermost first)');
-    for (const step of ctx.chain) {
-      const into = step.target ? ` → ${step.target}` : '';
-      out.push(`  - \`<${step.name}>\` at ${step.usedAt}${into}`);
-    }
+    const via = ctx.chain.map((step) => `${step.usedAt} \`<${step.name}>\``).join(' › ');
+    out.push(`- **Rendered by** ${via}`);
+  } else if (ctx.routeFile && ctx.routeFile !== ctx.loc.file) {
+    out.push(`- **Route** ${ctx.routeFile}`);
+  } else if (!ctx.routeFile) {
+    out.push(`- **Page** ${ctx.pageUrl}`);
   }
-  // Only worth its tokens when nothing below pins the element in source.
+  if (ctx.entryFile) out.push(`- **Content entry** ${ctx.entryFile}`);
+  const origin = originSentence(ctx.origin, ctx.chain.at(-1) ?? null, ctx.entryFile);
+  if (origin) out.push(`- **Text** ${origin}`);
   if (!ctx.source) out.push(`- **DOM path** ${ctx.domPath}`);
   out.push('');
 
   if (ctx.source) {
-    const { startLine, lines, totalLines, file } = ctx.source;
+    const { startLine, lines, file } = ctx.source;
     const last = startLine + lines.length - 1;
-    const range = lines.length === totalLines ? `all ${totalLines} lines` : `lines ${startLine}–${last} of ${totalLines}`;
-    out.push(`## Source — ${file} (${range}, \`>\` marks the element)`);
-    const lang = fenceLang(file);
-    out.push(`\`\`\`${lang}`, quoteSource(ctx.source), '```', '');
+    const range = last === startLine ? `line ${startLine}` : `lines ${startLine}–${last}`;
+    out.push(`\`\`\`${fenceLang(file)} ${range}`, quoteSource(ctx.source), '```', '');
   } else if (ctx.sourceUnavailable) {
-    out.push('## Source', `_Not available — ${ctx.sourceUnavailable}_`, '');
+    out.push(`_Source not available — ${ctx.sourceUnavailable}_`, '');
   }
 
   return `${out.join('\n').trimEnd()}\n`;
 }
 
-/** Cut the paste-sized window out of a /peek response (which is normally the
- *  whole file). Exported for its own test — the arithmetic is 1-based and easy
- *  to get wrong by one. */
-export function windowAround(peeked: PeekResponse, context = SOURCE_CONTEXT): SourceWindow {
+/** Cut the element's own lines out of a /peek response (normally the whole
+ * file): from its opening line down to the line that closes it, capped. The
+ * close is found by text — the first `</tag` or `/>` after the opening — which
+ * is exact for the one-line and plain-block cases this is for; a nested
+ * same-name tag stops the quote early, which the line range makes visible.
+ * Exported for its own test — the arithmetic is 1-based and easy to get wrong
+ * by one. */
+export function elementLines(peeked: PeekResponse, tag: string, max = ELEMENT_LINES_MAX): SourceWindow {
   const first = peeked.startLine;
-  const last = first + peeked.lines.length - 1;
-  const from = Math.max(first, peeked.focusLine - context);
-  const to = Math.min(last, peeked.focusLine + context);
+  const from = peeked.focusLine - first;
+  const close = new RegExp(`</${tag}\\s*>|/>`, 'i');
+  let to = from;
+  // The opening line may hold the whole element; look past its own `<tag`.
+  const opening = peeked.lines[from] ?? '';
+  const openAt = opening.search(new RegExp(`<${tag}\\b`, 'i'));
+  const rest = openAt === -1 ? opening : opening.slice(openAt + tag.length + 1);
+  if (!close.test(rest)) {
+    while (to + 1 < peeked.lines.length && to - from + 1 < max) {
+      to++;
+      if (close.test(peeked.lines[to]!)) break;
+    }
+  }
   return {
     file: peeked.file,
-    startLine: from,
-    focusLine: peeked.focusLine,
-    totalLines: peeked.totalLines,
-    lines: peeked.lines.slice(from - first, to - first + 1),
+    startLine: peeked.focusLine,
+    lines: peeked.lines.slice(from, to + 1),
   };
 }
 
@@ -245,7 +293,23 @@ async function routeFileFor(): Promise<string | null> {
   }
 }
 
+async function originFor(el: HTMLElement, src: SourceLoc): Promise<TextOrigin | null> {
+  try {
+    const result = await classifyCached({ file: src.file, loc: src.loc, tag: el.tagName.toLowerCase() });
+    return {
+      kind: result.kind,
+      expression: result.expression?.label,
+      prop: result.prop?.name,
+      hasChildElements: el.children.length > 0,
+    };
+  } catch {
+    // The verdict is one sentence of the payload; the rest still stands.
+    return null;
+  }
+}
+
 async function sourceFor(
+  el: HTMLElement,
   src: SourceLoc,
 ): Promise<Pick<ElementContext, 'source' | 'sourceUnavailable'>> {
   try {
@@ -253,7 +317,7 @@ async function sourceFor(
     // Not an error: the file is real but package-owned (an astro:assets
     // <Image>, say), so the server explains instead of returning source.
     if (peeked.refused) return { source: null, sourceUnavailable: peeked.refused };
-    return { source: windowAround(peeked), sourceUnavailable: null };
+    return { source: elementLines(peeked, el.tagName.toLowerCase()), sourceUnavailable: null };
   } catch (err) {
     return {
       source: null,
@@ -262,14 +326,16 @@ async function sourceFor(
   }
 }
 
-/** Gather everything for one element. The three reads run together; every
+/** Gather everything for one element. The four reads run together; every
  *  path in the result is already root-relative — that is what the annotation
  *  carries and what the server echoes back — so nothing here rewrites one. */
 export async function collectContext(
   el: HTMLElement,
   src: SourceLoc,
 ): Promise<ElementContext> {
-  const [source, routeFile, chain] = await Promise.all([sourceFor(src), routeFileFor(), chainFor(el)]);
+  const [source, origin, routeFile, chain] = await Promise.all([
+    sourceFor(el, src), originFor(el, src), routeFileFor(), chainFor(el),
+  ]);
   return {
     loc: { file: src.file, loc: src.loc },
     openTag: openTagOf(el),
@@ -277,6 +343,7 @@ export async function collectContext(
     // innerText, not textContent: it breaks between block children, so a card
     // reads "Strategy We find…" rather than "StrategyWe find…".
     text: textOf(el.innerText ?? el.textContent ?? ''),
+    origin,
     pageUrl: location.href,
     routeFile,
     entryFile: pageSource(),

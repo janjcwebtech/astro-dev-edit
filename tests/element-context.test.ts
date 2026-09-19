@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { PeekResponse, UsageLink } from '../src/shared/protocol.ts';
 import {
   chainSteps,
+  elementLines,
   formatContext,
+  originSentence,
   textOf,
-  windowAround,
   type ElementContext,
 } from '../src/client/element-context.ts';
 
@@ -16,21 +17,20 @@ import {
  */
 
 const FULL: ElementContext = {
-  loc: { file: 'src/components/Hero.astro', loc: '12:3' },
-  openTag: '<h1 class="hero-title">',
-  label: 'h1.hero-title',
-  text: 'Something Familiar',
-  pageUrl: 'http://localhost:4321/',
-  routeFile: 'src/pages/index.astro',
+  loc: { file: 'src/components/notes-detail/NoteArticle.astro', loc: '70:56' },
+  openTag: '<h1 class="note-article__title">',
+  label: 'h1.note-article__title',
+  text: 'AI brand visibility',
+  origin: { kind: 'dynamic', hasChildElements: false },
+  pageUrl: 'http://localhost:4321/notes/ai-brand-visibility',
+  routeFile: 'src/pages/notes/[id].astro',
   entryFile: null,
-  chain: [{ name: 'Hero', usedAt: 'src/pages/index.astro:8:5', target: 'src/components/Hero.astro' }],
-  domPath: 'body > main > section.hero > h1.hero-title',
+  chain: [{ name: 'NoteArticle', usedAt: 'src/pages/notes/[id].astro:57:5', target: 'src/components/notes-detail/NoteArticle.astro' }],
+  domPath: 'body > main > article > h1.note-article__title',
   source: {
-    file: 'src/components/Hero.astro',
-    startLine: 11,
-    focusLine: 12,
-    totalLines: 24,
-    lines: ['<section class="hero">', '  <h1 class="hero-title">{title}</h1>', '</section>'],
+    file: 'src/components/notes-detail/NoteArticle.astro',
+    startLine: 70,
+    lines: ['    <h1 class="note-article__title">{cleanTitle}</h1>'],
   },
   sourceUnavailable: null,
 };
@@ -39,103 +39,142 @@ function peek(overrides: Partial<PeekResponse> = {}): PeekResponse {
   return {
     file: 'src/pages/index.astro',
     startLine: 1,
-    focusLine: 5,
-    totalLines: 9,
-    lines: ['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7', 'l8', 'l9'],
+    focusLine: 2,
+    totalLines: 6,
+    lines: ['<section>', '  <h1>Hi</h1>', '  <p>', '    Body', '  </p>', '</section>'],
     ...overrides,
   };
 }
 
 describe('formatContext', () => {
-  it('names the element, where it is written, and the files that render it', () => {
-    const out = formatContext(FULL);
-    expect(out).toContain('# Element context — src/components/Hero.astro:12:3');
-    expect(out).toContain('- **Element** `<h1 class="hero-title">`');
-    expect(out).toContain('- **Text** "Something Familiar"');
-    expect(out).toContain('- **Written in** src/components/Hero.astro:12:3');
-    expect(out).toContain('- **Page** http://localhost:4321/');
-    expect(out).toContain('- **Route file** src/pages/index.astro');
-    expect(out).toContain('- **Rendered via** (outermost first)\n  - `<Hero>` at src/pages/index.astro:8:5 → src/components/Hero.astro');
-    expect(out).toContain('## Source — src/components/Hero.astro');
-    expect(out.endsWith('\n')).toBe(true);
+  it('prints the whole payload exactly — nothing said twice', () => {
+    expect(formatContext(FULL)).toBe(
+      [
+        '# h1.note-article__title "AI brand visibility"',
+        '',
+        '- **Source** src/components/notes-detail/NoteArticle.astro:70:56',
+        '- **Rendered by** src/pages/notes/[id].astro:57:5 `<NoteArticle>`',
+        '- **Text** Computed by an expression — the words are not in this file.',
+        '',
+        '```astro line 70',
+        '70 |     <h1 class="note-article__title">{cleanTitle}</h1>',
+        '```',
+        '',
+      ].join('\n'),
+    );
   });
 
   // Compiled markup and matched CSS exist in no source file; a model handed
   // them searches for markup that is not there, or starts restyling.
   it('carries no rendered HTML, no CSS, and nothing Astro generated', () => {
     const out = formatContext(FULL);
-    expect(out).not.toContain('Rendered HTML');
-    expect(out).not.toContain('CSS');
     expect(out).not.toContain('```html');
     expect(out).not.toContain('```css');
     expect(out).not.toContain('data-astro-cid');
-    expect(out).not.toContain('**Editability**');
   });
 
-  it('stays small — it identifies one element, it does not describe a page', () => {
-    expect(formatContext(FULL).length).toBeLessThan(800);
-  });
-
-  it('gutter-marks the element line with ">" and numbers from startLine', () => {
-    const out = formatContext(FULL);
-    expect(out).toContain('  11 | <section class="hero">');
-    expect(out).toContain('> 12 |   <h1 class="hero-title">{title}</h1>');
-    expect(out).toContain('  13 | </section>');
-  });
-
-  it('states the quoted range and picks the fence language from the extension', () => {
-    expect(formatContext(FULL)).toContain(
-      '## Source — src/components/Hero.astro (lines 11–13 of 24, `>` marks the element)',
-    );
-    expect(formatContext(FULL)).toContain('```astro');
-    const md = formatContext({
+  it('joins a deep chain outermost first', () => {
+    const out = formatContext({
       ...FULL,
-      source: { ...FULL.source!, file: 'src/content/works/lamp.md' },
+      chain: [
+        { name: 'Marketing', usedAt: 'src/pages/marketing.astro:4:1', target: 'Marketing.astro' },
+        { name: 'FeatureCard', usedAt: 'FeatureSection.astro:9:22', target: 'FeatureCard.astro' },
+      ],
     });
-    expect(md).toContain('```markdown');
+    expect(out).toContain('- **Rendered by** src/pages/marketing.astro:4:1 `<Marketing>` › FeatureSection.astro:9:22 `<FeatureCard>`');
   });
 
-  it('says "all N lines" when the whole file is quoted', () => {
-    const whole = formatContext({
-      ...FULL,
-      source: { ...FULL.source!, startLine: 1, totalLines: 3 },
-    });
-    expect(whole).toContain('(all 3 lines,');
+  it('names the route only when it is not the file the element is written in', () => {
+    const inComponent = formatContext({ ...FULL, chain: [] });
+    expect(inComponent).toContain('- **Route** src/pages/notes/[id].astro');
+    const inRoute = formatContext({ ...FULL, chain: [], loc: { file: 'src/pages/notes/[id].astro', loc: '3:1' } });
+    expect(inRoute).not.toContain('**Route**');
+    expect(inRoute).not.toContain('**Page**');
   });
 
-  it('omits the optional facts that are absent', () => {
-    const out = formatContext({ ...FULL, text: '', routeFile: null, entryFile: null, chain: [] });
-    expect(out).not.toContain('**Text**');
-    expect(out).not.toContain('**Route file**');
-    expect(out).not.toContain('**Content entry**');
-    expect(out).not.toContain('**Rendered via**');
+  it('falls back to the page URL when the route did not resolve', () => {
+    const out = formatContext({ ...FULL, chain: [], routeFile: null });
+    expect(out).toContain('- **Page** http://localhost:4321/notes/ai-brand-visibility');
   });
 
   it('names the backing content entry when the page declares one', () => {
-    const out = formatContext({ ...FULL, entryFile: 'src/content/works/lamp.md' });
-    expect(out).toContain('- **Content entry** src/content/works/lamp.md');
+    const out = formatContext({ ...FULL, entryFile: 'src/content/notes/ai.md' });
+    expect(out).toContain('- **Content entry** src/content/notes/ai.md');
+    expect(out).toContain("The page's content entry is src/content/notes/ai.md.");
   });
 
-  it('prints the DOM path only when there is no source quote to pin the element', () => {
+  it('prints the tag and DOM path only when there is no quote', () => {
+    expect(formatContext(FULL)).not.toContain('**Element**');
     expect(formatContext(FULL)).not.toContain('**DOM path**');
-    const out = formatContext({ ...FULL, source: null, sourceUnavailable: 'refused' });
-    expect(out).toContain('- **DOM path** body > main > section.hero > h1.hero-title');
+    const out = formatContext({ ...FULL, source: null, sourceUnavailable: 'That file belongs to a package.' });
+    expect(out).toContain('- **Element** `<h1 class="note-article__title">`');
+    expect(out).toContain('- **DOM path** body > main > article > h1.note-article__title');
+    expect(out).toContain('_Source not available — That file belongs to a package._');
   });
 
-  it('replaces the source block with the reason when the server refused it', () => {
-    const out = formatContext({
-      ...FULL,
-      source: null,
-      sourceUnavailable: 'That file belongs to a package, not your project.',
-    });
-    expect(out).toContain('## Source\n_Not available — That file belongs to a package, not your project._');
-    expect(out).not.toContain('```astro');
-    expect(out).toContain('- **Written in** src/components/Hero.astro:12:3');
+  it('omits what is absent', () => {
+    const out = formatContext({ ...FULL, text: '', origin: null, source: null, sourceUnavailable: null });
+    expect(out.split('\n')[0]).toBe('# h1.note-article__title');
+    expect(out).not.toContain('**Text**');
+    expect(out).not.toContain('```');
   });
 
-  it('drops the source section entirely when there is nothing to say', () => {
-    const out = formatContext({ ...FULL, source: null, sourceUnavailable: null });
-    expect(out).not.toContain('## Source');
+  it('numbers a multi-line quote and states the range', () => {
+    const out = formatContext({ ...FULL, source: { ...FULL.source!, startLine: 9, lines: ['<p>', '  Body', '</p>'] } });
+    expect(out).toContain('```astro lines 9–11\n 9 | <p>\n10 |   Body\n11 | </p>\n```');
+  });
+});
+
+describe('originSentence', () => {
+  const origin = (o: Partial<Parameters<typeof originSentence>[0] & object>) =>
+    ({ kind: 'text', hasChildElements: false, ...o }) as NonNullable<Parameters<typeof originSentence>[0]>;
+  const caller = { name: 'Hero', usedAt: 'src/pages/index.astro:8:5', target: 'src/components/Hero.astro' };
+
+  it('says where the words live, per verdict', () => {
+    expect(originSentence(origin({ kind: 'text' }), null, null)).toBe('Written literally in the quoted source.');
+    expect(originSentence(origin({ kind: 'expression', expression: 'hero.title' }), null, null))
+      .toBe('An expression traced to the frontmatter string `hero.title` in this file.');
+    expect(originSentence(origin({ kind: 'dynamic', prop: 'title' }), caller, null))
+      .toBe('The prop `title` — the words are set by the caller at src/pages/index.astro:8:5, not in this file.');
+    expect(originSentence(origin({ kind: 'dynamic', hasChildElements: true }), null, null)).toMatch(/^Mixed content/);
+  });
+
+  it('stays silent where there is nothing to prove', () => {
+    for (const kind of ['image', 'empty', 'ambiguous', 'unresolved'] as const) {
+      expect(originSentence(origin({ kind }), null, null)).toBeNull();
+    }
+    expect(originSentence(null, null, null)).toBeNull();
+  });
+});
+
+describe('elementLines', () => {
+  it('quotes a one-line element alone', () => {
+    const w = elementLines(peek(), 'h1');
+    expect(w.startLine).toBe(2);
+    expect(w.lines).toEqual(['  <h1>Hi</h1>']);
+  });
+
+  it('runs a block element down to its closing tag', () => {
+    const w = elementLines(peek({ focusLine: 3 }), 'p');
+    expect(w.startLine).toBe(3);
+    expect(w.lines).toEqual(['  <p>', '    Body', '  </p>']);
+  });
+
+  it('stops at a self-closing tag', () => {
+    const w = elementLines(peek({ lines: ['<Image', '  src={a}', '  alt="x" />', 'after'], focusLine: 1 }), 'img');
+    expect(w.lines).toHaveLength(3);
+  });
+
+  it('caps an element that never closes within reach', () => {
+    const lines = ['<div>', ...Array.from({ length: 20 }, (_, i) => `  l${i}`)];
+    const w = elementLines(peek({ lines, focusLine: 1, totalLines: 21 }), 'div', 8);
+    expect(w.lines).toHaveLength(8);
+  });
+
+  it('slices correctly when /peek already windowed the file (startLine > 1)', () => {
+    const w = elementLines(peek({ startLine: 100, focusLine: 101, totalLines: 500 }), 'h1');
+    expect(w.startLine).toBe(101);
+    expect(w.lines).toEqual(['  <h1>Hi</h1>']);
   });
 });
 
@@ -167,54 +206,5 @@ describe('chainSteps', () => {
       { name: 'Layout', usedAt: 'src/pages/index.astro:8:5', target: 'src/layouts/Base.astro' },
       { name: 'Hero', usedAt: 'src/pages/index.astro:8:5', target: null },
     ]);
-  });
-});
-
-describe('windowAround', () => {
-  it('defaults to a tight window — the payload identifies one element, not a file', () => {
-    // 107 lines, the element on line 30: the old ±30 quoted more than half the
-    // file around a one-line subject.
-    const lines = Array.from({ length: 107 }, (_, i) => `l${i + 1}`);
-    const w = windowAround({
-      file: 'src/pages/index.astro', startLine: 1, focusLine: 30, totalLines: 107, lines,
-    });
-    expect(w.startLine).toBe(27);
-    expect(w.lines).toHaveLength(7);
-    expect(w.lines[w.lines.length - 1]).toBe('l33');
-    // …and the heading still says what was left out.
-    expect(w.totalLines).toBe(107);
-  });
-
-  it('keeps `context` lines either side of the focus line', () => {
-    const w = windowAround(peek(), 2);
-    expect(w.startLine).toBe(3);
-    expect(w.lines).toEqual(['l3', 'l4', 'l5', 'l6', 'l7']);
-    expect(w.focusLine).toBe(5);
-    expect(w.totalLines).toBe(9);
-  });
-
-  it('clamps to the response when the window would run past either end', () => {
-    const top = windowAround(peek({ focusLine: 2 }), 5);
-    expect(top.startLine).toBe(1);
-    expect(top.lines[0]).toBe('l1');
-
-    const bottom = windowAround(peek({ focusLine: 8 }), 5);
-    expect(bottom.lines.at(-1)).toBe('l9');
-  });
-
-  it('returns the whole response when it is smaller than the window', () => {
-    const w = windowAround(peek(), 100);
-    expect(w.lines).toHaveLength(9);
-    expect(w.startLine).toBe(1);
-  });
-
-  it('slices correctly when /peek already windowed the file (startLine > 1)', () => {
-    // Lines 100–108 of a 500-line file, element on 104.
-    const w = windowAround(
-      peek({ startLine: 100, focusLine: 104, totalLines: 500 }),
-      1,
-    );
-    expect(w.startLine).toBe(103);
-    expect(w.lines).toEqual(['l4', 'l5', 'l6']);
   });
 });

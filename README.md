@@ -71,9 +71,9 @@ _Editing a heading in place. The pill names the file, the line and the column, a
 
 _The class chips on the pill show which CSS rules apply to the element and which file they are written in, so adjusting a transition is one click rather than a search._
 
-![The pill's copy button, next to a Claude Code prompt filled with the element context: its tag, source location and the source lines around it](https://raw.githubusercontent.com/janjcwebtech/astro-dev-edit/main/documentation/images/copy-context.png)
+![The pill's copy button, next to a Claude Code prompt filled with the element context: its source location and source lines](https://raw.githubusercontent.com/janjcwebtech/astro-dev-edit/main/documentation/images/copy-context.png)
 
-_**Copy Context** puts what identifies the element on your clipboard: its tag and text, the file and line it is written on, the components that render it, and the source lines around it. Your AI agent starts at the change instead of spending turns working out where it lives._
+_**Copy Context** puts what identifies the element on your clipboard: its text, the file and line it is written on, the components that render it, where its words actually live, and its own source lines. Your AI agent starts at the change instead of spending turns working out where it lives._
 
 ## Configuration
 
