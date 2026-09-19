@@ -353,10 +353,76 @@ body[data-tree="1"] .insp.left { left:320px; }
 #rail .sc:hover { background:#f1eefb; border-color:#e2dcf7; }
 #rail .sc[data-cur="1"] { background:#5b3fd0; border-color:#5b3fd0; color:#fff; font-weight:600; }
 #rail .nt { flex:none; color:#8b86a0; font-size:10.5px; white-space:nowrap; border-left:1px solid #eae6f5; padding-left:11px; }
+/* ---------- LAYOUT COMPARISON: overlay (current) vs docked (proposed) ----------
+   Overlay — panels float over the page at z-700; the page keeps the whole
+   viewport and slides under them. Docked — the page is squeezed between the
+   panels and a code dock holds the lower third; nothing renders under chrome.
+   The geometry maths is unchanged either way: the highlight and the pill are
+   placed in DOCUMENT coordinates from live rects, so a reflow needs a redraw,
+   never a different formula. What the mode does change is WHEN a redraw is
+   owed — opening a panel now moves the page. #host is under a ResizeObserver
+   for exactly that reason. */
+body { --pl:0px; --pr:0px; --dock-h:0px; }
+body[data-layout="docked"][data-tree="1"] { --pl:320px; }
+body[data-layout="docked"][data-insp="1"][data-side="r"] { --pr:400px; }
+body[data-layout="docked"][data-insp="1"][data-side="l"][data-tree="0"] { --pl:400px; }
+body[data-layout="docked"][data-insp="1"][data-side="l"][data-tree="1"] { --pl:720px; }
+body[data-layout="docked"][data-dock="0"] { --dock-h:38px; }
+body[data-layout="docked"][data-dock="1"] { --dock-h:34vh; }
+body[data-layout="docked"] #host {
+  margin-left:var(--pl); margin-right:var(--pr);
+  padding-bottom:calc(60px + var(--dock-h));
+  transition:margin .17s ease;
+}
+/* Scene jumps centre an element in the viewport; the dock eats the bottom of
+   it, so targets carry their own keep-clear. */
+body[data-layout="docked"] #host [data-atx] { scroll-margin:96px 0 calc(var(--dock-h) + 28px); }
+body[data-layout="docked"] .toasts { bottom:calc(var(--dock-h) + 18px); }
+
+/* the code dock — spans the page column only, so the side panels stay full height */
+.dock { position:fixed; left:var(--pl); right:var(--pr); bottom:0; height:var(--dock-h); z-index:700;
+  display:flex; flex-direction:column; overflow:hidden; color:var(--fg);
+  background:color-mix(in srgb, var(--glass) 96%, transparent); backdrop-filter:blur(14px);
+  border-top:1px solid var(--border); transition:left .17s ease, right .17s ease, height .17s ease; }
+body:not([data-layout="docked"]) .dock { display:none; }
+.dock .dh { display:flex; align-items:center; gap:10px; padding:0 8px 0 16px; height:38px; flex:none;
+  border-bottom:1px solid var(--border); }
+.dock .dh b { font-family:var(--mono); font-size:11.5px; font-weight:600; }
+.dock .dh .loc { font-family:var(--mono); font-size:10.5px; color:var(--faint); }
+.dock .dh .sp { margin-left:auto; }
+.dock .code { flex:1; max-height:none; border-radius:0; background:transparent; padding:10px 0 14px; }
+/* The dock's top edge is the handle. It overlays the header's top 7px, which
+   holds nothing — the header's controls are centred in a 38px bar. */
+.dock .grip { position:absolute; top:0; left:0; right:0; height:7px; z-index:2; padding:0; border:0;
+  background:transparent; cursor:ns-resize; transition:background .12s; }
+.dock .grip::after { content:""; position:absolute; left:50%; top:2px; transform:translateX(-50%);
+  width:46px; height:3px; border-radius:999px; background:var(--input); opacity:0; transition:opacity .12s; }
+.dock .grip:hover::after, .dock .grip:focus-visible::after, body[data-resizing="1"] .dock .grip::after { opacity:1; }
+.dock .grip:hover, body[data-resizing="1"] .dock .grip { background:color-mix(in srgb, var(--brand) 30%, transparent); }
+.dock .grip:focus-visible { outline:none; background:color-mix(in srgb, var(--brand) 30%, transparent); }
+body[data-dock="0"] .dock .grip { display:none; }
+/* A drag must land on the frame it was given, not 170ms later. */
+body[data-resizing="1"] { cursor:ns-resize; user-select:none; }
+body[data-resizing="1"] .dock, body[data-resizing="1"] #host { transition:none; }
+body[data-dock="0"] .dock .code { display:none; }
+body[data-dock="0"] .dock #dockFold { transform:rotate(180deg); }
+
+/* Docking costs 720px of width before the page gets any. Below that the mode
+   degrades to overlay rather than lying about the geometry. */
+@media (max-width:1180px) {
+  body[data-layout="docked"] { --pl:0px !important; --pr:0px !important; }
+  body[data-layout="docked"] #host { margin-left:0; margin-right:0; }
+}
+/* ---------- rail: the layout switch ---------- */
+#rail .seg { flex:none; display:flex; gap:2px; padding:2px; border:1px solid #e2dcf7; border-radius:999px; background:#f7f5fd; margin-left:4px; }
+#rail .seg button { border:0; background:none; font:inherit; font-size:11px; color:#3a3650; padding:4px 11px; border-radius:999px; cursor:pointer; white-space:nowrap; }
+#rail .seg button[data-cur="1"] { background:#16151c; color:#fff; font-weight:600; }
+#rail .warn { display:none; flex:none; font-size:10.5px; color:#b4791a; white-space:nowrap; }
+@media (max-width:1180px) { body[data-layout="docked"] #rail .warn { display:inline; } }
 @media (max-width:900px) { .hero, .grid { grid-template-columns:1fr; } .insp { width:320px; } }
 </style>
 </head>
-<body data-edit="0" data-tree="0">
+<body data-edit="0" data-tree="0" data-layout="overlay" data-insp="0" data-side="r" data-dock="1">
 <!-- HOST PAGE. data-atx = where WRITTEN · data-chain = usage ids · data-k = what a click can do -->
 <div id="host"><div id="page-home" class="wrap">
   <nav class="site-nav">
@@ -499,9 +565,20 @@ body[data-tree="1"] .insp.left { left:320px; }
     </div>
     <div class="df"><button class="btn-ui outline" data-close>Close</button><button class="btn-ui primary" data-close>Save</button></div>
   </div>
+  <section class="dock" id="dock" aria-label="Code preview">
+    <div class="grip" id="dockGrip" role="separator" aria-orientation="horizontal" tabindex="0"
+      aria-label="Resize the code preview" title="Drag to resize · double-click to reset"></div>
+    <div class="dh">
+      <svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;color:var(--brand-text)"><path d="M11 2.5 4.5 11.2h4.2L9 17.5 15.5 8.8h-4.2Z"/></svg>
+      <b id="dockTitle">No file open</b><span class="loc" id="dockLoc"></span>
+      <button class="mini sp" id="dockOpen">Open in editor</button>
+      <button class="ctl icon" id="dockFold" title="Collapse"><svg class="ico-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12l4-4 4 4"/></svg></button>
+    </div>
+    <pre class="code" id="dockCode"><div class="ln"><span class="n"></span><span class="k-cm">Pick an element and choose "view code".</span></div></pre>
+  </section>
   <div class="toasts" id="toasts"></div>
 </div>
-<div id="rail"><span class="tagm">Mockup</span><div class="rb" id="railBody"></div><span class="nt" title="Hovering, clicking and typing on the page really work.">mock only — nothing is written</span></div>
+<div id="rail"><span class="tagm">Mockup</span><div class="rb" id="railBody"></div><span class="warn" title="Docking needs ~1180px before the page gets any width.">⚠ too narrow to dock — showing overlay</span><div class="seg" id="railLayout" title="Compare the two panel layouts"><button data-m="overlay" data-cur="1">Overlay</button><button data-m="docked">Docked</button></div><span class="nt" title="Hovering, clicking and typing on the page really work.">mock only — nothing is written</span></div>
 <script>
 /* =========================== MOCK USAGE GRAPH =========================== */
 const LINKS = {
@@ -708,7 +785,7 @@ document.querySelectorAll('#host [data-k="text"], #host [data-k="markup"]').forE
 const $ = (s) => document.querySelector(s);
 const el = (t, c, h) => { const n = document.createElement(t); if (c) n.className = c; if (h != null) n.innerHTML = h; return n; };
 const base = (p) => p.split('/').pop();
-const S = { edit:false, tree:false, node:null, hover:null, dwell:null, sel:null, textFinish:null, cssOpen:{} };
+const S = { edit:false, tree:false, node:null, hover:null, dwell:null, sel:null, textFinish:null, cssOpen:{}, peek:null };
 
 function toast(msg, k = 'ok') {
   const t = el('div', 'toast', `<i>${k === 'ok' ? '✓' : '⌁'}</i><span>${msg}</span>`); t.dataset.k = k;
@@ -740,21 +817,26 @@ function supplier(n) {
 function drawHl(n, locked) {
   const h = $('#hl'), r = n.getBoundingClientRect();
   h.hidden = false; h.classList.toggle('locked', !!locked);
-  h.style.cssText += `;top:${r.top + scrollY - 2}px;left:${r.left + scrollX - 2}px;width:${r.width + 4}px;height:${r.height + 4}px`;
+  h.style.top = r.top + scrollY - 2 + 'px'; h.style.left = r.left + scrollX - 2 + 'px';
+  h.style.width = r.width + 4 + 'px'; h.style.height = r.height + 4 + 'px';
 }
-/** The strip of viewport the side panels are not sitting on. */
+/** The strip of viewport no panel is sitting on. Measured, never assumed: in
+    docked mode the page no longer reaches under the chrome, but the clamp is
+    the same clamp — it just finds more room. The dock supplies the bottom. */
 function freeBounds() {
-  let L = 8, R = innerWidth - 12;
-  const t = $('#tree'), i = $('#insp');
+  let L = 8, R = innerWidth - 12, B = innerHeight - 12;
+  const t = $('#tree'), i = $('#insp'), d = $('#dock');
   if (t && !t.hidden) L = Math.max(L, t.getBoundingClientRect().right + 8);
   if (i && !i.hidden) {
     const b = i.getBoundingClientRect();
     if (b.left > innerWidth / 2) R = Math.min(R, b.left - 8); else L = Math.max(L, b.right + 8);
   }
-  return { L, R };
+  // A fixed element has no offsetParent, so ask whether it renders at all.
+  if (d && d.getClientRects().length) B = Math.min(B, d.getBoundingClientRect().top - 8);
+  return { L, R, B };
 }
 function place(n, box, gap = 8) {
-  const r = n.getBoundingClientRect(), below = innerHeight - r.bottom, { L, R } = freeBounds();
+  const r = n.getBoundingClientRect(), { L, R, B } = freeBounds(), below = B - r.bottom;
   const flip = below < box.offsetHeight + gap + 12 && r.top > box.offsetHeight + gap;
   box.style.top = (flip ? r.top + scrollY - box.offsetHeight - gap : r.bottom + scrollY + gap) + 'px';
   box.style.left = Math.max(L, Math.min(r.left + scrollX, R - box.offsetWidth)) + 'px';
@@ -811,7 +893,7 @@ document.addEventListener('mousedown', (e) => {
 function openInspector(n, focusLink) {
   if (S.node !== n) suspendTextEdit();
   S.node = n; S.sel = focusLink || supplier(n) || (isSlotted(n) ? chainOf(parentHost(n)).slice(-1)[0] : chainOf(n).slice(-1)[0]) || 'root';
-  drawHl(n, true); $('#insp').hidden = false; $('#pill').hidden = true;
+  drawHl(n, true); $('#insp').hidden = false; $('#pill').hidden = true; syncLayout();
   $('#inspTag').textContent = `<${n.tagName.toLowerCase()}>`;
   // Before renderInspector, so the field knows a caret is already on the page
   // and does not steal it back.
@@ -1368,16 +1450,32 @@ function beginTextEdit(n) {
 function suspendTextEdit() { if (S.textFinish) S.textFinish(); syncCommit(); }
 
 /* ============================ PEEK / MENU ============================== */
-function openPeek(file, line) {
+/* One renderer, two destinations: the centred modal in overlay mode, the
+   fixed dock in docked mode. The door is the same door — every "view code"
+   caller still just asks for a file and a line. */
+function codeHTML(file, line) {
   const lines = (SOURCES[file] || cssFixture(file) || (() => ['// not part of the mockup fixture']))();
-  $('#peek').dataset.loc = line ? `${file}:${line}` : file;
-  $('#peekTitle').textContent = file; $('#peekLoc').textContent = line ? 'line ' + line : '';
-  $('#peekCode').innerHTML = lines.map((t, i) => {
+  return lines.map((t, i) => {
     const cls = /^\s*(---|import|const|\]|\);)/.test(t) ? 'k-tk' : /^\s*</.test(t) ? 'k-tg' : 'k-cm';
     return `<div class="ln" data-f="${i + 1 === line ? 1 : 0}"><span class="n">${i + 1}</span><span class="${cls}">${
       t.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span></div>`;
   }).join('');
+}
+function openPeek(file, line) {
+  S.peek = { file, line };
+  if (document.body.dataset.layout === 'docked') return dockCode(file, line);
+  $('#peek').dataset.loc = line ? `${file}:${line}` : file;
+  $('#peekTitle').textContent = file; $('#peekLoc').textContent = line ? 'line ' + line : '';
+  $('#peekCode').innerHTML = codeHTML(file, line);
   $('#backdrop').hidden = false; $('#peek').hidden = false;
+}
+function dockCode(file, line) {
+  S.peek = { file, line };
+  $('#dockTitle').textContent = file; $('#dockLoc').textContent = line ? 'line ' + line : '';
+  $('#dockCode').innerHTML = codeHTML(file, line);
+  document.body.dataset.dock = '1'; syncLayout();
+  const hit = $('#dockCode .ln[data-f="1"]');
+  if (hit) hit.scrollIntoView({ block:'center' });
 }
 $('#peekOpen').onclick = () => { hideModal(); toast('Opened ' + $('#peek').dataset.loc + ' in your editor'); };
 
@@ -1405,10 +1503,10 @@ document.addEventListener('click', () => ($('#menu').hidden = true));
 $('#menu').addEventListener('click', (e) => e.stopPropagation());
 document.querySelectorAll('.sw').forEach((s) => (s.onclick = () => (s.dataset.on = s.dataset.on === '1' ? '0' : '1')));
 $('#inspClose').onclick = () => {
-  suspendTextEdit(); $('#insp').hidden = true; S.node = null; $('#hl').hidden = true;
+  suspendTextEdit(); $('#insp').hidden = true; S.node = null; $('#hl').hidden = true; syncLayout();
   if (document.querySelector('#host [data-dirty="1"]')) toast('Closed with unsaved changes — they are still marked on the page', 'warn');
 };
-$('#inspDock').onclick = () => $('#insp').classList.toggle('left');
+$('#inspDock').onclick = () => { $('#insp').classList.toggle('left'); syncLayout(); };
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('#backdrop').hidden) return hideModal();
@@ -1483,6 +1581,7 @@ function toggleTree(on) {
   S.tree = on === undefined ? !S.tree : on;
   $('#tree').hidden = !S.tree; document.body.dataset.tree = S.tree ? '1' : '0';
   $('#launcher').hidden = S.tree; if (S.tree) renderTree();
+  syncLayout();
 }
 
 /* ============ MODES — interception is held, selection persists ===========
@@ -1520,6 +1619,8 @@ function goto(page) {
   $('#pgFile').textContent = ROUTES[page].file;
   $('#insp').hidden = true; S.node = null; $('#hl').hidden = true; $('#pill').hidden = true;
   if (S.tree) renderTree();
+  syncLayout();
+  if (document.body.dataset.layout === 'docked') dockCode(ROUTES[page].file, 1);
   scrollTo({ top:0 });
 }
 document.addEventListener('click', (e) => {
@@ -1538,6 +1639,107 @@ addEventListener('scroll', () => {
   if (n && !$('#hl').hidden) drawHl(n, !!S.node);
   if (S.hover && !$('#pill').hidden) place(S.hover, $('#pill'));
 }, { passive:true });
+
+/* ========================= LAYOUT: OVERLAY vs DOCKED =====================
+   Everything the two modes disagree about is expressed as attributes on
+   <body>; the CSS does the arithmetic. JS's only job is to keep those
+   attributes honest and to redraw what is positioned absolutely. */
+function syncLayout() {
+  const b = document.body, i = $('#insp');
+  b.dataset.insp = i.hidden ? '0' : '1';
+  b.dataset.side = i.classList.contains('left') ? 'l' : 'r';
+  redraw();
+}
+/** Redraw whatever is placed in document coordinates. Cheap, idempotent. */
+function redraw() {
+  const n = S.node || S.hover;
+  if (n && !$('#hl').hidden) drawHl(n, !!S.node);
+  if (S.hover && !$('#pill').hidden) place(S.hover, $('#pill'));
+}
+/* THE collision the docked mode creates: opening a panel now reflows the page,
+   so every rect the highlight was drawn from is stale. Watching #host catches
+   it for free — including every frame of the margin transition — which is why
+   the panels can animate at all. */
+new ResizeObserver(redraw).observe($('#host'));
+addEventListener('resize', () => { if (dockH != null) setDockH(dockH); else redraw(); });
+
+function setLayout(m) {
+  const was = document.body.dataset.layout;
+  document.body.dataset.layout = m;
+  try { localStorage.setItem('mockup-layout', m); } catch {}
+  $('#railLayout').querySelectorAll('button').forEach((x) => (x.dataset.cur = x.dataset.m === m ? '1' : '0'));
+  if (m === 'docked') {
+    // A modal peek and a docked peek are the same peek. Carry it across.
+    const open = !$('#peek').hidden;
+    if (open) hideModal();
+    const src = S.peek || { file:ROUTES[CURRENT].file, line:1 };
+    dockCode(src.file, src.line);
+  }
+  if (m !== was) toast(m === 'docked'
+    ? 'Docked — the page is squeezed between the panels, code sits below it'
+    : 'Overlay — panels float over the page');
+  syncLayout();
+}
+$('#railLayout').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (b) setLayout(b.dataset.m);
+});
+/* ---- the dock is resizable ----
+   --dock-h is the single source of the dock's height AND of the page's
+   bottom padding, so dragging the edge moves both in lockstep and nothing
+   ever ends up underneath. An inline custom property on <body> outranks the
+   stylesheet's default; removing it hands the default back, which is what
+   collapsing wants. */
+const DOCK_MIN = 110, dockMax = () => Math.round(innerHeight * 0.82);
+let dockH = null;
+function setDockH(px, persist) {
+  dockH = Math.max(DOCK_MIN, Math.min(dockMax(), Math.round(px)));
+  document.body.style.setProperty('--dock-h', dockH + 'px');
+  $('#dockGrip').setAttribute('aria-valuenow', dockH);
+  if (persist) { try { localStorage.setItem('mockup-dock-h', dockH); } catch {} }
+  redraw();
+}
+function resetDockH() {
+  dockH = null; document.body.style.removeProperty('--dock-h');
+  try { localStorage.removeItem('mockup-dock-h'); } catch {}
+  redraw();
+}
+const grip = $('#dockGrip');
+grip.addEventListener('pointerdown', (e) => {
+  if (document.body.dataset.dock !== '1') return;
+  e.preventDefault();
+  grip.setPointerCapture(e.pointerId);
+  document.body.dataset.resizing = '1';
+  const y0 = e.clientY, h0 = $('#dock').getBoundingClientRect().height;
+  const move = (ev) => setDockH(h0 + (y0 - ev.clientY));
+  const up = () => {
+    grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up);
+    grip.removeEventListener('pointercancel', up);
+    delete document.body.dataset.resizing;
+    if (dockH != null) setDockH(dockH, true);
+  };
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', up);
+  grip.addEventListener('pointercancel', up);
+});
+grip.addEventListener('dblclick', resetDockH);
+grip.addEventListener('keydown', (e) => {
+  const step = { ArrowUp:24, ArrowDown:-24, PageUp:120, PageDown:-120 }[e.key];
+  if (step === undefined) { if (e.key === 'Home') { e.preventDefault(); resetDockH(); } return; }
+  e.preventDefault();
+  setDockH($('#dock').getBoundingClientRect().height + step, true);
+});
+$('#dockFold').onclick = () => {
+  const open = document.body.dataset.dock !== '1';
+  document.body.dataset.dock = open ? '1' : '0';
+  $('#dockFold').title = open ? 'Collapse' : 'Expand';
+  // Collapsing yields the height back to the stylesheet; expanding restores
+  // whatever the drag left, so a fold never loses it.
+  if (open && dockH != null) document.body.style.setProperty('--dock-h', dockH + 'px');
+  else if (!open) document.body.style.removeProperty('--dock-h');
+  syncLayout();
+};
+$('#dockOpen').onclick = () => toast('Opened ' + $('#dockTitle').textContent
+  + ($('#dockLoc').textContent ? ' ' + $('#dockLoc').textContent : '') + ' in your editor');
 
 /* =============================== SCENES =============================== */
 const pick = (sel) => document.querySelector(sel.startsWith('#') ? sel : '#host ' + sel);
@@ -1607,6 +1809,20 @@ const SCENES = [
       const n = pick('[data-i="0"] .card-body'); setTimeout(() => openInspector(n), 20); }],
     ['Settings', () => { reset(); $('#backdrop').hidden = false; $('#settings').hidden = false; }],
   ]],
+  ['Layout A/B', [
+    ['Overlay · page under the panels', () => { setLayout('overlay'); reset(); toggleTree(true); setEdit(true);
+      const n = pick('[data-i="0"] .card-body'); setTimeout(() => openInspector(n), 20); }],
+    ['Docked · page between them', () => { setLayout('docked'); reset(); toggleTree(true); setEdit(true);
+      const n = pick('[data-i="0"] .card-body'); setTimeout(() => openInspector(n), 20); }],
+    ['Docked · code below the page', () => { setLayout('docked'); reset('service'); toggleTree(true);
+      openPeek('src/content/services/product-design.md', 7); }],
+    ['Docked · inspector on the left', () => { setLayout('docked'); reset(); toggleTree(true); setEdit(true);
+      const n = pick('.hero-title');
+      setTimeout(() => { openInspector(n); $('#insp').classList.add('left'); syncLayout(); }, 20); }],
+    ['Docked · code folded away', () => { setLayout('docked'); reset(); toggleTree(true); setEdit(true);
+      document.body.dataset.dock = '0';
+      const n = pick('.hero-sub'); setTimeout(() => openInspector(n), 20); }],
+  ]],
 ];
 $('#railBody').innerHTML = SCENES.map(([g, items]) =>
   `<small>${g}</small>` + items.map((it, i) => `<button class="sc" data-g="${g}" data-i="${i}">${it[0]}</button>`).join('')).join('');
@@ -1618,6 +1834,13 @@ $('#railBody').addEventListener('click', (e) => {
 });
 goto('home');
 $('#railBody').querySelector('.sc[data-g="Waking it"][data-i="0"]').dataset.cur = '1';
+let saved = 'overlay';
+try { saved = localStorage.getItem('mockup-layout') || 'overlay'; } catch {}
+document.body.dataset.layout = saved;
+$('#railLayout').querySelectorAll('button').forEach((x) => (x.dataset.cur = x.dataset.m === saved ? '1' : '0'));
+if (saved === 'docked') dockCode(ROUTES[CURRENT].file, 1);
+try { const h = +localStorage.getItem('mockup-dock-h'); if (h) setDockH(h); } catch {}
+syncLayout();
 </script>
 </body>
 </html>
