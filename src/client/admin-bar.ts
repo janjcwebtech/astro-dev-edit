@@ -316,7 +316,7 @@ export function initAdminBar(deps: AdminBarDeps): AdminBarHandle {
     // saying it twice in JS is how the two used to drift.
     bar.dataset.edge = prefs.edge;
     hairline.dataset.edge = prefs.edge;
-    setChromeInset({
+    setChromeInset('bar', {
       top: prefs.edge === 'top' ? BAR_H : 0,
       bottom: prefs.edge === 'bottom' ? BAR_H : 0,
     });

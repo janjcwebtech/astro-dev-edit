@@ -10,6 +10,7 @@ import { card, item, itemGroup } from './group.ts';
 import { createInspectorLoader, occurrenceSummary, passedLabel, passedRows } from './inspector-model.ts';
 import { nearestOwnSource, sourceFor } from './source-map.ts';
 import type { StagedValues } from './staged-values.ts';
+import type { LayoutMode } from './layout.ts';
 import { basename, footButton, inputEl, isolateScroll, setButtonEnabled, styled, toast } from './ui.ts';
 import { typesOnPage, writable, type ElementTarget, type ValueTarget } from './value-model.ts';
 import { buildValueRows, chainBadges, type ValueRow, type ValueRows, type ValueSelection } from './value-rows.ts';
@@ -24,6 +25,13 @@ export interface InspectorDeps {
    *  unresolved. The jump of last resort, and never a guessed one. */
   routeFile(): string | null;
   onClose(): void;
+  /** The layout switch this panel's header carries. Read lazily, never
+   *  captured: the layout is built *after* the panels it measures, and the
+   *  effective mode changes on its own when the window gets too narrow. */
+  layout: {
+    mode(): LayoutMode;
+    toggle(): void;
+  };
   /** Element-scoped counterpart to the launcher menu's page context: the
    *  selector, the source loc, the chain and the applied CSS, as one paste. */
   copyContext(el: HTMLElement, source: SourceLoc): void;
@@ -45,13 +53,42 @@ export function initInspector(deps: InspectorDeps) {
   const title = styled('strong', 'atx-inspector-title');
   title.textContent = 'Inspector';
   const tag = styled('span', 'atx-inspector-tag');
+  // The one control that changes the *shape* of the session rather than the
+  // selection: overlay, where the panels float over the page, or docked, where
+  // the page is squeezed between them with the code dock under it. It sits next
+  // to Close because both are about the panel rather than about the element,
+  // and it is a view preference — per developer, in localStorage, never a
+  // project setting in OPTION_SPECS.
+  const layoutButton = styled('button', 'atx-tree-action');
+  layoutButton.type = 'button';
+  layoutButton.append(icon('sidebar', 16));
+  layoutButton.addEventListener('click', () => {
+    deps.layout.toggle();
+    syncLayout();
+  });
+
+  /** Paint the switch from the *effective* mode — a window too narrow to dock
+   *  stays overlay, and the button must not claim otherwise. */
+  function syncLayout(): void {
+    const docked = deps.layout.mode() === 'docked';
+    layoutButton.toggleAttribute('data-on', docked);
+    const label = docked
+      ? 'Float the panels over the page'
+      : 'Dock the panels beside the page';
+    layoutButton.title = label;
+    layoutButton.setAttribute('aria-label', label);
+    layoutButton.setAttribute('aria-pressed', String(docked));
+  }
+  // Deliberately not painted here: the layout measures this very panel, so it
+  // does not exist yet. The composition root paints it the moment it does.
+
   const closeButton = styled('button', 'atx-tree-action');
   closeButton.type = 'button';
   closeButton.title = 'Close (Esc)';
   closeButton.setAttribute('aria-label', 'Close the inspector');
   closeButton.append(icon('x', 16));
   closeButton.addEventListener('click', close);
-  header.append(title, tag, closeButton);
+  header.append(title, tag, layoutButton, closeButton);
 
   const status = styled('div', 'atx-inspector-status');
   /** One word on whether the chain can be trusted. Hidden until an answer
@@ -814,6 +851,10 @@ export function initInspector(deps: InspectorDeps) {
   }).observe(document.documentElement, { childList: true, subtree: true });
 
   return { root, select, focusUsage, close, isOpen: () => selected !== null,
+    /** Repaint the layout switch. The effective mode can change without the
+     *  button being touched — the window narrowing past the point where the
+     *  page column is still a page. */
+    syncLayout,
     /** Whether `el` is what the panel currently describes — a breadcrumb asks
      *  before deciding between moving its mark and opening the panel. */
     shows: (el: HTMLElement) => selected === el,

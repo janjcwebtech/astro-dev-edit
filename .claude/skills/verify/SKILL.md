@@ -63,7 +63,8 @@ root.getElementById('atx-entry').click();
 Exception: `.atx-rte-content` is slotted **light DOM**, so `document.querySelector` finds it.
 
 - Singletons in that root: `#atx-bar` holding `#atx-toggle`, `#atx-entry` (detail pages only), `#atx-bar-elements`, `#atx-bar-pin`, `#atx-bar-exit`, `#atx-bar-edge`; `#atx-hairline` when retracted; menu items `#atx-menu-page-source`, `#atx-menu-collections`, `#atx-menu-settings`; `#atx-tree-tab`; drawer `.atx-drawer`.
-- State: `sessionStorage.astroDevEditMode` (`'1'`/`'0'`), `localStorage.astroDevEditBar` (pin/dock).
+- Inspector mode (`composition: true`, `npm run dev:composition`) adds `#atx-dock` and its drag handle `#atx-dock-grip`; the layout switch is the first button in `.atx-inspector-header`.
+- State: `sessionStorage.astroDevEditMode` (`'1'`/`'0'`), `localStorage.astroDevEditBar` (pin/dock), `localStorage.astroDevEditLayout` (`{mode, dockHeight, dockOpen}`).
 - Hover is JS-driven on `#atx-bar` — `browser_hover` plus `getComputedStyle` through `browser_evaluate`.
 
 Fixtures:

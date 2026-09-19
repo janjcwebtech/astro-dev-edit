@@ -1,8 +1,10 @@
-import type { SlotPlacement, UsageLink } from '../shared/protocol.ts';
+import type { SlotPlacement, SourceLoc, UsageLink } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { chainIds, createChainLinks } from './composition.ts';
 import { readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
-import { openPeekPanel } from './editors/peek.ts';
+import { initLayout, type LayoutHandle } from './layout.ts';
+import { freeBox, pillPlacement } from './layout-model.ts';
+import { onReflow } from './reflow.ts';
 import { openSettingsPanel } from './editors/settings-panel.ts';
 import { icon } from './icons.ts';
 import { initInspector } from './inspector.ts';
@@ -15,7 +17,7 @@ import { createStagedValues } from './staged-values.ts';
 import * as state from './state.ts';
 import { tip } from './tip.ts';
 import { type TreeMark, initTree } from './tree.ts';
-import { basename, footButton, outlineRect, setChromeInset, styled, toast } from './ui.ts';
+import { basename, chromeInset, footButton, outlineRect, setChromeInset, styled, toast } from './ui.ts';
 
 /** Opt-in read-only composition surface. Selection and Alt interception have
  * independent lifetimes; none of the legacy editor routes are entered. */
@@ -31,7 +33,7 @@ const EDGE = 8;
 
 export function initInspectorApp() {
   // The editing toolbar is not mounted in this mode.
-  setChromeInset({ top: 0, bottom: 0 });
+  setChromeInset('bar', {});
   let held = false;
   let previousCursor = '';
   let hovered: HTMLElement | null = null;
@@ -45,6 +47,9 @@ export function initInspectorApp() {
    *  code* opens it. */
   let routeFile: string | null = null;
   const descriptions = new Map<Element, TreeMark>();
+  /** What the panel is describing, so the dock can be pointed at it when the
+   *  layout docks with a selection already made. */
+  let selected: HTMLElement | null = null;
   const chainLinks = createChainLinks(api);
   /** Every pending edit on this page, and the amber it wears. One store, so
    *  the panel's field and the caret on the page are two views of one value. */
@@ -121,12 +126,32 @@ export function initInspectorApp() {
 
   // --- Source navigation ----------------------------------------------------
 
-  function viewCode(source: { file: string; loc: string }) {
-    openPeekPanel(source, src => {
-      void api.open(src).then(answer => {
-        if (answer.refused) toast(answer.refused, 'warn');
-      }).catch(error => toast(String(error), 'err'));
-    });
+  /** The jump-out every source surface offers, wherever it is drawn. */
+  function openInEditor(src: SourceLoc) {
+    void api.open(src).then(answer => {
+      if (answer.refused) toast(answer.refused, 'warn');
+    }).catch(error => toast(String(error), 'err'));
+  }
+
+  /** The one door onto source, whichever room is behind it: a modal peek in
+   *  overlay mode, the code dock when the layout is docked. */
+  function viewCode(source: SourceLoc) {
+    layout.showCode(source, openInEditor);
+  }
+
+  /**
+   * Open the inspector on an element, from wherever the selection came from.
+   *
+   * Docked, the code dock follows the selection onto the element's own source —
+   * the same file and line the tree row's `</>` opens — so the code for what is
+   * selected is simply there, without a second click asking for it. A selection
+   * with no annotation of its own leaves the dock showing what it was showing:
+   * its header names that file, so nothing on screen claims to be this element.
+   */
+  function select(el: HTMLElement, usageId?: string) {
+    selected = el;
+    layout.followSelection(sourceFor(el), openInEditor);
+    void inspector.select(el, usageId);
   }
 
   /** The route's template. One verb, one popup: *Open in editor* lives inside
@@ -224,13 +249,26 @@ export function initInspectorApp() {
       }).catch(error => toast(String(error), 'err'));
     },
     onClose: () => tree.clearSelection(),
+    // Lazy on purpose: the layout measures these very panels, so it cannot
+    // exist until they do.
+    layout: { mode: () => layout.mode(), toggle: () => layout.toggleMode() },
   });
   const tree = initTree({
     readOnly: true, header, footer: legend, titleActions: [menuButton, settingsButton], isEditMode: () => true,
     highlight, clearHighlight, openEditor: () => {},
     openSource: viewCode,
-    onSelect: el => { clearHighlight(); void inspector.select(el); },
+    onSelect: el => { clearHighlight(); select(el); },
     describe: el => descriptions.get(el) ?? null,
+  });
+  // The page is squeezed between these two when the layout is docked, so this
+  // is the one place that knows which panel is on which edge.
+  const layout: LayoutHandle = initLayout({ left: [tree.root], right: [inspector.root] });
+  inspector.syncLayout();
+  layout.onChange(() => {
+    inspector.syncLayout();
+    // Docking with something already selected arrives at the same place a
+    // selection made while docked would: the dock on that element's source.
+    if (selected) layout.followSelection(sourceFor(selected), openInEditor);
   });
 
   // --- Hover pill -----------------------------------------------------------
@@ -256,14 +294,18 @@ export function initInspectorApp() {
 
   /** Above the element when it fits there, below it otherwise. Measured after
    *  the content is in, because a breadcrumb row changes the height and the
-   *  pill must not end up over what it is naming. */
+   *  pill must not end up over what it is naming.
+   *
+   *  The clamp is against the chrome inset rather than the raw viewport: docked,
+   *  the bottom of the window belongs to the code dock and the sides to the
+   *  panels, and a pill under any of them is a pill that cannot be read. */
   function placePill() {
     if (!hoveredRect) return;
-    const height = pill.offsetHeight;
-    const above = hoveredRect.top - height - PILL_GAP;
-    pill.style.top = `${above >= EDGE ? above
-      : Math.max(EDGE, Math.min(hoveredRect.bottom + PILL_GAP, innerHeight - height - EDGE))}px`;
-    pill.style.left = `${Math.max(EDGE, Math.min(hoveredRect.left, innerWidth - pill.offsetWidth - EDGE))}px`;
+    const free = freeBox(chromeInset(), { width: innerWidth, height: innerHeight }, EDGE);
+    const size = { width: pill.offsetWidth, height: pill.offsetHeight };
+    const at = pillPlacement(hoveredRect, size, free, PILL_GAP);
+    pill.style.top = `${at.top}px`;
+    pill.style.left = `${at.left}px`;
   }
 
   function crumb(label: string, onSelect: (() => void) | null, refused = false) {
@@ -286,7 +328,7 @@ export function initInspectorApp() {
    *  already shows and only moves the mark. */
   function openAt(el: HTMLElement, usageId: string) {
     tree.selectElement(el);
-    void inspector.select(el, usageId);
+    select(el, usageId);
   }
 
   /** The breadcrumb row, grown on dwell: route › each usage's resolved file ›
@@ -359,6 +401,18 @@ export function initInspectorApp() {
     if (src && !opaque) dwellTimer = window.setTimeout(() => { void renderCrumbs(el); }, DWELL);
   }
 
+  /** Redraw what is drawn in viewport coordinates. Idempotent and cheap: it is
+   *  called for every frame of a docked push as well as for a page reflow the
+   *  overlay had nothing to do with. */
+  function redrawHover() {
+    if (!hovered) return;
+    if (!hovered.isConnected) return clearHighlight();
+    hoveredRect = hovered.getBoundingClientRect();
+    Object.assign(hoverOutline.style, outlineRect(hoveredRect));
+    placePill();
+  }
+  onReflow(redrawHover);
+
   function setHeld(on: boolean) {
     if (on === held) return;
     held = on;
@@ -413,7 +467,7 @@ export function initInspectorApp() {
     staging.notePoint(event.clientX, event.clientY);
     clearHighlight();
     tree.selectElement(el);
-    void inspector.select(el);
+    select(el);
   }, true);
   window.addEventListener('scroll', clearHighlight, { passive: true });
   window.addEventListener('resize', clearHighlight, { passive: true });
@@ -479,6 +533,7 @@ export function initInspectorApp() {
     // that mints them, and a navigation changes which route's graph they are
     // resolved against.
     chainLinks.invalidate();
+    selected = null;
     routeFile = null;
     inspector.invalidate();
     if (state.get()?.kind === 'panel') state.dismiss();
@@ -535,6 +590,10 @@ export function initInspectorApp() {
     }
   }
 
+  // Model only. Putting the overlay's host back in the swapped-in document is
+  // `overlay.ts::onPageChange`, whose listener is registered at module
+  // evaluation and so runs before these — do not add a second copy here, or a
+  // navigation gets two re-attaches and one of them is the wrong order.
   document.addEventListener('astro:before-swap', invalidate);
   document.addEventListener('astro:page-load', () => { invalidate(); rebuild(); staging.repaint(); });
   window.addEventListener('popstate', () => { invalidate(); rebuild(); staging.repaint(); });
@@ -553,7 +612,7 @@ export function initInspectorApp() {
       announceDrops(staging.drainNotices());
     });
   }
-  mount(hoverOutline, pill, tree.root, tree.tab, tree.selectionOutline, tip.root, menu.root, inspector.root);
+  mount(hoverOutline, pill, tree.root, tree.tab, tree.selectionOutline, tip.root, menu.root, inspector.root, layout.dock);
   tree.tab.title = 'Open source inspector · hold Alt / ⌥ to select on the page';
   tree.tab.setAttribute('aria-label', 'Open source inspector');
   tree.hide();
@@ -568,7 +627,3 @@ export function initInspectorApp() {
   announceDrops(taken.dropped);
   return { invalidate, rebuild };
 }
-  // Model only. Putting the overlay's host back in the swapped-in document is
-  // `overlay.ts::onPageChange`, whose listener is registered at module
-  // evaluation and so runs before these — do not add a second copy here, or a
-  // navigation gets two re-attaches and one of them is the wrong order.

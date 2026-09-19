@@ -21,6 +21,54 @@ returns clicks to the page while keeping the selection and inspector open.
 Close or Escape clears the selection. With `composition: false`, the existing
 editing UI remains available.
 
+### Overlay and docked
+
+The switch beside the inspector's close button decides where the panels live.
+The choice is per developer, kept in `localStorage`, and is not an integration
+option — nothing about it reaches the server or the project.
+
+- **Overlay** (the default) — the panels float at the viewport edges and the
+  page keeps the whole window, running underneath them.
+- **Docked** — the panels go flush to their edges and the page is squeezed into
+  the strip between them, with the **code dock** across the bottom of that
+  strip. *View code* renders into the dock instead of opening the modal peek,
+  and the dock is chrome rather than a modal: no backdrop, Escape still belongs
+  to the panel, and the page stays clickable with it open.
+
+**The dock follows the selection.** Selecting an element — a tree row, an
+Alt/Option click on the page, a breadcrumb segment — points the dock at that
+element's own source, scrolled to its line: the same file and line the tree
+row's `</>` opens, without asking for it. A selection with no annotation of its
+own leaves the dock where it was; its header names the file it is showing, so
+nothing on screen claims to be the new selection. *View code* still overrides
+it with whatever file that particular button names, and a folded dock stays
+folded for a selection while an explicit *View code* unfolds it to answer.
+
+The dock's top edge is a separator. Drag it, or focus it and use ↑/↓ (24px),
+PgUp/PgDn (120px) and Home; double-click or Home hands the height back to the
+default. It is clamped between 110px and 82vh, and the height survives both a
+fold and a reload — folding leaves the header bar and unfolding gives the
+dragged height back.
+
+A window with no room left for the page after the open panels stays overlay and
+says so, so closing the element tree can be what makes docking possible at the
+same window size.
+
+**What docking does not move.** The page is pushed by padding `<html>`, which
+moves the page's *flow*. Three things are not in it:
+
+- a host page's `position: fixed` elements — a site's fixed header still spans
+  the whole viewport and runs under the panels;
+- any width measured in `vw` — a `100vw` full-bleed band overflows the page
+  column on both sides;
+- `100vh` heights, which stay the window's height rather than the column's.
+
+`position: sticky` is unaffected: it stays in flow, so it lands in the page
+column correctly. There is no general fix for the other three short of
+rendering the site in an iframe, which is not what this tool is. Overlay mode
+is the one to use on a site whose own chrome is taken out of flow; `/sticky` in
+the composition fixture is the page to look at it on.
+
 The tree panel's own header carries every tool-wide action, because this mode
 mounts no toolbar:
 
@@ -44,7 +92,7 @@ Every card on it collapses from the chevron in its header, and a collapsed
 card stays collapsed — across a new selection and across a page — because the
 choice is kept per card title in `localStorage`. Its own two bands
 sit above them: a title bar naming the tool and the selected tag with the
-close, and a status row carrying the chain's tier, a **saved** or **N unsaved**
+layout switch and the close, and a status row carrying the chain's tier, a **saved** or **N unsaved**
 chip once there is something to report, and **Copy context** — this element's selector, source
 loc, chain and applied CSS as one paste. A card's caveat is not a line under
 its title: it hangs off the ⓘ beside it, shown on hover.
@@ -108,8 +156,9 @@ A component chain row can also be reached from the hover pill's breadcrumb
 (below): the segment marks its chain row and scrolls to it, and never replaces
 the element the rest of the panel describes.
 
-Source buttons open the existing read-only preview. Its **Open in editor**
-action respects the `openInEditor` option; CSS also respects `cssInspector`.
+Source buttons open the read-only preview — the centred modal in overlay mode,
+the code dock when docked. Its **Open in editor** action respects the
+`openInEditor` option; CSS also respects `cssInspector`.
 Occurrence counts distinguish repeated insertions of the selected source
 element. Route-scoped usage counts describe source sites, including unrendered
 branches, rather than runtime instances.
@@ -124,7 +173,9 @@ late responses. Navigation, HMR and removal of the selected DOM node clear the
 selection, so render identities are not carried onto a replacement page.
 
 Run `npm run dev:composition` for a fixture using this integration. `/advanced`
-exercises repeated components and slots; `/cached` contains replayed HTML.
+exercises repeated components and slots; `/cached` contains replayed HTML;
+`/sticky` has a fixed header, a sticky sub-bar and a `100vw` band, for the
+docked layout's limits above.
 [Tracing mechanics and boundaries](COMPOSITION-PROOF.md) describe the identities
 and supported source relationships.
 

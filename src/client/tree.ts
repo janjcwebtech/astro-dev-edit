@@ -4,7 +4,8 @@ import { isOwnUi } from './shadow.ts';
 import { annotatedElements, pathFor, sourceFor } from './source-map.ts';
 import { type TreeNode, buildTreeModel } from './tree-model.ts';
 import { tip } from './tip.ts';
-import { basename, isolateScroll, onChromeInset, outlineRect, styled } from './ui.ts';
+import { onReflow } from './reflow.ts';
+import { basename, chromeInset, isolateScroll, onChromeInset, outlineRect, styled } from './ui.ts';
 
 /**
  * Element-tree panel: a left-docked, non-modal outline of the page's
@@ -143,9 +144,16 @@ export function initTree(deps: TreeDeps): TreeHandle {
 
   // Keep clear of the admin bar, whichever edge it is docked to. Fires once on
   // subscribe, so the panel is correct however the two modules boot.
-  onChromeInset(({ top, bottom }) => {
-    root.style.top = `${top + 5}px`;
-    root.style.bottom = `${bottom + 5}px`;
+  //
+  // The *bar's* share, not the whole inset: this panel is full height by
+  // definition, so the code dock's strip along the bottom is not its to avoid —
+  // the dock spans the page column between the panels, never under one. The
+  // float away from the edge is `margin` in styles.ts, which is what lets the
+  // docked variant go flush by dropping it.
+  onChromeInset(() => {
+    const { top, bottom } = chromeInset('bar');
+    root.style.top = `${top}px`;
+    root.style.bottom = `${bottom}px`;
   });
 
   // The locked-selection outline — this panel's own, distinct from hover's
@@ -189,15 +197,11 @@ export function initTree(deps: TreeDeps): TreeHandle {
     Object.assign(selectionOutline.style, outlineRect(r) as Partial<CSSStyleDeclaration>);
   }
 
-  let repositionScheduled = false;
-  function onReposition(): void {
-    if (repositionScheduled) return;
-    repositionScheduled = true;
-    requestAnimationFrame(() => {
-      repositionScheduled = false;
-      positionSelection();
-    });
-  }
+  // Scroll and resize are no longer the only ways the selected element moves:
+  // docked, opening a panel pushes the page and neither event fires. One bus,
+  // one idempotent redraw — a second path is how two outlines around one
+  // element start disagreeing by a pixel.
+  onReflow(positionSelection);
 
   function select(el: HTMLElement): void {
     const prev = selectedEl;
@@ -207,11 +211,9 @@ export function initTree(deps: TreeDeps): TreeHandle {
     paintRow(el);
     positionSelection();
     // Scroll the element into view. This scrolls the page (firing hover's own
-    // scroll→clearHighlight), and our reposition listener keeps the locked
-    // outline glued to the element as it moves.
+    // scroll→clearHighlight), and the reflow bus keeps the locked outline glued
+    // to the element as it moves.
     el.scrollIntoView({ block: 'center', inline: 'nearest' });
-    window.addEventListener('scroll', onReposition, { passive: true });
-    window.addEventListener('resize', onReposition, { passive: true });
   }
 
   function clearSelection(): void {
@@ -219,8 +221,6 @@ export function initTree(deps: TreeDeps): TreeHandle {
     selectedEl = null;
     selectedPath = null;
     selectionOutline.toggleAttribute('data-on', false);
-    window.removeEventListener('scroll', onReposition);
-    window.removeEventListener('resize', onReposition);
     if (prev) paintRow(prev);
   }
 

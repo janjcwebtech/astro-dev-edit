@@ -21,7 +21,13 @@
  * holds them to WCAG AA.
  */
 
+import { NO_INSET, addInsets, sameInset, type ChromeInset } from './layout-model.ts';
 import { mount } from './shadow.ts';
+
+// The inset's shape is arithmetic, so it is declared where the arithmetic is.
+// Re-exported because ui.ts is where every consumer already reads the chrome
+// from, and a second import path for one interface is a second thing to know.
+export type { ChromeInset };
 
 // Base layer for the overlay's *ambient* chrome — the hover outline and pill,
 // the element tree, the admin bar and its menu, at Z+1..Z+4. Deliberately
@@ -390,30 +396,47 @@ export function hexToRgba(hex: string, alpha: number): string {
 
 // --- Viewport chrome ---------------------------------------------------------
 
-/** Strips of the viewport that the overlay's own fixed chrome occupies. */
-export interface ChromeInset {
-  top: number;
-  bottom: number;
-}
+/**
+ * Who is claiming a strip of the viewport.
+ *
+ * Kept apart because the two are not the same question. A side panel must keep
+ * clear of the **bar** and of nothing else — it is full height by definition,
+ * so the code dock's strip is not its to avoid — while anything placed *inside*
+ * the page has to clear all of it. Summing without naming the owner would make
+ * the docked element tree shrink by the dock's height.
+ */
+export type ChromeOwner = 'bar' | 'layout';
 
-let inset: ChromeInset = { top: 0, bottom: 0 };
+const claims = new Map<ChromeOwner, ChromeInset>([
+  ['bar', NO_INSET],
+  ['layout', NO_INSET],
+]);
+let inset: ChromeInset = NO_INSET;
 const insetListeners = new Set<(i: ChromeInset) => void>();
 
-/** The current chrome inset — read it when placing anything against a viewport
- *  edge (the hover pill, a docked panel), so it can't hide under the admin bar. */
-export function chromeInset(): ChromeInset {
-  return inset;
+/** The chrome inset — every strip our own fixed chrome occupies, or one
+ *  owner's share of it. Read it when placing anything against a viewport edge
+ *  (the hover pill, a docked panel), so it can't hide under the admin bar or
+ *  under the code dock. */
+export function chromeInset(owner?: ChromeOwner): ChromeInset {
+  return owner ? claims.get(owner)! : inset;
 }
 
 /**
- * Declare how much of the viewport edge the admin bar occupies. One-directional
- * on purpose: the bar tells ui.ts, and the surfaces that must keep clear (toast,
- * element tree, hover pill) read it back or subscribe — so nothing here has to
- * import the bar.
+ * Declare how much of the viewport edge an owner occupies. One-directional on
+ * purpose: the bar and the layout tell ui.ts, and the surfaces that must keep
+ * clear (toast, element tree, hover pill) read it back or subscribe — so
+ * nothing here has to import either.
+ *
+ * Partial, because an owner only ever speaks for the edges it claims.
  */
-export function setChromeInset(next: ChromeInset): void {
-  if (next.top === inset.top && next.bottom === inset.bottom) return;
-  inset = next;
+export function setChromeInset(owner: ChromeOwner, next: Partial<ChromeInset>): void {
+  const claim = { ...NO_INSET, ...next };
+  if (sameInset(claim, claims.get(owner)!)) return;
+  claims.set(owner, claim);
+  const total = addInsets(claims.values());
+  if (sameInset(total, inset)) return;
+  inset = total;
   for (const fn of insetListeners) fn(inset);
 }
 

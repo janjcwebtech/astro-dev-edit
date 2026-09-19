@@ -31,6 +31,7 @@
  * with nothing in the terminal to point at this file.
  */
 
+import { DOCK_BAR_H } from './layout-model.ts';
 import { BAR_CHIP, BAR_CHIP_HOVER, CHECKER, COLOR, FONT, RADIUS, Z, Z_MODAL, hexToRgba, lift } from './ui.ts';
 
 const kebab = (k: string): string => k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
@@ -70,13 +71,21 @@ export function overlayCss(): string {
    faintly through the panel's own surface, while every card on it stays
    opaque — a translucent card would put the page behind the words. */
 .atx-inspector {
-  display: none; position: fixed; right: 8px; top: 8px; bottom: 8px;
+  display: none; position: fixed; right: 0; top: 0; bottom: 0; margin: 8px;
   width: min(460px, calc(100vw - 16px)); z-index: ${Z + 4};
   color: var(--atx-foreground); background: rgba(0, 0, 0, 0.9);
   border: 1px solid var(--atx-border); border-radius: var(--atx-radius-xl);
   box-shadow: 0 8px 32px #0005; overflow: hidden;
 }
 .atx-inspector[data-on] { display: flex; flex-direction: column; }
+/* Docked, the page is squeezed between the panels rather than running under
+   them, so the panel goes flush to its edge: the float, the radius and the
+   three borders that no longer face anything all come off, leaving the one
+   edge the page is on. The panel stays full height — the code dock spans the
+   page column between the panels, never under one. */
+.atx-inspector[data-layout="docked"] {
+  margin: 0; border-radius: 0; border-width: 0 0 0 1px; box-shadow: none;
+}
 /* Two bands. The title bar names the tool and the selection; the status row
    under it carries the selection's own answers and the one action scoped to
    it. Keeping them apart is what stops "which element" and "can I trust this"
@@ -1600,12 +1609,15 @@ input[type='checkbox'].atx-switch:disabled {
 
 .atx-tree {
   position: fixed;
-  left: 5px;
+  left: 0;
   /* Top/bottom rather than a height: the admin bar reserves a strip of one
      edge, and the panel must never sit under it. Both are overwritten inline
-     as the inset changes. */
-  top: 5px;
-  bottom: 5px;
+     as the inset changes — with the bar's strip only, never the code dock's.
+     The float away from the edge is the margin below, so the docked variant
+     can go flush by dropping it without JS having to know the difference. */
+  top: 0;
+  bottom: 0;
+  margin: 5px;
   z-index: ${Z + 3};
   display: none;
   flex-direction: column;
@@ -1623,6 +1635,14 @@ input[type='checkbox'].atx-switch:disabled {
 
 .atx-tree[data-on] {
   display: flex;
+}
+
+/* Flush to its edge for the same reason the inspector is — see there. */
+.atx-tree[data-layout="docked"] {
+  margin: 0;
+  border-radius: 0;
+  border-width: 0 1px 0 0;
+  box-shadow: none;
 }
 
 .atx-tree-title {
@@ -2822,6 +2842,150 @@ input[type='checkbox'].atx-switch:disabled {
 
 .atx-peek-loading[data-tone='err'] {
   color: var(--atx-destructive);
+}
+
+/* == Code dock =============================================================
+   dock.ts. The docked layout's second destination for a peek: the same code,
+   the same loader, in chrome instead of a modal. It spans the *page column* —
+   left/right are written inline from the panels' measured edges, so the side
+   panels stay full height beside it — and its height is the one number the
+   page's own bottom padding is also derived from, which is what stops content
+   ever ending up underneath it.
+
+   [data-on] is the docked layout; [data-open] is the fold. Folded, the body
+   goes and the header bar is all that stands, and the dragged height is kept
+   rather than discarded — it is what unfolding gives back. */
+
+.atx-dock {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  z-index: ${Z + 4};
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-top: 1px solid var(--atx-border);
+  /* The page keeps scrolling behind the dock — padding at the end of the
+     document is what stops content *finishing* underneath it, not what stops
+     it passing through — so the ground is blurred as well as nearly opaque.
+     Safe here and nowhere near the shadow host: a backdrop filter makes its
+     own element a containing block for fixed descendants, and the dock has
+     none. */
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(14px);
+  color: var(--atx-muted-fg);
+  font: 400 12px/1.5 var(--atx-font-mono);
+  transition: left 170ms ease, right 170ms ease, height 170ms ease;
+}
+
+.atx-dock[data-on] {
+  display: flex;
+}
+
+/* A drag must land on the frame it was given, not 170ms later. */
+.atx-dock[data-resizing] {
+  transition: none;
+}
+
+/* The top edge is the handle, laid over the header's top few pixels — which
+   hold nothing, because the header's controls are centred in their bar. */
+.atx-dock-grip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  height: 7px;
+  background: transparent;
+  cursor: ns-resize;
+  transition: background 120ms;
+}
+
+.atx-dock-grip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  transform: translateX(-50%);
+  width: 46px;
+  height: 3px;
+  border-radius: var(--atx-radius-full);
+  background: var(--atx-input);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.atx-dock-grip:hover::after,
+.atx-dock-grip:focus-visible::after,
+.atx-dock[data-resizing] .atx-dock-grip::after {
+  opacity: 1;
+}
+
+.atx-dock-grip:hover,
+.atx-dock-grip:focus-visible,
+.atx-dock[data-resizing] .atx-dock-grip {
+  background: ${hexToRgba(COLOR.brand, 0.3)};
+}
+
+/* The edge is its own focus ring — an outline on a 7px strip reads as a line
+   across the dock rather than as a focused control. */
+.atx-dock-grip:focus-visible {
+  outline: none;
+}
+
+.atx-dock:not([data-open]) .atx-dock-grip {
+  display: none;
+}
+
+.atx-dock-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  height: ${DOCK_BAR_H}px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--atx-border);
+}
+
+.atx-dock-title {
+  color: var(--atx-foreground);
+  font: 600 11.5px var(--atx-font-mono);
+}
+
+/* Always present, empty or not: its auto margin is what puts the controls on
+   the other end of the bar, and a spacer that only sometimes exists is a bar
+   that only sometimes lines up. */
+.atx-dock-loc {
+  margin-right: auto;
+  color: var(--atx-faint-fg);
+  font: 10.5px var(--atx-font-mono);
+}
+
+.atx-dock:not([data-open]) .atx-dock-body {
+  display: none;
+}
+
+.atx-dock:not([data-open]) .atx-dock-fold .atx-ico {
+  transform: rotate(180deg);
+}
+
+.atx-dock-body,
+.atx-dock-pane {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The peek's own height cap is for a modal in the middle of the window. In the
+   dock the pane is the height, and the drag is what sets it. */
+.atx-dock .atx-peek-code {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.atx-dock .atx-peek-loading {
+  flex: 1 1 auto;
 }
 
 /* Code token colours on the panel's dark ground. Chosen for contrast, not to

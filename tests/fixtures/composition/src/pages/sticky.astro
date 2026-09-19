@@ -1,0 +1,41 @@
+---
+/**
+ * A site whose own chrome is taken out of flow: a `position: fixed` header, a
+ * `position: sticky` sub-bar and a `100vw` band.
+ *
+ * The docked layout pushes the page by padding `<html>`, which moves the page's
+ * *flow* — and none of these three are in it. This page is how that limitation
+ * is looked at rather than guessed at, and it is the page to open when the
+ * behaviour under a docked panel is ever questioned again.
+ */
+const rows = Array.from({ length: 24 }, (_, i) => `Paragraph ${i + 1}`);
+---
+<html>
+  <head><title>Fixed and sticky chrome</title></head>
+  <body>
+    <header id="fixed-bar">Fixed header — spans the viewport, not the page column</header>
+    <nav id="sticky-bar">Sticky sub-bar</nav>
+    <main id="sticky-main">
+      <h1 id="sticky-title">Fixed and sticky chrome</h1>
+      <div id="full-bleed">A 100vw full-bleed band</div>
+      {rows.map(row => <p class="sticky-row">{row}</p>)}
+    </main>
+    <style>
+      body { margin: 0; font: 16px/1.6 system-ui, sans-serif; }
+      #fixed-bar {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+        padding: 12px 16px; background: #1d4ed8; color: #fff;
+      }
+      #sticky-bar {
+        position: sticky; top: 44px; z-index: 9;
+        padding: 8px 16px; background: #e0e7ff; border-bottom: 1px solid #c7d2fe;
+      }
+      #sticky-main { padding: 60px 16px 40px; }
+      #full-bleed {
+        width: 100vw; margin-left: calc(50% - 50vw);
+        padding: 24px 16px; background: #fde68a;
+      }
+      .sticky-row { max-width: 60ch; }
+    </style>
+  </body>
+</html>
