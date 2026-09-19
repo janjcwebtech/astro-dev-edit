@@ -75,6 +75,7 @@ Fixtures:
 | `/articles/<slug>`, `/works/<slug>` | a route rendering a Markdown entry — its values are not editable in the browser |
 | `/swap/a` ↔ `/swap/b` | `<ClientRouter />` navigation: the overlay must survive the body swap |
 | `npm run dev:composition` → `/marketing` | inspector mode on a three-deep component chain |
+| `npm run dev:composition` → `/notes` | a variable tag with no `<slot />` inside: proven cards, and the two shapes it refuses |
 
 ### Live server checks without a browser
 

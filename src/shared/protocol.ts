@@ -473,6 +473,49 @@ export interface InspectOpenResponse {
   loc: string | null;
 }
 
+// --- POST /inspect/tag -------------------------------------------------------
+/**
+ * Prove where an **unannotated** element with no slot boundary is written,
+ * from the annotated elements directly inside it (issue #82).
+ *
+ * `const Wrapper = href ? 'a' : 'article'` renders an element nothing stamps:
+ * `<Wrapper>` parses as a component. The proof runs downward and never climbs:
+ * a child's AST parent must be that component node, and its name must be a
+ * local `const` bound only to string literals. Then the element *is* that HTML
+ * tag, written where the component node is. The server refuses anything else,
+ * so the client does not climb to an ancestor to make up an owner.
+ */
+export interface VariableTagRequest {
+  /** The unannotated element's tag, lowercased. It must be one of the literals
+   *  the binding can take. */
+  tag: string;
+  /** Its annotated direct children in document order, at most 16. The first
+   *  one may be another component's root, so each is tried. */
+  children: ClassifyRequest[];
+}
+/** Why no child proved the element. `not-a-wrapper`: no child's AST parent is
+ *  a component node. `not-literal`: the name is imported, a prop, a `let`, or
+ *  computed. `tag-mismatch`: the rendered tag is not one of the literals.
+ *  `ambiguous`: two children prove different nodes. */
+export type VariableTagRefusal =
+  | 'disabled' | 'unresolved' | 'not-a-wrapper' | 'not-literal' | 'tag-mismatch' | 'ambiguous';
+export type VariableTagResponse =
+  | {
+    ok: true;
+    /** The index into `children` of the child that proved it. Its render
+     *  annotations (chain, instance, ordinal) are the element's own. */
+    child: number;
+    /** Where the element is written: the file, and the `<` of `<Wrapper`.
+     *  This is a tag start, not an annotation loc, so it never collides with
+     *  one and `/classify` never resolves it. */
+    source: SourceLoc;
+    /** The binding as the template spells it, e.g. `Wrapper`. */
+    name: string;
+    /** Every literal the binding can take, in source order, e.g. `['a', 'article']`. */
+    tags: string[];
+  }
+  | { ok: false; reason: VariableTagRefusal };
+
 // --- POST /peek --------------------------------------------------------------
 export interface PeekRequest {
   file: string;

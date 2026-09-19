@@ -1,7 +1,7 @@
 import type { SlotPlacement, SourceLoc, UsageLink } from '../shared/protocol.ts';
 import * as api from './api.ts';
 import { chainIds, createChainLinks } from './composition.ts';
-import { readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
+import { annotatedChild, readRenderOccurrences, wrappedSlot } from './composition-dom.ts';
 import { initLayout, type LayoutHandle } from './layout.ts';
 import { freeBox, pillPlacement } from './layout-model.ts';
 import { onReflow } from './reflow.ts';
@@ -18,6 +18,7 @@ import * as state from './state.ts';
 import { tip } from './tip.ts';
 import { type TreeMark, initTree } from './tree.ts';
 import { basename, chromeInset, footButton, outlineRect, setChromeInset, styled, toast } from './ui.ts';
+import { createVariableTags, type VariableTag } from './variable-tag.ts';
 
 /** Opt-in read-only composition surface. Selection and Alt interception have
  * independent lifetimes; none of the legacy editor routes are entered. */
@@ -51,6 +52,8 @@ export function initInspectorApp() {
    *  layout docks with a selection already made. */
   let selected: HTMLElement | null = null;
   const chainLinks = createChainLinks(api);
+  /** One answer per unannotated element, for the pill's dwell and the panel. */
+  const variableTags = createVariableTags(api);
   /** Every pending edit on this page, and the amber it wears. One store, so
    *  the panel's field and the caret on the page are two views of one value. */
   const staging = createStagedValues({ apply: api.apply, applyUsage: api.applyUsage });
@@ -224,10 +227,10 @@ export function initInspectorApp() {
   /** One element's context as one paste — the panel's counterpart to the
    *  menu's page-wide *Copy page context*, and the same gather the hover
    *  pill's copy button uses. */
-  async function copyElementContext(el: HTMLElement, source: { file: string; loc: string }) {
+  async function copyElementContext(el: HTMLElement, source: { file: string; loc: string }, carrier: Element = el) {
     if (!source.file) return toast('No source annotation on this element', 'warn');
     try {
-      const context = await collectContext(el, source);
+      const context = await collectContext(el, source, carrier);
       await navigator.clipboard.writeText(formatContext(context));
       toast(`Copied context for ${context.label}`, 'ok');
     } catch (error) {
@@ -237,7 +240,11 @@ export function initInspectorApp() {
 
   const inspector = initInspector({
     viewCode,
-    copyContext: (el, source) => void copyElementContext(el, source),
+    copyContext: (el, source, carrier) => void copyElementContext(el, source, carrier),
+    variableTag: el => variableTags.resolve(el),
+    // Only while that element is still the selection: the proof lands after
+    // the click, and a newer click has already pointed the dock elsewhere.
+    onSource: source => { if (selected) layout.followSelection(source, openInEditor); },
     // Read per selection, not captured: a navigation changes both, and the
     // route's own resolve lands after the first paint.
     markdownEntry: markdownSource,
@@ -274,7 +281,7 @@ export function initInspectorApp() {
     inspector.syncLayout();
     // Docking with something already selected arrives at the same place a
     // selection made while docked would: the dock on that element's source.
-    if (selected) layout.followSelection(sourceFor(selected), openInEditor);
+    if (selected) layout.followSelection(inspector.source(), openInEditor);
   });
 
   // --- Hover pill -----------------------------------------------------------
@@ -339,11 +346,12 @@ export function initInspectorApp() {
 
   /** The breadcrumb row, grown on dwell: route › each usage's resolved file ›
    *  the element itself. Ids resolve through one batched, per-page cache, so a
-   *  dwell costs a request only for links this page has not shown before. */
-  async function renderCrumbs(el: HTMLElement) {
+   *  dwell costs a request only for links this page has not shown before.
+   *  `carrier` holds the chain annotation — a variable tag's proving child. */
+  async function renderCrumbs(el: HTMLElement, carrier: Element = el) {
     const seq = hoverSeq;
     const pathname = location.pathname;
-    const ids = chainIds(el);
+    const ids = chainIds(carrier);
     const row = document.createDocumentFragment();
     if (routeFile) row.append(crumb(basename(routeFile), () => openAt(el, 'route')));
     if (ids === null) {
@@ -393,10 +401,14 @@ export function initInspectorApp() {
     // The same naming the panel does, at the point the reader first meets the
     // element: a dynamic tag is unannotated for a reason the page can state.
     const dynamic = !src && !opaque ? wrappedSlot(el) : null;
+    // A variable tag costs a request, so like the chain it is asked on dwell;
+    // an answer already known is shown at once. `null` is a known refusal.
+    const variable = !src && !opaque && !dynamic && annotatedChild(el) ? variableTags.known(el) : null;
     pillRow.textContent = src && !opaque ? `${basename(src.file)}:${src.loc} · inspect`
-      : opaque ? 'Generated HTML · untracked'
-        : dynamic ? `<${el.tagName.toLowerCase()}> · dynamic tag in ${basename(dynamic.placement.file)}`
-          : `<${el.tagName.toLowerCase()}> · no source annotation`;
+      : variable ? variableLabel(variable)
+        : opaque ? 'Generated HTML · untracked'
+          : dynamic ? `<${el.tagName.toLowerCase()}> · dynamic tag in ${basename(dynamic.placement.file)}`
+            : `<${el.tagName.toLowerCase()}> · no source annotation`;
     pillCrumbs.replaceChildren();
     pillCrumbs.removeAttribute('data-on');
     pill.setAttribute('data-on', '');
@@ -405,6 +417,23 @@ export function initInspectorApp() {
     // Only an element with a source of its own has a chain worth naming;
     // untracked HTML has no proven inner relationship to show one for.
     if (src && !opaque) dwellTimer = window.setTimeout(() => { void renderCrumbs(el); }, DWELL);
+    else if (variable !== null) dwellTimer = window.setTimeout(() => { void dwellVariable(el); }, DWELL);
+  }
+
+  /** The pill's row for a proven variable tag: where `<Wrapper` is written. */
+  function variableLabel(variable: VariableTag): string {
+    return `${basename(variable.source.file)}:${variable.source.loc} · <${variable.name}> · inspect`;
+  }
+
+  /** Resolve a variable tag on dwell, then name it and grow its breadcrumb
+   *  from the child that proved it. A refusal leaves the row as it was. */
+  async function dwellVariable(el: HTMLElement) {
+    const seq = hoverSeq;
+    const variable = await variableTags.resolve(el);
+    if (seq !== hoverSeq || !variable) return;
+    pillRow.textContent = variableLabel(variable);
+    placePill();
+    await renderCrumbs(el, variable.carrier);
   }
 
   /** Redraw what is drawn in viewport coordinates. Idempotent and cheap: it is
@@ -572,6 +601,7 @@ export function initInspectorApp() {
     // that mints them, and a navigation changes which route's graph they are
     // resolved against.
     chainLinks.invalidate();
+    variableTags.invalidate();
     selected = null;
     routeFile = null;
     inspector.invalidate();

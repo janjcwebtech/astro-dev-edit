@@ -1,0 +1,18 @@
+---
+/** Issue #82's shape as a site writes it: a feed of cards, one linked (an
+ *  `<a>`) and one not (an `<article>`), beside the two shapes it refuses. */
+import Boxed from './Boxed.astro';
+import Layout from './Layout.astro';
+import NoteCard from './NoteCard.astro';
+import Polymorphic from './Polymorphic.astro';
+
+const notes = [
+  { title: 'A linked note', category: 'Essay', href: '/notes#linked' },
+  { title: 'An unlinked note', category: 'Draft' },
+];
+---
+<Layout>
+  {notes.map(note => <NoteCard title={note.title} category={note.category} href={note.href} />)}
+  <Polymorphic as="div" />
+  <Boxed />
+</Layout>

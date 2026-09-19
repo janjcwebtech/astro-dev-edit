@@ -63,18 +63,24 @@ export function wrappedSlot(el: Element): { placement: SlotPlacement; content: S
 }
 
 /**
- * The first annotated element directly inside an unannotated one — evidence
- * that the page *is* annotated here and the reader can select further in.
+ * The annotated elements directly inside an unannotated one, in document
+ * order — what `/inspect/tag` proves a variable tag from (issue #82).
  *
- * Deliberately not an owner. Without a slot boundary there is no proof of who
- * wrote the outer element: in `<Wrapper><Inner /></Wrapper>` the child is
- * stamped by `Inner.astro`, not by the file that wrote `<Wrapper>`.
+ * None of them is an owner on its own. Without a slot boundary nothing says
+ * who wrote the outer element: in `<Wrapper><Inner /></Wrapper>` the child is
+ * stamped by `Inner.astro`. The server decides which, if any, proves it.
  */
-export function annotatedChild(el: Element): SourceLoc | null {
+export function annotatedChildren(el: Element, max = 16): Element[] {
+  const out: Element[] = [];
   for (const child of el.children) {
-    const file = child.getAttribute('data-atx-file');
-    const loc = child.getAttribute('data-atx-loc');
-    if (file && loc) return { file, loc };
+    if (out.length === max) break;
+    if (child.hasAttribute('data-atx-file') && child.hasAttribute('data-atx-loc')) out.push(child);
   }
-  return null;
+  return out;
+}
+
+/** The first of {@link annotatedChildren}, as the loc the refusal names. */
+export function annotatedChild(el: Element): SourceLoc | null {
+  const [child] = annotatedChildren(el, 1);
+  return child ? { file: child.getAttribute('data-atx-file')!, loc: child.getAttribute('data-atx-loc')! } : null;
 }

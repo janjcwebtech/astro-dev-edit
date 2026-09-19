@@ -274,7 +274,7 @@ export function chainSteps(ids: readonly string[], links: ReadonlyMap<string, Us
  *  thing it saves is re-asking for a chain the user copies twice. */
 const chainLinks = createChainLinks(api);
 
-async function chainFor(el: HTMLElement): Promise<ChainStep[]> {
+async function chainFor(el: Element): Promise<ChainStep[]> {
   const ids = chainIds(el);
   if (!ids?.length) return [];
   try {
@@ -328,13 +328,18 @@ async function sourceFor(
 
 /** Gather everything for one element. The four reads run together; every
  *  path in the result is already root-relative — that is what the annotation
- *  carries and what the server echoes back — so nothing here rewrites one. */
+ *  carries and what the server echoes back — so nothing here rewrites one.
+ *
+ *  `carrier` holds the chain annotation. It is `el`, except for a variable tag
+ *  (issue #82): there it is the child that proved it, and no origin is asked,
+ *  because `src` names a component node that `/classify` never resolves. */
 export async function collectContext(
   el: HTMLElement,
   src: SourceLoc,
+  carrier: Element = el,
 ): Promise<ElementContext> {
   const [source, origin, routeFile, chain] = await Promise.all([
-    sourceFor(el, src), originFor(el, src), routeFileFor(), chainFor(el),
+    sourceFor(el, src), carrier === el ? originFor(el, src) : null, routeFileFor(), chainFor(carrier),
   ]);
   return {
     loc: { file: src.file, loc: src.loc },

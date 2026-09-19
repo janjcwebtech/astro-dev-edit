@@ -1,0 +1,8 @@
+---
+/** Refused: `<Box><Badge /></Box>` — the only annotated child is Badge's
+ *  root, which Badge.astro wrote, not this file. */
+import Badge from './Badge.astro';
+
+const Box = 'aside';
+---
+<Box class="boxed"><Badge label="Only a component inside" /></Box>

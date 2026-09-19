@@ -682,6 +682,74 @@ describe('POST /classify', () => {
   });
 });
 
+/**
+ * Issue #82. The route proves an unannotated element from the annotated
+ * elements directly inside it, trying each; the pure proof itself is pinned in
+ * `inspect-locate.test.ts`.
+ */
+describe('POST /inspect/tag', () => {
+  const CARD = `---\nconst Wrapper = href ? 'a' : 'article';\n---\n<Wrapper href={href}>\n  <div>Card text</div>\n</Wrapper>\n`;
+  const OTHER = `---\nconst Box = 'a';\n---\n<Box><span>Other</span></Box>\n`;
+  const INNER = `<section><p>Inner</p></section>\n`;
+  const card = { file: 'src/components/Card.astro', loc: locOf(CARD, 'Card text'), tag: 'div' };
+  const inner = { file: 'src/components/Inner.astro', loc: locOf(INNER, 'p>Inner'), tag: 'section' };
+  const image = { file: 'node_modules/astro/components/Image.astro', loc: '1:2', tag: 'img' };
+  let tagHandler: Connect.NextHandleFunction;
+
+  beforeAll(async () => {
+    await mkdir(join(root, 'src/components'), { recursive: true });
+    await writeFile(join(root, 'src/components/Card.astro'), CARD);
+    await writeFile(join(root, 'src/components/Other.astro'), OTHER);
+    await writeFile(join(root, 'src/components/Inner.astro'), INNER);
+    tagHandler = createMiddleware({ logger, root, routeManifest: null,
+      optionsResolver: stubOptions(root, { composition: true }) });
+  });
+
+  const tagRequest = (body: unknown, via = tagHandler) =>
+    request({ method: 'POST', url: '/__dev-edit/inspect/tag', body, via });
+
+  it('names the wrapper at its `<`, and which child proved it', async () => {
+    const r = await tagRequest({ tag: 'a', children: [card] });
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: true, child: 0,
+      source: { file: 'src/components/Card.astro', loc: '4:1' }, name: 'Wrapper', tags: ['a', 'article'] });
+  });
+
+  it('tries past a package-owned child and another component\'s root', async () => {
+    const r = await tagRequest({ tag: 'article', children: [image, inner, card] });
+    expect(r.body).toMatchObject({ ok: true, child: 2, source: { loc: '4:1' } });
+  });
+
+  it('answers the furthest refusal when no child proves it', async () => {
+    expect((await tagRequest({ tag: 'a', children: [inner] })).body).toEqual({ ok: false, reason: 'not-a-wrapper' });
+    expect((await tagRequest({ tag: 'section', children: [inner, card] })).body)
+      .toEqual({ ok: false, reason: 'tag-mismatch' });
+    expect((await tagRequest({ tag: 'a', children: [image, { ...card, file: 'outside.astro' }] })).body)
+      .toEqual({ ok: false, reason: 'unresolved' });
+  });
+
+  it('refuses two children that prove different nodes', async () => {
+    const other = { file: 'src/components/Other.astro', loc: locOf(OTHER, 'Other'), tag: 'span' };
+    expect((await tagRequest({ tag: 'a', children: [card, other] })).body).toEqual({ ok: false, reason: 'ambiguous' });
+  });
+
+  it('answers disabled, not 404, while composition is off', async () => {
+    const r = await tagRequest({ tag: 'a', children: [card] }, handler);
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: false, reason: 'disabled' });
+  });
+
+  it.each([
+    ['no tag', { children: [card] }],
+    ['no children', { tag: 'a', children: [] }],
+    ['too many children', { tag: 'a', children: Array(17).fill(card) }],
+    ['a malformed loc', { tag: 'a', children: [{ ...card, loc: '4' }] }],
+    ['a malformed tag', { tag: 'A B', children: [card] }],
+  ])('rejects a request with %s', async (_label, body) => {
+    expect((await tagRequest(body)).status).toBe(400);
+  });
+});
+
 describe('POST /apply', () => {
   it('patches the file on disk atomically and returns ok', async () => {
     const r = await request({

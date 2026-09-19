@@ -1,0 +1,5 @@
+---
+/** Refused: the tag is a prop, and a caller may pass a component. */
+const { as: Tag = 'section' } = Astro.props;
+---
+<Tag class="poly"><p class="poly-text">The caller chose this tag.</p></Tag>

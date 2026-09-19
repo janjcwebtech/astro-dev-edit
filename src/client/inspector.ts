@@ -14,6 +14,7 @@ import type { LayoutMode } from './layout.ts';
 import { basename, footButton, inputEl, isolateScroll, setButtonEnabled, styled, toast } from './ui.ts';
 import { typesOnPage, writable, type ElementTarget, type ValueTarget } from './value-model.ts';
 import { buildValueRows, chainBadges, type ValueRow, type ValueRows, type ValueSelection } from './value-rows.ts';
+import type { VariableTag } from './variable-tag.ts';
 
 export interface InspectorDeps {
   viewCode(source: SourceLoc): void;
@@ -33,8 +34,16 @@ export interface InspectorDeps {
     toggle(): void;
   };
   /** Element-scoped counterpart to the launcher menu's page context: the
-   *  selector, the source loc, the chain and the applied CSS, as one paste. */
-  copyContext(el: HTMLElement, source: SourceLoc): void;
+   *  selector, the source loc, the chain and the applied CSS, as one paste.
+   *  `carrier` holds the chain annotation: `el` itself, or the child that
+   *  proved a variable tag. */
+  copyContext(el: HTMLElement, source: SourceLoc, carrier: Element): void;
+  /** Where an unannotated element is written, when a variable tag proves it
+   *  (issue #82). Shared with the hover pill, so a dwell and a click ask once. */
+  variableTag(el: HTMLElement): Promise<VariableTag | null>;
+  /** A source the selection turned out to have after the click — a variable
+   *  tag's. The code dock follows it as it follows an annotated element's. */
+  onSource(source: SourceLoc): void;
   /** The one staged-value store the panel and the page share. */
   staging: StagedValues;
 }
@@ -100,7 +109,7 @@ export function initInspector(deps: InspectorDeps) {
    *  one place a panel covering the page can still report the amber. */
   const saveState = styled('span', 'atx-value-chip');
   const copyButton = footButton('Copy context', 'outline', () => {
-    if (selected) deps.copyContext(selected, sourceFor(selected) ?? { file: '', loc: '' });
+    if (selected) deps.copyContext(selected, selectedSource ?? { file: '', loc: '' }, carrier ?? selected);
   });
   copyButton.classList.add('atx-btn-sm');
   copyButton.title = 'Copy this element’s tag, source location and the files that render it';
@@ -111,6 +120,11 @@ export function initInspector(deps: InspectorDeps) {
   root.append(header, status, body);
   const loader = createInspectorLoader(api);
   let selected: HTMLElement | null = null;
+  /** The selection's source: its own annotation, or a proven variable tag's. */
+  let selectedSource: SourceLoc | null = null;
+  /** The element whose render annotations stand for the selection's — itself,
+   *  or for a variable tag the child that proved it. */
+  let carrier: Element | null = null;
   let generation = 0;
   /** The chain card of the current selection, for {@link focusUsage}. */
   let chainBody: HTMLElement | null = null;
@@ -148,6 +162,8 @@ export function initInspector(deps: InspectorDeps) {
     unbind();
     deps.staging.stopEditing();
     selected = null;
+    selectedSource = null;
+    carrier = null;
     pageEdit = null;
     chainBody = null;
     wrote = false;
@@ -628,6 +644,8 @@ export function initInspector(deps: InspectorDeps) {
     deps.staging.stopEditing();
     pageEdit = null;
     selected = el;
+    selectedSource = sourceFor(el) ?? null;
+    carrier = el;
     chainBody = null;
     const current = ++generation;
     loader.invalidate();
@@ -657,20 +675,34 @@ export function initInspector(deps: InspectorDeps) {
     body.append(picker, chain.root, values.root, slots.root, css(el));
     note(values.body, 'Resolving values…');
 
-    const source = sourceFor(el);
+    const own = sourceFor(el);
     const opaque = !!el.parentElement?.closest('[data-atx-boundary="html"]');
-    const ancestor = !source && el.parentElement ? nearestOwnSource(el.parentElement) : null;
-    const ancestorSource = ancestor ? sourceFor(ancestor) ?? null : null;
     // Only asked of an element with nothing of its own to say: a slot boundary
     // inside an annotated element is an ordinary containment fact, and the
     // Slot relationships card already covers it.
-    const wrapped = !source && !opaque ? wrappedSlot(el) : null;
+    const wrapped = !own && !opaque ? wrappedSlot(el) : null;
+    // A variable tag with no slot inside (issue #82). The server proves it
+    // from the elements directly inside, or nothing does — the page is never
+    // climbed to borrow an ancestor's source. Asked last, being a request.
+    const variable = !own && !opaque && !wrapped ? await deps.variableTag(el) : null;
+    if (!alive()) return;
+    const source = own ?? variable?.source;
+    /** The element whose render annotations are this one's. */
+    const stamped = variable?.carrier ?? el;
+    if (variable) {
+      selectedSource = variable.source;
+      carrier = stamped;
+      deps.onSource(variable.source);
+    }
+    const ancestor = !source && el.parentElement ? nearestOwnSource(el.parentElement) : null;
+    const ancestorSource = ancestor ? sourceFor(ancestor) ?? null : null;
     const dynamicTag = wrapped
       ? { component: { file: wrapped.placement.file, loc: wrapped.placement.loc }, content: wrapped.content }
       : null;
     const selection: ValueSelection = {
       source: source ?? null, opaque, viaSlot: false, tag: el.tagName.toLowerCase(),
       ancestorSource, dynamicTag,
+      variableTag: variable ? { name: variable.name, tags: variable.tags } : null,
       text: (el.textContent ?? '').trim().slice(0, 4000),
       // The attribute, not `currentSrc`: the row describes what the file holds.
       ...(el instanceof HTMLImageElement
@@ -683,20 +715,24 @@ export function initInspector(deps: InspectorDeps) {
     // route's own template, which is known rather than guessed. Never an entry
     // file — a value belonging to one earns a row of its own, and a page that
     // has not declared one has told us nothing to name.
-    const jump: { label: string; src: SourceLoc; description: string }[] = dynamicTag
-      // Both files, because the answer is in two places: the component that
-      // chose the tag, and the file the words are written in.
-      ? [{ label: 'Dynamic tag', src: dynamicTag.component,
-        description: `The <slot /> this element wraps, in ${basename(dynamicTag.component.file)}.` },
-        ...(dynamicTag.content ? [{ label: 'Content source', src: dynamicTag.content,
-          description: `Where the words inside were written, ${basename(dynamicTag.content.file)}:${dynamicTag.content.loc}.` }] : [])]
-      : ancestorSource
-        ? [{ label: 'Enclosing source', src: ancestorSource,
-          description: 'Container source; this element’s source is not proven.' }]
-        : routeFile
-          ? [{ label: 'Route template', src: { file: routeFile, loc: '1:1' },
-            description: 'The file this route is written in; this element’s own source is not proven.' }]
-          : [];
+    const jump: { label: string; src: SourceLoc; description: string }[] = variable
+      // Proven, so it outranks every fallback below.
+      ? [{ label: 'Variable tag', src: variable.source,
+        description: `<${variable.name}> in ${basename(variable.source.file)}:${variable.source.loc}.` }]
+      : dynamicTag
+        // Both files, because the answer is in two places: the component that
+        // chose the tag, and the file the words are written in.
+        ? [{ label: 'Dynamic tag', src: dynamicTag.component,
+          description: `The <slot /> this element wraps, in ${basename(dynamicTag.component.file)}.` },
+          ...(dynamicTag.content ? [{ label: 'Content source', src: dynamicTag.content,
+            description: `Where the words inside were written, ${basename(dynamicTag.content.file)}:${dynamicTag.content.loc}.` }] : [])]
+        : ancestorSource
+          ? [{ label: 'Enclosing source', src: ancestorSource,
+            description: 'Container source; this element’s source is not proven.' }]
+          : routeFile
+            ? [{ label: 'Route template', src: { file: routeFile, loc: '1:1' },
+              description: 'The file this route is written in; this element’s own source is not proven.' }]
+            : [];
 
     // Never climb from an untracked descendant to manufacture its ownership.
     // Values is still answered: /classify needs only a source loc, and a
@@ -730,14 +766,14 @@ export function initInspector(deps: InspectorDeps) {
         note(chain.body, `No chain · ${render.result.reason}. Render annotations are incomplete or damaged.`);
         note(slots.body, 'Slot placement graph refused.');
       } else {
-        const key = render.elements.indexOf(el);
+        const key = render.elements.indexOf(stamped);
         ordinals = chainOrdinals(render.events, key);
         const occurrence = render.result.occurrences.find(p => p.key === key);
         const peers = render.result.occurrences.filter(p => {
           const peer = render!.elements[p.key];
-          return peer.getAttribute('data-atx-file') === el.getAttribute('data-atx-file') &&
-            peer.getAttribute('data-atx-chain') === el.getAttribute('data-atx-chain') &&
-            peer.getAttribute('data-atx-loc') === el.getAttribute('data-atx-loc');
+          return peer.getAttribute('data-atx-file') === stamped.getAttribute('data-atx-file') &&
+            peer.getAttribute('data-atx-chain') === stamped.getAttribute('data-atx-chain') &&
+            peer.getAttribute('data-atx-loc') === stamped.getAttribute('data-atx-loc');
         });
         group = occurrence ? occurrenceSummary(occurrence, peers) : null;
         selection.viaSlot = (group?.slots ?? []).some(placement => !placement.fallback);
@@ -762,10 +798,12 @@ export function initInspector(deps: InspectorDeps) {
       answer = await loader.load(
         chainable ? {
           pathname, file: source!.file, ordinals,
-          chain: el.getAttribute('data-atx-chain') ?? undefined,
-          ...(el.getAttribute('data-atx-version') === '2' ? { traceVersion: 2 as const } : {}),
+          chain: stamped.getAttribute('data-atx-chain') ?? undefined,
+          ...(stamped.getAttribute('data-atx-version') === '2' ? { traceVersion: 2 as const } : {}),
         } : null,
-        source ? { file: source.file, loc: source.loc, tag: el.tagName.toLowerCase() } : null,
+        // A variable tag's loc names a component node, which /classify never
+        // resolves: there is no verdict to ask for (`ValueSelection.variableTag`).
+        own ? { file: own.file, loc: own.loc, tag: el.tagName.toLowerCase() } : null,
       );
     } catch (error) {
       if (!alive()) return;
@@ -805,6 +843,10 @@ export function initInspector(deps: InspectorDeps) {
     tier.dataset.tier = answer.chain.tier;
     tier.textContent = labels[answer.chain.tier];
     if (answer.chain.reason) note(chain.body, answer.chain.reason);
+    if (variable) {
+      note(chain.body, `Written as <${variable.name}> in ${basename(variable.source.file)}:${variable.source.loc}, ` +
+        `a const that is only ever ${variable.tags.map(tag => `'${tag}'`).join(' or ')} — proven from the element directly inside it.`);
+    }
     if (group) note(chain.body, `Rendered occurrence ${group.index} of ${group.total} of this source element.`);
     // Depth is the nesting: the route entry, then a level per link, then the
     // element the chain ends at.
@@ -816,8 +858,11 @@ export function initInspector(deps: InspectorDeps) {
     }
     for (const link of answer.chain.links) usage(chain.body, link, source?.file ?? null, depth++);
     if (source) {
+      // A variable tag has no pinned Values row, so this row is the one door
+      // onto where it is written.
       chainRow(chain.body, { depth, glyph: 'node', kind: 'leaf',
-        name: `<${el.tagName.toLowerCase()}>`, sub: `${source.file}:${source.loc}` });
+        name: `<${el.tagName.toLowerCase()}>`, sub: `${source.file}:${source.loc}`,
+        ...(variable ? { actions: [codeButton(variable.source)] } : {}) });
     }
     // Only for a value the entry actually supplies: an ordinary literal in the
     // same template ends at the template, and saying "chain ends at the entry"
@@ -851,6 +896,9 @@ export function initInspector(deps: InspectorDeps) {
   }).observe(document.documentElement, { childList: true, subtree: true });
 
   return { root, select, focusUsage, close, isOpen: () => selected !== null,
+    /** The selection's source — its annotation, or a proven variable tag's —
+     *  for the code dock to follow when the layout changes. */
+    source: () => selectedSource,
     /** Repaint the layout switch. The effective mode can change without the
      *  button being touched — the window narrowing past the point where the
      *  page column is still a page. */

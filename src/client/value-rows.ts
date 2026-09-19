@@ -132,6 +132,16 @@ export interface ValueSelection {
    * refusal in this tool names its cause and points somewhere.
    */
   dynamicTag?: { component: SourceLoc; content: SourceLoc | null } | null;
+  /**
+   * For an element written as a variable tag with no slot inside — `<Wrapper>`,
+   * a local const bound only to string literals (issue #82). `source` is then
+   * where `<Wrapper` is written, and the chain is proven.
+   *
+   * No classification is asked for it: its loc names a component node, which
+   * `/classify` never resolves, so nothing on the element is a value written
+   * in place. What its caller passes still arrives as usage rows.
+   */
+  variableTag?: { name: string; tags: readonly string[] } | null;
 }
 
 export interface ValueRowsInput {
@@ -426,6 +436,15 @@ function dynamicTagRefusal(selection: ValueSelection): string {
     : `${where} Nothing inside it carries a source annotation either.`;
 }
 
+/** Why a proven variable tag has no rows: nothing on it is written in place,
+ *  and the elements inside it are where the words are. */
+function variableTagRefusal(selection: ValueSelection, variable: { name: string; tags: readonly string[] }): string {
+  const tags = variable.tags.map(tag => `<${tag}>`).join(' or ');
+  const where = selection.source ? ` in ${base(selection.source.file)}` : '';
+  return `Written as <${variable.name}>${where}, a tag whose name is a value (${tags}), so nothing on it is ` +
+    'edited in place. Select an element inside it for its values.';
+}
+
 /** Build the Values card's rows for one selection. */
 export function buildValueRows(input: ValueRowsInput): ValueRows {
   const { selection, classification, classifyError, links } = input;
@@ -440,6 +459,7 @@ export function buildValueRows(input: ValueRowsInput): ValueRows {
     return { rows, refusal: 'Generated HTML — its inner elements have no proven source relationship.' };
   }
   if (!selection.source) return { rows, refusal: dynamicTagRefusal(selection) };
+  if (selection.variableTag) return { rows, refusal: variableTagRefusal(selection, selection.variableTag) };
   if (classifyError) return { rows, refusal: classifyError };
   if (classification) return { rows, refusal: classification.reason };
   return { rows, refusal: 'No value was resolved for this selection.' };

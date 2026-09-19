@@ -24,6 +24,8 @@ import type {
   UploadRequest,
   UploadResponse,
   UsageApplyRequest,
+  VariableTagRequest,
+  VariableTagResponse,
 } from '../shared/protocol.ts';
 
 /**
@@ -127,6 +129,15 @@ export async function inspectOpen(req: InspectOpenRequest): Promise<InspectOpenR
   const res = await post('/inspect/open', req);
   if (!res.ok) throw new Error((await errorMessage(res)) ?? `open failed (${res.status})`);
   return (await res.json()) as InspectOpenResponse;
+}
+
+/** Where an unannotated element is written, proven from the annotated
+ *  elements directly inside it (issue #82). A refusal is an answer, not an
+ *  error. */
+export async function resolveVariableTag(req: VariableTagRequest): Promise<VariableTagResponse> {
+  const res = await post('/inspect/tag', req);
+  if (!res.ok) throw new Error((await errorMessage(res)) ?? `variable tag failed (${res.status})`);
+  return (await res.json()) as VariableTagResponse;
 }
 
 /** Read-only window of source lines around a loc, for the in-browser peek. */

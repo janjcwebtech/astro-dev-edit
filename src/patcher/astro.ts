@@ -371,7 +371,7 @@ function annotationLoc(el: AstNode): Pos | null {
   return first.type === 'text' ? { line: s.line, column: s.column } : { line: s.line, column: s.column + 1 };
 }
 
-interface Resolution {
+export interface Resolution {
   status: 'ok' | 'ambiguous' | 'unresolved';
   element?: AstNode;
   /** Present when resolution succeeded — the ancestor links and frontmatter
@@ -380,7 +380,10 @@ interface Resolution {
   frontmatter?: { text: string; at: number } | null;
 }
 
-async function resolveElement(source: string, loc: string, tag: string): Promise<Resolution> {
+/** The one element an annotation names. Exported so a reader that needs the
+ *  node itself (`server/inspect-locate.ts`) matches locs by this rule rather
+ *  than by a copy of it — the paired inverse stays one function (rule 9). */
+export async function resolveElement(source: string, loc: string, tag: string): Promise<Resolution> {
   const m = /^(\d+):(\d+)$/.exec(loc);
   if (!m) return { status: 'unresolved' };
   const line = Number(m[1]);

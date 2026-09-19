@@ -230,6 +230,33 @@ describe('a refusal collapses the card instead of drawing an empty list', () => 
     expect(refusal).toContain('Nothing inside it carries a source annotation');
   });
 
+  /**
+   * Issue #82. A variable tag with no slot inside is proven, so it has a
+   * source and a chain — but its loc names a component node, so no verdict is
+   * asked for the element itself. What its caller passes is still a row.
+   */
+  it('shows what the caller passes to a proven variable tag, with no row of its own', () => {
+    const { rows, refusal } = buildValueRows(input({
+      selection: { ...input().selection, tag: 'a', source: { file: 'src/NoteCard.astro', loc: '46:1' },
+        variableTag: { name: 'Wrapper', tags: ['a', 'article'] } },
+      classification: null,
+      links: [link('a', 'src/pages/notes.astro', { props: [prop('title', '"Protected"')] })],
+    }));
+    expect(refusal).toBeNull();
+    expect(rows.map(row => [row.label, row.pinned])).toEqual([['title', false]]);
+  });
+
+  it('names a proven variable tag when nothing is passed to it', () => {
+    const refusal = buildValueRows(input({
+      selection: { ...input().selection, tag: 'a', source: { file: 'src/NoteCard.astro', loc: '46:1' },
+        variableTag: { name: 'Wrapper', tags: ['a', 'article'] } },
+      classification: null,
+    })).refusal;
+    expect(refusal).toContain('Written as <Wrapper> in NoteCard.astro');
+    expect(refusal).toContain('(<a> or <article>)');
+    expect(refusal).not.toContain('No value was resolved');
+  });
+
   it('carries a failed classification through as the reason', () => {
     expect(buildValueRows(input({ classification: null, classifyError: 'Could not classify — offline' }))
       .refusal).toBe('Could not classify — offline');

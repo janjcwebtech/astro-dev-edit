@@ -1,0 +1,16 @@
+---
+/** Issue #82: a tag whose name is a local const bound only to string
+ *  literals, with no <slot /> inside. Nothing annotates the element it
+ *  renders. The first annotated child is Badge's root, which proves
+ *  nothing; the <div> after it proves where the element is written. */
+import Badge from './Badge.astro';
+
+const { title, category, href } = Astro.props;
+const Wrapper = href ? 'a' : 'article';
+---
+<Wrapper class="note-card" href={href}>
+  <Badge label={category} />
+  <div class="note-card__text">
+    <h2 class="note-card__title">{title}</h2>
+  </div>
+</Wrapper>

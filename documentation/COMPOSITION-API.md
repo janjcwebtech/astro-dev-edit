@@ -148,9 +148,18 @@ become props. The panel names it instead of stopping at *no source annotation*:
 the slot boundary such an element wraps identifies the component that rendered
 it and the first annotated element inside identifies where the words were
 written, so Values refuses with both named, *View code* is offered on each, and
-the slot row says which `<slot />` is wrapped. A dynamic tag that wraps no
-`<slot />` names no file, since nothing proves who wrote it, and the panel shows the
-annotated element directly inside it instead. Selecting an element inside gives
+the slot row says which `<slot />` is wrapped.
+
+A dynamic tag that wraps no `<slot />` is proven from the annotated elements
+directly inside it, when its name is a local `const` bound only to string
+literals — `const Wrapper = href ? 'a' : 'article'`. The proof runs downward: a
+child's own AST parent is the `<Wrapper>` node, so the element is that HTML tag,
+written where `<Wrapper` starts. The panel then shows the chain the child has,
+ending at that line with **View code**, and Values lists what the caller
+passes. An `as` prop, an imported component, a `let`, or anything computed
+proves nothing, and neither does a child written by another component
+(`<Wrapper><Inner /></Wrapper>`). The chain card then says *No chain* and names
+the annotated element directly inside instead. Selecting an element inside gives
 the full chain, unchanged.
 - **CSS:** inline declarations, readable matched selectors in stylesheet order,
   and computed values behind a disclosure. Each rule is shown as source — the
@@ -190,10 +199,11 @@ and supported source relationships.
 
 ## Contract
 
-All four endpoints are `POST`s under `/__dev-edit` sharing the existing
-localhost/origin gate, and only `/composition/apply` writes. The three read
-endpoints cap request bodies at 32 KiB; invalid shapes return `400`, named
-refusals return `200`, and a disabled endpoint returns `reason: "disabled"`.
+All five endpoints are `POST`s under `/__dev-edit` sharing the existing
+localhost/origin gate, and only `/composition/apply` writes. The read endpoints
+cap request bodies at 32 KiB, `/inspect/tag` at 64 KiB; invalid shapes return
+`400`, named refusals return `200`, and a disabled endpoint returns
+`reason: "disabled"`.
 `/health` reports `composition`.
 
 | Endpoint | Request | Answer |
@@ -202,10 +212,11 @@ refusals return `200`, and a disabled endpoint returns `reason: "disabled"`.
 | `/composition/links` | `{ pathname, ids }` | `links`, `missing`, `route`, `coverage`, optional `reason` |
 | `/composition/uses` | `{ pathname, file }` | matching usage `links`, `route`, `coverage`, optional `reason` |
 | `/composition/apply` | `{ pathname, usageId, target, ordinal?, original, newText }` | `{ ok: true }`, or `422` with `error` and a `code` |
+| `/inspect/tag` | `{ tag, children }`: an unannotated element's tag and up to 16 annotated direct children as `{ file, loc, tag }` | `{ ok: true, child, source, name, tags }`, or `{ ok: false, reason }` |
 
 `pathname` is the browser's route, including any configured base. Astro's route
 manifest selects the source entrypoint; a client-supplied `route` field cannot
-replace it. Files are canonical absolute paths in successful responses. Client
+replace it. Files are root-relative in successful responses. Client
 file paths and discovered modules pass the existing source-path gate, restricted
 to `.astro` files in `contentRoots`, excluding packages and escaping symlinks.
 An unsupported or disallowed entrypoint/selected file returns `path-refused`.
