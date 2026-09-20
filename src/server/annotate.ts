@@ -6,8 +6,7 @@ import { toWirePath } from './wire-path.ts';
 
 /**
  * Self-annotation — the tool stamps its own `data-atx-file` / `-loc` on every
- * supported Astro version, and Astro's `data-astro-source-*` only where Astro
- * itself does not.
+ * supported Astro version, and emits nothing in Astro's namespace.
  *
  * Astro 5/6 (WASM Go compiler) annotate every element in dev when the toolbar
  * is on; Astro 7's Rust compiler (@astrojs/compiler-rs) accepts the
@@ -18,16 +17,23 @@ import { toWirePath } from './wire-path.ts';
  * source BEFORE Astro's compiler sees it, and `data-atx-*` is the one channel
  * the client reads.
  *
- * **Never emit the legacy pair where the compiler will emit its own** (the
- * `legacy` option) — measured against `@astrojs/compiler` 2.x, that is not a
- * harmless duplicate. Given an element we already annotated, the Go printer
- * splices its own `data-astro-source-loc` in directly after our
- * `data-astro-source-file` and *also* appends its usual pair at the end. Its
- * loc is computed from the source we have already lengthened, so it is shifted
- * right by the width of our injection — and being first, it is the one the
- * HTML parser keeps. The duplicate does not lose; ours does.
+ * **Astro's `data-astro-source-*` is never emitted here**, and the reason
+ * differs by case. Where Astro emits its own — 5/6 with the dev toolbar on —
+ * a second pair is not a harmless duplicate: measured against
+ * `@astrojs/compiler` 2.x, the Go printer splices its own
+ * `data-astro-source-loc` in directly after our `data-astro-source-file` and
+ * *also* appends its usual pair at the end. Its loc is computed from the
+ * source we have already lengthened, so it is shifted right by the width of
+ * our injection — and being first, it is the one the HTML parser keeps. The
+ * duplicate does not lose; ours does. Where Astro emits nothing — 7, or 5/6
+ * with the toolbar off — the pair served only readers outside this tool (the
+ * dev toolbar's Audit app, `astro-click-to-source`), and cost one ABSOLUTE
+ * path per element in served HTML: the developer's home directory, and 21.9%
+ * of a measured real page (issue #76). Stock Astro 7 gives those readers
+ * nothing either, so not emitting it restores that behavior rather than
+ * degrading it.
  *
- * What no injection can avoid is that shift itself: an element's loc points at
+ * What no injection can avoid is the loc shift itself: an element's loc points at
  * its first child, which sits after the whole opening tag, so any attribute we
  * add moves the compiler's own idea of it. On 5/6 Astro's `data-astro-source-loc`
  * is therefore shifted whether or not we emit a pair of our own, which is the
@@ -36,7 +42,7 @@ import { toWirePath } from './wire-path.ts';
  * The critical invariant: injected locs are computed from the ORIGINAL source,
  * so they reference on-disk coordinates — the patcher resolves them against
  * the on-disk file (`src/patcher/astro.ts`) and needs no changes. Injection
- * in legacy mode adds no newlines. The enhanced composition experiment may
+ * adds no newlines. The enhanced composition experiment may
  * add frontmatter to allocate per-render state; its file/loc attributes still
  * refer to the original source, independently of generated line numbers.
  *
@@ -140,32 +146,25 @@ interface Insertion {
 
 /**
  * Annotate every plain element in an `.astro` source with the tool-owned
- * `data-atx-file` / `-loc` pair, and — unless `legacy` is false — the
- * `data-astro-source-*` pair Astro 5/6 would have emitted. `file` is the
- * absolute path the Vite transform receives as its module id, and stays the
- * index's identity for a module throughout.
+ * `data-atx-file` / `-loc` pair, and nothing else. `file` is the absolute path
+ * the Vite transform receives as its module id, and stays the index's identity
+ * for a module throughout.
  *
  * **`data-atx-file` carries the root-relative spelling** ({@link toWirePath}),
  * never `file` itself: it is repeated once per element into HTML anyone on the
  * network can read, and an absolute path there names the developer's home
  * directory (issue #72). `opts.root` is what makes that possible; without it
  * the absolute path is stamped, which is only ever a unit test with no project
- * root to speak of.
- *
- * `data-astro-source-file` is the exception, and deliberately so: it is
- * Astro's own attribute in Astro's own format, read by the dev toolbar and by
- * other tooling that expects the absolute path Astro itself emits. Changing
- * its shape would break those readers to no benefit — the tool's own channel
- * is the one the client reads.
+ * root to speak of. No attribute this emits carries `file` verbatim — which is
+ * what keeps a served page free of it (issue #76).
  */
 export async function annotateAstroSource(
   source: string, file: string,
-  opts: { composition?: readonly UsageLink[]; runtime?: string; legacy?: boolean; root?: string } = {},
+  opts: { composition?: readonly UsageLink[]; runtime?: string; root?: string } = {},
 ): Promise<string> {
   const { ast } = await parse(source, { position: true });
   const starts = lineStartIndices(source);
   const insertions: Insertion[] = [];
-  const fileAttr = escapeAttr(file);
   const atxAttr = escapeAttr(opts.root === undefined ? file : toWirePath(opts.root, file));
   const enhanced = opts.runtime ? await prepareComposition(source, file, opts.composition ?? [], opts.runtime, opts.root) : undefined;
   if (enhanced) insertions.push(...enhanced.insertions);
@@ -187,9 +186,6 @@ export async function annotateAstroSource(
         insertions.push({
           index: tagStart + 1 + node.name!.length,
           text:
-            (opts.legacy === false ? '' :
-              ` data-astro-source-file="${fileAttr}"` +
-              ` data-astro-source-loc="${loc.line}:${loc.column}"`) +
             ` data-atx-file="${atxAttr}" data-atx-loc="${loc.line}:${loc.column}"` +
             (opts.composition ?
               (enhanced ? ` data-atx-chain={${enhanced.trace}.chain} data-atx-instance={${enhanced.trace}.id}` +
@@ -231,7 +227,7 @@ export async function annotateAstroSource(
  * main module is transformed — style/script sub-requests carry a
  * `?astro&type=…` query and no longer end in `.astro`.
  */
-export function createAnnotatePlugin(root: string, opts: { legacy: boolean }): VitePlugin {
+export function createAnnotatePlugin(root: string): VitePlugin {
   return {
     name: 'astro-dev-edit:annotate',
     enforce: 'pre',
@@ -239,7 +235,7 @@ export function createAnnotatePlugin(root: string, opts: { legacy: boolean }): V
       order: 'pre',
       async handler(code, id) {
         if (!id.endsWith('.astro')) return null;
-        return { code: await annotateAstroSource(code, id, { legacy: opts.legacy, root }), map: null };
+        return { code: await annotateAstroSource(code, id, { root }), map: null };
       },
     },
   };

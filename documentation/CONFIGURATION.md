@@ -59,14 +59,15 @@ Astro 5, 6 and 7 are supported, and the overlay reads the same annotations on
 all three: `data-atx-file` / `data-atx-loc`, injected by the integration itself
 before Astro's compiler sees the file.
 
-Astro's own `data-astro-source-*` is **not read**. It is emitted on **Astro 5
-and 6** only while the dev toolbar is enabled, and on **Astro 7** not at all
-([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)),
+Astro's own `data-astro-source-*` is neither read nor emitted. Astro emits it on
+**Astro 5 and 6** only while the dev toolbar is enabled, and on **Astro 7** not at
+all ([withastro/compiler-rs#96](https://github.com/withastro/compiler-rs/issues/96)),
 and the toolbar strips it from the live DOM within a frame of hydration on both
-majors. Where Astro emits nothing — on 7, and on 5/6 with the dev toolbar off —
-the integration still injects those attributes alongside its own, so the dev
-toolbar and other tooling that looks for them keep working. That is an emit, not
-a dependency.
+majors. The integration adds none of its own, because that pair is one absolute
+path per element — the developer's home directory — in a page that a LAN dev
+server, a tunnel, a screen share or a screenshot all publish, and it serves only
+readers outside this tool. Tooling that looks for it on Astro 7 finds nothing
+under stock Astro 7 either.
 
 `'auto'` is the default and injects on every version; `'force'` is a synonym
 kept for configs that set it. `'off'` disables injection entirely, and because

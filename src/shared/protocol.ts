@@ -15,9 +15,8 @@
  * directory; it is also one long string repeated once per element. The server
  * converts on the way out (`server/wire-path.ts`) and resolves against the
  * project root on the way in (`server/paths.ts::checkEditablePath`), so the
- * relative form is a wire format and never a filesystem input. The one
- * exception is `data-astro-source-file`, which is Astro's attribute in Astro's
- * format and stays absolute for the tooling that reads it.
+ * relative form is a wire format and never a filesystem input. There is no
+ * exception: the tool emits no absolute path into a served page at all.
  */
 
 /** A source location as captured from `data-atx-file` / `-loc`. */

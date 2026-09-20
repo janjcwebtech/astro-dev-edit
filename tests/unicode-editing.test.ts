@@ -11,12 +11,12 @@ describe('Unicode page content source positions', () => {
       it(`edits after ${JSON.stringify(content)} with separator ${JSON.stringify(separator)}`, async () => {
         const source = `<p>${content}</p>${separator}<h2>Later heading</h2><footer>Keep me</footer>`;
         const annotated = await annotateAstroSource(source, '/project/page.astro');
-        const loc = annotated.match(/<h2 data-astro-source-file="[^"]*" data-astro-source-loc="([^"]*)"/)?.[1];
+        const loc = annotated.match(/<h2 data-atx-file="[^"]*" data-atx-loc="([^"]*)"/)?.[1];
         expect(loc).toBe(locOf(source, 'Later heading'));
         // Removing annotations must recover the complete original, catching
         // insertion drift even when annotate and patch share the same mistake.
         expect(annotated.replace(
-          / data-astro-source-file="[^"]*" data-astro-source-loc="[^"]*" data-atx-file="[^"]*" data-atx-loc="[^"]*"/g,
+          / data-atx-file="[^"]*" data-atx-loc="[^"]*"/g,
           '')).toBe(source);
         expect(await classifyAstro(source, loc!, 'h2')).toMatchObject({ kind: 'text' });
         expect(await applyAstro(source, {

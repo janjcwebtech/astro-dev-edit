@@ -66,11 +66,11 @@ export interface DevEditOptions {
    */
   cssInspector?: boolean;
   /**
-   * Who emits the `data-astro-source-*` attributes the feature rides on.
-   * `'auto'` (default): Astro's own compiler on Astro 5/6; injected by this
-   * integration on Astro ≥7, whose Rust compiler doesn't emit them
-   * (withastro/compiler-rs#96). `'force'` always injects (also lifts the
-   * dev-toolbar requirement on 5/6); `'off'` never injects.
+   * Whether the tool injects the `data-atx-*` source annotations the feature
+   * rides on. `'auto'` (default) and `'force'` both inject, on every supported
+   * Astro version: Astro's own `data-astro-source-*` is not a channel the
+   * client reads, and is never emitted here. `'off'` injects nothing, which
+   * leaves the overlay unable to locate any element.
    */
   sourceAnnotations?: 'auto' | 'force' | 'off';
   /** Opt-in read-only inspector and composition API. Config-only: installs
@@ -159,7 +159,7 @@ const OPTION_SPECS: readonly OptionSpec[] = [
   {
     key: 'sourceAnnotations',
     label: 'Source annotations',
-    help: 'Who emits the source annotations everything rides on. "auto" (and "force") inject the tool\'s own data-atx-* on every Astro version; "off" leaves only whatever the compiler provides. Registers a Vite plugin, so it is config-only.',
+    help: 'Whether the tool injects the source annotations everything rides on. "auto" (and "force") inject its own data-atx-* on every Astro version; "off" injects nothing and the overlay then finds no elements. Registers a Vite plugin, so it is config-only.',
     type: 'select',
     choices: ['auto', 'force', 'off'],
     group: 'general',

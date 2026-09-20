@@ -17,17 +17,16 @@ import { locOf } from './helpers.ts';
 
 const FILE = '/proj/src/pages/index.astro';
 
-/** The full attribute run one annotated element carries, tool-owned pair
- *  included — both namespaces come from one walk, on every Astro version. */
+/** The full attribute run one annotated element carries. One namespace, on
+ *  every Astro version — Astro's own is never emitted here (issue #76). */
 function stamp(file: string, loc: string): string {
-  return ` data-astro-source-file="${file}" data-astro-source-loc="${loc}"` +
-    ` data-atx-file="${file}" data-atx-loc="${loc}"`;
+  return ` data-atx-file="${file}" data-atx-loc="${loc}"`;
 }
 
 /** Extract the injected loc for the first annotated occurrence of `tag`. */
 function injectedLoc(annotated: string, tag: string): string {
   const re = new RegExp(
-    `<${tag} data-astro-source-file="[^"]*" data-astro-source-loc="([0-9]+:[0-9]+)"`,
+    `<${tag} data-atx-file="[^"]*" data-atx-loc="([0-9]+:[0-9]+)"`,
   );
   const m = annotated.match(re);
   if (!m) throw new Error(`no injected annotation found for <${tag}>`);
@@ -38,7 +37,7 @@ describe('annotateAstroSource', () => {
   it('never stamps slots, and does stamp custom elements', async () => {
     const out = await annotateAstroSource('<slot><my-card>Fallback</my-card></slot>', FILE);
     expect(out).toContain('<slot>');
-    expect(out).toContain('<my-card data-astro-source-file=');
+    expect(out).toContain('<my-card data-atx-file=');
     expect(out).not.toContain('<slot data-');
   });
 
@@ -54,7 +53,7 @@ describe('annotateAstroSource', () => {
     expect(injectedLoc(out, 'h1')).toBe(locOf(src, 'Title'));
     expect(injectedLoc(out, 'p')).toBe(locOf(src, 'Body text'));
     // <main>'s first positioned child is whitespace text before <h1>
-    expect(out).toContain('<main data-astro-source-file=');
+    expect(out).toContain('<main data-atx-file=');
   });
 
   it('stamps an expression child at its `{` (start + 1)', async () => {
@@ -78,7 +77,7 @@ describe('annotateAstroSource', () => {
   it('skips components and fragments', async () => {
     const src = `---\nimport Card from './Card.astro';\n---\n<Card><p>inside</p></Card>\n`;
     const out = await annotateAstroSource(src, FILE);
-    expect(out).not.toContain('<Card data-astro-source-file');
+    expect(out).not.toContain('<Card data-atx-file');
     // …but the plain element inside the component's slot IS annotated
     expect(injectedLoc(out, 'p')).toBe(locOf(src, 'inside'));
   });
@@ -91,7 +90,7 @@ describe('annotateAstroSource', () => {
     const out = await annotateAstroSource(src, FILE);
     expect(out).toContain('<script>');
     expect(out).toContain('<style>');
-    expect(out).not.toMatch(/<(script|style) data-astro-source-/);
+    expect(out).not.toMatch(/<(script|style) data-atx-/);
     // …the ordinary element between them is still annotated
     expect(injectedLoc(out, 'p')).toBe(locOf(src, 'hi'));
   });
@@ -108,10 +107,9 @@ describe('annotateAstroSource', () => {
     expect(out.split('\n').length).toBe(src.split('\n').length);
   });
 
-  it('escapes quotes in the file path, in both namespaces', async () => {
+  it('escapes quotes in the file path', async () => {
     const src = `<p>x</p>\n`;
     const out = await annotateAstroSource(src, `/odd"path.astro`);
-    expect(out).toContain('data-astro-source-file="/odd&quot;path.astro"');
     expect(out).toContain('data-atx-file="/odd&quot;path.astro"');
   });
 
@@ -121,7 +119,7 @@ describe('annotateAstroSource', () => {
    * is what lets `client/source-map.ts` read that one channel and nothing
    * else.
    */
-  it('stamps the tool-owned pair beside the legacy one, with the same loc', async () => {
+  it('stamps the tool-owned pair on a plain run, and nothing else', async () => {
     const src = `<main>\n  <h1>Title</h1>\n</main>\n`;
     const out = await annotateAstroSource(src, FILE);
     expect(out).toContain(`<h1${stamp(FILE, locOf(src, 'Title'))}>`);
@@ -140,9 +138,9 @@ describe('annotateAstroSource', () => {
    * on, and the loc is untouched — locs are computed from the ORIGINAL source,
    * so shortening an attribute cannot move one (rule 9).
    *
-   * `data-astro-source-file` is deliberately NOT relativized: it is Astro's
-   * attribute in Astro's own format, and the tooling that reads it expects the
-   * absolute path Astro itself emits.
+   * With Astro's own pair gone (#76), `data-atx-file` is the only path-bearing
+   * attribute left — so a root makes the served page carry no absolute path at
+   * all.
    */
   it('emits data-atx-file root-relative, naming nothing above the root', async () => {
     const root = '/proj';
@@ -151,14 +149,14 @@ describe('annotateAstroSource', () => {
     const out = await annotateAstroSource(src, FILE, { root });
     expect(out).toContain(`data-atx-file="src/pages/index.astro" data-atx-loc="${loc}"`);
     expect(out).not.toContain('data-atx-file="/proj');
-    // Astro's own namespace keeps Astro's own shape.
-    expect(out).toContain(`data-astro-source-file="${FILE}"`);
+    // Nothing else carries a path, so nothing carries the absolute one.
+    expect(out).not.toContain('/proj');
   });
 
   it('shortening the attribute moves no loc — the pair is identical either way', async () => {
     const src = `---\nconst t = 'x';\n---\n<article>\n  <h2>A heading</h2>\n  <p>Copy.</p>\n  <h3>{t}</h3>\n</article>\n`;
-    const absolute = await annotateAstroSource(src, FILE, { legacy: false });
-    const relative = await annotateAstroSource(src, FILE, { legacy: false, root: '/proj' });
+    const absolute = await annotateAstroSource(src, FILE);
+    const relative = await annotateAstroSource(src, FILE, { root: '/proj' });
     expect(relative).toBe(absolute.replaceAll(`data-atx-file="${FILE}"`,
       'data-atx-file="src/pages/index.astro"'));
   });
@@ -176,7 +174,7 @@ describe('annotateAstroSource', () => {
       injectionOffset: src.indexOf('<Card') + '<Card'.length, name: 'Card',
       target: '/proj/src/Card.astro', hasSpread: false, props: [], slots: [] }];
     const out = await annotateAstroSource(src, FILE,
-      { composition: links, runtime: '/runtime.mjs', legacy: false, root: '/proj' });
+      { composition: links, runtime: '/runtime.mjs', root: '/proj' });
     expect(out).toContain('begin(Astro.props,"src/pages/index.astro",Astro.request)');
     expect(out).toContain('"aaaaaaaa","src/Card.astro"');
     expect(out).not.toContain('"/proj/src');
@@ -184,21 +182,29 @@ describe('annotateAstroSource', () => {
 
   it('keeps the node_modules segment, so package ownership still reads off the annotation', async () => {
     const out = await annotateAstroSource('<img src="/x.jpg" alt="x">\n',
-      '/proj/node_modules/astro/components/Image.astro', { legacy: false, root: '/proj' });
+      '/proj/node_modules/astro/components/Image.astro', { root: '/proj' });
     expect(out).toContain('data-atx-file="node_modules/astro/components/Image.astro"');
   });
 
   /**
-   * `legacy: false` is what runs on Astro 5/6 with the dev toolbar on, where
-   * the Go compiler emits its own pair. A second one is not a harmless
-   * duplicate there: the printer splices its own (injection-shifted) loc in
-   * ahead of ours and the HTML parser keeps the first, so ours would lose.
+   * Issue #76 — Astro's namespace is never emitted, under any options.
+   *
+   * Where Astro's own compiler emits the pair (5/6, toolbar on) a second one
+   * is not a harmless duplicate: the Go printer splices its own
+   * injection-shifted loc in ahead of ours and the HTML parser keeps the
+   * first, so ours would lose. Where it emits nothing (7, or 5/6 with the
+   * toolbar off) the pair served readers outside this tool only, and carried
+   * the one absolute path left in a served page. Neither case survives, so
+   * this holds for every option combination the plugins can pass.
    */
-  it('omits Astro’s pair under legacy:false, keeping the tool-owned one', async () => {
+  it('never emits Astro’s namespace, whatever the options', async () => {
     const src = `<p>Hello world</p>\n`;
     const loc = locOf(src, 'Hello');
-    const out = await annotateAstroSource(src, FILE, { legacy: false });
-    expect(out).toBe(`<p data-atx-file="${FILE}" data-atx-loc="${loc}">Hello world</p>\n`);
+    expect(await annotateAstroSource(src, FILE))
+      .toBe(`<p data-atx-file="${FILE}" data-atx-loc="${loc}">Hello world</p>\n`);
+    for (const opts of [{}, { root: '/proj' }, { composition: [], root: '/proj' }]) {
+      expect(await annotateAstroSource(src, FILE, opts)).not.toContain('data-astro-source');
+    }
   });
 
   it('round-trips: injected locs classify against the ORIGINAL source', async () => {

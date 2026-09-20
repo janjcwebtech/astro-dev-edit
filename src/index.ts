@@ -113,11 +113,13 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         // leaves the overlay with nothing at all: the client reads no other
         // namespace.
         //
-        // Astro's own `data-astro-source-*` is emitted alongside ONLY where
-        // Astro will not emit it itself. Where it would, a second pair is not a
-        // harmless duplicate: the Go printer splices its own (shifted) loc in
-        // ahead of ours and the parser keeps that one — see `annotate.ts`'s
-        // header for the measurement.
+        // Astro's own `data-astro-source-*` is never emitted alongside, and
+        // the reason differs by case. Where Astro emits its own, a second pair
+        // is not a harmless duplicate: the Go printer splices its own (shifted)
+        // loc in ahead of ours and the parser keeps that one. Where Astro emits
+        // nothing — 7, or 5/6 with the toolbar off — the pair served readers
+        // outside this tool only, and cost one absolute path per element in
+        // served HTML (#76). See `annotate.ts`'s header for both measurements.
         const astroMajor = detectAstroMajor(projectRoot);
         const toolbarEnabled = config.devToolbar?.enabled ?? true;
         const astroAnnotates = astroMajor !== null && astroMajor < 7 && toolbarEnabled;
@@ -125,12 +127,11 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         const selfAnnotate = trace || sourceAnnotations !== 'off';
         if (selfAnnotate) {
           updateConfig({ vite: { plugins: [trace
-            ? createCompositionPlugin(projectRoot, () => composition?.invalidate(), { legacy: !astroAnnotates })
-            : createAnnotatePlugin(projectRoot, { legacy: !astroAnnotates })] } });
+            ? createCompositionPlugin(projectRoot, () => composition?.invalidate())
+            : createAnnotatePlugin(projectRoot)] } });
           logger.info(
             (trace ? 'component tracing and ' : '') +
-            `injecting data-atx-* source annotations (Astro ${astroMajor ?? 'unknown'}` +
-            (astroAnnotates ? ', which emits its own data-astro-source-*)' : ', and data-astro-source-* with them)'),
+            `injecting data-atx-* source annotations (Astro ${astroMajor ?? 'unknown'})`,
           );
         }
 

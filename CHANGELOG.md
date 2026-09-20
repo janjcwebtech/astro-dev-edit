@@ -14,6 +14,10 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Fixed
+
+- A served page carries no absolute filesystem path at all. Astro's `data-astro-source-file` / `-loc` is no longer emitted where Astro's own compiler does not — Astro 7, or 5/6 with the dev toolbar off — where it was one absolute path per element naming the developer's home directory, and 21.9% of a measured page. Tooling that reads `data-astro-source-*` gets on Astro 7 what stock Astro 7 gives it, which is nothing ([#76](https://github.com/janjcwebtech/astro-dev-edit/issues/76))
+
 ### Changed
 
 - **Copy context** copies only what identifies the element and where its words live: its text, its source location, the files that render it, whether the text is literal, a traced expression, a prop or computed, and the element's own source lines. Rendered HTML and applied CSS are no longer included.

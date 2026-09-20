@@ -5,11 +5,11 @@ import type { Plugin } from 'vite';
 import { annotateAstroSource } from './annotate.ts';
 import { createUsageIndex } from './usage-index.ts';
 
-/** Opt-in dev tracing. Supersedes the plain annotation plugin when enabled.
- *  `legacy` carries the same meaning as there: emit Astro's own
- *  `data-astro-source-*` pair only where Astro's compiler will not. */
+/** Opt-in dev tracing. Supersedes the plain annotation plugin when enabled,
+ *  and stamps the same tool-owned namespace: nothing here emits Astro's
+ *  `data-astro-source-*`, on any version. */
 export function createCompositionPlugin(
-  root: string, invalidate: () => void = () => {}, opts: { legacy: boolean } = { legacy: true },
+  root: string, invalidate: () => void = () => {},
 ): Plugin {
   const index = createUsageIndex({ root, canonical: realpath });
   return {
@@ -23,7 +23,7 @@ export function createCompositionPlugin(
         // Keep resolution local to the awaited transform, including aliases.
         const links = await index.update(source, file,
           async (specifier, importer) => (await this.resolve(specifier, importer))?.id ?? null);
-        return { code: await annotateAstroSource(source, file, { composition: links, legacy: opts.legacy, root,
+        return { code: await annotateAstroSource(source, file, { composition: links, root,
           runtime: fileURLToPath(new URL('./composition-runtime.ts', import.meta.url)) }), map: null };
       },
     },
