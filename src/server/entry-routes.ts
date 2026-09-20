@@ -288,7 +288,7 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
         if (!result.ok) {
           return { status: 422, body: { error: result.error, code: 'unsupported' } };
         }
-        await writeText(abs, result.newSource, source);
+        await writeText(abs, result.newSource, { original: source });
         logger.info(`entry saved -> ${basename(abs)}`);
         return { status: 200, body: { ok: true } };
       },
@@ -356,7 +356,7 @@ export function createEntryRoutes(deps: EntryRouteDeps): Route[] {
         const values = Object.fromEntries(
           Object.entries(frontmatter).filter(([, v]) => v !== '' && v !== null && v !== undefined),
         );
-        await writeText(abs, serializeEntry(values, String(entryBody ?? '')), null);
+        await writeText(abs, serializeEntry(values, String(entryBody ?? '')), { original: null });
         const rel = await relToRoot(abs);
         logger.info(`entry created -> ${rel}`);
         return { status: 200, body: { file: rel } };

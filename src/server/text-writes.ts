@@ -4,30 +4,38 @@ import { launchInEditor } from './editor.ts';
 import type { OptionsResolver, ResolvedOptions } from './options.ts';
 import { atomicWrite, insideRoot } from './paths.ts';
 
+/** What a write is verified against, and what it lands as. */
+export interface TextWriteOptions {
+  /** null means a new file; undefined snapshots the current contents. */
+  original?: string | null;
+  /**
+   * File mode for the write, applied to the temp file so a secret is never
+   * briefly world-readable — pass `SECRET_MODE` for anything holding the access
+   * key, and omit it otherwise.
+   */
+  mode?: number;
+}
+
 /**
  * The injected write seam.
  *
- * `original`: null means a new file; undefined snapshots the current contents.
- * `mode`: file mode for the write, applied to the temp file so a secret is
- * never briefly world-readable — pass `SECRET_MODE` for anything holding the
- * access key, and omit it otherwise.
+ * The two optionals are a bag rather than positionals so that neither can be
+ * passed as the other, and so a writer that takes a bare mode — `atomicWrite`
+ * — no longer typechecks in this position.
  */
 export type TextWriter = (
   target: string,
   content: string,
-  original?: string | null,
-  mode?: number,
+  opts?: TextWriteOptions,
 ) => Promise<void>;
 
 /**
- * The default when no write seam is injected.
+ * The default when no write seam is injected, and how tests skip the seam.
  *
- * Deliberately not `atomicWrite` itself: its third parameter is the file mode
- * and {@link TextWriter}'s is the verified original, so a bare assignment
- * typechecks in some positions while silently passing one as the other.
+ * Not `atomicWrite` itself, whose third parameter is a bare mode.
  */
-export const directWrite: TextWriter = (target, content, _original, mode) =>
-  atomicWrite(target, content, mode);
+export const directWrite: TextWriter = (target, content, opts) =>
+  atomicWrite(target, content, opts?.mode);
 
 async function contents(target: string): Promise<string | null> {
   try {
@@ -61,9 +69,9 @@ export function createTextWrites(deps: {
     try { await launch(`${target}:${line}:1`, warn); } catch { warn(); }
   }
 
-  const write: TextWriter = async (target, content, original, mode) => {
+  const write: TextWriter = async (target, content, opts) => {
     const options = active ?? (await deps.optionsResolver.resolve()).options;
-    const before = original === undefined ? await contents(target) : original;
+    const before = opts?.original === undefined ? await contents(target) : opts.original;
     if (before === content) return;
     // Callers retain their content / config / fixed-path gates (the settings
     // file and `.env.local` are both fixed targets). Pin the
@@ -87,7 +95,7 @@ export function createTextWrites(deps: {
         await contents(target) !== before) {
       throw new Error('file changed on disk before saving; reopen it and try again');
     }
-    await atomicWrite(target, content, mode);
+    await atomicWrite(target, content, opts?.mode);
     if (options.revealWrites && before === null) await reveal(target, 1);
   };
 

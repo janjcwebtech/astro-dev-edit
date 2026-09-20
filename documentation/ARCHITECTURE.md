@@ -70,7 +70,7 @@ Anything reaching generated source — collection name, field name, directory, g
 - It **re-verifies at the last moment** — parent realpath, file identity, byte contents — because `revealWrites` opens the destination in the user's editor and then *pauses* before writing, which makes the window between a handler's gate and the write real rather than theoretical.
 - `run()` wraps every text-mutating POST (the `textMutationPaths` set), serializing whole requests and pinning the resolved options for the duration, so a save that switches the mode off still behaves the way it started.
 
-A handler that writes project text takes `writeText` from its deps (defaulting to `text-writes.ts::directWrite`, which is how tests skip the seam — not `atomicWrite` itself, whose third parameter is the file mode where `TextWriter`'s is the original), passes the `original` it verified against (`null` for a create), an optional file mode, and adds its path to that set. Uploads, imports and deletions stay outside the seam on purpose.
+A handler that writes project text takes `writeText` from its deps (defaulting to `text-writes.ts::directWrite`, which is how tests skip the seam — not `atomicWrite` itself, whose third parameter is a bare mode rather than a `TextWriteOptions`), passes an options bag holding the `original` it verified against (`null` for a create) and, for a secret, a `mode`, and adds its path to that set. Both are optional and neither is positional, so one cannot be passed as the other. Uploads, imports and deletions stay outside the seam on purpose.
 
 ### Impure dependencies are injected
 

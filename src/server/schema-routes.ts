@@ -537,7 +537,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
           }
 
           if (next !== config.source) {
-            await writeText(config.abs, next, config.source);
+            await writeText(config.abs, next, { original: config.source });
             logger.info(`${req.collection} schema updated -> ${config.rel}`);
             etag = sha256(next);
           }
@@ -749,7 +749,7 @@ export function createSchemaRoutes(deps: SchemaRouteDeps): Route[] {
         // Directory first: a registered collection whose directory is missing is
         // a build error, while a directory with no collection is inert.
         await mkdir(dirAbs, { recursive: true });
-        await writeText(config.abs, patched.newSource, config.source);
+        await writeText(config.abs, patched.newSource, { original: config.source });
         logger.info(`collection created -> ${name} (${dir})`);
         return { status: 200, body: { name, dir, etag: sha256(patched.newSource) } };
       },

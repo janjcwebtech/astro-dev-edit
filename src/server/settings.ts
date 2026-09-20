@@ -1,4 +1,4 @@
-import type { TextWriter } from './text-writes.ts';
+import { directWrite, type TextWriter } from './text-writes.ts';
 import { createHash } from 'node:crypto';
 import { chmod, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -8,7 +8,7 @@ import { loadEnv } from 'vite';
 import type { SettingsSource } from '../shared/protocol.ts';
 import { upsertEnvVar } from '../patcher/dotenv.ts';
 import type { StoredOptions } from './options.ts';
-import { atomicWrite, SECRET_MODE } from './paths.ts';
+import { SECRET_MODE } from './paths.ts';
 
 /**
  * User settings that live outside the Astro config, and the resolution of the
@@ -114,10 +114,10 @@ async function readIfPresent(target: string): Promise<string | null> {
 async function writeSettingsFile(
   root: string,
   next: StoredSettings,
-  writeText: TextWriter = (target, content, _original, mode) => atomicWrite(target, content, mode),
+  writeText: TextWriter = directWrite,
 ): Promise<void> {
   const target = join(root, SETTINGS_FILE);
-  await writeText(target, JSON.stringify(next, null, 2) + '\n', undefined, SECRET_MODE);
+  await writeText(target, JSON.stringify(next, null, 2) + '\n', { mode: SECRET_MODE });
   try {
     await chmod(target, SECRET_MODE);
   } catch {
@@ -295,8 +295,7 @@ export async function saveUnsplashKey(
   accessKey: string,
   writeText?: TextWriter,
 ): Promise<KeySaveResult> {
-  const write: TextWriter =
-    writeText ?? ((target, content, _original, mode) => atomicWrite(target, content, mode));
+  const write: TextWriter = writeText ?? directWrite;
   const target = join(root, ENV_TARGET);
 
   const before = await readIfPresent(target);
@@ -304,7 +303,7 @@ export async function saveUnsplashKey(
   if (!patched.ok) return { ok: false, reason: patched.reason };
 
   if (patched.action !== 'unchanged') {
-    await write(target, patched.text, before, SECRET_MODE);
+    await write(target, patched.text, { original: before, mode: SECRET_MODE });
   }
 
   // Migration. Only ever a removal, so a failure here can lose nothing.

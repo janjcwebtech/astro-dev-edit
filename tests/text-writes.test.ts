@@ -34,7 +34,7 @@ it('opens at the changed line and waits while the original is still on disk', as
     expect(await readFile(target, 'utf8')).toBe('title\nbefore\n');
     events.push('open');
   }));
-  await c.run(() => c.write(target, 'title\nafter\n', 'title\nbefore\n'));
+  await c.run(() => c.write(target, 'title\nafter\n', { original: 'title\nbefore\n' }));
   expect(events).toEqual(['open', 'wait']);
   expect(await readFile(target, 'utf8')).toBe('title\nafter\n');
 });
@@ -55,10 +55,10 @@ it('creates complete new files before launching and refuses existing creation ta
   const c = coordinator(true, undefined, vi.fn(async () => {
     expect(await readFile(created, 'utf8')).toBe('complete');
   }));
-  await c.run(() => c.write(created, 'complete', null));
+  await c.run(() => c.write(created, 'complete', { original: null }));
   expect(c.launch).toHaveBeenCalledOnce();
   expect(c.wait).not.toHaveBeenCalled();
-  await expect(c.run(() => c.write(created, 'replacement', null))).rejects.toThrow('changed on disk');
+  await expect(c.run(() => c.write(created, 'replacement', { original: null }))).rejects.toThrow('changed on disk');
 });
 
 it('preserves external edits made during the pause', async () => {
@@ -118,7 +118,7 @@ it('carries the file mode through the seam to disk', async () => {
   // the trip or `.env.local` lands at the umask.
   const c = coordinator(false);
   const secret = join(root, '.env.local');
-  await c.run(() => c.write(secret, 'UNSPLASH_ACCESS_KEY=abc\n', null, 0o600));
+  await c.run(() => c.write(secret, 'UNSPLASH_ACCESS_KEY=abc\n', { original: null, mode: 0o600 }));
   expect(await readFile(secret, 'utf8')).toBe('UNSPLASH_ACCESS_KEY=abc\n');
   if (process.platform !== 'win32') {
     const { stat } = await import('node:fs/promises');

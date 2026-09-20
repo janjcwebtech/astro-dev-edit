@@ -431,7 +431,7 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
           }
           working = result.newSource;
         }
-        await writeText(abs, working, source);
+        await writeText(abs, working, { original: source });
         logger.info(`applied ${ops.map((o) => o.targetType).join('+')} edit -> ${basename(abs)}:${loc}`);
         return { status: 200, body: { ok: true } };
       },
