@@ -12,7 +12,7 @@ import {
 } from './expression-trace.ts';
 
 /**
- * .astro source patcher — resolves a `data-astro-source-loc` back to the AST
+ * .astro source patcher — resolves a `data-atx-loc` back to the AST
  * element it was emitted for, classifies it, and patches literal text or
  * static `src`/`alt` attribute values. Pure string-in/string-out: no fs here.
  *
@@ -23,12 +23,12 @@ import {
  *   units, which is exactly JS string indexing — so all offset math here is
  *   plain (line, column) → string index. The `offset` field is BYTE-based
  *   (Go compiler) and must not be mixed with JS indices; we never use it.
- * - `data-astro-source-loc` is NOT the element's own start. It is the start of
+ * - A loc is NOT the element's own start. It is the start of
  *   the element's first child's *content*: a text child's start as-is, an
  *   element/expression child's start + 1 (the tag name / the `{`). For
  *   childless elements it is the element's own start + 1 (its tag name).
  * - If two elements produce the same candidate loc (e.g. `<span><span></span>`
- *   nested empty spans) Astro's own annotations are ambiguous; we refuse.
+ *   nested empty spans) the loc convention is ambiguous there; we refuse.
  */
 
 // The compiler's node types, loosely — we only touch what we verify.

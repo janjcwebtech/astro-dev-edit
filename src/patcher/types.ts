@@ -16,7 +16,7 @@ export interface Patcher {
 }
 
 export interface PatchRequest {
-  /** "line:col" from data-astro-source-loc. */
+  /** "line:col" from data-atx-loc. */
   loc: string;
   /** Lowercased tag name of the clicked element. */
   tag: string;

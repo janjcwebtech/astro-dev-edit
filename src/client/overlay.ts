@@ -39,8 +39,9 @@ import { basename, toast } from './ui.ts';
 
 // Begin capturing source annotations as early as possible. If the body isn't
 // parsed yet, wait for it; the observer then catches every annotated node as
-// it arrives. This must run synchronously at module evaluation to win the
-// dev-toolbar attribute-strip race — see source-map.ts.
+// it arrives. This must run synchronously at module evaluation so the cache is
+// populated before anything asks it a question — source-map.ts's timing
+// contract, which that module has no top-level side effects of its own to keep.
 if (document.body) {
   startCapture();
 } else {

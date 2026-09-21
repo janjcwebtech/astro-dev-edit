@@ -86,7 +86,7 @@ export const Z_MODAL = 2000000020;
  */
 export const COLOR = {
   // --- Surfaces (achromatic: chroma 0, no tint) ----------------------------
-  /** Deepest well — code blocks and the raw-markdown pane. oklch(0.145 0 0) */
+  /** Deepest well — the peek's code surface, footer bands, the drawer canvas. oklch(0.145 0 0) */
   background: '#0a0a0a',
   /** The standard overlay surface: panels, drawers, popovers. oklch(0.205 0 0) */
   card: '#171717',
@@ -352,9 +352,8 @@ export function inputEl<K extends 'input' | 'textarea' | 'select'>(
 
 /**
  * The transparency checkerboard behind an image preview, at `size` px per
- * square. One definition for the four surfaces that draw it (the image panel,
- * its recent strip, the media grid tile, the asset picker), which previously
- * each carried their own copy of the gradient and drifted apart in size.
+ * square. One definition rather than a gradient copied per surface, so the
+ * square size cannot drift between them.
  *
  * Built from `card` and `elevated` so the squares read as a *surface* rather
  * than as content — the contrast between them is deliberately low (1.4:1),
@@ -582,9 +581,9 @@ export function buildPanel(
   return panel;
 }
 
-/** A right-side drawer shell (entry editor, settings): title bar with an action
- *  slot, scrollable body, sticky footer. Same [data-body]/[data-foot] contract
- *  as buildPanel, so wirePanelButtons works unchanged. */
+/** A right-side drawer shell: title bar with an action slot, scrollable body,
+ *  sticky footer. Same [data-body]/[data-foot] contract as buildPanel, so
+ *  wirePanelButtons works unchanged. */
 export interface DrawerOptions {
   /** CSS width; defaults to `min(max(440px, 50vw), 94vw)`. */
   width?: string;

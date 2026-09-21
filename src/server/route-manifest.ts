@@ -8,15 +8,15 @@ import { insideRoot, isPackageOwned } from './paths.ts';
  * manifest, captured by the `astro:routes:resolved` hook in `src/index.ts`.
  *
  * The DOM cannot answer this. Component tags are never annotated
- * (`annotate.ts`), so counting `data-astro-source-file` values makes a
+ * (`annotate.ts`), so counting `data-atx-file` values makes a
  * markup-dense `Nav.astro` outrank a page that merely composes components —
  * which is exactly how *Open page source* used to pick the wrong file. Astro
  * already knows the answer, so we ask it.
  *
  * Impure only in `existsSync` (injected, so tests stay pure), and injected into
- * the middleware the way `content-config.ts` is: **every failure path is a
- * refusal, never a throw and never a guess.** A caller handed `ok: false` tells
- * the user why nothing opened.
+ * the middleware under one contract: **every failure path is a refusal, never a
+ * throw and never a guess.** A caller handed `ok: false` tells the user why
+ * nothing opened.
  *
  * Three things about the matching are load-bearing, all verified against
  * Astro's own `dist/core/routing/`:

@@ -9,8 +9,8 @@
  * used the component — and must answer without a round trip, since the answer
  * is wanted for every annotated element under the pointer.
  *
- * A `shared/slug.ts`-shaped runtime module rather than a corner of
- * `protocol.ts`, which stays types-only.
+ * A `shared/`-shaped runtime module, like `asset-path.ts` and `usage-id.ts`,
+ * rather than a corner of `protocol.ts`, which stays types-only.
  */
 
 /**

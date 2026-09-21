@@ -1,7 +1,7 @@
 /**
  * Minimal syntax tokenizer for the source-peek panel. Pure string→token logic,
  * no DOM (peek.ts renders tokens to styled spans) — keep it that way so it
- * stays unit-testable like markdown.ts.
+ * stays unit-testable (`tests/highlight.test.ts`).
  *
  * This is a readability aid, not a grammar: one lexer covers the mix that
  * appears in editable files (.astro markup + frontmatter JS, .md/.mdx, YAML)
