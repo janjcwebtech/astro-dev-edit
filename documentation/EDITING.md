@@ -18,10 +18,15 @@ The [README](../README.md) has the short version; this is the whole of it.
 | Literal text in an `.astro` template | inline edit — Enter or blur saves, Esc cancels | the element's text |
 | Text carrying inline markup | a **markup popup** | the element's source |
 | Text rendered through an `{expression}` | a **value popup** | the string in the frontmatter |
-| A prop or slot value at a component usage site | a **Values** row with a field | the attribute, the frontmatter string, or the slot text — in the caller's file |
-| A static `<img>` | the inspector's **image picker**, above its `src` and `alt` rows | `src` and `alt` |
-| A route rendering a `.md`/`.mdx` entry | a Values row naming that file, with **View code** and no field | nothing |
+| A prop or slot value at a component usage site † | a **Values** row with a field | the attribute, the frontmatter string, or the slot text — in the caller's file |
+| A static `<img>` † | the inspector's **image picker**, above its `src` and `alt` rows | `src` and `alt` |
+| A route rendering a `.md`/`.mdx` entry † | a Values row naming that file, with **View code** and no field | nothing |
 | Anything else | a notice with the reason and a *View code* jump | nothing |
+
+† Inspector surfaces, so they need `devEdit({ composition: true })`. Without it
+an image click is refused in words — `src` and `alt` are edited in the file
+instead — and there are no Values rows at all. See
+[Component tracing and inspector](COMPOSITION-API.md).
 
 ### Inline markup
 
@@ -88,9 +93,10 @@ and the field are two views of one value: type in either, save from either.
 - **The element wears an amber outline while it is pending**, inside the purple
   selection frame. The two are deliberately different colours: "this is what I
   picked" must never read as "this is on disk". The panel header carries the
-  same answer as a `saved` / `N unsaved` badge.
-- **Literal text is typed on the page.** Alt-clicking text puts the caret where
-  you clicked and mirrors what you type into the field. Everything else is
+  same answer as a `saved` / `N unsaved` chip on the status row.
+- **Literal text is typed on the page.** Clicking text puts the caret where you
+  clicked and mirrors what you type into the field — hold Alt, or leave the
+  element tree open, which arms selection on a plain click. Everything else is
   typed in the field only — markup's value is the element's *source*, which a
   browser hands back re-spelled; an expression's words live in the frontmatter
   rather than in the text node; and a value passed at a usage site is rendered
@@ -222,10 +228,12 @@ there. Open the source peek for the surrounding file, and the CSS inspector for
 the rules.
 
 If your browser refuses clipboard access (reaching the dev server over a
-network address is not a secure context, so the API is simply absent) the text
-opens in a panel, preselected, to copy by hand.
+network address is not a secure context, so the API is simply absent) the
+pill's copy opens the text in a panel, preselected, to copy by hand. The
+inspector's **Copy context** has no such fallback — it reports that it could
+not copy, and the pill is the way through.
 
-![The pill's copy button, next to an AI agent prompt filled with the element context: source location, page URL, DOM path and applied CSS](images/copy-context.png)
+![The pill's copy button, next to an AI agent prompt filled with the element context: its source location, the components that render it, where its words are written, and its own source lines](images/copy-context.png)
 
 ## CSS inspector
 
@@ -274,7 +282,7 @@ right end that answers "is my work on disk?" without guessing:
 | Button | Meaning |
 | --- | --- |
 | green **Done** | nothing pending — everything typed is written |
-| purple **Save & exit** | an inline edit, or an open source popup, has unsaved keystrokes |
+| pale **Save & exit** | an inline edit, or an open source popup, has unsaved keystrokes |
 | grey **Saving…** | the write is in flight |
 | green **Saved** | it just landed |
 | red **Save failed** | the write was refused and the change rolled back |

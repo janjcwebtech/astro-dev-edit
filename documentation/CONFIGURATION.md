@@ -6,7 +6,7 @@ Every option the integration takes, where you can set it, and which source wins.
 - [Where a value can come from](#where-a-value-can-come-from)
 - [Astro versions and source annotations](#astro-versions-and-source-annotations)
 - [The Settings drawer](#the-settings-drawer)
-- [Where settings and your key are stored](#where-settings-and-your-key-are-stored)
+- [Where settings are stored](#where-settings-are-stored)
 - [Watching writes in your editor](#watching-writes-in-your-editor)
 
 ## Options
@@ -33,15 +33,15 @@ export default defineConfig({
 | `enabled` | `true` | Kill switch. Config only, because it is read before the dev server exists. |
 | `assetDirs` | `['src/assets', 'public']` | Directories the image picker scans. |
 | `uploadDir` | `'public'` | Where uploads land. Must be web servable. |
-| `imageUploadDir` | `'src/assets'` | Fallback for uploads backing an `image()` field. Must be under `src/`. |
-| `editableExtensions` | `['.astro', '.md', '.mdx']` | Extensions the patcher may write. |
+| `imageUploadDir` | `'src/assets'` | Fallback directory for an upload referenced relative to the file using it, rather than by web path. Must be under `src/` — Astro imports those assets, and `public/` files cannot be. |
+| `editableExtensions` | `['.astro', '.md', '.mdx']` | Extensions the path gate admits — for opening and peeking as well as writing. Only `.astro` has a patcher, so a `.md` entry opens in your editor but is not edited in place. |
 | `contentRoots` | `['src', 'public']` | Writes are confined to these, with symlinks resolved. |
 | `openInEditor` | `true` | The "Open source" and jump to file buttons. |
 | `revealWrites` | `false` | Open each text file in your editor as it is written. See [Watching writes in your editor](#watching-writes-in-your-editor). |
 | `revealWriteDelayMs` | `1000` | How long to wait after asking the editor to open an existing file. A whole number of milliseconds, `0` to `10000`. |
 | `cssInspector` | `true` | The hover pill's class and ID CSS inspector. |
 | `sourceAnnotations` | `'auto'` | Whether the integration injects its own source annotations: `'auto'` (yes, on every Astro version), `'force'` (a synonym) or `'off'`. Config only, because it registers a Vite plugin. |
-| `composition` | `false` | Read-only inspector, tracing API and version-2 source annotations. Config only; when true, replaces the editing UI and supersedes `sourceAnnotations`. See [Component tracing and inspector](COMPOSITION-API.md). |
+| `composition` | `false` | The source inspector, tracing API and version-2 source annotations. Config only; when true, replaces the editing UI and supersedes `sourceAnnotations`. See [Component tracing and inspector](COMPOSITION-API.md). |
 
 ## Where a value can come from
 
@@ -73,6 +73,8 @@ under stock Astro 7 either.
 kept for configs that set it. `'off'` disables injection entirely, and because
 nothing else is read, it **disables the overlay** — on every Astro version,
 whatever the dev toolbar is doing. The integration logs a warning saying so.
+`composition: true` is the one exception: the tracing plugin stamps the same
+attributes, so the overlay still works and no warning fires.
 
 ## The Settings drawer
 
@@ -113,9 +115,10 @@ save follows after a pause — **Delay before writing (ms)**
 to watch until it exists. A save whose content already matches the file on disk
 opens nothing.
 
-Every text write is covered: text and image edits made on the page, and the
-options in `.astro-dev-edit.json`. Uploaded images and Astro's own generated
-files are left alone.
+Every text write is covered: text and image edits made on the page, the
+inspector's prop and slot value saves, and the options in
+`.astro-dev-edit.json`. Uploaded images and Astro's own generated files are
+left alone.
 
 The timing is best-effort by nature. The launcher is the one behind *Open
 source*, and it cannot report that your editor has actually brought the file

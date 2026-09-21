@@ -2,7 +2,7 @@
 
 Component tracing is opt-in and dev-only. Without it the integration runs its
 editing UI; `composition: true` enables the stronger tracing, the source
-inspector and a [read-only API](COMPOSITION-API.md). This page is the evidence
+inspector and the [tracing API](COMPOSITION-API.md). This page is the evidence
 for that mechanism, run against the committed fixture, which sets the option.
 
 ## Run it
@@ -95,7 +95,7 @@ and text-only slot placements remain available as placement records.
 | Slot HTML is cached as a string and inserted twice with `set:html` | Marked `untracked-html`; replayed instance IDs are not grouped |
 | Malformed, duplicate or incomplete boundary markers | Refused rather than used for a partial placement graph |
 
-`npm run typecheck` passes and the full suite with both runtimes passes **918
+`npm run typecheck` passes and the full suite with both runtimes passes **739
 tests across 42 files**. The pre-existing shutdown-timeout warning still follows
 a successful run.
 
@@ -150,8 +150,9 @@ map back to the original file. Astro's first legacy loc can be shifted on Go;
   a parity check when client code can remove both halves of a boundary.
 - The tracing API discovers the graph reachable from a requested route, not
   every caller in the repository. Its completeness and freshness rules are in
-  [the API contract](COMPOSITION-API.md). The inspector consumes it; staged
-  edits, prop writes and HTML-string writes are not part of the API.
+  [the API contract](COMPOSITION-API.md). The inspector consumes it, and stages
+  a value against what it read; the write goes through `/composition/apply`,
+  which verifies against the source before patching.
 
 Within the tested Astro scope the mechanism handles spread props and multi-root
 components. It gives the inspector concrete instance and slot-placement data,

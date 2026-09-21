@@ -38,16 +38,23 @@ Dev middleware, mounted under `/__dev-edit`.
 | Module | Owns |
 | --- | --- |
 | `src/index.ts` | Integration entry: injects the overlay client, preflight-warns if the dev toolbar is off, mounts the middleware |
-| `middleware.ts` | Composition point: the localhost gate, the core loc-based routes (health, assets, upload, open, classify, apply), and the concatenated feature route groups |
+| `middleware.ts` | Composition point: the localhost gate, the core loc-based routes (health, assets, upload, open, peek, classify, apply), and the concatenated feature route groups |
 | `router.ts` | The dispatcher — body reading, JSON parse, size caps, error mapping |
 | `inspect-routes.ts`, `page-source-routes.ts`, `settings-routes.ts`, `composition-routes.ts` | One feature group each |
-| `annotate.ts`, `private-files.ts` | The two injected Vite plugins, both ordering-critical: one annotates `.astro` source before the compiler, the other refuses to serve the files this integration writes |
+| `annotate.ts`, `composition-plugin.ts`, `private-files.ts` | The three injected Vite plugins, all ordering-critical. The first two annotate `.astro` source before the compiler and are alternatives — `src/index.ts` installs the composition transform in place of the plain one — and the third refuses to serve the files this integration writes |
 | `options.ts` | The option vocabulary, `OPTION_SPECS`, `DevEditOptions`, `DEFAULTS`, `createOptionsResolver` |
 | `paths.ts` | `validateEditablePath`, the one path gate |
 | `wire-path.ts` | `toWirePath` — absolute fs path → the root-relative spelling every response and annotation carries |
 | `text-writes.ts` | The single write seam |
 | `route-manifest.ts` | Which file a route is written in, from `astro:routes:resolved`; and which routes are dynamic |
 | `usage-parse.ts`, `usage-index.ts`, `composition.ts` | The static usage graph: a pure parser, an mtime-cached index, and the pure tiering |
+| `usage-write.ts` | The pure writer behind `/composition/apply` — a quoted prop, the frontmatter literal a traced prop reads, or literal slot text |
+| `composition-service.ts`, `composition-instrument.ts`, `composition-runtime.ts` | Bounded graph discovery, the per-render frontmatter instrumentation, and the render-time trace counters |
+| `assets.ts` | Asset listing and upload — `listAssets`, `saveUpload`, `safeFileName` |
+| `inspect-locate.ts` | `locateSelector` and `resolveVariableTag` — where on disk something the panel names is written |
+| `settings.ts` | `SETTINGS_FILE`, `readStoredOptions`, `saveStoredOptions`, the uncovered-file warning |
+| `editor.ts` | `launchInEditor` — the one `launch-editor` call site |
+| `astro-tag-end.ts` | `AttrSpan` — where a component tag's attribute value sits in source |
 
 Each feature group is a `create<Feature>Routes(deps): Route[]` factory.
 
@@ -82,12 +89,12 @@ A future fixed target follows the second shape: a constant in server source, nev
 
 ### Every text write goes through one seam
 
-`text-writes.ts::createTextWrites` owns it. `createMiddleware` builds a single coordinator and injects its `write` as `writeText` into the core `/apply` handler and the settings group. It is `atomicWrite` plus the two things a bare write cannot do:
+`text-writes.ts::createTextWrites` owns it. `createMiddleware` builds a single coordinator and injects its `write` as `writeText` into the core `/apply` handler, the composition group (whose `/composition/apply` is its one write) and the settings group. It is `atomicWrite` plus the two things a bare write cannot do:
 
 - It **re-verifies at the last moment** — parent realpath, file identity, byte contents — because `revealWrites` opens the destination in the user's editor and then *pauses* before writing, which makes the window between a handler's gate and the write real rather than theoretical.
 - `run()` wraps every text-mutating POST (the `textMutationPaths` set), serializing whole requests and pinning the resolved options for the duration, so a save that switches the mode off still behaves the way it started.
 
-A handler that writes project text takes `writeText` from its deps (defaulting to `text-writes.ts::directWrite`, which is how tests skip the seam — not `atomicWrite` itself, whose third parameter is the file mode where `TextWriter`'s is the original), passes the `original` it verified against (`null` for a create), an optional file mode, and adds its path to that set. Uploads, imports and deletions stay outside the seam on purpose.
+A handler that writes project text takes `writeText` from its deps (defaulting to `text-writes.ts::directWrite`, which is how tests skip the seam — not `atomicWrite` itself, whose third parameter is the file mode where `TextWriter`'s is the original), passes the `original` it verified against (`null` for a create), an optional file mode, and adds its path to that set. Uploads stay outside the seam on purpose.
 
 ### Impure dependencies are injected
 
@@ -122,7 +129,7 @@ One further client invariant, unrelated to the boundary but broken the same way 
 
 ### Modules
 
-`overlay.ts` is the composition root — toggle button, boot, HMR wiring — and wires the leaves together. With `composition: true` it hands boot to `inspector-app.ts` instead, and none of the editing routes below are entered.
+`overlay.ts` is the composition root — boot, HMR wiring, edit-mode entry and exit — and wires the leaves together. With `composition: true` it hands boot to `inspector-app.ts` instead, and none of the editing routes below are entered.
 
 - **`source-map.ts` — the subtle core.** It reads **`data-atx-file` / `-loc` and nothing else**. Astro's own `data-astro-source-*` was a second read path until it was removed on evidence: the dev toolbar strips those attributes from the live DOM within a frame of hydration on *both* majors — and across five Astro 5.18.2 routes all **1,721** of Astro's own `(file, loc)` pairs reproduce byte-identically from the integration's own annotations, zero disagreements, with 75 head elements annotated beyond them. The legacy population was a strict subset, and on 5/6 its loc is injection-shifted into transformed source. The consequence is that **`sourceAnnotations: 'off'` now disables the tool outright** on every version, not just where Astro emits nothing. The module still snapshots each annotated element (onto a private JS property plus a structural-path map) via a `MutationObserver`, because a node replaced wholesale — a framework island re-rendering, an HMR swap — carries no annotation of its own. Read source locations through `sourceFor` / `nearestSource`.
 - **`router.ts`** — capture-phase click routing. Every click is confirmed against the server's `/classify` before an editor opens, because the DOM cannot tell a resolved `{expression}` from literal text; only the AST can. Routes to `editors/text.ts` (inline contenteditable), `editors/markup.ts`, `editors/expression.ts` or `editors/notice.ts` (safe refusal + *View code*). An image is refused here and named as the inspector's: `editors/image.ts` is a section of that panel, not a modal.
@@ -132,8 +139,23 @@ One further client invariant, unrelated to the boundary but broken the same way 
 - **`layout.ts`** — overlay or docked, and everything positional that follows from it. It measures the open panels, publishes the strips of viewport they and the code dock occupy through `ui.ts::setChromeInset`, and docked, pushes the host page by padding `<html>` — the one thing the overlay does that the page can feel, done the way `overlay.ts` does `body.style.cursor`: one owner, the found inline value saved, restored on switching back and on teardown. `layout-model.ts` is the pure half (the dock clamp, the inset sum, the free box and the pill's flip) and `dock.ts` is the view. The mode is a `localStorage` view preference, deliberately **not** an `OPTION_SPECS` entry: it is per developer, not per project, and needs no server round-trip.
 - **`reflow.ts`** — one coalesced redraw for everything drawn in viewport coordinates. Docked, **opening a panel moves the page**, and neither scroll nor resize fires; a `ResizeObserver` on `<html>` and `<body>` catches that, along with every frame of the push's transition, which is what lets the push animate at all. Every surface placed from a live rect — the hover outline and pill, the element tree's locked selection — redraws through this one bus, because two figures around one element have to agree to the pixel and the way they disagreed before was by being redrawn from different events. Subscribers must be idempotent.
 - **`focus.ts`** — modal focus containment, the keyboard half of what a backdrop does for the pointer. `trapFocus(shell)` gives a panel dialog semantics and holds Tab inside it; traps **stack**, only the innermost acting, and the walk follows `<slot>`s so slotted content is in the cycle. Every `buildBackdrop` caller pairs with one.
-- **`state.ts`** — a single token-based interaction controller. **`hover.ts`**, **`api.ts`** (typed `fetch` wrappers — nothing else in the client calls `fetch`), **`ui.ts`** (styled DOM helpers: the `COLOR`/`RADIUS`/`FONT`/`INPUT_STYLE` tokens, the `footButton` primitive every panel and drawer button goes through, and the `atx-*` classes and IDs — **internal** hooks for the stylesheet and DOM lookups, not a theming API, since user CSS cannot match across the boundary).
+- **`state.ts`** — a single token-based interaction controller. **`hover.ts`**, **`api.ts`** (typed `fetch` wrappers — nothing else in the client calls `fetch`), **`ui.ts`** (styled DOM helpers: the `COLOR`/`RADIUS`/`FONT` tokens, `inputEl()` and the `[data-input]` baseline, the `footButton` primitive every panel and drawer button goes through, and the `atx-*` classes and IDs — **internal** hooks for the stylesheet and DOM lookups, not a theming API, since user CSS cannot match across the boundary).
 - **`styles.ts`** — `overlayCss()`, the single stylesheet the root adopts. It opens with the `:host { all: initial }` inheritance guard and **generates** the `--atx-*` custom-property block from `ui.ts`'s tokens; hand-writing that block would leave `tests/contrast.test.ts` guarding a copy the UI does not use. It is a function, not a constant, because `ui.ts → shadow.ts → styles.ts → ui.ts` is an import cycle and reading `COLOR` at module-evaluation time would hit the TDZ.
+
+The leaves the composition surface is built from, none of which the sections above name:
+
+| Module | Owns |
+| --- | --- |
+| `staged-values.ts` | The staging store — what is pending, its `sessionStorage` persistence, and the page-typing mirror |
+| `value-model.ts`, `value-rows.ts` | Which targets the write path serves, and the Values card as data: one row per prop and slot run, with its verdict |
+| `composition.ts`, `composition-dom.ts`, `render-occurrences.ts` | Chain ids off the DOM, the batched per-pathname link cache, and occurrence grouping |
+| `variable-tag.ts` | The `/inspect/tag` client — one request per element, shared by pill and panel |
+| `tree.ts`, `tree-model.ts` | The element tree view and its pure nesting model |
+| `element-context.ts` | The copy-context payload |
+| `css-inspect.ts`, `highlight.ts`, `page-source.ts`, `classify-cache.ts` | The CSS inspector, the peek tokenizer, *Open page source*, and the verdict cache |
+| `menu.ts`, `tip.ts`, `icons.ts`, `features.ts`, `asset-view.ts` | The tree-header menu, tooltips, the icon set, the feature flags read off `/health`, and the picker's filter/sort model |
+| `admin-bar.ts` | The edit-mode bar: its buttons, the pin and edge state in `localStorage`, and the save-phase exit button |
+| `editors/peek.ts`, `editors/source-popup.ts`, `editors/copy-panel.ts`, `editors/media-grid.ts` | The source preview, the markup/value popups, the clipboard fallback panel, and the picker's grid |
 
 Theming is `--atx-*` plus a deliberately small `::part()` set (`bar`, `panel`, `drawer`, `backdrop`, `pill`, `toast`), assigned centrally from `PARTS` in `ui.ts::styled`. A new part is an API commitment — add one only on demand. Both tables are documented in [Styling reference](STYLING.md).
 
@@ -150,17 +172,17 @@ Every extension point is a registry or a factory. Expansion means adding a file 
 | **An endpoint** | One `Route` entry. The core table in `middleware.ts` only if it serves the loc-based editing flow; anything feature-shaped gets its own `create<Feature>Routes(deps)` module, concatenated in `createMiddleware`. Define the wire shapes in `protocol.ts` first, add the typed wrapper in `client/api.ts`, give the route a `maxBytes` cap, and pass any file path through `validateEditablePath` and `atomicWrite` — or the injected `writeText` for project text |
 | **A project file that must never be served** | One entry in `PRIVATE_FILES` (`src/server/private-files.ts`). Vite serves the project root, so anything written there is reachable at `/<name>` and `/@fs/<abs>` unless listed. `server.fs.deny` is not the seam: an array in user config *replaces* Vite's defaults rather than extending them |
 | **A Settings control** | The name in `OptionControl` (`protocol.ts`) plus a builder in `CONTROL_BUILDERS` (`client/editors/fields.ts`) — builders get `{field, raw, initial, placeholder, root}` and return `{value, dirty}`; label and error chrome are added for you. Unknown types render as read-only `json`, so old clients degrade safely |
-| **An editable file type** | One `Patcher` implementation (`src/patcher/types.ts`) plus an entry in `patcher/registry.ts`, and the extension in the `editableExtensions` default in `src/index.ts` |
-| **A client editor or panel** | A module under `client/editors/`, opened from `client/router.ts`'s classification switch. Claim the interaction slot with `state.begin({kind: 'panel', close})` and release via `state.releaseIf`; for drawer-shaped UI use `editors/drawer.ts::openDrawer` and `ui.ts::footButton`. Build DOM through `ui.ts::styled` and `group.ts`, reusing `COLOR`/`FONT`/`INPUT_STYLE` |
+| **An editable file type** | One `Patcher` implementation (`src/patcher/types.ts`) plus an entry in `patcher/registry.ts`, and the extension in the `editableExtensions` default in `DEFAULTS` (`src/server/options.ts`) |
+| **A client editor or panel** | A module under `client/editors/`, opened from `client/router.ts`'s classification switch. Claim the interaction slot with `state.begin({kind: 'panel', close})` and release via `state.releaseIf`; for drawer-shaped UI use `editors/drawer.ts::openDrawer` and `ui.ts::footButton`. Build DOM through `ui.ts::styled` and `group.ts`, reusing `COLOR`/`FONT` and `inputEl()` |
 | **A surface placed against a viewport edge** | Read `ui.ts::chromeInset()` — the sum of every strip our fixed chrome occupies — or `chromeInset('bar')` for the bar's alone, which is what a full-height panel wants. Claim a strip with `setChromeInset(owner, …)`. Anything drawn from a live element rect subscribes to `reflow.ts::onReflow` rather than to `scroll`/`resize`, or it will be stale the first time a docked panel opens |
 | **A persistent chrome pane (not a modal)** | Follow `dock.ts`: no `state.begin`, no backdrop, no focus trap, so Escape and focus stay with whatever is innermost. Its geometry comes from `layout.ts`, which is the only module that measures panels or touches the host page |
 | **An integration option** | **One entry in `OPTION_SPECS` (`src/server/options.ts`)**, carrying the default, wire label and help, control, Settings tab, and how to read it out of a partial config. It drives resolution, the `/settings` payload **and** the panel's control, so no client change is needed. Set `configOnly: true` only for something consumed in `astro:config:setup`, before a dev server exists. Read it off `await deps.options()`; do not add a field to `MiddlewareDeps`, which carries one options thunk |
 | **Server logic needing the dev server or project config** | Follow `usage-index.ts`: a small interface, injected, degrading to a named refusal rather than erroring, stubbed in tests |
-| **A user setting that is not an integration option** | It goes in `.astro-dev-edit.json` (`settings.ts`) beside `options` — an ordinary `Partial<DevEditOptions>` — or it is an option and belongs in `OPTION_SPECS`. **A secret does not go in that file at all**: that file sits in the tree Vite serves. A secret goes to `.env.local` through a pure patcher, at `0600`, with its own resolution, and never enters a response — only whether one resolved, where from, and whether the panel may change it |
+| **A user setting that is not an integration option** | It goes in `.astro-dev-edit.json` (`settings.ts`) beside `options` — an ordinary `Partial<DevEditOptions>` — or it is an option and belongs in `OPTION_SPECS`. It is written `0600` through `SECRET_MODE`, though nothing secret goes in it — that file sits in the tree Vite serves, so a credential would need its own store outside it |
 
 ## Tests
 
-Vitest characterization tests pin patcher, middleware and composition behavior. The client layer's unit tests cover its pure modules — `tree-model.ts`, `inspector-model.ts`, `layout-model.ts`, `element-context.ts`; the DOM half is covered by a manual checklist.
+Vitest characterization tests pin patcher, middleware and composition behavior. The client layer's unit tests cover its pure modules — `tree-model.ts`, `inspector-model.ts`, `layout-model.ts`, `value-model.ts`, `value-rows.ts`, `element-context.ts`, `variable-tag.ts`, `classify-cache.ts`, `highlight.ts`, `markup-insert.ts`, `asset-view.ts`, `page-source.ts` and `shadow.ts`; the DOM half is covered by a manual checklist.
 
 `tests/helpers.ts::locOf` computes the `line:col` an element would be annotated with, mirroring the loc rules in `astro.ts`; use it to build classify and apply requests.
 

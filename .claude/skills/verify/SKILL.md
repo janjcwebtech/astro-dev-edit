@@ -13,7 +13,7 @@ Feature → test-file matrix and the full manual checklist: `internal-documentat
 ```bash
 npm run typecheck   # build-equivalent; enforces the protocol.ts contract
 npm test            # vitest; the spec of current behavior
-npx vitest run tests/frontmatter.test.ts     # scoped, while iterating
+npx vitest run tests/annotate.test.ts     # scoped, while iterating
 npx vitest run -t "name substring"
 ```
 

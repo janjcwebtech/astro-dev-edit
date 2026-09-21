@@ -10,10 +10,11 @@ devEdit({ composition: true })
 `composition` defaults to `false` and is config-only: changing it requires a dev
 server restart. It installs the version-2 annotation transform in place of the
 plain one, even when `sourceAnnotations` is `off`. Builds and previews install neither the transform
-nor the API. This option selects the read-only inspector described below.
-Staged edits, prop writes and HTML-string writes are not part of this layer.
+nor the API. This option selects the inspector described below. Reading the graph and
+writing a value are separate halves of it: every read route answers without
+touching disk, and `/composition/apply` is the one route that writes.
 
-## Read-only inspector
+## The inspector
 
 The left-edge tab opens the element tree. While the tree is open, selection
 is armed: hovering highlights and clicking inspects, with no key held — a
@@ -125,7 +126,8 @@ The panel shows, in this order:
   A usage-site prop or slot value says so and offers **View code** only.
 - **Component chain:** a proven runtime chain, an explicitly inferred static
   path, separate candidate paths, or a named refusal — the status row says
-  which in one word (*proven chain*, *one link inferred*, *no chain*) and the
+  which in a word or two (*proven chain*, *one link inferred*, *no chain ·
+  candidates*, *no chain*) and the
   reason sits at the top of the card. Drawn as a tree, indented by depth: the
   route entry, then a level per component, then the element the chain ends at,
   with a rule where the rows stop. A component row is badged *presentation*
@@ -183,9 +185,9 @@ branches, rather than runtime instances.
 
 Generated HTML descendants never acquire a chain from copied annotations or
 their container. Malformed render/slot metadata is refused. Incomplete graph
-coverage is reported on the wire but no longer shown in the panel: a file the
-walker could not follow is rarely the reason the chain in front of you is
-wrong, and the list read as a defect report for the site. Source changes during
+coverage is reported on the wire and deliberately not shown in the panel: a
+file the walker could not follow is rarely the reason the chain in front of you
+is wrong, and the list reads as a defect report for the site. Source changes during
 discovery are retried once; rapid selection changes and closed panels discard
 late responses. Navigation, HMR and removal of the selected DOM node clear the
 selection, so render identities are not carried onto a replacement page.
@@ -348,7 +350,7 @@ identities or the watcher revision as a write precondition.
   one with no string to write. Every verdict but `editable` carries a named
   `reason` — `styling`, `directive`, `spread`, `boolean`, `computed`,
   `template`, `untraced`, `unproven-entry`, `markup`, `empty`, `unlocated`,
-  `unsupported`, `imported` — decided in `usage-parse.ts` beside the byte range
+  `unsupported`, `imported`, `absent` — decided in `usage-parse.ts` beside the byte range
   it needs. `elsewhere` names a module; it never resolves or follows one.
 - **`unproven-entry`**, the refusal a value read from a `.map()` carries until
   its ordinal arrives. The trace resolves and the array holds matching

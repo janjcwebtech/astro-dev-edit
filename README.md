@@ -19,7 +19,7 @@
 For bigger changes it **points you to the right place in the source code**.
 There is also a **quick source preview** for HTML and CSS and allows you to give the exact **context to your AI** agent.
 
-**Tip:** Hold Ctrl (Option on macOS) and links work as usual, so you can move around the site without leaving edit mode.
+**Tip:** Hold Ctrl or Alt and links work as usual, so you can move around the site without leaving edit mode. The bar says which key while you are editing.
 
 ## Install
 
@@ -41,20 +41,20 @@ export default defineConfig({
 
 Run `npm run dev` and click **Edit page** in the admin bar.
 
-Works on Astro 5, 6 and 7. The per-version setup, and the one flag Astro 5 and 6 need, are in [Astro versions and source annotations](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/CONFIGURATION.md#astro-versions-and-source-annotations).
+Works on Astro 5, 6 and 7, with the same setup on each — the integration injects its own source annotations rather than relying on Astro's. The details, and the one opt-out, are in [Astro versions and source annotations](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/CONFIGURATION.md#astro-versions-and-source-annotations).
 
 ## What you can edit
 
 - **Literal text in a template.** Click it and type. The pill above the element names the file and the line the change will land in. Enter saves, escape cancels.
 - **Strings that arrive through an expression.** A value pulled from the frontmatter is followed back to the string that produced it, and you edit that string, with the trace of where it came from.
 - **Text carrying inline markup.** A heading broken by a `<br>`, or a sentence with a `<strong>` in it, opens over the raw source with a row of insertable tags: `br`, `strong`, `em`, `b`, `i`, `u`, `a`, `span`, `code`, `small`, `sup`, `sub`.
-- **Images.** Click one and you get a preview, the file name and size, the alt text, and the six images most recently added to the project. The full picker lists everything in your asset directories, with a filter and an upload button.
+- **Images.** With the inspector on, clicking one opens a picker above its `src` and `alt` rows: the eight most recently added images, a *Show more* button, a filter over the whole path and an upload. Files your build would not serve are shown dimmed with the reason rather than hidden. Without the inspector, an image click says so and you edit `src` and `alt` in the file.
 
 Content that lives in a Markdown or MDX entry is not edited in the browser. Each such value gets a row naming the entry file, with **View code** and no field, so you open that file in your IDE instead of typing over rendered text. Literal content in the route template stays editable as usual.
 
 ## Other features
 
-- **Component inspector** — opt in with `devEdit({ composition: true })` for a read-only inspector with component chains, native slots, source links and CSS. Hold Alt/Option and click, or open the left-edge element tree — selection needs no key while it is open. See [Component tracing and inspector](documentation/COMPOSITION-API.md).
+- **Component inspector** — opt in with `devEdit({ composition: true })` for a source inspector with component chains, native slots, source links and CSS. Hold Alt/Option and click, or open the left-edge element tree — selection needs no key while it is open. See [Component tracing and inspector](documentation/COMPOSITION-API.md).
 - **CSS peek**
 - **Code peek**
 - **Structure tree view**
@@ -89,21 +89,22 @@ Every option, with its default and what it does: [Configuration reference](https
 
 ## Documentation
 
-| Doc                                  | What's in it                                                 |
-| ------------------------------------ | ------------------------------------------------------------ |
-| Editing reference                    | Everything the overlay can edit, and every surface it draws  |
-| Component tracing and inspector      | The read-only inspector, chains, slots and the tracing API   |
-| Media picker                         | Choosing and uploading images                                |
-| Configuration reference              | Every option, the Settings drawer, and which source wins     |
-| Styling reference                    | The --atx-\* properties and ::part() names you can theme     |
-| Architecture                         | How the layers fit together, and where a new capability goes |
-| Changelog                            | What changed, release by release                             |
+| Doc | What's in it |
+| --- | --- |
+| [Editing reference](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/EDITING.md) | Everything the overlay can edit, and every surface it draws |
+| [Component tracing and inspector](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/COMPOSITION-API.md) | The inspector, chains, slots and the tracing API |
+| [Tracing proof](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/COMPOSITION-PROOF.md) | What the tracing guarantees, and the evidence for it |
+| [Media picker](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/MEDIA.md) | Choosing and uploading images |
+| [Configuration reference](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/CONFIGURATION.md) | Every option, the Settings drawer, and which source wins |
+| [Styling reference](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/STYLING.md) | The --atx-\* properties and ::part() names you can theme |
+| [Architecture](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/ARCHITECTURE.md) | How the layers fit together, and where a new capability goes |
+| [Changelog](https://github.com/janjcwebtech/astro-dev-edit/blob/main/CHANGELOG.md) | What changed, release by release |
 
 **Disclaimer:** The author is not responsible for any data loss. Back up your work regularly using git best practices.
 
 ## Credits
 
-The technique of snapshotting Astro's `data-astro-source-*` attributes into a private JS property the instant they appear, before the dev toolbar runtime strips them from the live DOM, is borrowed from [`astro-click-to-source`](https://www.npmjs.com/package/astro-click-to-source) by **invisible1988** (MIT). If source navigation is all you want, that is the lighter tool for the job.
+The technique of snapshotting source annotations onto a private JS property the instant they appear, rather than reading them off the element later, is borrowed from [`astro-click-to-source`](https://www.npmjs.com/package/astro-click-to-source) by **invisible1988** (MIT). This tool injects and reads its own `data-atx-*` pair rather than Astro's, but the caching pattern is theirs. If source navigation is all you want, that is the lighter tool for the job.
 
 ## Contributing
 

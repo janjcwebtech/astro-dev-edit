@@ -3,6 +3,11 @@
 One picker, in one place: a block at the top of the inspector panel, above
 **Values**. The [README](../README.md) has the summary.
 
+The inspector is opt-in, so the picker is too — turn it on with
+`devEdit({ composition: true })`. Without it, clicking an image in edit mode
+answers with a notice saying so, and `src` and `alt` are edited in the source
+file instead.
+
 It sits there because a list of fields cannot show pictures. Everything else
 about an image — its `src`, its `alt` — is an ordinary Values row with its own
 field and its own Save, so the picker adds the thumbnails and nothing else.
@@ -21,9 +26,12 @@ value and is still one Save away.
 
 ## What it shows
 
-- **Newest first**, so a file uploaded a minute ago is the first tile rather
-  than something to hunt for alphabetically.
-- **Eight at a time**, with a *Show more* button. Paging and the filter are both
+- **Newest first among the files you can actually use**, so a file uploaded a
+  minute ago is the first tile rather than something to hunt for
+  alphabetically. A file a build would not serve sinks to the end whatever its
+  date — see the dimmed tiles below.
+- **Eight at a time**, with a button that names what it will add and how much
+  there is — *Show 8 more · 34 in this project*. Paging and the filter are both
   views over the one listing `GET /assets` returns; the server pages nothing.
 - **Filter** matches anywhere in the path, so `hero`, `.svg` and `blog/` all
   work.

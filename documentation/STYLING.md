@@ -118,6 +118,12 @@ shape stable. Buttons, fields and rows are not parts: recolour them with the
 properties above. If you need one that is not here, open an issue rather than
 reaching for a workaround; there isn't one.
 
+These six cover the editing chrome. With `composition: true` the surfaces are
+different ones — the inspector panel, the element tree, the code dock and the
+inspector's own pill — and none of them carries a part yet, so `::part(bar)`
+and `::part(pill)` match nothing in that mode. The custom properties reach all
+of them.
+
 ## Internal class hooks
 
 Elements inside the root carry `atx-*` classes, and singletons carry `atx-*`
@@ -140,8 +146,8 @@ overlay's own lists scroll normally over it.
 
 Form controls in the overlay set `color-scheme: dark`, so browser-drawn parts —
 the date input's calendar picker, number spinners, scrollbars — render light on
-the dark surface instead of as near-invisible dark glyphs. The markdown writing
-surface sets `color-scheme: light` for the same reason, being a light island.
+the dark surface instead of as near-invisible dark glyphs. Nothing in the
+overlay sets a light scheme.
 
 ## Contrast
 
