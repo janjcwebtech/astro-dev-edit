@@ -54,12 +54,12 @@ Content that lives in a Markdown or MDX entry is not edited in the browser. Each
 
 ## Other features
 
-- **Component inspector** — opt in with `devEdit({ composition: true })` for a source inspector with component chains, native slots, source links and CSS. Hold Alt/Option and click, or open the left-edge element tree — selection needs no key while it is open. See [Component tracing and inspector](documentation/COMPOSITION-API.md).
-- **CSS peek**
-- **Code peek**
-- **Structure tree view**
-- **Links to the source code across the UI**
-- **Copy element's context for AI**
+- **Component inspector** — opt in with `devEdit({ composition: true })` for a source inspector with component chains, native slots, source links and CSS. Hold Alt/Option and click, or open the left-edge element tree — selection needs no key while it is open. See [Component tracing and inspector](https://github.com/janjcwebtech/astro-dev-edit/blob/main/documentation/COMPOSITION-API.md).
+- **CSS peek** — the class chips on the hover pill pop the rules that actually apply to the element, each with the file it is written in.
+- **Code peek** — *View code* shows the element's own source, scrolled to its line, without leaving the page.
+- **Structure tree view** — a left-edge tree of every annotated element on the page; picking a row selects the element, and selecting on the page moves the row.
+- **Links to the source code across the UI** — every file the overlay names opens in your editor, from the pill, the tree and every panel row.
+- **Copy element's context for AI** — one button puts the element, the files that render it, where its words live and its source lines on your clipboard.
 
 ## Screenshots
 

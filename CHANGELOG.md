@@ -16,7 +16,7 @@ Writing an entry — one line, past tense, no essay:
 
 ### Fixed
 
-- A served page carries no absolute filesystem path at all. Astro's `data-astro-source-file` / `-loc` is no longer emitted where Astro's own compiler does not — Astro 7, or 5/6 with the dev toolbar off — where it was one absolute path per element naming the developer's home directory, and 21.9% of a measured page. Tooling that reads `data-astro-source-*` gets on Astro 7 what stock Astro 7 gives it, which is nothing ([#76](https://github.com/janjcwebtech/astro-dev-edit/issues/76))
+- A served page carries no absolute filesystem path at all. The integration emits nothing in Astro's `data-astro-source-*` namespace on any version: where Astro emits its own, a second pair was a duplicate the compiler resolved in favour of its own shifted loc; where Astro emits none — Astro 7, or 5/6 with the dev toolbar off — it was one absolute path per element naming the developer's home directory, and 21.9% of a measured page. Tooling that reads `data-astro-source-*` gets on Astro 7 what stock Astro 7 gives it, which is nothing ([#76](https://github.com/janjcwebtech/astro-dev-edit/issues/76))
 
 ### Changed
 
@@ -34,11 +34,11 @@ Writing an entry — one line, past tense, no essay:
 - Every card in the overlay **collapses** from a chevron in its header, and stays collapsed across selections and pages, and the header is a band with a rule under it. Rules inside a card are inset to the content rather than running to its edges.
 - The inspector's **saved** chip appears only once there is something to report — a pending edit, or a write that landed. A panel that has never written anything no longer claims the file is saved.
 - Dropped from the inspector: the chain card's *Incomplete discovery* list, and the *Further up the chain* values. The first named files the graph walker could not follow, which is almost never why the chain in front of you is wrong; the second listed values belonging to components further up, which are reachable by selecting them.
-- `data-atx-file` is now **root-relative** (`src/components/Hero.astro`), and so is every `file`, `route` and `target` on the `/__dev-edit` wire. Served HTML no longer names the developer's home directory once per element, and an annotated page drops roughly two thirds of the bytes that attribute cost. Astro's own `data-astro-source-file` is unchanged — it stays absolute, in Astro's format, for the dev toolbar and other tooling that reads it.
+- `data-atx-file` is now **root-relative** (`src/components/Hero.astro`), and so is every `file`, `route` and `target` on the `/__dev-edit` wire. Served HTML no longer names the developer's home directory once per element, and an annotated page drops roughly two thirds of the bytes that attribute cost.
 - `GET /__dev-edit/health` no longer returns `root`. The overlay has no use for the project root now that every path it receives is already relative.
-- The integration now injects its own `data-atx-file` / `data-atx-loc` source annotations on **every** supported Astro version, not just where Astro stopped emitting its own; `sourceAnnotations: 'auto'` means "inject" everywhere and `'force'` is a synonym. Astro's `data-astro-source-*` is injected only where Astro itself emits none, so no element ever carries the attribute twice.
+- The integration now injects its own `data-atx-file` / `data-atx-loc` source annotations on **every** supported Astro version, not just where Astro stopped emitting its own; `sourceAnnotations: 'auto'` means "inject" everywhere and `'force'` is a synonym.
 - On Astro 5 and 6 the dev toolbar's own *open in editor* now lands on the right file and line but a shifted column: an element's source loc points past its opening tag, so any injected attribute moves the column the compiler computes. The editor reads its own `data-atx-loc`, which is unaffected.
-- The overlay reads `data-atx-file` / `data-atx-loc` and nothing else; Astro's own `data-astro-source-*` is no longer a fallback read path. It is still injected where Astro emits none, for the dev toolbar and other tooling. **`sourceAnnotations: 'off'` therefore disables the overlay on every Astro version**, where before it could still ride Astro's attributes on 5/6 with the dev toolbar on.
+- The overlay reads `data-atx-file` / `data-atx-loc` and nothing else; Astro's own `data-astro-source-*` is no longer a fallback read path. **`sourceAnnotations: 'off'` therefore disables the overlay on every Astro version**, where before it could still ride Astro's attributes on 5/6 with the dev toolbar on.
 
 ### Added
 

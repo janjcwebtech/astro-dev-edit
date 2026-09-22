@@ -182,7 +182,7 @@ Every extension point is a registry or a factory. Expansion means adding a file 
 
 ## Tests
 
-Vitest characterization tests pin patcher, middleware and composition behavior. The client layer's unit tests cover its pure modules — `tree-model.ts`, `inspector-model.ts`, `layout-model.ts`, `value-model.ts`, `value-rows.ts`, `element-context.ts`, `variable-tag.ts`, `classify-cache.ts`, `highlight.ts`, `markup-insert.ts`, `asset-view.ts`, `page-source.ts` and `shadow.ts`; the DOM half is covered by a manual checklist.
+Vitest characterization tests pin patcher, middleware and composition behavior. The client layer's unit tests cover its pure modules — `tree-model.ts`, `inspector-model.ts`, `layout-model.ts`, `value-model.ts`, `value-rows.ts`, `element-context.ts`, `variable-tag.ts`, `classify-cache.ts`, `highlight.ts`, `markup-insert.ts`, `asset-view.ts` and `shadow.ts`; the DOM half is covered by a manual checklist.
 
 `tests/helpers.ts::locOf` computes the `line:col` an element would be annotated with, mirroring the loc rules in `astro.ts`; use it to build classify and apply requests.
 

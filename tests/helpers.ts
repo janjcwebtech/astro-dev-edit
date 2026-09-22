@@ -6,7 +6,7 @@ import type { UsageLink } from '../src/shared/protocol.ts';
  *
  * `locOf` computes the "line:col" (1-based, JS string columns) of the first
  * occurrence of `needle` in `source`. Tests use it to derive the
- * data-astro-source-loc an element would be annotated with, per the rules in
+ * data-atx-loc an element would be annotated with, per the rules in
  * src/patcher/astro.ts: a text child's own start; an element/expression
  * child's start + 1 (point at the tag name / past the `{`); a childless
  * element's own start + 1 (its tag name).

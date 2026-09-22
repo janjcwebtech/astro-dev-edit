@@ -67,14 +67,20 @@ async function fixture(compiler: 'go' | 'rust', enhanced = false, entry = 'Page'
     .replace('astro/runtime/server/index.js', pathToFileURL(runtime.resolve('astro/runtime/server/index.js')).href);
   if (enhanced) await writeFile(runtimePath, runtimeCode);
   const transform = compiler === 'go' ? goTransform : (await nativeImport(import.meta.resolve('@astrojs/compiler-rs'))).transform;
+  let annotationRuns = 0;
   for (const [file, source] of sources) {
     const annotated = await annotateAstroSource(source, file, { composition: index.links().filter(l => l.file === file), runtime: enhanced ? pathToFileURL(runtimePath).href : undefined });
     const plain = await annotateAstroSource(source, file);
     if (!enhanced) expect(annotated.split('\n')).toHaveLength(source.split('\n').length);
-    // Both namespaces, in one match: composition adds chain attributes, and
-    // must not move a single byte of the file/loc run either namespace carries.
+    // Composition appends its chain attributes after the file/loc run and must
+    // not move a single byte of it. A fixture of nothing but components and
+    // slots annotates nothing, so the run is counted across the whole set and
+    // asserted non-zero after the loop — without that, a regex naming the wrong
+    // namespace would match nothing in either string and compare null to null
+    // forever, which is how the `data-astro-source-*` version of this went dead.
     const annotations = (text: string) => text.match(
-      /data-astro-source-file="[^"]*" data-astro-source-loc="[^"]*" data-atx-file="[^"]*" data-atx-loc="[^"]*"/g);
+      /data-atx-file="[^"]*" data-atx-loc="[^"]*"/g);
+    annotationRuns += annotations(plain)?.length ?? 0;
     expect(annotations(annotated)).toEqual(annotations(plain));
     const compiled = await transform(annotated, {
       filename: file, internalURL: pathToFileURL(runtime.resolve('astro/runtime/server/index.js')).href,
@@ -87,6 +93,7 @@ async function fixture(compiler: 'go' | 'rust', enhanced = false, entry = 'Page'
       (_: string, quote: string, name: string) => `${quote}${pathToFileURL(join(dir, name.replace('@fixture/', './') + '.mjs')).href}${quote}`);
     await writeFile(join(dir, file.split('/').at(-1)!.replace('.astro', '.mjs')), code);
   }
+  expect(annotationRuns).toBeGreaterThan(0);
   const Page = (await nativeImport(pathToFileURL(join(dir, entry + '.mjs')).href)).default;
   const container = await AstroContainer.create();
   const html = await container.renderToString(Page);
