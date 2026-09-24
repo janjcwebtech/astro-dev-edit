@@ -73,9 +73,6 @@ export interface DevEditOptions {
    * leaves the overlay unable to locate any element.
    */
   sourceAnnotations?: 'auto' | 'force' | 'off';
-  /** Opt-in read-only inspector and composition API. Config-only: installs
-   * a pre-compiler transform and selects the inspector instead of editing. */
-  composition?: boolean;
 }
 
 /** Every option's effective value for one request — no optionals left. */
@@ -97,7 +94,6 @@ export const DEFAULTS: ResolvedOptions = {
   revealWriteDelayMs: 1000,
   cssInspector: true,
   sourceAnnotations: 'auto',
-  composition: false,
 };
 
 /** Which Settings tab an option is grouped under. */
@@ -140,12 +136,6 @@ interface OptionSpec {
 /** The registry. Adding an option is one entry — resolution, the `/settings`
  *  response and the panel's control all follow from it. */
 const OPTION_SPECS: readonly OptionSpec[] = [
-  {
-    key: 'composition', label: 'Component tracing',
-    help: 'Read-only component inspector and tracing API. Replaces the editing UI; requires a dev-server restart.',
-    type: 'boolean', group: 'general', configOnly: true,
-    fallback: DEFAULTS.composition, read: (o) => o.composition,
-  },
   {
     key: 'enabled',
     label: 'Integration enabled',
@@ -309,7 +299,6 @@ function toResolvedOptions(flat: Map<string, unknown>): ResolvedOptions {
     revealWriteDelayMs: validRevealDelay(flat.get('revealWriteDelayMs')) ? flat.get('revealWriteDelayMs') as number : DEFAULTS.revealWriteDelayMs,
     cssInspector: flat.get('cssInspector') === true,
     sourceAnnotations: flat.get('sourceAnnotations') as 'auto' | 'force' | 'off',
-    composition: flat.get('composition') === true,
   };
 }
 

@@ -81,7 +81,7 @@ export function createCompositionRoutes(deps: CompositionRouteDeps): Route[] {
         ? { tier: 'none', links: [], reason, route: null, coverage: empty } satisfies CompositionLookupResponse
         : { links: [], reason, route: null, coverage: empty, ...(path.endsWith('/links') ? { missing: [] } : {}) } });
       const { options } = await deps.optionsResolver.resolve();
-      if (!options.composition || !deps.composition) return fail('disabled');
+      if (!deps.composition) return fail('disabled');
       if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('object body is required');
       const req = body as Record<string, unknown>;
       if (typeof req.pathname !== 'string' || !req.pathname.startsWith('/') || req.pathname.length > 4096) {
@@ -165,7 +165,7 @@ export function createCompositionRoutes(deps: CompositionRouteDeps): Route[] {
     method: 'POST', path: '/composition/apply', label: 'composition/apply', maxBytes: 256 * 1024,
     async handler(body) {
       const { options } = await deps.optionsResolver.resolve();
-      if (!options.composition || !deps.composition) {
+      if (!deps.composition) {
         return { status: 422, body: { error: 'Component composition is disabled in settings.', code: 'unsupported' } };
       }
       if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('object body is required');

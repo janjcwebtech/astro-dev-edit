@@ -702,7 +702,7 @@ describe('POST /inspect/tag', () => {
     await writeFile(join(root, 'src/components/Other.astro'), OTHER);
     await writeFile(join(root, 'src/components/Inner.astro'), INNER);
     tagHandler = createMiddleware({ logger, root, routeManifest: null,
-      optionsResolver: stubOptions(root, { composition: true }) });
+      optionsResolver: stubOptions(root, {}) });
   });
 
   const tagRequest = (body: unknown, via = tagHandler) =>
@@ -733,11 +733,6 @@ describe('POST /inspect/tag', () => {
     expect((await tagRequest({ tag: 'a', children: [card, other] })).body).toEqual({ ok: false, reason: 'ambiguous' });
   });
 
-  it('answers disabled, not 404, while composition is off', async () => {
-    const r = await tagRequest({ tag: 'a', children: [card] }, handler);
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ ok: false, reason: 'disabled' });
-  });
 
   it.each([
     ['no tag', { children: [card] }],

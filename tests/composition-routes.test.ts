@@ -27,13 +27,15 @@ const request = (path: string, body?: unknown, remote = '127.0.0.1', origin?: st
   });
 };
 function mount(composition = true) {
-  middleware = createMiddleware({ root, logger, optionsResolver: stubOptions(root, { composition }),
+  middleware = createMiddleware({ root, logger, optionsResolver: stubOptions(root, {}),
 
     routeManifest: createRouteManifest({ root, base: '/docs', routes: () => [
       { pattern: '/', patternRegex: /^\/$/, type: 'page', entrypoint: 'src/pages/index.astro' },
     ] }),
-    composition: createCompositionService({ root,
-      resolve: async (specifier, importer) => resolve(dirname(importer), specifier) }),
+    composition: composition
+      ? createCompositionService({ root,
+        resolve: async (specifier, importer) => resolve(dirname(importer), specifier) })
+      : null,
   });
 }
 beforeEach(async () => {
@@ -50,7 +52,6 @@ const query = () => ({ pathname: '/docs/', file: 'src/Card.astro', chain: '.' + 
 describe('composition HTTP contract through real middleware', () => {
   it('anchors to Astro routes, proves chains, batches source links and scopes reverse usages', async () => {
     const before = await readFile(join(root, 'src/pages/index.astro'), 'utf8');
-    expect((await request('/health')).body.composition).toBe(true);
     const answer = await request('/composition', query());
     expect(answer).toMatchObject({ status: 200, body: { tier: 'proven', route: 'src/pages/index.astro', coverage: { complete: true, files: 2 } } });
     // Issue #72: the index keys modules by absolute path, but nothing absolute
@@ -147,7 +148,6 @@ describe('composition HTTP contract through real middleware', () => {
 
   it('answers disabled at every endpoint, and rejects remote requests through the existing gate', async () => {
     mount(false);
-    expect((await request('/health')).body.composition).toBe(false);
     for (const path of ['/composition', '/composition/links', '/composition/uses']) {
       expect(await request(path, {})).toMatchObject({ status: 200, body: { reason: 'disabled' } });
       expect((await request(path, {}, '192.0.2.1')).status).toBe(403);
@@ -194,7 +194,7 @@ describe('composition HTTP contract through real middleware', () => {
     expect((await request('/composition', { ...query(), chain: ('.' + id()).repeat(129) })).status).toBe(400);
   });
   it('does not install tracing, scripts or API for builds', async () => {
-    const integration = devEdit({ composition: true });
+    const integration = devEdit({});
     const hook = integration.hooks['astro:config:setup']!;
     await hook({ command: 'build', updateConfig() { throw new Error('installed a plugin'); }, injectScript() { throw new Error('injected script'); } } as never);
     await integration.hooks['astro:server:setup']!({ server: { middlewares: { use() { throw new Error('installed middleware'); } } } } as never);

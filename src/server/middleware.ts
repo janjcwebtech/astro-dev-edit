@@ -156,7 +156,6 @@ export function createMiddleware(deps: MiddlewareDeps): Connect.NextHandleFuncti
             name: 'astro-dev-edit',
             milestone: 1,
             cssInspector: o.cssInspector,
-            composition: o.composition && Boolean(deps.composition),
             openInEditor: o.openInEditor,
           },
         };

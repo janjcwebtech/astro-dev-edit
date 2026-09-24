@@ -128,7 +128,6 @@ export function createInspectRoutes(deps: InspectRouteDeps): Route[] {
       handler: async (body) => {
         const answer = (value: VariableTagResponse) => ({ status: 200, body: value });
         const { options } = await optionsResolver.resolve();
-        if (!options.composition) return answer({ ok: false, reason: 'disabled' });
         const req = variableTagRequestOf(body);
         if (!req) throw new Error(`tag and 1–${MAX_CHILDREN} annotated children ({file, loc, tag}) are required`);
         const sources = new Map<string, Promise<string>>();

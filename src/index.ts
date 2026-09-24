@@ -1,7 +1,6 @@
 import type { AstroIntegration } from 'astro';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
-import { createAnnotatePlugin } from './server/annotate.ts';
 import { createCompositionPlugin } from './server/composition-plugin.ts';
 import { createCompositionService, type CompositionService } from './server/composition-service.ts';
 import { createMiddleware } from './server/middleware.ts';
@@ -123,15 +122,12 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         const astroMajor = detectAstroMajor(projectRoot);
         const toolbarEnabled = config.devToolbar?.enabled ?? true;
         const astroAnnotates = astroMajor !== null && astroMajor < 7 && toolbarEnabled;
-        const trace = userOptions.composition ?? DEFAULTS.composition;
-        const selfAnnotate = trace || sourceAnnotations !== 'off';
+        const selfAnnotate = sourceAnnotations !== 'off';
         if (selfAnnotate) {
-          updateConfig({ vite: { plugins: [trace
-            ? createCompositionPlugin(projectRoot, () => composition?.invalidate())
-            : createAnnotatePlugin(projectRoot)] } });
+          updateConfig({ vite: { plugins: [
+            createCompositionPlugin(projectRoot, () => composition?.invalidate())] } });
           logger.info(
-            (trace ? 'component tracing and ' : '') +
-            `injecting data-atx-* source annotations (Astro ${astroMajor ?? 'unknown'})`,
+            `component tracing and injecting data-atx-* source annotations (Astro ${astroMajor ?? 'unknown'})`,
           );
         }
 
@@ -157,9 +153,7 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
         const overlayUrl = new URL('./client/overlay.ts', import.meta.url);
         injectScript('page', `import ${JSON.stringify(fileURLToPath(overlayUrl))};`);
 
-        logger.info(userOptions.composition
-          ? 'read-only inspector available — hold Alt / Option and click, or open the left-edge element tree'
-          : 'edit mode available — toggle it from the admin bar at the top of the page');
+        logger.info('inspector available — hold Alt / Option and click, or open the left-edge element tree');
       },
 
       // Astro's answer to "which file is this route written in", which the DOM
@@ -182,10 +176,8 @@ export default function devEdit(userOptions: DevEditOptions = {}): AstroIntegrat
           root: projectRoot,
           configOptions: userOptions,
         });
-        if (userOptions.composition ?? DEFAULTS.composition) {
-          composition = createCompositionService({ root: projectRoot,
-            resolve: async (specifier, importer) => (await server.pluginContainer.resolveId(specifier, importer, { ssr: true }))?.id ?? null });
-        }
+        composition = createCompositionService({ root: projectRoot,
+          resolve: async (specifier, importer) => (await server.pluginContainer.resolveId(specifier, importer, { ssr: true }))?.id ?? null });
 
         // Vite dev middleware exposes the edit API under /__dev-edit/. (spec §4.3)
         server.middlewares.use(

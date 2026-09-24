@@ -5,7 +5,7 @@ import devEdit from '../../../src/index.ts';
 
 export default defineConfig({
   devToolbar: { enabled: true },
-  integrations: [devEdit({ composition: true, uploadDir: 'public/uploads',
+  integrations: [devEdit({ uploadDir: 'public/uploads',
     contentRoots: ['src', ...readdirSync(new URL('.', import.meta.url)).filter(file => file.endsWith('.astro'))] })],
   vite: {
     resolve: { alias: { '@fixture': fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, '') } },

@@ -1,5 +1,4 @@
 import { parse } from '@astrojs/compiler';
-import type { Plugin as VitePlugin } from 'vite';
 import type { UsageLink } from '../shared/protocol.ts';
 import { prepareComposition } from './composition-instrument.ts';
 import { toWirePath } from './wire-path.ts';
@@ -215,28 +214,3 @@ export async function annotateAstroSource(
   return parts.join('');
 }
 
-/**
- * The dev-only Vite plugin. Ordering matters twice over: Astro's `astro:build`
- * plugin is itself `enforce: 'pre'` and compiles main `.astro` modules in a
- * plain `transform` handler — and integration-injected plugins land AFTER it
- * in the resolved array, so plugin-level `enforce` alone is not enough (the
- * transform would receive compiled JS, not source). Hook-level
- * `order: 'pre'` is the decisive lever: Vite runs order-'pre' transform
- * handlers before all plain handlers regardless of array position, so the
- * compiler (WASM or Rust) receives the already-annotated source. Only the
- * main module is transformed — style/script sub-requests carry a
- * `?astro&type=…` query and no longer end in `.astro`.
- */
-export function createAnnotatePlugin(root: string): VitePlugin {
-  return {
-    name: 'astro-dev-edit:annotate',
-    enforce: 'pre',
-    transform: {
-      order: 'pre',
-      async handler(code, id) {
-        if (!id.endsWith('.astro')) return null;
-        return { code: await annotateAstroSource(code, id, { root }), map: null };
-      },
-    },
-  };
-}

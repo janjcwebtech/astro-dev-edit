@@ -94,7 +94,7 @@ describe('precedence', () => {
 describe('config-only options', () => {
   it('reports setup options locked and restart-requiring', async () => {
     const { described } = await resolve();
-    for (const key of ['enabled', 'sourceAnnotations', 'composition']) {
+    for (const key of ['enabled', 'sourceAnnotations']) {
       const d = describedBy(described, key);
       expect(d.locked).toBe(true);
       expect(d.restartRequired).toBe(true);
@@ -104,10 +104,9 @@ describe('config-only options', () => {
   it('never takes them from the stored file, even when present', async () => {
     // Storing `enabled: false` must not be able to lock the user out of the UI
     // that set it; `sourceAnnotations` registers a Vite plugin at config time.
-    const { options } = await resolve({}, { enabled: false, sourceAnnotations: 'off', composition: true });
+    const { options } = await resolve({}, { enabled: false, sourceAnnotations: 'off' });
     expect(options.enabled).toBe(true);
     expect(options.sourceAnnotations).toBe('auto');
-    expect(options.composition).toBe(false);
   });
 
   it('keeps them out of the writable key list', () => {

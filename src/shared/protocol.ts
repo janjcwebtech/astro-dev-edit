@@ -326,8 +326,6 @@ export interface HealthResponse {
   /** Whether the hover-pill CSS class/ID inspector is enabled. The overlay
    *  reads this at boot and skips rendering the chips row when false. */
   cssInspector: boolean;
-  /** Opt-in read-only inspector, tracing API and version-2 annotations. */
-  composition?: boolean;
   /** Whether the "Open source" buttons and jump-to-file links should render.
    *  Absent from a server that predates the option editor. */
   openInEditor?: boolean;
