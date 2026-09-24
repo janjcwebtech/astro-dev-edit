@@ -39,9 +39,8 @@ export default defineConfig({
 | `openInEditor` | `true` | The "Open source" and jump to file buttons. |
 | `revealWrites` | `false` | Open each text file in your editor as it is written. See [Watching writes in your editor](#watching-writes-in-your-editor). |
 | `revealWriteDelayMs` | `1000` | How long to wait after asking the editor to open an existing file. A whole number of milliseconds, `0` to `10000`. |
-| `cssInspector` | `true` | The hover pill's class and ID CSS inspector. |
+| `cssInspector` | `true` | The inspector's CSS card. |
 | `sourceAnnotations` | `'auto'` | Whether the integration injects its own source annotations: `'auto'` (yes, on every Astro version), `'force'` (a synonym) or `'off'`. Config only, because it registers a Vite plugin. |
-| `composition` | `false` | The source inspector, tracing API and version-2 source annotations. Config only; when true, replaces the editing UI and supersedes `sourceAnnotations`. See [Component tracing and inspector](COMPOSITION-API.md). |
 
 ## Where a value can come from
 
@@ -49,7 +48,7 @@ Highest first: **`astro.config.mjs`**, then **`.astro-dev-edit.json`**, then the
 defaults above. `astro.config.mjs` wins because it is code you wrote
 deliberately, it is committed, and `astro build` reads it.
 
-`enabled`, `sourceAnnotations` and `composition` are config only options. They are
+`enabled` and `sourceAnnotations` are config only options. They are
 consumed in `astro:config:setup`, before a dev server exists, so the settings
 file cannot reach them. They render read-only in the drawer.
 
@@ -73,8 +72,6 @@ under stock Astro 7 either.
 kept for configs that set it. `'off'` disables injection entirely, and because
 nothing else is read, it **disables the overlay** — on every Astro version,
 whatever the dev toolbar is doing. The integration logs a warning saying so.
-`composition: true` is the one exception: the tracing plugin stamps the same
-attributes, so the overlay still works and no warning fires.
 
 ## The Settings drawer
 

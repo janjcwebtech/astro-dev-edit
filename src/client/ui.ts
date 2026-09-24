@@ -294,11 +294,10 @@ export const FONT = {
  * Documented in docs/STYLING.md.
  */
 const PARTS: Record<string, string> = {
-  'atx-bar': 'bar',
   'atx-panel': 'panel',
   'atx-drawer': 'drawer',
   'atx-backdrop': 'backdrop',
-  'atx-tooltip': 'pill',
+  'atx-tip': 'pill',
   'atx-toast': 'toast',
 };
 

@@ -4,7 +4,7 @@ One picker, in one place: a block at the top of the inspector panel, above
 **Values**. The [README](../README.md) has the summary.
 
 The inspector is opt-in, so the picker is too — turn it on with
-`devEdit({ composition: true })`. Without it, clicking an image in edit mode
+the inspector. Selecting an image
 answers with a notice saying so, and `src` and `alt` are edited in the source
 file instead.
 

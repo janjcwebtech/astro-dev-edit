@@ -5,10 +5,10 @@ The [README](../README.md) has the short version; this is the whole of it.
 
 - [What it can edit](#what-it-can-edit)
 - [Staged values and Save](#staged-values-and-save)
-- [The hover pill and source peek](#the-hover-pill-and-source-peek)
+- [The hover pill and View code](#the-hover-pill-and-view-code)
 - [Copy context for an AI assistant](#copy-context-for-an-ai-assistant)
-- [CSS inspector](#css-inspector)
-- [The admin bar](#the-admin-bar)
+- [CSS](#css)
+- [The panels](#the-panels)
 - [Element tree](#element-tree)
 
 ## What it can edit
@@ -23,7 +23,7 @@ The [README](../README.md) has the short version; this is the whole of it.
 | A route rendering a `.md`/`.mdx` entry † | a Values row naming that file, with **View code** and no field | nothing |
 | Anything else | a notice with the reason and a *View code* jump | nothing |
 
-† Inspector surfaces, so they need `devEdit({ composition: true })`. Without it
+† Inspector surfaces. Without them
 an image click is refused in words — `src` and `alt` are edited in the file
 instead — and there are no Values rows at all. See
 [Component tracing and inspector](COMPOSITION-API.md).
@@ -69,19 +69,14 @@ Literal content written in the Astro route template stays editable as usual, so 
 Every refusal names its reason and offers one *View code* jump — a read-only source popup carrying its own **Open in editor**. On a route that declares a Markdown backing file, a value coming from that entry is not a refusal at all: it is an `elsewhere` row naming the file (above).
 
 - **Not traceable to a string** — an expression the AST cannot resolve, a component, a `set:html` whose value is not a quoted string or a frontmatter `const`, or block-level nested markup.
-- **Arriving as a prop** — the component was handed these words by whoever used it, so the strings are in *that* file's frontmatter. The notice names the prop rather than calling the copy code, because a `const faqs = [{ question: "Is it free?" }]` one file away is plain copy the tool would edit without hesitation if it were declared where it is rendered. Which file that is depends on the call site, so the notice points rather than writes; with [`composition: true`](COMPOSITION-API.md) the **Component chain** names the usage site and the value is editable there.
+- **Arriving as a prop** — the component was handed these words by whoever used it, so the strings are in *that* file's frontmatter. The notice names the prop rather than calling the copy code, because a `const faqs = [{ question: "Is it free?" }]` one file away is plain copy the tool would edit without hesitation if it were declared where it is rendered. Which file that is depends on the call site, so the notice points rather than writes; the **Component chain** names the usage site and the value is editable there.
 - **Rendered by a component or a slot** — it has no source location of its own, because Astro annotates only what is written in the file, so the click is answered about the nearest element that *has* one. The notice names the tag you clicked, since the reason belongs to that ancestor: a one-word button can be refused for "containing nested markup" that lives in the wrapper around it.
 - **Rendered by a package** — `astro:assets`' `<Image>` renders through `node_modules/astro/components/Image.astro`, and that is the path its annotation carries. The notice names where the component was *used* — the nearest enclosing element written in your own source — and its button opens that file at that line, so the jump lands on the call site rather than in Astro's internals. Two levels of indirection are fine: a wrapper of your own around an `<Image>` still resolves to the markup that holds it. It is a **jump, not an edit**: an `<Image>`'s `src` and `alt` reach it as props, which the patchers do not trace, so you change them in the file the button opens. Package paths are never writable, and never open in your editor either — `contentRoots` does not include `node_modules`, and widening it is not a supported fix. Asking to open one is refused with that sentence rather than an error.
 
-![A markup popup showing the raw source of an h2 with a br in it, above a row of insertable tags: br, strong, em, b, i, u, a, span, code, small, sup, sub](images/markup.png)
-
-![A value editor titled Value · benefits[].title, editing the string in index.astro that the expression resolves to](images/expression.png)
-
-![A notice reading Can't edit this here, explaining the text comes from a template expression, with the source location and a View code button](images/refusal.png)
 
 ## Staged values and Save
 
-In the [`composition: true`](COMPOSITION-API.md) inspector, an edit is **staged**
+In the inspector, an edit is **staged**
 before it is written. Every value the write path can serve gets a field in
 **Values** and exactly one **Save** / **Revert** pair under that field. The page
 and the field are two views of one value: type in either, save from either.
@@ -164,154 +159,143 @@ Two destinations spell the value differently, and the difference is load-bearing
 The caret never goes on the page for one: its tags would become the elements
 they describe.
 
-## The hover pill and source peek
+## The hover pill and View code
 
-In edit mode, hovering an element draws a box a couple of pixels clear of it
-and shows a `file:line:col` pill above. The pill starts neutral (grey
-`loading…`, no editability claim); once the pointer rests on one element for a
-moment, the source AST is consulted and both name the verdict a click would
-get — the pill in words (**editable**, **image**, or **dynamic**), the box in
-colour. Verdicts are remembered until the file next changes, so known elements
-show theirs instantly.
+Hovering an element draws a box a couple of pixels clear of it and shows a
+`file:line:col · inspect` pill above. It is a pointer, not a verdict: it claims
+nothing about what a click will do and costs no request.
 
-With [`composition: true`](COMPOSITION-API.md) the tool shows a different pill.
-It is read-only and has no verdict to claim, so it reads `file:line:col ·
-inspect` on one row and costs no request. Rest on one element and it grows a
-second row — the breadcrumb of files responsible for what you are pointing at,
-`index.astro › Services.astro › ServiceCard.astro › <h2>`, ending in the element
-itself. Each file is a button: it opens the inspector on the element you are
-hovering, scrolled to that link's row in the **Component chain**, so a segment
-is a way into the panel rather than a different selection. A segment the chain
-could not resolve is drawn dashed and does nothing. Ids resolve in one batched
-request per page, not one per hover.
+Rest on one element and the pill grows a second row — the breadcrumb of files
+responsible for what you are pointing at, `index.astro › Services.astro ›
+ServiceCard.astro › <h2>`, ending in the element itself. Each file is a button:
+it opens the inspector on the element you are hovering, scrolled to that link's
+row in the **Component chain**, so a segment is a way into the panel rather
+than a different selection. A segment the chain could not resolve is drawn
+dashed and does nothing. Ids resolve in one batched request per page, not one
+per hover.
 
-Clicking the pill's `file:loc` label opens a **source peek** — a wide
-read-only panel showing the whole file syntax-highlighted, with line numbers,
-scrolled to the element's line (highlighted and centered; scroll for full
-context) — while the **open** button next to it jumps to the location in your
-editor. The refusal notice's location line opens the same peek, so you can
-see *why* something refused without leaving the browser. The peek's footer
-has its own **Open in editor** jump-out.
+**View code** — on the tree header, on a Values row, on a slot row — shows the
+file syntax-highlighted with line numbers, scrolled to the element's line. Where
+it opens depends on the layout: the **code dock** when the panels are docked, a
+wide read-only modal when they are floating. Either way its **Open in editor**
+jumps to that location in your real editor.
 
 That same jump-out can also run on every save: *Settings → Editing* has
 **Show changed files in editor**, which opens each file the tool writes at the
 line it is about to change, so an edit can be watched landing in the source. See
 [Watching writes in your editor](CONFIGURATION.md#watching-writes-in-your-editor).
 
-![A source peek showing syntax-highlighted Astro source with line numbers and the element's own line focused, above Close and Open in editor buttons](images/source-peek.png)
-
 ## Copy context for an AI assistant
 
-Next to `open` the pill has a **`copy context`** button; the inspector's
-status row has the same as **Copy context**. It puts on your clipboard what an
-assistant needs to find that element in your source, as one markdown block to
-paste along with what you want changed:
+The inspector's header has a **Copy context** button, and the tree's menu has
+**Copy page context** for the route as a whole. The element one puts on your
+clipboard what an assistant needs to find that element in your source, as one
+markdown block to paste along with what you want changed:
 
 - a heading naming the element and the first 80 characters of its **text**;
 - its **source location**, repo-relative (`src/components/Hero.astro:12:3`);
 - the files that **render** it, outermost first — each component's usage site
-  (`file:line:col`) and name, with `composition: true`; otherwise the **route
-  file** when it is not the element's own file;
+  (`file:line:col`) and name;
 - the page's **content entry** when it declares one;
-- where its **text** comes from, from the same classification the pill's
-  verdict uses: written literally on the quoted line, traced to a frontmatter
-  string, passed in as a prop by the caller named above, or computed — in which
-  case the words are not in this file;
-- the element's own **source lines**, from its opening line to its closing
-  tag, read through the same `/peek` endpoint the source peek uses. A location
-  the server won't serve (an `astro:assets` `<Image>`, say) says so instead,
-  and the element's **opening tag** and **DOM path** take the quote's place.
+- where its **text** comes from: written literally on the quoted line, traced
+  to a frontmatter string, passed in as a prop by the caller named above, or
+  computed — in which case the words are not in this file;
+- the element's own **source lines**, from its opening line to its closing tag,
+  read through the same `/peek` endpoint *View code* uses. A location the server
+  won't serve (an `astro:assets` `<Image>`, say) says so instead, and the
+  element's **opening tag** and **DOM path** take the quote's place.
 
 Rendered HTML and applied CSS are left out on purpose: compiled markup exists
 in no source file, so an assistant handed it searches for markup that is not
-there. Open the source peek for the surrounding file, and the CSS inspector for
-the rules.
+there. Use *View code* for the surrounding file and the CSS card for the rules.
 
-If your browser refuses clipboard access (reaching the dev server over a
-network address is not a secure context, so the API is simply absent) the
-pill's copy opens the text in a panel, preselected, to copy by hand. The
-inspector's **Copy context** has no such fallback — it reports that it could
-not copy, and the pill is the way through.
+If your browser refuses clipboard access — reaching the dev server over a
+network address is not a secure context, so the API is simply absent — the copy
+reports that it could not write to the clipboard. There is no hand-copy
+fallback panel.
 
-![The pill's copy button, next to an AI agent prompt filled with the element context: its source location, the components that render it, where its words are written, and its own source lines](images/copy-context.png)
+## CSS
 
-## CSS inspector
+The inspector's **CSS** card lists every rule the element actually matches, in
+stylesheet order, read straight from the browser so it needs no server
+round-trip. Each rule whose source can be resolved offers an **open** that jumps
+your editor to (near) the rule; rules from cross-origin/CDN stylesheets or an
+inline `<style>` are shown without one. A **Computed styles** disclosure below
+gives the resolved values, inheritance included.
 
-The pill also lists the element's **classes and ID** as chips (turn this off
-with `cssInspector: false`). Hover a chip to pop a card of the CSS rules that
-element actually matches through that class/ID — selector and declarations,
-read straight from the browser, so it works without any server round-trip.
-Each rule whose source can be resolved offers an **open** that jumps your
-editor to (near) the rule; rules from cross-origin/CDN stylesheets or an inline
-`<style>` still show their CSS but have no jump. The jump also honours
-`openInEditor`, and reaches `.css` files as well as `.astro` `<style>` blocks
-(still confined to `contentRoots`, so `node_modules`/external CSS is excluded).
+Conditional rules — inside a media or container query that does not currently
+apply — are listed too, because "why is this not taking effect" is the question
+the card exists to answer.
 
-![The hover pill showing class chips for btn and btn-primary, with a popup listing the CSS rules applied by btn-primary and the file they are written in](images/css-inspector.png)
+Turn the whole card off with `cssInspector: false`; it then says so rather than
+disappearing.
 
-## The admin bar
+## The panels
 
-Every global control lives in a slim bar across the top of the page:
+There is no bar across the top. Everything lives in three panels, and on a page
+you have not asked anything of, none of them is drawn — only a small tab on the
+left edge.
 
-- **Elements** — show or hide the [element tree](#element-tree), which edit mode
-  leaves closed unless you ask for it. Asking for it from a cold page turns edit
-  mode on with it, since the tree's row highlights only mean anything while
-  editing.
-- **Edit page** — the edit-mode toggle.
-- **The pin** — lit while the bar is pinned. Unpin it and the bar slides off the
-  edge leaving a thin accent line, returning the moment the pointer reaches that
-  edge again. **Edit mode overrides it**: while you are editing, the bar stays out
-  whether it is pinned or not, since it carries the save state and the way out.
-- **The dock button** — moves the bar to the **bottom** of the viewport, for
-  sites whose own chrome lives at the top.
-- **The purple mark** — the overflow menu plus the dev-server status. It holds
-  *Open page source*, which opens **the file the page itself is written in** —
-  resolved from Astro's own route manifest, so a page that mostly composes
-  components opens the page rather than the busiest component, and a URL that
-  matches no route says so instead of guessing; and *Settings*, where
-  [every integration option](CONFIGURATION.md) is editable.
+![The playground site at rest, with no overlay chrome but a small tab on the left edge](images/at-rest.png)
 
-The bar **overlays** the page rather than pushing it down: the top edge is where
-sticky site headers live, and reflowing the page would change the very layout
-you are editing. It stays semi-transparent until the pointer comes near. Pin
-state and edge are remembered per browser.
+**Element tree**, left. Its header carries the route and the file it is written
+in, a **View code** button for that file, and two icon buttons:
 
-**The exit button is the save indicator.** In edit mode a button appears at the
-right end that answers "is my work on disk?" without guessing:
+- **Menu** — *Copy page context* (this route, its source file and the components
+  on it, as markdown) and *Re-scan the page* (re-read the annotations and rebuild
+  the tree). Its foot reports the dev-server connection.
+- **Settings** — the drawer where [every integration option](CONFIGURATION.md)
+  is editable.
 
-| Button | Meaning |
-| --- | --- |
-| green **Done** | nothing pending — everything typed is written |
-| pale **Save & exit** | an inline edit, or an open source popup, has unsaved keystrokes |
-| grey **Saving…** | the write is in flight |
-| green **Saved** | it just landed |
-| red **Save failed** | the write was refused and the change rolled back |
+**Inspector**, right. Its header names the selected tag and holds **Copy
+context** plus the layout switch. A `proven chain` badge says how sure the
+tracing is about what rendered the element.
 
-Every way out of edit mode goes through it, so leaving **saves first and exits
-after the write lands** — no path out silently drops what you typed. Throwing an
-edit away stays deliberate: press **Escape** while editing.
+**Code dock**, bottom. It names the open file and line, offers **Open in
+editor**, and follows the selection: pick another element and the dock moves to
+that element's own source. Its top edge is a drag handle — double-click resets
+the height — and the chevron folds it away.
+
+### Docked or floating
+
+The button in the inspector's header switches between the two:
+
+- **Docked** — the page is reflowed *between* the panels, so nothing of your
+  site is covered. This is what the padding on `<html>` is doing.
+- **Floating** — the panels sit over the page, which is what a viewport too
+  narrow to dock falls back to.
+
+The choice is remembered per browser.
 
 **Panels and drawers are modal.** While one is open, the keyboard stays in it:
-Tab cycles through its own controls and wraps, the page behind it and the bar
-above it are out of reach, Escape closes it, and focus returns to whatever you
-were on when it opened. Each announces itself as a dialog, named by its title.
+Tab cycles through its own controls and wraps, the page behind it is out of
+reach, Escape closes it, and focus returns to whatever you were on when it
+opened. Each announces itself as a dialog, named by its title.
 
-![The Settings drawer with General, Editing and Media tabs, showing the Component tracing and Integration enabled controls, each locked with a note that it is read before the dev server starts](images/settings.png)
+![The Settings drawer with General, Editing and Media tabs, showing Integration enabled locked with a note that it is read before the dev server starts](images/settings.png)
 
 ## Element tree
 
 A **tree of the page's elements** — every source-annotated element, nested by
-structure — docks to the left edge on request. It is **opt-in**: edit mode leaves
-it closed and puts a small tab on the left edge, and it opens when you click that
-tab or **Elements** on the bar (so entering edit mode never covers the page you
-came to edit). It's two-way linked to the page: hovering a row outlines the
-matching element (with the same verdict pill and class/ID chips), and hovering an
-element on the page highlights its row and scrolls the tree to it.
+structure — sits on the left. It opens from the tab on the left edge and closes
+with its ✕, leaving that tab behind. It is two-way linked to the page: hovering
+a row outlines the matching element, and hovering an element on the page
+highlights its row and scrolls the tree to it.
 
-- **Click a row** to select the element — a persistent outline that stays put while you move the mouse onto the element to inspect it. Plain hovering never changes it; the selection clears on **Escape**, a click elsewhere on the page, or another row.
-- **Double-click a row** to open the editor for that element, exactly as a page click would.
-- **Click a row's `</>`** to open that file at that line in your editor — the same `/open` the hover pill's **open** button uses. Hovering a row names its file, line and column in a tooltip above it.
-- The tree collapses per node, rebuilds after each save, and is overlaid by any drawer while that is open.
-- Leaving edit mode hides it. Closing it with its ✕ while still editing leaves the left-edge tab that brings it back, as does **Elements** on the bar.
-- Whether it was open is remembered for the session, so a save-triggered reload restores it the way you left it.
+- **Click a row** to select the element. The inspector and the code dock both
+  follow that selection; it clears on **Escape**, a click elsewhere on the page,
+  or another row.
+- **Click a row's `</>`** to open that file at that line in your editor — the
+  same `/open` every other source surface uses. Hovering it names the file, line
+  and column.
+- Component and slot boundaries are marked, and the legend at the foot says
+  which mark is which.
+- The tree collapses per node and rebuilds after each save, preserving collapse
+  and selection by their stable paths.
+- Whether it was open is remembered for the session, so a save-triggered reload
+  restores it the way you left it.
 
+![The element tree open on the left with a nav link hovered, and a pill naming Nav.astro:16:28 above the chain index.astro, Base.astro, Nav.astro, a](images/tree-and-chain.png)
+
+Selecting on the page without the tree open needs a modifier: hold **Alt/Option**
+and click. While the tree is open, selection needs no key.

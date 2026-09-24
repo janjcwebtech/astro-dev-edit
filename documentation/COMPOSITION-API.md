@@ -1,18 +1,12 @@
 # Component tracing API
 
-The opt-in tracing layer supplies source chains and component usage data to an
-inspector. It is available through the normal integration:
+The tracing layer supplies the source chains and component usage data the
+inspector is built on. It needs no option — the dev server installs it, and
+builds and previews install neither the transform nor the API.
 
-```js
-devEdit({ composition: true })
-```
-
-`composition` defaults to `false` and is config-only: changing it requires a dev
-server restart. It installs the version-2 annotation transform in place of the
-plain one, even when `sourceAnnotations` is `off`. Builds and previews install neither the transform
-nor the API. This option selects the inspector described below. Reading the graph and
-writing a value are separate halves of it: every read route answers without
-touching disk, and `/composition/apply` is the one route that writes.
+Reading the graph and writing a value are separate halves of it: every read
+route answers without touching disk, and `/composition/apply` is the one route
+that writes.
 
 ## The inspector
 
@@ -206,7 +200,7 @@ localhost/origin gate, and only `/composition/apply` writes. The read endpoints
 cap request bodies at 32 KiB, `/inspect/tag` at 64 KiB; invalid shapes return
 `400`, named refusals return `200`, and a disabled endpoint returns
 `reason: "disabled"`.
-`/health` reports `composition`.
+`/health` reports the server is alive.
 
 | Endpoint | Request | Answer |
 | --- | --- | --- |

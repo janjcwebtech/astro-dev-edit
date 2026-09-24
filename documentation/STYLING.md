@@ -52,7 +52,7 @@ Three of them are worth knowing the intent behind before you change one.
 
 **`--atx-primary` is the emphatic fill and `--atx-brand` is the purple.** They
 are different jobs. `primary` is a near-white that carries dark `primary-fg`
-ink, and it is what the confirm button, a checked box and an active admin-bar
+ink, and it is what the confirm button, a checked box and an active toolbar
 chip are made of. `brand` marks the overlay pointing at *your* content — the
 editable outline, the save veil, a tree row aimed at a
 live node, the launcher glyph — and nothing else uses it. Swapping `primary`
@@ -96,11 +96,10 @@ override is yours to keep legible.
 ## Parts
 
 For anything a value cannot express — moving a surface, hiding one, restyling
-its box — the overlay exposes six parts:
+its box — the overlay exposes five parts:
 
 | Part | Surface |
 | --- | --- |
-| `bar` | the admin bar |
 | `panel` | the centred modal panel shell |
 | `drawer` | the side drawer shell (Settings) |
 | `backdrop` | the dim behind a panel or drawer |
@@ -108,7 +107,7 @@ its box — the overlay exposes six parts:
 | `toast` | the save confirmation |
 
 ```css
-astro-dev-edit::part(bar)     { opacity: 1; }        /* never fade at rest */
+astro-dev-edit::part(pill)    { opacity: 1; }
 astro-dev-edit::part(drawer)  { width: 620px; }
 astro-dev-edit::part(backdrop){ background: rgb(0 0 0 / .75); }
 ```
@@ -118,11 +117,9 @@ shape stable. Buttons, fields and rows are not parts: recolour them with the
 properties above. If you need one that is not here, open an issue rather than
 reaching for a workaround; there isn't one.
 
-These six cover the editing chrome. With `composition: true` the surfaces are
-different ones — the inspector panel, the element tree, the code dock and the
-inspector's own pill — and none of them carries a part yet, so `::part(bar)`
-and `::part(pill)` match nothing in that mode. The custom properties reach all
-of them.
+The three standing panes — the inspector panel, the element tree and the code
+dock — carry no part yet, because their shape is still moving. Reach them with
+the custom properties above, or with the class hooks below.
 
 ## Internal class hooks
 

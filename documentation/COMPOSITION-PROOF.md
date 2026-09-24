@@ -1,7 +1,7 @@
 # Component tracing proof
 
 Component tracing is opt-in and dev-only. Without it the integration runs its
-editing UI; `composition: true` enables the stronger tracing, the source
+editing UI; the dev server always installs the tracing, the source
 inspector and the [tracing API](COMPOSITION-API.md). This page is the evidence
 for that mechanism, run against the committed fixture, which sets the option.
 

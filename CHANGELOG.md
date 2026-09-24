@@ -14,6 +14,16 @@ Writing an entry — one line, past tense, no essay:
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking.** The `composition` option, and with it the second UI it selected. The inspector — element tree, inspector panel and code dock — is what the integration draws; the admin bar, the hover-pill editors and the click router are gone, along with `GET /health`'s `composition` field and the `bar` `::part()`. Tracing installs unconditionally on the dev server, and `sourceAnnotations: 'off'` is the one way to install nothing.
+- The row of insertable tag buttons that sat above the markup popup. Inline markup is still editable, as the raw source the file spells, through the Values card; the safelist that validates a write is unchanged.
+- The hand-copy fallback panel for **Copy context**. A browser without clipboard access is told the copy failed.
+
+### Changed
+
+- The `pill` `::part()` now names the inspector's pill (`atx-tip`), which is the only pill left.
+
 ### Fixed
 
 - A served page carries no absolute filesystem path at all. The integration emits nothing in Astro's `data-astro-source-*` namespace on any version: where Astro emits its own, a second pair was a duplicate the compiler resolved in favour of its own shifted loc; where Astro emits none — Astro 7, or 5/6 with the dev toolbar off — it was one absolute path per element naming the developer's home directory, and 21.9% of a measured page. Tooling that reads `data-astro-source-*` gets on Astro 7 what stock Astro 7 gives it, which is nothing ([#76](https://github.com/janjcwebtech/astro-dev-edit/issues/76))
